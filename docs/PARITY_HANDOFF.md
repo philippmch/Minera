@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DO (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DP (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6536,6 +6536,79 @@ probes, the dumps and the fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped (the Mac was
 offline).
+
+Round DP re-reviewed DO (Review DP1). DO's commit ed4809e ran CI run
+44123697378 (green on all six jobs). DP probed iterated arguments in the Polars table
+filters, dict keys in the Polars sequence filters and the attribute counts,
+and date strings and datetime bounds in the pandas filters, and replayed
+two batches of fresh seeds:
+- Iterated arguments in the Polars table filters (probes tp1, 2,796 calls
+  each way, and tp2, 1,602): the native filters already matched but for
+  twelve `paths.apply` calls with a tuple-keyed dict (outside the native
+  dict carrier, declared) and the dict attribute keys below.
+- Dict keys in the sequence filters beyond the variant filters (probe sv3,
+  3,694 calls each way): the start and end activity filters' group_by
+  refuses a dict case key (a DataFrame's after pl.col(activity)) and reads
+  a dict activity key as its keys; eager rework fails with a DuplicateError
+  when a dict case key's struct literal meets a literal activity key. 562
+  lazy and 1,192 eager calls -> 0.
+- Dict attribute keys (probe tp3, 1,400 calls each way):
+  `get_attribute_values` refuses them at once; the relative occurrence
+  filter per case checks its case key first (a set refused, on an eager
+  frame a missing column or a second `literal`); the attribute filters
+  read pl.col(dict) as its names, so several names expand the predicate.
+  515 lazy and 645 eager calls -> 0.
+- Date strings against pandas datetime64 columns (probes n2, 9,394 calls,
+  and n3, 4,200 random strings): an ISO-8601 text compares as its
+  Timestamp (a naive one localized to an aware column, an aware one
+  refused by a naive column), the NaT texts match nothing, short numbers
+  are refused; the LTL `timestamp_diff_boundaries` compares a datetime
+  bound row by row; the case size filter names float64 sizes. n2 1,754 ->
+  288, all native refusals of texts only pandas' dateutil fallback reads
+  (declared), as are n3's 3,042.
+- Fresh seeds 2026120900-11: three reference-random calls (two struct-cast
+  races the bank test accepts, one equal-size rework join order);
+  2026120912-23: four such calls (three struct-cast races, one two-case
+  `suffixes.apply` join order). Nothing to fix.
+
+In the suite: new `docs/polars-filter-dp-bank.json.gz` (11,572 calls),
+`docs/polars-sequence-filter-dp-bank.json.gz` (7,388 calls) and
+`docs/pandas-filter-dp-bank.json.gz` (10,264 calls) with their ctests. The
+probes, the dumps and the fresh banks are in the project files under
+`review-harness/round-dp/`.
+
+No fixture changed. The device check on the Mac was skipped (the Mac was
+not linked).
+
+Next round (DQ) should start by re-reviewing round DP:
+
+- DP's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- dict keys with non-str keys (`{1: "a"}`, `{None: 1}`) as attribute, case
+  and activity keys in the Polars filters (pl.col names the key's type;
+  the bank transport keeps only the key text, so the transport needs a
+  typed key first), and tuple-keyed dicts in `paths.apply` (DP1-1);
+- date strings in the other pandas filters that compare with a
+  datetime64 column (between, timestamp, case performance) and datetime64
+  columns of other units (`ns`, `ms`) in the numeric filters; whether a
+  small dateutil subset (month names, `1e3`) is worth modelling (DP1-4);
+- the eager paths performance race on frames of four rows or more (DO1-2,
+  declared) and the thread-count quirk of DN1-6 (declared);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DO's targets, taken in DP (findings DP1-1 to DP1-5): DO's CI run,
+the fresh seeds, iterated arguments in the Polars table filters, dict keys
+in the other sequence filters, and date strings and datetime bounds in the
+pandas filters; also dict attribute keys in the attribute counts. Not
+taken (carried to DQ): the eager paths race, the thread-count quirk of
+DN1-6, the CU list, the new dtypes and the open choices.
+
+Previous list for round DP (kept for its older items):
 
 Next round (DP) should start by re-reviewing round DO:
 

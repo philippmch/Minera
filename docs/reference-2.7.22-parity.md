@@ -30436,3 +30436,128 @@ Tests:
   the 75 pandas, attribute and review tests again after it (596 tests in
   all with the new pandas bank). Python script tests not rerun (scripts
   unchanged); the workbench fixture replay gave 2,673 responses unchanged.
+
+## Review DP1: re-review of round DO, iterated arguments in the Polars table filters, dict keys in the Polars sequence filters and the attribute counts, date strings and datetime bounds in the pandas filters, fresh seeds (2026-11-17)
+
+Round DP checked DO's CI (run 44123697378 on ed4809e: green on all six
+jobs), probed str, dict, set and tuple arguments in the Polars table
+filters that take value lists, dict case and activity keys in the
+sequence filters beyond the variant filters, dict attribute keys in the
+attribute counts and filters, and date strings and datetime bounds in the
+pandas filters against datetime64 columns, and replayed two batches of
+fresh seeds. The device check on the Mac was skipped (the Mac was not
+linked).
+
+- **DP1-1 Arguments Python iterates in the Polars table filters** (probes
+  `dp/specs/tp1.py`, 2,796 calls eagerly and lazily over six frames: str,
+  dict, set and tuple values in the attribute, between, LTL and paths
+  filters, nested and empty ones; `dp/specs/tp2.py`, 1,602 calls each
+  way: `most_common_variant`, `act_count0`, `timestamp_diff_boundaries`,
+  the A_next_B_next_C and four_eyes values, `variants.apply`,
+  `apply_from_variant_list` and top-k). The native filters already
+  matched all but two shapes: twelve `paths.apply` calls with a dict keyed
+  by tuples (the native dict carrier holds text keys only; declared, left
+  out of the bank) and the dict attribute keys of DP1-3.
+- **DP1-2 Dict keys in the sequence filters beyond the variant filters**
+  (probe `dp/specs/sv3.py`, 3,694 calls eagerly and lazily: dict case and
+  activity keys beside str, list, None and scalar ones in rework,
+  activity_split, the start and end activity filters and the case
+  grouping filters). Observed and modelled
+  (`polars_sequence_filters.cpp`):
+  - the start and end activity filters' group_by refuses a dict case key
+    (`Cannot pass a dictionary as a single positional argument`), a
+    LazyFrame's at once, a DataFrame's when agg runs, after the
+    aggregation's pl.col(activity);
+  - a dict activity key there is pl.col of its keys, as the list of them
+    (before, refused natively);
+  - rework on an eager frame builds a dict case key's struct literal
+    beside a literal activity key (a constant one, or a dict or list in
+    `apply_activity_set`), both named `literal`, so the group_by fails
+    with a DuplicateError; lazily the plan of `apply_activity_set`'s
+    DuplicateError shows the activity filter below the group_by;
+  - the bank test passes dict case and activity keys of the end activity
+    filters to the value overloads.
+  sv3: 562 lazy and 1,192 eager calls -> 0.
+- **DP1-3 Dict attribute keys in the attribute counts and filters**
+  (probe `dp/specs/tp3.py`, 1,400 calls each way: five dict keys, empty
+  ones and several names, beside eight case key shapes). Observed and
+  modelled (`polars_attributes_filter.cpp`):
+  - `get_attribute_values` refuses a dict key at once
+    (`Cannot pass a dictionary as a single positional argument`), on a
+    LazyFrame and a DataFrame, empty or not;
+  - the relative occurrence filter per case groups by [case, dict]: a set
+    case key is refused first as pl.lit builds it; on an eager frame the
+    group_by runs with the dict's struct literal, so a missing case column
+    fails by name and a literal case key (int, list, dict) repeats the
+    name `literal` (DuplicateError) before the dict is refused;
+  - the attribute filters (`apply`, `apply_events`, `apply_numeric`,
+    `filter_df_on_attribute_values`) read pl.col(dict) as the list of the
+    dict's names, so several existing names expand the predicate
+    (`The predicate passed to 'LazyFrame.filter' expanded to multiple
+    expressions`) as a list of names does (round DD).
+  tp3: 515 lazy and 645 eager calls -> 0; tp2: 24 each way -> 0.
+- **DP1-4 Date strings against datetime64 columns in the pandas filters**
+  (probe `probe/specs/n2.py`, 9,394 calls over seven CK frames: 22 date
+  strings as either bound of the numeric filters on a datetime64, a float
+  and a str column, and datetime and str bounds in the timestamp, case,
+  paths, LTL and other filters that compare; probe `n3.py`, 4,200 random
+  date-like strings in the numeric event filter). Observed on pandas 3.0.5
+  and modelled (`pandas_attributes_filter.cpp`, `pandas_ltl_filter.cpp`,
+  `pandas_case_filter.cpp`):
+  - a str bound against a datetime64 column is the Timestamp pandas
+    parses from it: the NaT texts (`NaT`, `nan`, `NaN`, empty) match no
+    row; an ISO-8601 text (a year, a year and month, a date with one- or
+    two-digit fields or eight digits, an hour, minutes with or without a
+    colon, seconds with a fraction, then `Z`, an offset or `UTC`)
+    compares as its instant, a naive one in an aware column's zone (a
+    wall time the zone skips or repeats is refused); a naive column
+    refuses an aware text; a field out of range fails; a text that reads
+    as a number below 1000 (unless it starts with `0`) and the letters
+    `a`, `m`, `p`, `t` are refused at once, while four digits or more
+    read as a year;
+  - the LTL `timestamp_diff_boundaries` with a datetime bound compares the
+    float differences with it row by row (`'>=' not supported between
+    instances of 'float' and 'datetime.datetime'`), so a frame without
+    differences keeps its rows;
+  - the case size filter names float64 sizes (a NaN case id) in a str
+    bound's comparison error.
+  n2: 1,754 -> 288 and n3: 3,042 left, all native refusals of texts only
+  pandas' dateutil fallback reads (`abc`, `1e3`, `March 1 2021`, random
+  shapes); no wrong outputs. Declared: Minera does not reproduce the
+  dateutil fallback.
+- **DP1-5 Fresh seeds.** Batch 1 (2026120900-11, twelve banks): three
+  calls differ in a strict replay, all reference-random: two struct-cast
+  races (CK 2026120901 case 625, CJ 2026120903 case 629; the comparison
+  error where the native filters give the majority cast error, accepted
+  by the bank test's leniency) and one `rework.apply` equal-size join row
+  order (sequence CH 2026120908 case 905, as DO1-5). Batch 2
+  (2026120912-23, twelve banks): four calls, again all reference-random:
+  three struct-cast races (CJ 2026120915 cases 241 and 434, CK 2026120913
+  case 40) and one `suffixes.apply` join on two cases whose rows came back
+  in the other order (sequence CP 2026120912 case 399; the same call with
+  the list reordered varied across the reference's own runs). No fix
+  needed.
+
+Declared:
+- `paths.apply` with a tuple-keyed dict (DP1-1).
+- Date strings only pandas' dateutil fallback reads (DP1-4): refused
+  natively.
+- The seven reference-random calls of DP1-5.
+- Still declared from earlier rounds: the eager paths performance race on
+  four rows or more (DO1-2), the thread-count quirk of DN1-6.
+
+Tests:
+- New: `docs/polars-filter-dp-bank.json.gz` (11,572 calls in 34 cases:
+  every call of tp1, tp2 and tp3 eagerly and lazily, the declared paths
+  calls left out), `docs/polars-sequence-filter-dp-bank.json.gz` (7,388
+  calls in 12 cases: sv3 eagerly and lazily) and
+  `docs/pandas-filter-dp-bank.json.gz` (10,264 calls in nine cases: n2
+  and n3 without the native refusals), replayed by
+  `minera_polars_filter_dp_bank_parity_tests`,
+  `minera_polars_sequence_filter_dp_bank_parity_tests` and
+  `minera_pandas_filter_dp_bank_parity_tests`.
+- All docs Polars table, Polars sequence, pandas table and pandas
+  sequence banks replay clean with the changes.
+- Full suite: 599 tests passed. Python script and frontend tests not
+  rerun (scripts and frontend unchanged); the workbench fixture replay
+  gave 2,673 responses unchanged.

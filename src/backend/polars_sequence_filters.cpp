@@ -1134,12 +1134,18 @@ Counts end_counts(const EventTable& df, const Value& case_key, const Value& act_
     scalar_range(case_key);
     return end_counts(df, scalar_as_list(case_key), act_value);
   }
+  // Round DP (probe dp/sv3): group_by refuses a dict case key, a
+  // LazyFrame's at once, a DataFrame's when agg runs, after the
+  // aggregation's pl.col(activity).
+  if (case_key.kind == Kind::kDict) {
+    if (eager()) check_col_list(&act_value);
+    dict_argument_error();
+  }
   const bool listed = list_value(&case_key);
   if (!listed && case_key.kind != Kind::kString)
     throw std::invalid_argument("Native Polars end activity counts outside the observed case key domain");
   // Round DI: pl.col refuses a scalar activity key other than a str (below).
-  if (act_value.kind == Kind::kDict)
-    throw std::invalid_argument("Native Polars end activity counts outside the observed activity key domain");
+  // Round DP: a dict activity key is pl.col of its keys, as a list of them.
   // Round DI: the case key's literals, then pl.col of the activity, before
   // the repeated-name refusal (probe big-plseqck case 138).
   if (listed && !eager()) (void)gk::build_values(case_key.items);
@@ -1672,6 +1678,13 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
       case_column == act)
     fail("DuplicateError", gk::duplicate_message(act_key) + (eager() ? resolved("group_by", frame_plan(df.columns), {"group_by"})
                                                                      : resolved("join", frame_plan(df.columns), kReworkPlan.stack)));
+  // Round DP (probe dp/sv3): the eager group_by builds a dict case key's
+  // struct literal beside a literal activity key (a constant one, or a dict
+  // or list in apply_activity_set): both are named "literal".
+  const bool literal_group =
+      constant_act || (activities && raw_act && (raw_act->kind == Kind::kDict || list_value(raw_act)));
+  if (eager() && dict_case && literal_group)
+    fail("DuplicateError", gk::duplicate_message("literal") + resolved("group_by", frame_plan(df.columns), {"group_by"}));
   if (eager() && !list_key) count_step();
   // Round DM: the count filter's comparison failures; on an eager frame it
   // runs before the select and join resolve a list case key's items.
@@ -1703,14 +1716,16 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   };
   std::optional<gk::Keys> keys;
   // Round DM: apply_activity_set groups by a dict or list activity key as
-  // its literal too (probe e922 case 253).
-  const bool literal_group =
-      constant_act || (activities && raw_act && (raw_act->kind == Kind::kDict || list_value(raw_act)));
+  // its literal too (probe e922 case 253; literal_group above).
   if (list_key) {
     // Two literal keys (the list case key and a dict or list activity key)
     // share the name "literal". Round DM: on an eager frame the group_by
-    // runs before the count filter is built.
-    if (literal_group) fail("DuplicateError", gk::duplicate_message("literal") + resolved("join", frame_plan(df.columns), kReworkPlan.stack));
+    // runs before the count filter is built. Round DP (probe dp/sv3): a
+    // LazyFrame's plan shows the activity filter below the group_by.
+    if (literal_group)
+      fail("DuplicateError", gk::duplicate_message("literal") +
+                                 resolved("join", activities && !eager() ? plan.above + "\n  " + frame_plan(df.columns) : frame_plan(df.columns),
+                                          kReworkPlan.stack));
     if (eager()) {
       count_step();
       compare_step(eager_rows());

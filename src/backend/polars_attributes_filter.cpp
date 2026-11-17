@@ -329,6 +329,13 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
     // name by name, a repeated one once, one name that column; probe
     // set-ddsc-5).
     const bool selecting=numeric(op)||op==Op::kTraces||op==Op::kEvents||op==Op::kOnValues;
+    // Round DP: pl.col(dict) selects the dict's names as a list of them does,
+    // so several existing names expand the predicate (probe dp/tp3).
+    if(selecting&&mapping(call.options.attribute_key)&&!call.options.attribute_key.children.empty()) {
+      EventAttribute names{call.options.attribute_key.key,""};names.container=AttributeContainerKind::kList;
+      for(const auto& item:call.options.attribute_key.children)names.children.push_back(EventAttribute{"",item.key});
+      call.options.attribute_key=names;
+    }
     const bool listed=selecting&&name_list(call.options.attribute_key);
     const bool expanded=selecting&&expanded_key(call.options.attribute_key,columns);
     if(expanded)call.options.attribute_key=distinct_names(call.options.attribute_key);
@@ -2007,6 +2014,25 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
   const bool explicit_cache=op==Op::kThreshold&&call.count_cache&&!(std::holds_alternative<EventAttribute>(*call.count_cache)&&null(std::get<EventAttribute>(*call.count_cache)));
   CountColumn schema;
   if(!explicit_cache) {
+    // Round DP: per case, group_by([case, dict]) builds the case key's
+    // literal first, a set refused there; on an eager frame the group_by
+    // runs with the dict's struct literal, so a missing case column fails
+    // by name and a literal case key repeats the name `literal`, before the
+    // dict is refused (probe dp/tp3).
+    if(mapping(attr)&&op==Op::kRelative&&options.keep_once_per_case&&truth(*options.keep_once_per_case)) {
+      const auto& key=options.case_id_key;
+      if(detail::polars_lit::set_argument(key))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
+      if(eager) {
+        const std::vector<std::string> groupnodes{"'group_by'","'group_by'"};
+        if(mapping(key))if(const auto error=detail::polars_lit::dict_literal_error(key))fail("TypeError","apply",*error);
+        if(key.container==AttributeContainerKind::kList||key.container==AttributeContainerKind::kTuple)
+          if(const auto error=detail::polars_lit::argument_literal_error(key))fail("TypeError","apply",*error);
+        if(detail::polars_lit::scalar_too_large(key))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
+        if(const auto error=detail::polars_lit::dict_literal_error(attr))fail("TypeError","apply",*error);
+        if(text(key)&&!index_of(source,key.value))fail("ColumnNotFoundError","apply",column_prefix(source,key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
+        if(!text(key))fail("DuplicateError","apply","group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved("'group_by'",frame_plan(source),groupnodes));
+      }
+    }
     // Round CM: group_by refuses a dict key while the plan is built.
     dict_argument(attr);
     // Round DG: group_by builds an int key as pl.lit, which refuses one past
@@ -2247,6 +2273,9 @@ LazyEventTable deferred(const LazyEventTable& source,std::function<EventTable(co
 PolarsAttributesFilterResult invoke_polars_attributes_filter(const EventTable& source,const PolarsAttributesFilterCall& input) {
   try {
     source.validate();const auto call=prepare(input,source.columns,true);
+    // Round DP: get_attribute_values' group_by refuses a dict key at once
+    // (probe dp/tp3).
+    if(call.operation==Op::kCounts)dict_argument(*call.attribute);
     if(call.operation==Op::kCounts){const auto schema=counts_schema(source,*call.attribute,call.options,false,true,true);(void)schema;fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");}
     if(statistics(call.operation)){const auto selected=stats(source,call,true);return stats_output(source,call,selected,true);}
     const auto query=predicate(source,call,true);return filtered(source,query);
@@ -2258,6 +2287,7 @@ PolarsAttributesFilterResult invoke_polars_attributes_filter(const EventTable& s
 LazyPolarsAttributesFilterResult invoke_polars_attributes_filter(const LazyEventTable& source,const PolarsAttributesFilterCall& input) {
   const auto call=prepare(input,source.columns());const auto meta=metadata_table(source);meta.validate();
   if(call.operation==Op::kCounts) {
+    dict_argument(*call.attribute);
     const auto schema=counts_schema(meta,*call.attribute,call.options,false,true);
     return counts_from(source.materialize(),schema);
   }

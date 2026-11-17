@@ -298,6 +298,9 @@ double duration(const EventAttribute& a,const EventAttribute& b){
  const auto ns=(TokenInteger(y->seconds)-TokenInteger(x->seconds))*TokenInteger(1'000'000'000)+(TokenInteger(y->nanoseconds)-TokenInteger(x->nanoseconds));
  return static_cast<double>(ns)/1e9;
 }
+bool row_wise_bound(const EventAttribute& bound){
+ return !bound.is_null&&bound.container==AttributeContainerKind::kScalar&&bound.kind==AttributeKind::kDate;
+}
 bool temporal_bound(double value,const EventAttribute& bound,bool lower,bool eager=false){
  if(missing(bound))return false;
  // Round CK: a dict bound compares row by row, so only a step with rows
@@ -305,6 +308,12 @@ bool temporal_bound(double value,const EventAttribute& bound,bool lower,bool eag
  if(bound.container==AttributeContainerKind::kContainer&&!bound.is_null){
   if(eager)return false;
   error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'float' and 'dict'");
+ }
+ // Round DP (probe dp/n2): so does a datetime (pandas compares the float
+ // differences with it as objects).
+ if(row_wise_bound(bound)){
+  if(eager)return false;
+  error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'float' and 'datetime.datetime'");
  }
  if(!numeric(bound))error("TypeError","Invalid comparison between dtype=float64 and "+type_name(bound));
  const auto number=native_attribute_number(bound);
@@ -355,7 +364,7 @@ std::vector<bool> compare_step(const std::vector<double>& differences,const Even
   return result;
  }
  if(missing(bound))return result;
- if(bound.container==AttributeContainerKind::kContainer&&!bound.is_null&&differences.empty())return result;
+ if(((bound.container==AttributeContainerKind::kContainer&&!bound.is_null)||row_wise_bound(bound))&&differences.empty())return result;
  for(std::size_t j=0;j<differences.size();++j)result[j]=temporal_bound(differences[j],bound,lower);
  if(differences.empty())temporal_bound(0.0,bound,lower,true);
  return result;
@@ -365,7 +374,7 @@ bool dict_bounds(const EventAttribute& boundaries,std::size_t steps){
  for(std::size_t i=0;i+1<steps&&i<boundaries.children.size();++i){
   const auto& bound=boundaries.children[i];
   if(bound.is_null||(bound.container!=AttributeContainerKind::kList&&bound.container!=AttributeContainerKind::kTuple))continue;
-  for(std::size_t j=0;j<2&&j<bound.children.size();++j)if(!bound.children[j].is_null&&bound.children[j].container==AttributeContainerKind::kContainer)return true;
+  for(std::size_t j=0;j<2&&j<bound.children.size();++j)if((!bound.children[j].is_null&&bound.children[j].container==AttributeContainerKind::kContainer)||row_wise_bound(bound.children[j]))return true;
  }
  return false;
 }

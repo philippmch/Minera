@@ -247,7 +247,9 @@ EventTable subset(const EventTable& source,const std::vector<bool>& keep){
 // Round CK: an object bound compares with each per-row size, so an empty
 // frame never fails, and a size Series with a missing case is float64.
 void validate_bound(const EventAttribute& bound,bool lower,bool duration,std::size_t rows=1,bool float_sizes=false){
- const std::string dtype=duration?"float64":"int64";
+ // Round DP (probe dp/n2): the float64 sizes name their dtype in a str's
+ // comparison error too.
+ const std::string dtype=duration||float_sizes?"float64":"int64";
  if(text_value(bound))error("TypeError","Invalid comparison between dtype="+dtype+" and str");
  if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",std::string(lower?"'>='":"'<='")+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
  if(!bound.is_null&&!numeric(bound)){

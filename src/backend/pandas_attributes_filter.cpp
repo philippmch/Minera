@@ -4,11 +4,14 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <limits>
 #include <numeric>
 #include <optional>
 #include <regex>
+#include <stdexcept>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -356,7 +359,143 @@ void dict_operand(const EventAttribute& operand,std::size_t rows,const std::stri
 // op is one of ">=", "<=", "<", ">" (value op bound).
 // Per-row bounds. A tuple is an array operand: a str column needs equal
 // lengths, other columns broadcast one item (or one row) with numpy.
+// Round DP: a str bound against a datetime64 column is the Timestamp pandas
+// parses from it (probe dp/n2): the NaT texts match no row, an ISO-8601 text
+// compares as its instant (a naive one in an aware column's zone, which
+// refuses a wall time the zone skips or repeats; a naive column refuses an
+// aware text). Texts outside ISO-8601 go through pandas' dateutil fallback,
+// which Minera does not reproduce: they throw std::invalid_argument.
+std::string exact_instant_text(const ParsedExactTimestamp& at){
+ const std::int64_t days=at.seconds>=0?at.seconds/86400:-((-at.seconds+86399)/86400);
+ const std::int64_t rest=at.seconds-days*86400;
+ // civil_from_days (H. Hinnant)
+ const std::int64_t z=days+719468;const std::int64_t era=(z>=0?z:z-146096)/146097;const std::int64_t doe=z-era*146097;
+ const std::int64_t yoe=(doe-doe/1460+doe/36524-doe/146096)/365;std::int64_t y=yoe+era*400;const std::int64_t doy=doe-(365*yoe+yoe/4-yoe/100);
+ const std::int64_t mp=(5*doy+2)/153;const std::int64_t d=doy-(153*mp+2)/5+1;const std::int64_t m=mp<10?mp+3:mp-9;if(m<=2)++y;
+ char buffer[64];
+ std::snprintf(buffer,sizeof buffer,"%04lld-%02lld-%02lldT%02lld:%02lld:%02lld.%09u",static_cast<long long>(y),static_cast<long long>(m),static_cast<long long>(d),
+               static_cast<long long>(rest/3600),static_cast<long long>(rest/60%60),static_cast<long long>(rest%60),static_cast<unsigned>(at.nanoseconds));
+ return std::string(buffer)+(at.timezone_aware?"+00:00":"");
+}
+// The texts pandas reads as a Timestamp in the ISO shapes it accepts
+// (observed on pandas 3.0.5): a year, a year and month, a date with one- or
+// two-digit month and day or as eight digits, then a time of an hour, hours
+// and minutes (with or without a colon), seconds and a fraction (nine digits
+// kept), then Z, an offset or UTC (a space allowed before). A field out of
+// range fails (no fallback rescues it); nullopt: not one of these shapes.
+struct TextTimestamp{bool refused=false;std::optional<ParsedExactTimestamp> at;};
+std::optional<TextTimestamp> iso_text_timestamp(std::string_view s){
+ std::size_t p=0;
+ const auto digits=[&](std::size_t lo,std::size_t hi,int& out)->bool{
+  std::size_t n=0;out=0;
+  while(p<s.size()&&n<hi&&std::isdigit(static_cast<unsigned char>(s[p]))){out=out*10+(s[p]-'0');++p;++n;}
+  return n>=lo;
+ };
+ int year=0,month=1,day=1,hour=0,minute=0,second=0;std::uint32_t nanos=0;
+ const auto start=p;
+ if(!digits(4,4,year))return std::nullopt;
+ bool range=true;
+ if(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p]))){
+  // eight digits
+  if(!digits(2,2,month)||!digits(2,2,day))return std::nullopt;
+  if(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p])))return std::nullopt;
+ }else if(p<s.size()&&s[p]=='-'){
+  ++p;if(!digits(1,2,month))return std::nullopt;
+  if(p<s.size()&&s[p]=='-'){++p;if(!digits(1,2,day))return std::nullopt;}
+  else if(p!=s.size())return std::nullopt;
+ }else if(p!=s.size())return std::nullopt;
+ (void)start;
+ static const int month_days[]={31,28,31,30,31,30,31,31,30,31,30,31};
+ const bool leap=(year%4==0&&year%100!=0)||year%400==0;
+ if(month<1||month>12)range=false;
+ else if(day<1||day>month_days[month-1]+(month==2&&leap?1:0))range=false;
+ bool aware=false;int offset=0;
+ if(p<s.size()){
+  if(s[p]!='T'&&s[p]!=' ')return std::nullopt;
+  ++p;
+  if(!digits(2,2,hour))return std::nullopt;
+  if(p<s.size()&&s[p]==':'){++p;if(!digits(2,2,minute))return std::nullopt;
+   if(p<s.size()&&s[p]==':'){++p;if(!digits(2,2,second))return std::nullopt;
+    if(p<s.size()&&s[p]=='.'){++p;std::size_t n=0;while(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p]))){if(n<9)nanos=nanos*10+static_cast<std::uint32_t>(s[p]-'0');++n;++p;}
+     for(;n<9;++n)nanos*=10;}
+   }
+  }else if(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p]))){if(!digits(2,2,minute))return std::nullopt;}
+  if(hour>23||minute>59||second>59)range=false;
+  if(p<s.size()&&s[p]==' ')++p;
+  if(p<s.size()){
+   if(s.substr(p)=="Z"||s.substr(p)=="UTC"){aware=true;p=s.size();}
+   else if(s[p]=='+'||s[p]=='-'){
+    const int sign=s[p]=='-'?-1:1;++p;int oh=0,om=0;
+    if(!digits(2,2,oh))return std::nullopt;
+    if(p<s.size()&&s[p]==':')++p;
+    if(p<s.size()&&!digits(2,2,om))return std::nullopt;
+    if(p!=s.size()||oh>23||om>59)return std::nullopt;
+    aware=true;offset=sign*(oh*60+om);
+   }else return std::nullopt;
+  }
+ }
+ if(!range)return TextTimestamp{true,std::nullopt};
+ char buffer[48];
+ std::snprintf(buffer,sizeof buffer,"%04d-%02d-%02dT%02d:%02d:%02d",year,month,day,hour,minute,second);
+ auto parsed=parse_timestamp_exact(buffer);
+ if(!parsed)return std::nullopt;
+ parsed->nanoseconds=nanos;
+ if(aware){parsed->seconds-=static_cast<std::int64_t>(offset)*60;parsed->timezone_aware=true;parsed->offset_minutes=offset;}
+ return TextTimestamp{false,parsed};
+}
+// Pandas refuses at once a text that reads as a number below 1000 (a float
+// of digits, then an optional fraction and exponent, spaces around), unless
+// it starts with "0", and the one letters a, m, p and t.
+bool unlikely_datetime_text(std::string_view s){
+ if(s=="a"||s=="A"||s=="m"||s=="M"||s=="p"||s=="P"||s=="t"||s=="T")return true;
+ if(s.empty()||s.front()=='0')return false;
+ std::size_t p=0;while(p<s.size()&&s[p]==' ')++p;
+ const auto begin=p;
+ if(p<s.size()&&(s[p]=='+'||s[p]=='-'))++p;
+ const auto int_start=p;while(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p])))++p;
+ if(p==int_start)return false;
+ // Four digits or more without a fraction or exponent read as a year first
+ // (probe dp/n3: "-1172" is the year -1172).
+ const bool year=p-int_start>=4;
+ if(p<s.size()&&s[p]=='.'){++p;while(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p])))++p;}
+ else if(year&&(p==s.size()||(s[p]!='e'&&s[p]!='E')))return false;
+ if(p<s.size()&&(s[p]=='e'||s[p]=='E')){
+  ++p;if(p<s.size()&&(s[p]=='+'||s[p]=='-'))++p;
+  const auto e=p;while(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p])))++p;
+  if(p==e)return false;
+ }
+ const auto end=p;while(p<s.size()&&s[p]==' ')++p;
+ if(p!=s.size())return false;
+ return std::strtod(std::string(s.substr(begin,end-begin)).c_str(),nullptr)<1000;
+}
+EventAttribute datetime_text_bound(const EventAttribute& bound,const std::string& dtype){
+ const std::string_view text=bound.value;
+ if(text.empty()||text=="NaT"||text=="nat"||text=="NAT"||text=="NaN"||text=="nan"||text=="NAN"){
+  EventAttribute nat{bound.key,"NaT",AttributeKind::kDate,true};return nat;
+ }
+ const auto refuse=[&]{error("TypeError","Invalid comparison between dtype="+dtype+" and str");};
+ if(unlikely_datetime_text(text))refuse();
+ auto trimmed=text;
+ while(!trimmed.empty()&&(trimmed.front()==' '||trimmed.front()=='\t'))trimmed.remove_prefix(1);
+ while(!trimmed.empty()&&(trimmed.back()==' '||trimmed.back()=='\t'))trimmed.remove_suffix(1);
+ const auto read=iso_text_timestamp(trimmed);
+ if(!read)throw std::invalid_argument("a date string outside the ISO shapes against a pandas datetime64 column (pandas' dateutil fallback) is outside the native domain");
+ if(read->refused)refuse();
+ auto parsed=read->at;
+ const auto comma=dtype.find(", ");
+ const bool aware=comma!=std::string::npos&&dtype.ends_with("]");
+ if(aware&&!parsed->timezone_aware){
+  const auto nanos=parsed->nanoseconds;
+  parsed=localize_timestamp_wall_time(*parsed,dtype.substr(comma+2,dtype.size()-comma-3));
+  if(!parsed)refuse();
+  parsed->nanoseconds=nanos;
+ }
+ if(!aware&&parsed->timezone_aware)refuse();
+ return EventAttribute{bound.key,exact_instant_text(*parsed),AttributeKind::kDate};
+}
 std::vector<EventAttribute> row_bounds(const EventAttribute& bound,std::size_t rows,const std::string& dtype){
+ if(text_value(bound)&&bound.container==AttributeContainerKind::kScalar&&!bound.is_null&&dtype.starts_with("datetime64"))
+  return std::vector<EventAttribute>(rows,datetime_text_bound(bound,dtype));
  if(text_value(bound)&&dtype!="object"&&dtype!="str")error("TypeError","Invalid comparison between dtype="+dtype+" and str");
  // Round DO: a datetime64 column refuses None, a number and a datetime of
  // the other time-zone kind (naive against aware or the reverse) as a

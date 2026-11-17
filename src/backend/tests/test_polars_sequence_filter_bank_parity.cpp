@@ -482,8 +482,9 @@ Json end_activities_module(const std::string& function, const Table& df, const A
     const auto* act = keyword(kwargs, "activity_key");
     const auto* list_glue = keyword(kwargs, "case_id_glue");
     const auto tag = [](const Json* node) { return node ? node->fields.begin()->first : std::string("s"); };
-    if (tag(list_glue) == "l" || tag(list_glue) == "t" || tag(list_glue) == "S" || tag(act) == "S" || tag(act) == "l" || tag(act) == "t" ||
-        scalar_case_tag(list_glue) || scalar_activity_tag(act)) {
+    // Round DP (probe dp/sv3): and so do dict keys.
+    if (tag(list_glue) == "l" || tag(list_glue) == "t" || tag(list_glue) == "S" || tag(list_glue) == "m" || tag(act) == "S" ||
+        tag(act) == "l" || tag(act) == "t" || tag(act) == "m" || scalar_case_tag(list_glue) || scalar_activity_tag(act)) {
       return table_node(polars_filter_df_on_end_activities(df, value_of(*args.at(0)), list_glue ? value_of(*list_glue) : PandasFilterValue::of("case:concept:name"),
                                                            act ? value_of(*act) : PandasFilterValue::of("concept:name"),
                                                            positive ? value_of(*positive) : PandasFilterValue::of(true)));
@@ -492,10 +493,11 @@ Json end_activities_module(const std::string& function, const Table& df, const A
                                                          positive ? value_of(*positive) : PandasFilterValue::of(true)));
   }
   // Round DC: set, list or tuple keys go through the PolarsFilterValue overloads.
+  // Round DP (probe dp/sv3): so do dict keys.
   const auto listed_key = [](const Json* node) {
     if (!node) return false;
     const auto& tag = node->fields.begin()->first;
-    return tag == "S" || tag == "l" || tag == "t";
+    return tag == "S" || tag == "l" || tag == "t" || tag == "m";
   };
   const auto listed_case = [&](const Json* node) { return listed_key(node) || scalar_case_tag(node); };
   const auto listed_activity = [&](const Json* node) { return listed_key(node) || scalar_activity_tag(node); };
