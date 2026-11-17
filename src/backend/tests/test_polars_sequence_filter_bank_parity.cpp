@@ -563,7 +563,8 @@ std::optional<std::pair<PandasFilterValue, PandasFilterValue>> set_variants_keys
   const auto* c = keyword(kwargs, "case_id_key");
   const auto* a = keyword(kwargs, "activity_key");
   const auto tag = [](const Json* node) { return node ? node->fields.begin()->first : std::string("s"); };
-  const auto listed = [&](const Json* node) { return tag(node) == "S" || tag(node) == "l" || tag(node) == "t"; };
+  // Round DO: dicts too.
+  const auto listed = [&](const Json* node) { return tag(node) == "S" || tag(node) == "l" || tag(node) == "t" || tag(node) == "m"; };
   if (!listed(c) && !listed(a) && !scalar_case_tag(c) && !scalar_activity_tag(a)) return std::nullopt;
   return std::pair{c ? value_of(*c) : PandasFilterValue::of("case:concept:name"),
                    a ? value_of(*a) : PandasFilterValue::of("concept:name")};

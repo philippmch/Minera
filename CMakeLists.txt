@@ -3256,6 +3256,14 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_dn_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dn-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_dn_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DO: the variant filters' v1 shapes (literal, list, None and dict
+  # case keys, dict activity keys, get_variants_df), str/dict/set/tuple
+  # arguments Python iterates, scalar activities in activity_split, and
+  # eager probes over the set, big-int and scalar domains on frames with a
+  # `literal` column.
+  add_test(NAME minera_polars_sequence_filter_do_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-do-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_do_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3516,6 +3524,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dn_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dn-bank.json.gz")
   set_tests_properties(minera_polars_filter_dn_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DO: the struct-cast partition race in the case size and
+  # performance filters and the paths performance filter (eager and lazy).
+  add_test(NAME minera_polars_filter_do_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-do-bank.json.gz")
+  set_tests_properties(minera_polars_filter_do_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3795,6 +3808,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_dk_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dk-bank.json.gz")
   set_tests_properties(minera_pandas_filter_dk_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DO: the numeric attribute filters with datetime, None and int
+  # bounds against every column (NaN float cells, datetime64 columns; fresh
+  # CK 2026120821 case 166, probe n1).
+  add_test(NAME minera_pandas_filter_do_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-do-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_do_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

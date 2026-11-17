@@ -358,6 +358,15 @@ void dict_operand(const EventAttribute& operand,std::size_t rows,const std::stri
 // lengths, other columns broadcast one item (or one row) with numpy.
 std::vector<EventAttribute> row_bounds(const EventAttribute& bound,std::size_t rows,const std::string& dtype){
  if(text_value(bound)&&dtype!="object"&&dtype!="str")error("TypeError","Invalid comparison between dtype="+dtype+" and str");
+ // Round DO: a datetime64 column refuses None, a number and a datetime of
+ // the other time-zone kind (naive against aware or the reverse) as a
+ // whole, before any row compares (probe n1).
+ if(dtype.starts_with("datetime64")&&bound.container==AttributeContainerKind::kScalar&&!is_native_na_attribute(bound)){
+  const bool aware=dtype.find(',')!=std::string::npos;
+  bool refused=(bound.is_null&&!date_value(bound))||(!bound.is_null&&numeric(bound));
+  if(!bound.is_null&&date_value(bound))if(const auto at=instant(bound))refused=at->timezone_aware!=aware;
+  if(refused)error("TypeError","Invalid comparison between dtype="+dtype+" and "+type_name(bound));
+ }
  dict_operand(bound,rows,dtype);
  if(bound.container==AttributeContainerKind::kList){
   if(bound.children.size()!=rows)error("ValueError","('Lengths must match to compare', ("+std::to_string(rows)+",), ("+std::to_string(bound.children.size())+",))");
@@ -377,7 +386,10 @@ std::vector<EventAttribute> row_bounds(const EventAttribute& bound,std::size_t r
 bool comparison(const EventAttribute& value,const EventAttribute& bound,const std::string& op,const std::string& dtype){
  // Round CK: a NaN cell of a float column still compares with a dict, list
  // or set (Python's own comparison error).
- if(missing(value)&&dtype.starts_with("float")&&!bound.is_null&&bound.container!=AttributeContainerKind::kScalar)
+ // Round DO: and with a datetime (fresh pandas CK 2026120821 case 166,
+ // probe do/pn1.py).
+ if(missing(value)&&dtype.starts_with("float")&&!bound.is_null&&
+    (bound.container!=AttributeContainerKind::kScalar||(!missing(bound)&&date_value(bound))))
   error("TypeError","'"+op+"' not supported between instances of 'float' and '"+qualified_type_name(bound)+"'");
  if(missing(value)||missing(bound))return false;
  int order=0;

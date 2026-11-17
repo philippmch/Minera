@@ -1126,8 +1126,14 @@ Json zone_masked(Json node) {
 // in time is raised (probe/cj/c12.py: thread count, width and height decide
 // it, and the scheduling race picks between them). The native filters raise
 // the cast failure, as Polars does with one thread; the comparison failure
-// of the same comparison is accepted for it.
+// of the same comparison is accepted for it. Round DO: the native filters
+// give the race's majority outcome (DN1-4, DO1-1), so either error of the
+// same comparison is accepted for the other.
+bool struct_partition_race_one_way(const Json& expected, const Json& actual);
 bool struct_partition_race(const Json& expected, const Json& actual) {
+  return struct_partition_race_one_way(expected, actual) || struct_partition_race_one_way(actual, expected);
+}
+bool struct_partition_race_one_way(const Json& expected, const Json& actual) {
   const auto* e = expected.get("error");
   const auto* a = actual.get("error");
   if (!e || !a || e->items.size() != 2 || a->items.size() != 2) return false;

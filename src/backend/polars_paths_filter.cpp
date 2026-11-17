@@ -704,17 +704,26 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
       if (compare(source.rows[timed[i - 1]][case_at], source.rows[timed[i]][case_at], case_kind, case_dictionary) == 0) return true;
     return false;
   };
+  const bool eager = phase == "apply";
   if (performance) {
     validate_time(source.dtypes[*time_at], options, phase);
     if (!folded) {
-      const bool present = duration_present();
+      // Round DO: on an eager frame the duration filter runs over the sorted
+      // frame in four row partitions (n // 4 rows for the first three) and
+      // the errors race (DN1-4): below four rows the three empty partitions'
+      // comparison error wins (probes do/r10.py, do/specs/c3.py: 40 and 15
+      // runs per layout). On larger frames the outcome depends on the
+      // process as well as the frame (one call on one frame gave the
+      // comparison error in 15 of 15 runs after other filters ran and the
+      // cast error in 14 of 15 as the first call, probe do/specs/p3.py);
+      // the cast error is kept there.
+      const bool present = duration_present() && !(eager && source.rows.size() < 4);
       validate_bound(options.min_performance, false, options, paths.front(), phase, present);
       validate_bound(options.max_performance, true, options, paths.front(), phase, present);
     }
   }
   // No admitted path keeps no case: a negative filter returns the frame as it
   // is (round DL: the sorted frame on an eager one, which ran the sort).
-  const bool eager = phase == "apply";
   if (!performance && paths.empty() && !truth(options.positive) && !eager) return source;
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
   // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).

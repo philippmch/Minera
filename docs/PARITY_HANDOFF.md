@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DN (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DO (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6483,6 +6483,94 @@ files under `review-harness/round-dn/`.
 
 No fixture changed. The device check on the Mac was skipped (the Mac was
 offline).
+
+Round DO re-reviewed DN (Review DO1). DN's commit a0fee4a ran CI run
+44105722499 (green on all six jobs). DO asked whether the case, paths and
+timestamp filters race in row partitions as the numeric attribute filters
+do, probed iterated arguments and DN's v1 shapes in the Polars sequence
+variant filters, took the eager sequence probes on to the set, big-int and
+scalar domains on `literal`-column frames and replayed two batches of
+fresh seeds:
+- The case size and performance filters filter the group_by's frame with
+  the struct bound and race in its row partitions: the cast error wins
+  with at least four cases of which two hold a present cast cell, on
+  frames of four columns or more (the native filters give that majority
+  outcome; probe c3, 962 calls each way, 0 differing). The paths
+  performance filter on eager frames of fewer than four rows gives the
+  comparison error (modelled); on larger eager frames the reference's
+  error depends on the process (declared, the bank test accepts either
+  error of the same comparison). The timestamp filters refuse a dict
+  bound in Python before any plan, so they do not race.
+- Arguments Python iterates (probe sv2, 2,112 calls each way): the
+  variant filters and `rework.apply_activity_set` take a str's characters
+  and a dict's keys; the start and end activity filters pass a str to
+  `is_in` as a column name (the boundary alias, the case column, or a
+  failing join). 600 lazy and 472 eager calls -> 0.
+- DN's v1 shapes (probe sv1, about 7,080 calls each way): dict case keys in
+  `get_variants_df` (the sort's struct literal, refused by the group_by at
+  once on a LazyFrame, after the sort and pl.col(activity) on a
+  DataFrame), dict activity keys as the list of their keys, list case keys
+  on one row, and the eager group_by building its keys after
+  pl.col(activity). 30 lazy and 61 eager calls -> 0.
+- Eager probes over the set, big-int and scalar sequence domains on
+  `literal`-column frames (12 probes, 49,629 calls): `activity_split`
+  shows an imploded scalar int or float as `Unknown(Int(n))` or
+  `Unknown(Float)` in its `is_in` errors (also lazily; probe as1, 420 ->
+  0) and builds pl.col(activity) after the eager cum_count; five
+  equal-size rework joins and one NaN set order are reference-random
+  (declared).
+- The pandas numeric attribute filters with datetime bounds (fresh pandas
+  CK 2026120821 case 166, probe n1, 2,520 calls): a NaN float cell fails
+  Python's comparison with a datetime, and a datetime64 column refuses
+  None, numbers and a datetime of the other time-zone kind as a whole
+  (`Invalid comparison between dtype=... and ...`). 252 -> 0.
+- Fresh seeds 2026120800-11 (clean) and 2026120812-23: the pandas
+  datetime bound (fixed) and one equal-size `attributes.apply` join order
+  the reference varies itself (declared).
+
+In the suite: new `docs/polars-filter-do-bank.json.gz` (3,240 calls),
+`docs/polars-sequence-filter-do-bank.json.gz` (17,853 calls) and
+`docs/pandas-filter-do-bank.json.gz` (2,520 calls) with their ctests; the table bank test's struct-cast leniency works both ways. The
+probes, the dumps and the fresh banks are in the project files under
+`review-harness/round-do/`.
+
+No fixture changed. The device check on the Mac was skipped (the Mac was
+offline).
+
+Next round (DP) should start by re-reviewing round DO:
+
+- DO's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the eager paths performance race on frames of four rows or more (DO1-2:
+  the reference's error follows the process, not the layout; a model
+  would need what in the process decides it, such as the thread pool's
+  state);
+- iterated arguments (str, dict, set, tuple) in the Polars table filters
+  that take value lists (attributes, between, LTL activities, paths),
+  as sv2 did for the sequence filters, eagerly and lazily;
+- dict keys in the other sequence filters' case and activity keys beyond
+  the variant filters (rework, activity_split, start/end activities),
+  eagerly and lazily;
+- date strings pandas can parse as bounds against datetime64 columns in
+  the pandas numeric filters (the reference compares them, the native
+  filter refuses every str there; DO1-6), and datetime bounds in the other
+  pandas filters that compare (between, timestamp, case performance);
+- the declared thread-count quirk of DN1-6;
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DN's targets, taken in DO (findings DO1-1 to DO1-6): DN's CI run,
+the fresh seeds, the partition race in the case, paths and timestamp
+filters, the eager sequence probes over the set, big-int and scalar
+domains on `literal`-column frames and the v1 shapes in the sequence
+variant filters; also the pandas datetime bounds of a fresh call. Not taken (carried to DP): the thread-count quirk of
+DN1-6, the CU list and the open choices.
+
+Previous list for round DO (kept for its older items):
 
 Next round (DO) should start by re-reviewing round DN:
 

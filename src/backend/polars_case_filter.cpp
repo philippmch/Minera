@@ -436,7 +436,29 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   if (op != Operation::kCount && !folded) {
     // Whether the count or the duration has a present cell (a dict bound's
     // cast fails only then).
-    const bool present = op == Operation::kSize ? !source.rows.empty() : std::any_of(source.rows.begin(), source.rows.end(), [&](const auto& row) { return row[time_at] && !null(*row[time_at]); });
+    // Round DO: the bounds filter the group_by's frame, the case keys beside
+    // the count or the duration (on an eager frame the duration's start and
+    // end times too). With four columns or more Polars filters it in four
+    // row partitions and the errors race as in the numeric attribute filters
+    // (DN1-4); the cases' order is the group_by's, random in the reference.
+    // Over the reference's runs (probes do/r5.py-r8.py, 100 runs per layout
+    // of 1-12 cases) the comparison error of the partitions without a
+    // present cell wins when the frame holds fewer than four cases or one
+    // case with a present cell, the cast error when it holds four or more
+    // cases and two or more of them have one.
+    const std::size_t width = keys.items.size() + (eager && op == Operation::kPerformance ? 3 : 1);
+    const auto cast_wins = [&](bool present) {
+      if (!present || width < 4) return present;
+      std::unordered_map<std::string, bool> cases; std::size_t timed = 0;
+      const auto cell_key = [](const std::optional<EventAttribute>& cell, const std::string& dtype) { return group_key(cell, dtype); };
+      for (const auto& row : source.rows) {
+        const auto found = cases.emplace(groups::group_of(keys, row, cell_key), false).first;
+        const bool cell = op == Operation::kSize || (row[time_at] && !null(*row[time_at]));
+        if (cell && !found->second) { found->second = true; ++timed; }
+      }
+      return cases.size() >= 4 && timed >= 2;
+    };
+    const bool present = cast_wins(op == Operation::kSize ? !source.rows.empty() : std::any_of(source.rows.begin(), source.rows.end(), [&](const auto& row) { return row[time_at] && !null(*row[time_at]); }));
     if (separate) validate_bound(low, none(), false, op, phase, present, true);
     else {
       validate_bound(low, high, false, op, phase, present);
@@ -470,7 +492,9 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     for (auto& group : groups) group.keep = compare_bound(static_cast<std::int64_t>(group.count), low, false);
     if (!null(high)) {
       validate_literals(op, high, none());
-      const bool present = std::any_of(groups.begin(), groups.end(), [](const Group& group) { return group.keep; });
+      // Round DO: the kept cases' frame races as the first one did.
+      const auto kept = static_cast<std::size_t>(std::count_if(groups.begin(), groups.end(), [](const Group& group) { return group.keep; }));
+      const bool present = kept && (keys.items.size() + 1 < 4 || kept >= 4);
       validate_bound(high, none(), true, op, phase, present, true);
       for (auto& group : groups) group.keep = group.keep && compare_bound(static_cast<std::int64_t>(group.count), high, true);
     }

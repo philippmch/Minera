@@ -30287,3 +30287,152 @@ Tests:
 - Full suite: 593 tests passed (`minera_review_bx1_tests` after the change
   above). Python script tests not rerun (scripts unchanged); the workbench
   fixture replay gave 2,673 responses unchanged.
+
+## Review DO1: re-review of round DN, the partition race in the case and paths filters, iterated arguments and dict keys in the sequence variant filters, eager sequence probes over the set, big-int and scalar domains, datetime bounds in the pandas numeric filters, fresh seeds (2026-11-17)
+
+Round DO checked DN's CI (run 44105722499 on a0fee4a: green on all six
+jobs), asked whether the other filters with struct-cast bounds race in row
+partitions as the numeric attribute filters do, probed str, dict, set and
+tuple arguments and DN's v1 shapes in the Polars sequence variant filters,
+took the eager sequence probes over `literal`-column frames on to the set,
+big-int and scalar domains, followed a fresh pandas call to datetime bounds
+in the numeric filters and replayed two batches of fresh seeds. The
+device check on the Mac was skipped (the Mac was offline).
+
+- **DO1-1 The partition race in the case filters** (probes `do/r1.py`-
+  `r10.py` over row layouts in the reference, 20-30 runs each; bank probe
+  `do/specs/c3.py`, 962 calls eagerly and lazily: list case keys of one to
+  four items, frames cut to 1-14 rows). `filter_on_case_size`,
+  `filter_on_case_performance` and `filter_case_performance` filter the
+  group_by's frame (the case keys beside the count or the duration; on an
+  eager frame the duration's start and end times too) with the struct
+  bound, so a frame of four columns or more runs the predicate in four row
+  partitions and races as DN1-4's numeric filters do. Observed: the cast
+  error (`must specify one field in the struct`) wins when the grouped
+  frame has at least four cases and at least two of them hold a present
+  cast cell (a non-null duration; every case for the size), the struct
+  comparison error otherwise; a frame of fewer than four columns never
+  partitions. The eager `filter_on_case_size` with a separate high bound
+  filters the kept cases' frame again, which races the same way. The
+  native filters now give that majority outcome
+  (`polars_case_filter.cpp`). c3: 0 differing lazily; eagerly 0 but the
+  paths calls of DO1-2.
+- **DO1-2 The paths performance filter on eager frames** (probes
+  `do/t1.py`-`t3.py`, `do/specs/p3.py`, 658 calls each way). Lazily the
+  paths filter keeps its first-partition model (0 differing). On an eager
+  frame of fewer than four rows the three empty partitions' comparison
+  error wins (now modelled, `polars_paths_filter.cpp`); on larger eager
+  frames the outcome depends on the process, not on the layout (one call
+  on one frame gave the cast error in one process context and the
+  comparison error in another, each in every run), so the cast error is
+  kept and the bank test accepts either error of the same comparison
+  (90 of p3's eager calls). Declared.
+- The timestamp filters have no struct-cast bound: a dict bound fails in
+  Python (`'dict' object has no attribute 'replace'`) before any plan
+  (probe `do/ts1.py`).
+- The bank test's struct-cast leniency is now symmetric: the native
+  filters give the race's majority outcome, so either error of the same
+  comparison is accepted for the other (DN1-4, DO1-1, DO1-2).
+- **DO1-3 Arguments Python iterates in the sequence filters** (probe
+  `do/specs/sv2.py`, 2,112 calls eagerly and lazily over six frames: str,
+  dict, set and tuple arguments, nested ones, empty ones). Observed and
+  modelled (`polars_sequence_filters.cpp`):
+  - `traces`, `starts_with`, `ends_with`, `prefixes`, `suffixes` and
+    `rework.apply_activity_set` iterate their argument: a str gives its
+    characters, a dict its keys;
+  - the start and end activity filters pass the argument to `is_in`,
+    which reads a str as a column name: the boundary alias keeps every
+    case with a non-null boundary activity, the case column tests the
+    boundary activity against the case ids (String columns), any other
+    name fails the join (`unable to find column`, the valid columns the
+    case keys and the alias); a dict is the list of its keys.
+  sv2: 600 lazy and 472 eager calls -> 0.
+- **DO1-4 DN's v1 shapes in the sequence variant filters** (probe
+  `do/specs/sv1.py`, 7,073 lazy and 7,082 eager calls over five frames:
+  str, missing, int, big-int, list, tuple, None, empty-list and dict case
+  keys against str, scalar, set, list and dict activity keys, empty and
+  typed patterns). Observed and modelled:
+  - `get_variants_df` with a dict case key: the sort by [case, timestamp]
+    builds its struct literal, which the group_by refuses (`Cannot pass a
+    dictionary as a single positional argument`): a LazyFrame's at once,
+    a DataFrame's after the sort ran (the timestamp, then a ShapeError
+    unless the frame has one row) and the aggregation's pl.col(activity)
+    was built;
+  - pl.col reads a dict activity key as the list of its keys (an empty
+    dict selects no column, so the trace variants miss `variant_list`; a
+    key naming the case column joins a non-String list);
+  - a list case key on a one-row frame groups by each item, a str item its
+    column and any other its literal, and an empty list by nothing;
+  - on an eager frame the variant filters' group_by takes its keys as
+    given and builds them when agg runs, after pl.col(activity): a dict
+    case key beside a non-str activity key gives the activity's TypeError;
+  - the bank test passes dict case and activity keys of `get_variants_df`
+    to the value overloads.
+  sv1: 30 lazy and 61 eager calls -> 0.
+- **DO1-5 Eager sequence probes over the set, big-int and scalar domains
+  on `literal`-column frames** (DN's `dn/seqwrap.sh` with DK's
+  `literal`-column wrapper under DM's eager wrapper; the set, big-int and
+  scalar domains of CK, CP, CJ and CH, 300 cases each, seeds
+  2026120931-42; 12 probes, 49,629 calls). 10 differing:
+  - `activity_split` with a scalar int or float activity: the imploded
+    scalar keeps its dynamic type in the `is_in` errors,
+    `List(Unknown(Int(5)))` or `List(Unknown(Float))`, also for ints past
+    Int64 (probe `do/specs/as1.py`, 480 calls each way over ten frames,
+    210 lazy and 210 eager -> 0);
+  - `activity_split` on an eager frame builds pl.col(activity) after the
+    case's cum_count ran, so a missing case column fails first;
+  - five `rework.apply` calls whose equal-size join comes back in either
+    row order (probe `do/rw/rw1.py`: of 300 small frames whose cases all
+    pass, 28 gave different row orders across three reference processes,
+    eagerly and lazily) and one `end_activities.apply` set holding NaN
+    (iteration order), declared and left out of the bank.
+- **DO1-6 Datetime bounds in the pandas numeric attribute filters**
+  (fresh pandas CK 2026120821 case 166; probe `probe/specs/n1.py`, 2,520
+  calls over ten CK frames: naive and aware datetimes, None and ints as
+  either bound against every column, each `positive`). Observed and
+  modelled (`pandas_attributes_filter.cpp`):
+  - a NaN cell of a float column compares with a datetime in Python, so
+    it fails (`'<' not supported between instances of 'float' and
+    'datetime.datetime'`) as a present cell does; before, NaN made the row
+    false;
+  - a datetime64 column refuses, as a whole and before any row compares
+    (an empty frame too), None, a number (int, float, NaN, bool) and a
+    datetime or Timestamp of the other time-zone kind (`Invalid
+    comparison between dtype=datetime64[us, UTC] and datetime`); NaT and
+    a datetime of the same kind compare.
+  n1: 252 -> 0 (all on datetime64 columns); all docs pandas table banks
+  replay clean with the change. A date string pandas can parse compares
+  with a datetime64 column in the reference, while the native filter
+  refuses every str there (not in any domain yet; carried).
+- **DO1-7 Fresh seeds.** Batch 1 (2026120800-11, twelve banks): 0
+  differing. Batch 2 (2026120812-23, twelve banks):
+  the pandas datetime bound of DO1-6 (pandas CK 2026120821 case 166,
+  fixed) and one `attributes.apply` call (CK 2026120813 case 30) whose
+  equal-size join comes back in either row order (eight reference reruns
+  gave both), declared; the rest 0 differing.
+- DN1-6 (the thread count of a filter over several columns) was not
+  taken; it stays declared.
+
+Declared:
+- The paths performance filter on eager frames of four rows or more
+  (DO1-2): the cast error is kept, the reference's error depends on the
+  process.
+- The equal-size rework joins and the NaN set order of DO1-5, and the
+  equal-size join of fresh CK 2026120813 case 30 (DO1-7).
+
+Tests:
+- New: `docs/pandas-filter-do-bank.json.gz` (n1's 2,520 calls in ten
+  cases), replayed by `minera_pandas_filter_do_bank_parity_tests`.
+- New: `docs/polars-filter-do-bank.json.gz` (3,240 calls in 262 cases:
+  every call of c3 and p3 eagerly and lazily) and
+  `docs/polars-sequence-filter-do-bank.json.gz` (17,853 calls in 3,354
+  cases: every error signature of sv1, sv2, as1 and the twelve DO1-5
+  probes up to 20 calls each and every fourth value call, the declared
+  calls left out), replayed by `minera_polars_filter_do_bank_parity_tests`
+  and `minera_polars_sequence_filter_do_bank_parity_tests`.
+- All 29 docs Polars sequence banks and all docs Polars table banks replay
+  clean with the changes.
+- Full suite: 595 tests passed before the pandas change of DO1-6, then
+  the 75 pandas, attribute and review tests again after it (596 tests in
+  all with the new pandas bank). Python script tests not rerun (scripts
+  unchanged); the workbench fixture replay gave 2,673 responses unchanged.

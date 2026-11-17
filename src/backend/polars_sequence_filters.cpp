@@ -880,10 +880,10 @@ void enum_is_in(const EventTable& df, std::size_t column, const std::vector<Valu
   detail::polars_lit::enum_is_in(enum_category_list(df, column), values, resolved(node, plan, stack));
 }
 void check_is_in(const EventTable& df, std::size_t column, const Literal& literal, const std::string& node,
-                 const std::string& plan, const std::vector<std::string>& stack) {
+                 const std::string& plan, const std::vector<std::string>& stack, const std::string* shown = nullptr) {
   const auto dtype = dtype_of(df, column);
   detail::polars_lit::check_is_in(dtype, enum_dtype(dtype) ? enum_category_list(df, column) : std::vector<std::string>{},
-                                  literal, resolved(node, plan, stack));
+                                  literal, resolved(node, plan, stack), shown);
 }
 // The Python type name of a value (str.join and iteration errors).
 std::string py_type(const Value& v) {
@@ -960,20 +960,64 @@ bool iterable(const Value& v) {
 
 const Plan kBoundaryPlan{"join", {"group_by", "filter", "select", "join right", "join"}, {}, {}};
 
-EventTable boundary_filter(const EventTable& df, const Value& values, const std::string& case_glue,
+// Round DO: Polars' is_in reads a str argument as pl.col(str) and lists any
+// other collection (a dict its keys; probe do/specs/sv2.py, pm4py's
+// start/end activity filters on a str or dict of activities). The column
+// resolves over the grouped frame: the alias itself is every group's own
+// boundary activity (every present one passes), a missing name fails as the
+// join resolves.
+std::vector<Value> elements(const Value& v);
+Value is_in_values(const Value& values) {
+  if (values.kind == Kind::kDict) return Value::list(elements(values));
+  return values;
+}
+// The str argument's column: true for the alias, false for a case column of
+// String activities (a membership test), else the failure.
+bool str_is_in_alias(const EventTable& df, const std::string& name, const CaseText& text, const std::string& alias,
+                     const std::string& aggregation, std::size_t act) {
+  if (name == alias) return true;
+  if (std::find(text.names.begin(), text.names.end(), name) != text.names.end()) {
+    const auto at = find_column(df, name);
+    if (!at || dtype_of(df, act) != "String" || dtype_of(df, *at) != "String")
+      throw std::invalid_argument("Native Polars is_in over a case column outside observed dtypes");
+    return false;
+  }
+  std::string message = "unable to find column " + debug_quote(name) + "; valid columns: [";
+  for (const auto& c : text.names) message += debug_quote(c) + ", ";
+  message += debug_quote(alias) + "]";
+  fail("ColumnNotFoundError", message + resolved("join", group_node(text, false, aggregation, frame_plan(df.columns)),
+                                                 {"select", "join right", "join"}));
+}
+EventTable boundary_filter(const EventTable& df, const Value& given, const std::string& case_glue,
                            const std::string& act_key, bool positive, bool end) {
+  const auto values = is_in_values(given);
+  const bool by_column = values.kind == Kind::kString;
   // Round DM: on an eager frame the group_by runs before the values'
   // literal is built.
   std::optional<Literal> built;
-  if (!eager()) built = list_literal(values.items);
+  if (!eager() && !by_column) built = list_literal(values.items);
   const auto case_column = require(df, case_glue, kBoundaryPlan);
   const std::string alias = end ? "end_activity" : "start_activity";
   // Round DM: the eager group_by over no activity column runs, then the
   // filter's literal is built before the filter misses its alias.
-  if (eager() && no_columns_key(act_key) && !built) built = list_literal(values.items);
+  if (eager() && no_columns_key(act_key) && !built && !by_column) built = list_literal(values.items);
   if (no_columns_key(act_key))
     no_columns_aggregate(df, case_glue, false, NoColumns{alias, "", {}, "join", {"select", "join right", "join"}});
   const auto act = require_activity(df, act_key, alias, kBoundaryPlan);
+  if (by_column) {
+    const auto aggregation = "col(" + quote(act_key) + ")." + (end ? "last" : "first") + "().alias(" + quote(alias) + ")";
+    const bool own = str_is_in_alias(df, values.text, case_text(case_glue), alias, aggregation, act);
+    const auto groups = groups_of(df, case_column, all_rows(df));
+    std::set<std::string> ids;
+    if (!own) for (const auto& row : df.rows) if (!null_cell(row[case_column])) ids.insert(row[case_column]->value);
+    std::vector<Key> kept;
+    for (const auto& key : groups.order) {
+      const auto& rows = groups.rows.at(key);
+      const auto& cell = df.rows[end ? rows.back() : rows.front()][act];
+      if (!null_cell(cell) && (own || ids.contains(cell->value))) kept.push_back(key);
+    }
+    return join_cases(df, case_column, kept, positive);
+  }
   if (!built) built = list_literal(values.items);
   const auto& literal = *built;
   check_is_in(df, act, literal, "join",
@@ -995,29 +1039,38 @@ EventTable boundary_filter(const EventTable& df, const Value& values, const std:
 // activity of every group (a select of the literals and the activity when
 // every key is a literal), the passing groups' keys are selected and joined
 // back (probes cp/k1-k3).
-EventTable boundary_list_filter(const EventTable& df, const Value& values, const Value& key, const std::string& act_key,
+EventTable boundary_list_filter(const EventTable& df, const Value& given, const Value& key, const std::string& act_key,
                                 bool positive, bool end) {
+  const auto values = is_in_values(given);
+  const bool by_column = values.kind == Kind::kString;
   // Round DM: on an eager frame the group_by runs before the values'
   // literal is built.
   std::optional<Literal> built;
-  if (!eager()) built = list_literal(values.items);
+  if (!eager() && !by_column) built = list_literal(values.items);
   if (none_key(key) && !eager()) join_on_none();
   const auto keys = list_keys(df, key, kBoundaryPlan);
   const std::string alias = end ? "end_activity" : "start_activity";
   const auto text = case_text(keys, key, false);
   // Round DM: the eager group_by over no activity column runs, then the
   // filter's literal is built before the filter misses its alias.
-  if (eager() && no_columns_key(act_key) && !built) built = list_literal(values.items);
+  if (eager() && no_columns_key(act_key) && !built && !by_column) built = list_literal(values.items);
   if (no_columns_key(act_key))
     no_columns_aggregate(df, text, false, NoColumns{alias, "", {}, "join", {"select", "join right", "join"}});
   const auto act = require_activity(df, act_key, alias, kBoundaryPlan);
-  if (!built) built = list_literal(values.items);
-  const auto& literal = *built;
+  if (by_column) {
+    const auto aggregation = "col(" + quote(act_key) + ")." + (end ? "last" : "first") + "().alias(" + quote(alias) + ")";
+    if (!str_is_in_alias(df, values.text, text, alias, aggregation, act))
+      throw std::invalid_argument("Native Polars is_in over a listed case key column outside observed domain");
+  }
+  if (!built && !by_column) built = list_literal(values.items);
+  const Literal empty_literal{};
+  const auto& literal = built ? *built : empty_literal;
   const auto aggregation = "col(" + quote(act_key) + ")." + (end ? "last" : "first") + "().alias(" + quote(alias) + ")";
   const auto source = group_node(text, false, aggregation, frame_plan(df.columns), 2);
-  check_is_in(df, act, literal, "join",
-              "FILTER col(" + quote(alias) + ").is_in(" + literal_text(literal) + ")\nFROM\n  " + source,
-              {"!filter", "select", "join right", "join"});
+  if (!by_column)
+    check_is_in(df, act, literal, "join",
+                "FILTER col(" + quote(alias) + ").is_in(" + literal_text(literal) + ")\nFROM\n  " + source,
+                {"!filter", "select", "join right", "join"});
   if (none_key(key) && eager()) join_on_none();
   if (keys.items.empty()) no_join_keys();
   std::vector<std::string> order;
@@ -1031,7 +1084,7 @@ EventTable boundary_list_filter(const EventTable& df, const Value& values, const
   std::vector<std::string> kept;
   for (const auto& g : order) {
     const auto row = end ? bounds.at(g).second : bounds.at(g).first;
-    if (!literal_has(literal, df.rows[row][act], dtype_of(df, act))) continue;
+    if (by_column ? null_cell(df.rows[row][act]) : !literal_has(literal, df.rows[row][act], dtype_of(df, act))) continue;
     if (const auto k = row_key_of(keys, df.rows[row])) kept.push_back(*k);
   }
   return join_keys(df, keys, kept, positive);
@@ -1285,6 +1338,13 @@ std::vector<Value> elements(const Value& v) {
   else
     out = v.items;
   return out;
+}
+// Round DO: a str or dict where pm4py iterates the filter's argument (the
+// patterns, suffixes, traces or activities) is the list of its characters or
+// keys (probe do/specs/sv2.py).
+Value iterated_argument(const Value& v) {
+  if (v.kind == Kind::kString || v.kind == Kind::kDict) return Value::list(elements(v));
+  return v;
 }
 // ",".join(item): a str item joins its characters; any other iterable must
 // hold only str (Python's TypeError names the first other item), and a
@@ -1779,7 +1839,10 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
         (void)require(df, case_key(raw), Plan{"sort", {"sort"}, {}, {}});
         (void)require(df, kTimestamp, Plan{"sort", {"sort"}, {}, {}});
       }
-      check_dict_argument(case_value);
+      // Round DO: a DataFrame's group_by takes its keys as given and builds
+      // them when agg runs, after the aggregation's pl.col(activity) (probe
+      // do/sv1 case 2).
+      if (!eager()) check_dict_argument(case_value);
       // Round CP: a list case key is the sort's list literal (variant
       // filters), then the group_by keys' literals.
       if (list_value(case_value)) {
@@ -1789,6 +1852,7 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
         if (!eager()) (void)gk::build_values(case_value->items);
       }
       check_col_list(activity_value);
+      if (eager()) check_dict_argument(case_value);
       if (eager() && list_value(case_value)) (void)gk::build_values(case_value->items);
       break;
     case KeyChecks::kRework: break;  // the dict case key fails in rework()
@@ -1800,7 +1864,9 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
     case KeyChecks::kSplit:
       check_dict_argument(case_value);
       check_col_list(case_value);
-      check_col_list(activity_value);
+      // Round DO: on an eager frame the case's cum_count runs before the
+      // activity's pl.col is built (see polars_activity_split_apply).
+      if (!eager()) check_col_list(activity_value);
       break;
   }
   // rework.apply groups by the activity key as given (see rework).
@@ -2064,14 +2130,21 @@ EventTable literal_variants_df(const EventTable& df, const PolarsFilterValue& ca
   if (eager()) no_collect();
   // Round DJ: a scalar literal (an int, float, bool or datetime) sorts a
   // one-row frame and groups it into one row too (probe dj-plseqcp-1 cases 12, 55).
-  if (!scalar_list(key))
-    throw std::invalid_argument("Polars get_variants_df of one row with a list case key is outside the native domain");
-  const auto& item = v.keys->items.front();
+  // Round DO: a list key groups by each item, a str its column and any
+  // other item its literal; an empty list groups by nothing (probe do/sv1
+  // case 2).
   const auto& activities = v.activities.front();
   EventTable out;
-  out.columns = {"literal"};
-  out.dtypes = {item.dtype};
-  EventTable::Row row{item.cell};
+  EventTable::Row row;
+  for (const auto& item : v.keys->items) {
+    if (!item.literal && item.column < df.categorical_dtypes.size() && df.categorical_dtypes[item.column]) {
+      out.categorical_dtypes.resize(out.columns.size() + 1);
+      out.categorical_dtypes.back() = df.categorical_dtypes[item.column];
+    }
+    out.columns.push_back(item.literal ? item.name : df.columns[item.column]);
+    out.dtypes.push_back(item.literal ? item.dtype : dtype_of(df, item.column));
+    row.push_back(item.literal ? std::optional<EventAttribute>(item.cell) : df.rows[0][item.column]);
+  }
   if (&sort_plan == &kTraceSortPlan) {
     EventAttribute list;
     list.key = "variant_list";
@@ -2086,33 +2159,55 @@ EventTable literal_variants_df(const EventTable& df, const PolarsFilterValue& ca
   out.dtypes.push_back("String");
   row.push_back(string_cell("variant", variant_string(activities, dtype_of(df, v.act))));
   out.rows.push_back(std::move(row));
+  if (!out.categorical_dtypes.empty()) out.categorical_dtypes.resize(out.columns.size());
   return out;
 }
 bool literal_case_key(const PolarsFilterValue& key) {
   return scalar_case_key(&key) || key.kind == Kind::kList || key.kind == Kind::kTuple;
+}
+// Round DO: a dict case key is the sort's struct literal, which the
+// group_by then refuses: a LazyFrame's at once, a DataFrame's when agg runs,
+// after the sort (the timestamp, then the frame's one row) and the
+// aggregation's pl.col(activity) (probe do/sv1).
+[[noreturn]] void dict_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key, const PolarsFilterValue& activity_key) {
+  if (const auto error = detail::polars_lit::dict_literal_error(case_id_key)) fail("TypeError", *error);
+  if (!eager()) dict_argument_error();
+  (void)require(df, kTimestamp, Plan{"sort", {"sort"}, {}, {}});
+  if (df.size() != 1) sort_shape_error(df);
+  check_col_list(&activity_key);
+  dict_argument_error();
+}
+// pl.col reads a dict activity key as the list of its keys (probe do/sv1).
+PolarsFilterValue col_names(const PolarsFilterValue& key) {
+  return key.kind == Kind::kDict ? Value::list(elements(key)) : key;
 }
 }  // namespace
 
 EventTable polars_trace_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                const PolarsFilterValue& activity_key) {
   return entry([&]() -> EventTable {
-    if (literal_case_key(case_id_key)) return literal_variants_df(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan);
-    const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
+    if (case_id_key.kind == Kind::kDict) dict_variants_df(df, case_id_key, activity_key);
+    const auto names = col_names(activity_key);
+    if (literal_case_key(case_id_key)) return literal_variants_df(df, case_id_key, names, kTraceSortPlan, kTraceAggPlan);
+    const auto [c, a] = variants_df_keys(df, case_id_key, names);
     return polars_trace_filter_get_variants_df(df, c, a);
   });
 }
 EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                    const PolarsFilterValue& activity_key) {
   return entry([&]() -> EventTable {
-    if (literal_case_key(case_id_key)) return literal_variants_df(df, case_id_key, activity_key, kSuffixSortPlan, kSuffixAggPlan);
-    const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
+    if (case_id_key.kind == Kind::kDict) dict_variants_df(df, case_id_key, activity_key);
+    const auto names = col_names(activity_key);
+    if (literal_case_key(case_id_key)) return literal_variants_df(df, case_id_key, names, kSuffixSortPlan, kSuffixAggPlan);
+    const auto [c, a] = variants_df_keys(df, case_id_key, names);
     return polars_ends_with_filter_get_variants_df(df, c, a);
   });
 }
 
-EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterValue& admitted_traces,
+EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterValue& given_traces,
                                      const PolarsFilterParameters& raw_parameters) {
   return entry([&]() -> EventTable {
+    const auto admitted_traces = iterated_argument(given_traces);
     const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
     const NoColumns none{"variant_list", "len().alias(\"count\")", {"count"}, "with_columns", {"with_columns"}};
     const auto v = variants_of(df, case_key(parameters), activity_key(parameters), kTraceSortPlan, kTraceAggPlan, &none,
@@ -2167,9 +2262,10 @@ EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterVal
   });
 }
 
-EventTable polars_starts_with_filter_apply(const EventTable& df, const PolarsFilterValue& prefixes,
+EventTable polars_starts_with_filter_apply(const EventTable& df, const PolarsFilterValue& given_prefixes,
                                            const PolarsFilterParameters& raw_parameters) {
   return entry([&]() -> EventTable {
+    const auto prefixes = iterated_argument(given_prefixes);
     const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
     // Round DM: on an eager frame the sort and group_by run before the
     // prefixes are joined (and before the filter receives no predicate).
@@ -2189,9 +2285,10 @@ EventTable polars_starts_with_filter_apply(const EventTable& df, const PolarsFil
   });
 }
 
-EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilterValue& admitted_suffixes,
+EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilterValue& given_suffixes,
                                          const PolarsFilterParameters& raw_parameters) {
   return entry([&]() -> EventTable {
+    const auto admitted_suffixes = iterated_argument(given_suffixes);
     const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
     // Round CM: an activity key selecting no column ({} or []) aggregates the
     // case column alone; the items are built in Python, then the eager frame
@@ -2570,14 +2667,14 @@ EventTable polars_prefix_filter_apply(const EventTable& df, const PolarsFilterVa
                                       const PolarsFilterParameters& raw_parameters) {
   return entry([&]() -> EventTable {
     const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
-    return list_filter(df, prefixes, parameters, false);
+    return list_filter(df, iterated_argument(prefixes), parameters, false);
   });
 }
 EventTable polars_suffix_filter_apply(const EventTable& df, const PolarsFilterValue& suffixes,
                                       const PolarsFilterParameters& raw_parameters) {
   return entry([&]() -> EventTable {
     const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kGrouped);
-    return list_filter(df, suffixes, parameters, true);
+    return list_filter(df, iterated_argument(suffixes), parameters, true);
   });
 }
 
@@ -2615,9 +2712,10 @@ EventTable polars_rework_filter_apply(const EventTable& df, const PolarsFilterPa
     return rework(df, parameters, nullptr, raw_parameters);
   });
 }
-EventTable polars_rework_filter_apply_activity_set(const EventTable& df, const PolarsFilterValue& activities,
+EventTable polars_rework_filter_apply_activity_set(const EventTable& df, const PolarsFilterValue& given_activities,
                                                    const PolarsFilterParameters& raw_parameters) {
   return entry([&]() -> EventTable {
+    const auto activities = iterated_argument(given_activities);
     const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kReworkSet);
     // Round DI: the activities are iterated after pl.col(activity) is built
     // and before any literal (probe di/k7).
@@ -2858,10 +2956,17 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
     } else if (eager()) {
       (void)require(df, case_glue, Plan{"with_columns", {"with_columns"}, {}, {}});
     }
+    // Round DO: then pl.col(activity) is built (probe sl-scal-ck case 19).
+    if (eager()) check_col_list(activity_key_value(raw_parameters));
     // Round DM: a scalar is pl.lit's own literal, which refuses an int past
     // the Int128 range (a list holds it as UInt128; probe dm/as2.py).
     if (activity.kind == Kind::kInt) scalar_range(activity);
     const auto literal = list_literal(activities);
+    // Round DO: the imploded scalar int or float keeps its dynamic type in
+    // the is_in errors, Unknown(Int(5)) or Unknown(Float) (probe do/as1).
+    std::optional<std::string> dynamic;
+    if (activity.kind == Kind::kInt) dynamic = "Unknown(Int(" + literal_item(activity) + "))";
+    if (activity.kind == Kind::kFloat) dynamic = std::string("Unknown(Float)");
     // Round CM: the separator is a literal that concat_horizontal casts to
     // String: an int as its digits, a bool as true/false, a float as Polars
     // casts a Float64, a date as its ISO text, a dict as its struct display
@@ -2913,7 +3018,7 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
              "`.alias(\"new_name\")` to avoid duplicate column names.");
       if (no_columns_key(act_key)) column_not_found(df, "_is_split_activity", Plan{"with_columns", {"with_columns"}, {}, extra});
       const auto act = require(df, act_key, Plan{"with_columns", {"with_columns"}, {}, extra});
-      check_is_in(df, act, literal, "with_columns", frame_plan(df.columns), {"!with_columns"});
+      check_is_in(df, act, literal, "with_columns", frame_plan(df.columns), {"!with_columns"}, dynamic ? &*dynamic : nullptr);
       if (split_names.empty() && df.size() > 0)
         fail("ComputeError", std::string("at least one key is required in a group_by operation\n\nThis error occurred in the "
                                          "following expression:\n\tcol(\"_is_split_activity\").") +
@@ -2973,7 +3078,7 @@ EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterV
                    ").alias(\"_is_split_activity\")] \n   WITH_COLUMNS:\n   [col(" + quote(case_glue) +
                    ").cum_count().over([col(" + quote(case_glue) + ")]).alias(\"_row_within_case\")] \n    " +
                    frame_plan(df.columns),
-               enum_stack);
+               enum_stack, dynamic ? &*dynamic : nullptr);
     if (eager()) build_separator();
     if (separator_list) {
       const auto c = "col(" + quote(case_glue) + ")";
