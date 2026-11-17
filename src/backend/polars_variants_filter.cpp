@@ -271,6 +271,7 @@ std::string missing_prefix(const std::string& key,const std::vector<std::string>
   if(!statistics){nodes.insert(nodes.end(),{"filter","select","join right","join"});}
   fail("ColumnNotFoundError",phase,missing_prefix(key,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING '"+(statistics?"group_by":"join")+"' <---\n"+(activity?sort_plan(source,options,statistics):frame_plan(source))+contexts(nodes));
 }
+bool listed_key(const EventAttribute& key);
 // Round CM: group_by(case) refuses a dict before anything else is built; a
 // list activity key names the first item that is not a str (pl.col), and a
 // dict or list of names resolves by name in grouped().
@@ -281,7 +282,14 @@ void validate(const PolarsVariantsFilterOptions& options,bool statistics=false){
   // Round DB: pl.lit refuses a set case key there.
   if(detail::polars_lit::set_argument(options.case_id_key))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
   if(options.case_id_key.container==AttributeContainerKind::kList||options.case_id_key.container==AttributeContainerKind::kTuple)
-    if(const auto error=detail::polars_lit::argument_literal_error(options.case_id_key))fail("TypeError","apply",*error);
+    if(const auto error=detail::polars_lit::argument_literal_fault(options.case_id_key))fail(error->type,"apply",error->message);
+  // Round DH: group_by spreads a list key into one expression per item and
+  // takes an int key as a literal: an int past the Int128 range fails
+  // pl.lit before the activity column is read (probe dh/p8).
+  if(detail::polars_lit::scalar_too_large(options.case_id_key))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
+  if(listed_key(options.case_id_key))
+    for(const auto& item:options.case_id_key.children)
+      if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
   if(!text(options.activity_key)&&!collection(options.activity_key))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(options.activity_key)+"'.");
   const auto& act=options.activity_key;
   // Round DB: pl.col reads a set's items like a list's.
@@ -341,7 +349,7 @@ Grouped grouped(const EventTable& source,const PolarsVariantsFilterOptions& raw,
   // while Python builds the sort), sorted as its one value.
   const bool list_time=statistics&&(options.timestamp_key.container==AttributeContainerKind::kList||options.timestamp_key.container==AttributeContainerKind::kTuple);
   if(statistics&&detail::polars_lit::set_argument(options.timestamp_key))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
-  if(list_time)if(const auto error=detail::polars_lit::argument_literal_error(options.timestamp_key))fail("TypeError","apply",*error);
+  if(list_time)if(const auto error=detail::polars_lit::argument_literal_fault(options.timestamp_key))fail(error->type,"apply",error->message);
   // Round CT: the statistics sort by a None case key sorts by the timestamp
   // alone and group_by(None) keeps every row in one literal group (probe
   // ct/l1); the join by None fails in Python afterwards (top_k).

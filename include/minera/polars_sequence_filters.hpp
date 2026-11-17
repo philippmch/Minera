@@ -121,8 +121,11 @@ struct PolarsEndActivitiesNocc {
 // every key as parameters[k], which a non-empty set cannot index
 // (PolarsSequenceFilterError TypeError); an empty set reads as no
 // parameters, except where the module calls parameters.get (the trace and
-// ends_with filters, `reads_get`: AttributeError). Other carriers than a
-// dict, None or a set are outside the captured domain (std::invalid_argument).
+// ends_with filters, `reads_get`: AttributeError). Round DH: every other
+// carrier as the pandas filters read it: a list or tuple fails on its first
+// item that is not a valid index (an int past the Int64 range cannot be an
+// index at all), then has no .get where the module calls it; a str fails on
+// its first character; any other value is not iterable.
 void polars_check_filter_parameters_carrier(const PolarsFilterValue& parameters, bool reads_get = false);
 // trace_filter: the variant equals a ",".join of an admitted trace, where a
 // "..." activity stands for any run of activities; an empty admitted list

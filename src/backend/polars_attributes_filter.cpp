@@ -1400,7 +1400,9 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
     for(const auto& item:attr.children) {
       if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
       if(item.container==AttributeContainerKind::kList||item.container==AttributeContainerKind::kTuple)
-        if(const auto error=detail::polars_lit::argument_literal_error(item))fail("TypeError","apply",*error);
+        if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);
+      // Round DH: an int item past the Int128 range fails its pl.lit (probe dh/a2).
+      if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
     }
     // The keys resolve in order: a missing name fails at its place, a second
     // item that is no str repeats the name `literal` there.
@@ -1573,6 +1575,15 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     if((attr.container==AttributeContainerKind::kList||attr.container==AttributeContainerKind::kTuple)&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case)))
       for(const auto& item:attr.children){if(mapping(item))break;if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
         if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);}
+    // Round DH: a set's items are built the same way, in the set's order (a
+    // tuple item builds its Series; probe dh/a2).
+    if(detail::polars_lit::set_argument(attr)&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case)))
+      for(const auto& item:attr.children){
+        if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
+        if(item.container==AttributeContainerKind::kList||item.container==AttributeContainerKind::kTuple)
+          if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);
+        if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
+      }
     // Round CM: a key list holding a dict (black-box): a leading dict is
     // unhashable; after a name, the dict groups as a struct literal whose
     // value meets the threshold; df[list] names a dict item.
@@ -1629,7 +1640,8 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
         for(const auto& item:attr.children) {
           if(detail::polars_lit::set_argument(item))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
           if(item.container==AttributeContainerKind::kList||item.container==AttributeContainerKind::kTuple)
-            if(const auto error=detail::polars_lit::argument_literal_error(item))fail("TypeError","apply",*error);
+            if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);
+          if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
         }
         const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
         if(!null(maximum)) {

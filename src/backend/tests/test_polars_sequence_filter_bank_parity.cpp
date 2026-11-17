@@ -14,6 +14,7 @@
 #include "minera/polars_sequence_filters.hpp"
 
 #include "../gzip_codec.hpp"
+#include "../polars_lit_model.hpp"
 #include "bank_dict_pairs.hpp"
 
 #include <algorithm>
@@ -266,7 +267,18 @@ PandasFilterValue value_of(const Json& node) {
   const auto& v = body(node);
   if (tag == "n") return PandasFilterValue::none();
   if (tag == "b") return PandasFilterValue::of(v.boolean);
-  if (tag == "i") return PandasFilterValue::of(static_cast<std::int64_t>(std::stoll(v.text)));
+  if (tag == "i") {
+    // Round DH: ints past Int64 as the literal model carries them (UInt64
+    // range: wide_value; past it: huge_value with its digits).
+    namespace lit = minera::detail::polars_lit;
+    if (lit::huge_digits(v.text)) {
+      const bool negative = v.text.front() == '-';
+      if (!negative || v.text.size() > 20 || (v.text.size() == 20 && v.text > "-9223372036854775808")) return lit::huge_value(v.text);
+    } else if (v.text.size() > 19 || (v.text.size() == 19 && v.text > "9223372036854775807")) {
+      return lit::wide_value(std::stoull(v.text));
+    }
+    return PandasFilterValue::of(static_cast<std::int64_t>(std::stoll(v.text)));
+  }
   if (tag == "f") return PandasFilterValue::of(hex_bits(v.text));
   if (tag == "s") return PandasFilterValue::of(v.text);
   if (tag == "w" || tag == "date") return temporal_of(tag, v);
@@ -335,7 +347,7 @@ Json typed_value(const PandasFilterValue& v) {
       b.boolean = v.boolean;
       return jtagged("b", b);
     }
-    case K::kInt: return typed("i", std::to_string(v.integer));
+    case K::kInt: return typed("i", v.text.empty() ? std::to_string(v.integer) : v.text);  // round DH: ints past Int64
     case K::kFloat: return typed("f", bits_hex(v.real));
     case K::kString: return typed("s", v.text);
     case K::kDatetime: return datetime_node(v);
@@ -473,7 +485,20 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
     const auto* dict = keyword(kwargs, "return_dict");
     const auto* variant = keyword(kwargs, "most_common_variant");
     // Round DB: `if return_dict:` reads a set by its truthiness.
-    const bool want = dict && (dict->fields.begin()->first == "S" ? !value_of(*dict).items.empty() : body(*dict).boolean);
+    // Round DH: as it reads any value (an int past Int64 is nonzero).
+    const bool want = dict && [](const PandasFilterValue& v) {
+      using K = PandasFilterValue::Kind;
+      switch (v.kind) {
+        case K::kNone: return false;
+        case K::kBool: return v.boolean;
+        case K::kInt: return v.integer != 0;
+        case K::kFloat: return v.real != 0.0;
+        case K::kString: return !v.text.empty();
+        case K::kDict: return !v.entries.empty();
+        case K::kList: case K::kTuple: case K::kSet: return !v.items.empty();
+        default: return true;
+      }
+    }(value_of(*dict));
     const auto* glue_node = keyword(kwargs, "case_id_glue");
     const auto str_call = [&] {
       return polars_filter_df_on_end_activities_nocc(df, value_of(*args.at(0)),

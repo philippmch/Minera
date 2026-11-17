@@ -3224,6 +3224,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_df_set_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-df-set-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_df_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DH: Python ints past Int64 in the sequence filters (big-int probes
+  # of the CH, CJ, CK and CP sequence domains, seed 1, less 161 carried calls).
+  add_test(NAME minera_polars_sequence_filter_dh_big_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dh-big-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_dh_big_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3439,6 +3444,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dg_set_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dg-set-bank.json.gz")
   set_tests_properties(minera_polars_filter_dg_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DH: the 896 big-int probe calls DG left to native refusals (LTL,
+  # between, timestamp and variants ints past Int64), set keys of the
+  # attribute counts (probe dh/a2) and fresh CK 2026120113 case 457.
+  add_test(NAME minera_polars_filter_dh_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dh-bank.json.gz")
+  set_tests_properties(minera_polars_filter_dh_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

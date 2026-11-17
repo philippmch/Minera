@@ -471,7 +471,20 @@ void list_key_literal(const EventAttribute& key) {
   // Round DB: pl.lit refuses a set key.
   if (!key.is_null && detail::polars_lit::set_argument(key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
   if (key.is_null || (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple)) return;
-  if (const auto error = detail::polars_lit::argument_literal_error(key)) fail("TypeError", "apply", *error);
+  if (const auto error = detail::polars_lit::argument_literal_fault(key)) fail(error->type, "apply", error->message);
+}
+// Round DH: pl.lit of a scalar int past the Int128 range fails while Python
+// builds the expression (big-int probes on the table domains).
+void scalar_range(const EventAttribute& value) {
+  if (detail::polars_lit::scalar_too_large(value)) fail("InvalidOperationError", "apply", detail::polars_lit::kIntegerTooLarge);
+}
+// Round DH: where the case key list is spread into keys (over, join on,
+// group_by) each item is its own expression: an int item past the Int128
+// range fails pl.lit, though the list's Series literal (a Float64 one
+// takes it) was built (probes dh/p2, dh/p4).
+void spread_key(const EventAttribute& key) {
+  if (key.is_null || (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple)) return;
+  for (const auto& item : key.children) scalar_range(item);
 }
 // repr() of a Python datetime (its text is ISO with an optional fraction
 // and UTC offset).
@@ -542,7 +555,7 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     else if (entry.key == "timestamp_diff_boundaries") out.options.timestamp_diff_boundaries = entry.value;
   }
   const auto& o = out.options;
-  if (sequence_rule(out.operation)) { dict_argument(o.case_id_key); list_key_literal(o.case_id_key); list_key_literal(o.timestamp_key); }
+  if (sequence_rule(out.operation)) { dict_argument(o.case_id_key); list_key_literal(o.case_id_key); list_key_literal(o.timestamp_key); spread_key(o.case_id_key); }
   if (sequence_rule(out.operation) && null(o.case_id_key))
     fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (out.operation == Op::kDifferentPersons) out.values = {out.original};
@@ -567,6 +580,7 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
   const auto first_pair_join = [&] {
     if (null(o.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
     dict_argument(o.case_id_key);
+    spread_key(o.case_id_key);
     if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
     // Round DB: a set resource key is refused by pl.lit where a list one
     // is concatenated.
@@ -590,9 +604,12 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
       if (out.operation == Op::kFourEyes && at == 2) first_pair_join();
       // Round DE: that select refuses a set resource key as pl.lit does,
       // before the next activity's literal (set probe pltblci-6 cases 163, 194).
-      if (out.operation == Op::kFourEyes && at == 1 && detail::polars_lit::set_argument(o.resource_key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
+      // Round DH: and builds a list resource key as a Series literal
+      // (strictly) there (big-int probe pltblch case 59).
+      if (out.operation == Op::kFourEyes && at == 1) list_key_literal(o.resource_key);
       if (query.container == AttributeContainerKind::kList || query.container == AttributeContainerKind::kTuple)
-        if (const auto error = detail::polars_lit::argument_literal_error(query)) fail("TypeError", "apply", *error);
+        if (const auto error = detail::polars_lit::argument_literal_fault(query)) fail(error->type, "apply", error->message);
+      scalar_range(query);
       // Round DB: and a set activity is refused by pl.lit.
       if (detail::polars_lit::set_argument(query)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
       // Round CI: a dict becomes a struct literal then too (a list field
@@ -615,6 +632,7 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (null(o.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
     dict_argument(o.case_id_key);
     list_key_literal(o.case_id_key);
+    spread_key(o.case_id_key);
     // Round DB: attr_value_different_persons groups by [case, resource], so
     // pl.lit refuses a set resource key while the plan is built (probe
     // set-pltblck-2 case 188).
@@ -1392,7 +1410,18 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     }
     // Round DB: the collected frame refuses a set as a column selector.
     if (detail::polars_lit::set_argument(o.attribute_key)) fail("TypeError", "apply", detail::polars_lit::set_selector_error(o.attribute_key));
+    // Round DH: a list of row positions converts each int to a C long first
+    // (big-int probe pltblci case 100).
+    if (collection(o.attribute_key) && !o.attribute_key.children.empty() && integer(o.attribute_key.children.front()) &&
+        !boolean(o.attribute_key.children.front()))
+      for (const auto& item : o.attribute_key.children)
+        if (integer(item) && !boolean(item) && (TokenInteger(std::numeric_limits<std::int64_t>::max()) < exact(item) ||
+                                                exact(item) < TokenInteger(std::numeric_limits<std::int64_t>::min())))
+          fail("OverflowError", "apply", "Python int too large to convert to C long");
     if (collection(o.attribute_key)) fail("AttributeError", "apply", "'DataFrame' object has no attribute 'to_list'");
+    // Round DH: an empty frame selects no case, so an int key is never read
+    // either (big-int probe pltblck case 96).
+    if (integer(o.attribute_key) && source.rows.empty()) return;
     if (integer(o.attribute_key)) {
       std::size_t height = 0;
       // Round CS: a literal case key reads the one-row frame itself.
@@ -1471,6 +1500,12 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
     }
     // Round CQ: later pairs add their joins below (probe cq/q5).
     const auto pairs = static_cast<std::ptrdiff_t>(p.values.size() * (p.values.size() - 1) / 2);
+    // Round DH: the third pair's join resolves its inputs first, the filters
+    // of pairs (0,1), (0,2) and (1,2) with three activities, (0,3) with more
+    // (fresh CK bank 2026120113 case 457: a str activity on a Datetime
+    // column).
+    if (text(o.attribute_key) && column(source, o.attribute_key))
+      validate_queries(source, p, eager, true, false, false, p.values.size() == 3 ? 3 : 4);
     std::vector<std::string> nodes{"join schema resolving", "join"};
     repeat(nodes, pairs - 3, {"join left", "join"});
     nodes.insert(nodes.end(), {"join right", "join"});

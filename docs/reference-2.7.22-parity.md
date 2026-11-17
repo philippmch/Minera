@@ -29456,3 +29456,114 @@ Tests:
   case 469), replayed by the `minera_polars_filter_dg_*_bank_parity_tests`
   and `minera_pandas_filter_dg_bank_parity_tests` ctests.
 - Full suite: 578 tests, all passing; workbench fixtures 2,673 unchanged.
+
+## Review DH1: re-review of round DG, Python ints past Int64 in the LTL, between, timestamp, variants and sequence filters, fresh seeds (2026-11-17)
+
+Round DH checked DG's CI (run 43976413859 on 51851f2: green on all six
+jobs), replayed every docs bank against fresh code, modelled the big-int
+calls DG left to native refusals, probed the Polars sequence filters with
+ints past Int64 for the first time and replayed two batches of fresh seeds.
+The device check on the Mac was skipped (no device linked).
+
+- **DH1-1 Ints past Int64 in the LTL, between, timestamp and variants
+  filters** (DG's big-int probes `dom/_probe_pltbl{cj,ci,ch,ck,cn}_big_domain.py`,
+  seed 1, the 902 calls DG left). Every Polars table filter now takes the
+  huge value (`polars_lit_model.hpp` value_of no longer refuses one), and
+  the check order follows the reference:
+  - a scalar value or activity past the Int128 range fails `integer too
+    large for Polars` when its `pl.lit` builds, before any column or join
+    resolves (LTL activities and values, between anchors and the
+    `subcase_concat_str` value, the timestamp attribute value, variants
+    case keys);
+  - a list key is first built strictly as one Series literal (inside
+    `sort([key, ts])`, `over([key])`, `group_by([key, x])`; the first
+    value's type is the builder, so `[2**127, 1.5]` fails `building
+    Series of type UInt128; found Float64` and `[1, 2**64]` `... Int64
+    ... found Int128`), then spread item by item (`over(list)`,
+    `group_by(list)`, `join(on=list)`), where an item past Int128 fails
+    `integer too large`; then the anchors or activities, then `pl.col`;
+  - four_eyes reads the resource key's list literal with the second
+    activity; A_next_B_next_C indexes rows with a list key whose first
+    item is an int, so an int item outside Int64 fails `OverflowError:
+    Python int too large to convert to C long`; an int attribute key on
+    an empty frame returns it;
+  - between's `is_in([v])` with an Int128 value resolves as
+    `col.is_in([[v].cast(List(<column dtype>))])`, without a column cast;
+  - set items of the attribute counts read in the set's order: a nested
+    set is refused, a list or tuple item gets its typed literal fault, an
+    int past Int128 `integer too large`.
+  902 -> 6, the six being attribute counts over small key lists (DH1-5).
+- **DH1-2 Set keys of the attribute counts** (new probe `dh/specs/a2.py`,
+  880 calls: sets of names, ints in and past Int64, None, floats, bools):
+  21 differing, all several-key counts (a name beside a literal in
+  `get_attribute_values`, the threshold and relative counts), declared as
+  in DC to DG. The probe harness first built the sets under another hash
+  seed than the capture, so 14 more calls differed only by set order; it
+  now captures under PYTHONHASHSEED=0 with the sets listed in that order.
+- **DH1-3 The Polars sequence filters with ints past Int64** (new probe
+  domains `dom/_probe_plseq{cp,ck,cj,ch}_big_domain.py`, seed 1, 150
+  cases each, 8,538 calls). The sequence bank test could not read such an
+  int (it parsed every int as Int64); it now reads one as the literal
+  model carries it and writes its digits back. Then 255 differing calls:
+  - a parameters argument that is not a dict, None or a set is read as
+    the pandas filters read it (round CL): a list or tuple fails on its
+    first item that is not a valid index (`list indices must be integers
+    or slices, not str`, `list index out of range`, and for an int past
+    Int64 `IndexError: cannot fit 'int' into an index-sized integer`),
+    then has no `.get` in the trace and ends_with filters; a str fails on
+    its first character (`string indices must be integers, not 'str'`, or
+    `'in <string>' requires string as left operand, not Parameters` when
+    empty); an int, float or bool is not iterable. Checked directly on
+    the reference for 18 carriers;
+  - `filter_df_on_end_activities_nocc`: `ea_count0=None` counts the end
+    activities, anything but a dict fails `'T' object has no attribute
+    'items'` first; the counts compare with `nocc` as Python ints (an int
+    past Int64 by its digits) and the returned dict keeps them;
+  - `return_dict` is read by its truthiness (an int past Int64 is true).
+  255 -> 161. Carried to DI: scalar keys that are not str (an int as the
+  case, activity or timestamp key goes through `pl.col` as `invalid input
+  for col` or groups as a literal, depending on the module; the str
+  overloads read it as a column name today), and ints past Int128 in the
+  values and parameters the modules build as `pl.lit` (ends_with and
+  prefix values, rework `min_occurrences`, nocc case-key lists).
+- **DH1-4 four_eyes with a literal case key and three or more
+  activities** (fresh CK 2026120113 case 457: a str activity on a
+  Datetime activity column, case key `[{}]`). The third pair's join
+  resolves its inputs before it finds `literal_right` twice: the filters
+  of activities 0 to 2 with three activities, 0 to 3 with more (checked
+  on the reference with 3 to 6 activities and the str activity at each
+  position), so their comparison errors come first.
+- **DH1-5 Attribute counts over small key lists** (new probe
+  `dh/specs/a1.py`, 880 calls: lists and tuples of names, ints, None,
+  floats and bools as the key of `get_attribute_values`, the threshold,
+  top-activities and relative counts): 636 differing, all native
+  refusals of list keys, carried to DI. Observed: `group_by` flattens the
+  list (a `literal` per non-name item, two of them `DuplicateError`),
+  `get_attribute_values` builds its dict as `{row[0]: row[1]}`, the
+  relative counts compare `row[1] >= threshold` (a str or None count
+  fails `TypeError`), `keep_once_per_case` builds the list as one strict
+  Series literal, and the top-activities filter indexes `df[list]`.
+- **DH1-6 Fresh seeds.** Batch 1 (2026120100-11, twelve banks): one
+  differing call, the rework row order declared below. Batch 2
+  (2026120112-23, twelve banks): one differing call (DH1-4), 0 after.
+- All 94 docs banks replayed with the final code: 0 mismatches.
+
+Declared:
+- `rework.apply` on a Boolean case column holding a null case (fresh
+  sequence CK 2026120106 case 797): the reference's row order varies from
+  run to run (10 reruns: 6 in the native's order, 4 in the bank's), as
+  DD's equal-size joins.
+- `get_attribute_values` and the threshold and relative counts over a set
+  holding a name and a literal (probe a2, 21 calls), as in DC to DG.
+
+Tests:
+- New: `docs/polars-filter-dh-bank.json.gz` (the 896 big-int calls
+  above, probe a2 less its 21 declared calls and fresh CK 2026120113 case
+  457, 1,810 calls) and
+  `docs/polars-sequence-filter-dh-big-bank.json.gz` (the four sequence
+  big-int probes less the 161 carried calls, 8,335 calls), replayed by
+  `minera_polars_filter_dh_bank_parity_tests` and
+  `minera_polars_sequence_filter_dh_big_bank_parity_tests`.
+- Full suite: 580 tests, all passing (the table bank's test passed on its
+  own after the bank was renamed during the run); Python script tests 406;
+  workbench fixtures 2,673 unchanged.

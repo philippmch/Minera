@@ -1642,9 +1642,10 @@ inline bool cell_equals(const EventAttribute& cell, const Value& v, const std::s
 // as their bank and routes carry it) as a filter value: a datetime with its
 // fixed UTC offset (an offset of 0 is datetime.timezone.utc), a ten-character
 // date text a date, containers item by item (a dict by its keys' text).
-// Round DG: `huge` takes ints past the Int64 and UInt64 ranges as huge
-// values (the attribute, case and path filters model them); elsewhere they
-// are refused.
+// Round DG: `huge` took ints past the Int64 and UInt64 ranges as huge
+// values only in the attribute, case and path filters. Round DH: every
+// filter models them, so the flag no longer changes anything (kept for the
+// callers that pass it).
 inline Value value_of(const EventAttribute& a, bool huge = false) {
   if (a.is_null || is_native_na_attribute(a)) return Value::none();
   if (a.container == AttributeContainerKind::kContainer) {
@@ -1666,7 +1667,7 @@ inline Value value_of(const EventAttribute& a, bool huge = false) {
       if (const auto u = wide_cell(a)) return wide_value(*u);
       // Round DF: refused rather than failing to parse (probe df/i1).
       if (big_int(a) != BigInt::kNone) {
-        if (!huge) throw std::invalid_argument("Native Polars filters take ints in the Int64 and UInt64 ranges only");
+        (void)huge;
         std::string digits = a.value;
         const bool negative = digits.front() == '-';
         const auto first = digits.find_first_not_of('0', negative ? 1 : 0);
@@ -1739,6 +1740,19 @@ inline std::optional<std::string> argument_literal_error(const EventAttribute& a
     (void)argument_literal(a);
   } catch (const PolarsSequenceFilterError& e) {
     return e.message;
+  }
+  return std::nullopt;
+}
+// Round DH: the same with the error's type (an OverflowError for a list
+// item past the UInt128 range, a TypeError otherwise).
+struct LiteralFault {
+  std::string type, message;
+};
+inline std::optional<LiteralFault> argument_literal_fault(const EventAttribute& a) {
+  try {
+    (void)argument_literal(a, true);
+  } catch (const PolarsSequenceFilterError& e) {
+    return LiteralFault{e.type, e.message};
   }
   return std::nullopt;
 }

@@ -44,22 +44,37 @@ bool truthy(const Value& v) {
 }
 
 // A Python number (bool and int as integers).
+// Round DH: an int past the Int64 range keeps its decimal digits.
 struct Number {
   bool integral = true;
   std::int64_t integer = 0;
   double real = 0.0;
+  std::string digits;
 };
 std::optional<Number> number_of(const Value& v) {
-  if (v.kind == Kind::kBool) return Number{true, v.boolean ? 1 : 0, 0.0};
-  if (v.kind == Kind::kInt) return Number{true, v.integer, 0.0};
-  if (v.kind == Kind::kFloat) return Number{false, 0, v.real};
+  if (v.kind == Kind::kBool) return Number{true, v.boolean ? 1 : 0, 0.0, {}};
+  if (v.kind == Kind::kInt) return Number{true, v.integer, 0.0, v.text};
+  if (v.kind == Kind::kFloat) return Number{false, 0, v.real, {}};
   return std::nullopt;
 }
+// Python's int order on decimal texts (an optional '-', no leading zeros).
+int decimal_order(const std::string& a, const std::string& b) {
+  const bool na = !a.empty() && a.front() == '-', nb = !b.empty() && b.front() == '-';
+  if (na != nb) return na ? -1 : 1;
+  int magnitude = a.size() != b.size() ? (a.size() < b.size() ? -1 : 1) : a.compare(b) < 0 ? -1 : a == b ? 0 : 1;
+  return na ? -magnitude : magnitude;
+}
 bool at_least(const Number& a, const Number& b) {
-  if (a.integral && b.integral) return a.integer >= b.integer;
-  const double x = a.integral ? static_cast<double>(a.integer) : a.real;
-  const double y = b.integral ? static_cast<double>(b.integer) : b.real;
-  return x >= y;
+  if (a.integral && b.integral) {
+    if (a.digits.empty() && b.digits.empty()) return a.integer >= b.integer;
+    return decimal_order(a.digits.empty() ? std::to_string(a.integer) : a.digits,
+                         b.digits.empty() ? std::to_string(b.integer) : b.digits) >= 0;
+  }
+  const auto real = [](const Number& n) {
+    if (!n.integral) return n.real;
+    return n.digits.empty() ? static_cast<double>(n.integer) : std::strtod(n.digits.c_str(), nullptr);
+  };
+  return real(a) >= real(b);
 }
 
 // A parameter given twice keeps its last value (a Python dict literal).
@@ -1576,6 +1591,13 @@ PolarsFilterValue polars_get_end_activities(const EventTable& df, const PolarsFi
 }
 
 namespace {
+// Round DH: ea_count0=None counts the end activities; anything but a dict
+// fails ea_count0.items() before any key is read (probe big-plseq*).
+bool given_counts(const std::optional<PolarsFilterValue>& ea_count0) {
+  if (!ea_count0 || ea_count0->kind == Kind::kNone) return false;
+  if (ea_count0->kind != Kind::kDict) fail("AttributeError", "'" + col_item_type(*ea_count0) + "' object has no attribute 'items'");
+  return true;
+}
 // The nocc filter after its counts: str keys filter by boundary_filter, other
 // keys (round DC) by the PolarsFilterValue overload of
 // polars_filter_df_on_end_activities.
@@ -1588,7 +1610,7 @@ PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
     const EventTable& df, const PolarsFilterValue& nocc, const std::optional<PolarsFilterValue>& ea_count0,
     const PolarsFilterValue& case_id_glue, const PolarsFilterValue& activity_key, bool return_dict,
     const std::optional<PolarsFilterValue>& most_common_variant) {
-  const Counts counts = ea_count0 ? ea_count0->entries : end_counts(df, case_id_glue, activity_key);
+  const Counts counts = given_counts(ea_count0) ? ea_count0->entries : end_counts(df, case_id_glue, activity_key);
   return nocc_filter(df, nocc, counts, return_dict, most_common_variant, [&](const Value& values) {
     return polars_filter_df_on_end_activities(df, values, case_id_glue, activity_key, Value::of(true));
   });
@@ -1598,7 +1620,7 @@ PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
     const EventTable& df, const PolarsFilterValue& nocc, const std::optional<PolarsFilterValue>& ea_count0,
     const std::string& case_id_glue, const std::string& activity_key, bool return_dict,
     const std::optional<PolarsFilterValue>& most_common_variant) {
-  const Counts counts = ea_count0 ? ea_count0->entries : end_counts(df, case_id_glue, activity_key);
+  const Counts counts = given_counts(ea_count0) ? ea_count0->entries : end_counts(df, case_id_glue, activity_key);
   return nocc_filter(df, nocc, counts, return_dict, most_common_variant, [&](const Value& values) {
     return boundary_filter(df, values, case_id_glue, activity_key, true, true);
   });
@@ -2147,8 +2169,28 @@ EventTable polars_suffix_filter_apply(const EventTable& df, const PolarsFilterVa
 
 void polars_check_filter_parameters_carrier(const PolarsFilterValue& parameters, bool reads_get) {
   if (parameters.kind == Kind::kNone || parameters.kind == Kind::kDict) return;
-  if (parameters.kind != Kind::kSet)
-    throw std::invalid_argument("Polars filter parameters other than a dict, None or a set are outside the captured native domain");
+  // Round DH: every carrier as the pandas filters read it (round CL):
+  // parameters[k] for k in parameters, where an int outside the index range
+  // (Py_ssize_t) cannot be an index at all; a list or tuple that survives
+  // then has no .get (probe big-plseq*).
+  if (parameters.kind == Kind::kList || parameters.kind == Kind::kTuple) {
+    const auto name = col_item_type(parameters);
+    const auto size = static_cast<std::int64_t>(parameters.items.size());
+    for (const auto& key : parameters.items) {
+      if (key.kind != Kind::kInt && key.kind != Kind::kBool)
+        fail("TypeError", name + " indices must be integers or slices, not " + col_item_type(key));
+      if (key.kind == Kind::kInt && !key.text.empty()) fail("IndexError", "cannot fit 'int' into an index-sized integer");
+      const std::int64_t index = key.kind == Kind::kBool ? (key.boolean ? 1 : 0) : key.integer;
+      if (index < -size || index >= size) fail("IndexError", name + " index out of range");
+    }
+    if (reads_get) fail("AttributeError", "'" + name + "' object has no attribute 'get'");
+    return;
+  }
+  if (parameters.kind == Kind::kString) {
+    if (parameters.text.empty()) fail("TypeError", "'in <string>' requires string as left operand, not Parameters");
+    fail("TypeError", "string indices must be integers, not 'str'");
+  }
+  if (parameters.kind != Kind::kSet) fail("TypeError", "'" + col_item_type(parameters) + "' object is not iterable");
   if (!parameters.items.empty()) fail("TypeError", "'set' object is not subscriptable");
   if (reads_get) fail("AttributeError", "'set' object has no attribute 'get'");
 }

@@ -137,7 +137,11 @@ namespace lit = detail::polars_lit;
 // Python builds a list anchor as pl.lit builds a list (round CD: the shared
 // literal model, its strict construction and supertype errors).
 void validate_anchor(const EventAttribute& value, const std::string& phase = "apply") {
-  if (!collection(value)) return;
+  // Round DH: a scalar anchor past the Int128 range fails pl.lit (probe dh/p6).
+  if (!collection(value)) {
+    if (lit::scalar_too_large(value)) fail("InvalidOperationError", phase, lit::kIntegerTooLarge);
+    return;
+  }
   try {
     (void)lit::literal_of(lit::value_of(value));
   } catch (const PolarsSequenceFilterError& error) {
@@ -196,11 +200,22 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
     // Round CN: a list or tuple case key is first built as a Series literal
     // (strictly), then read by pl.col, before its over() refuses it.
     if (key.container == AttributeContainerKind::kList || key.container == AttributeContainerKind::kTuple) {
-      if (const auto error = detail::polars_lit::argument_literal_error(key)) fail("TypeError", "apply", *error);
+      if (const auto error = detail::polars_lit::argument_literal_fault(key)) fail(error->type, "apply", error->message);
+      // Round DH: over() spreads the list into one expression per item, so
+      // an int item past the Int128 range fails pl.lit (probes dh/p6, dh/p7).
+      for (const auto& item : key.children)
+        if (lit::scalar_too_large(item)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);
       // Round CO: the anchors build their literals before pl.col reads the
       // list (case 80 of the CK seed 60 bank).
       validate_anchor(act1); validate_anchor(act2);
       col_items(key);
+    }
+    // Round DH: a scalar key is a literal in the sort and over (an int past
+    // the Int128 range fails it), and the anchors build theirs before
+    // pl.col refuses it (probe dh/p7).
+    if (!collection(key)) {
+      if (lit::scalar_too_large(key)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);
+      validate_anchor(act1); validate_anchor(act2);
     }
     if (collection(key)) fail("TypeError", "apply", "'" + core_type(key) + "' object is not an instance of 'str'");
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(key) + "'.");
@@ -212,6 +227,9 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
   (void)activity_key(options.activity_key, columns, &several);
   validate_anchor(act1); validate_anchor(act2);
   if (several) throw std::invalid_argument("Native Polars between activity selector accepts one column");
+  // Round DH: a scalar separator past the Int128 range fails pl.lit while
+  // the expressions build (probe dh/p7).
+  if (lit::scalar_too_large(options.subcase_concat_str)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);
 }
 
 Dtype dtype(const std::string& value) {
@@ -370,6 +388,9 @@ std::string resolved_text(const Anchor& a, const std::string& column, const std:
     // Round CH: an int past the Int64 range shows its digits.
     const auto item = lit::integer_text(v);
     if (lit::float_dtype(dtype)) return c + ".is_in(" + cast_list(item, dtype) + ")";
+    // Round DH: an Int128 one casts to the column's list type like an int
+    // inside the column's range (probe dh/p10).
+    if (lit::huge_int(v)) return c + ".is_in(" + cast_list(item, dtype) + ")";
     // Round CQ: an int past the Int64 range is a UInt64: an unsigned column
     // meets it in UInt64, a signed one in Float64 (cast strictly).
     if (lit::wide_int(v)) {
@@ -552,7 +573,7 @@ EventTable collect(const EventTable& source, const EventAttribute& act1, const E
   // Round DB: pl.lit refuses a set separator.
   if (detail::polars_lit::set_argument(options.subcase_concat_str)) fail("TypeError", phase, detail::polars_lit::kSetLiteralError);
   if (collection(options.subcase_concat_str) && options.subcase_concat_str.container != AttributeContainerKind::kContainer)
-    if (const auto error = detail::polars_lit::argument_literal_error(options.subcase_concat_str)) fail("TypeError", phase, *error);
+    if (const auto error = detail::polars_lit::argument_literal_fault(options.subcase_concat_str)) fail(error->type, phase, error->message);
   source.validate();
   if (source.index) throw std::invalid_argument("Native Polars between tables cannot have dataframe index metadata");
   if (source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars between requires declared column dtypes");

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DG (2026-11-05 to 2026-11-16, cloud container)
+## Review-fix loop, rounds T–DH (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6216,6 +6216,70 @@ and set domains and fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DH re-reviewed DG (Review DH1). DG's commit 51851f2 ran CI run
+43976413859 (green on all six jobs). DH modelled the big-int calls DG left
+to native refusals, probed the Polars sequence filters with ints past
+Int64 for the first time and replayed two batches of fresh seeds:
+- Every Polars table filter takes ints past Int64 (`value_of` no longer
+  refuses them; the `huge` flag is inert). The LTL, between, timestamp
+  and variants filters check them in the reference's order: `pl.lit` of a
+  scalar past Int128 fails `integer too large` before any column or join;
+  a list key builds as one strict Series literal first, then item by item
+  where it is spread (`over`, `group_by`, `join`), then anchors or
+  activities, then `pl.col` (`argument_literal_fault`, `scalar_range`,
+  `spread_key`). A_next_B_next_C row-indexes a list key with an int first
+  item (`Python int too large to convert to C long`). DG's 902 -> 6.
+- Set items of the attribute counts get their typed literal faults in set
+  order (probe a2: 21 left, several-key counts, declared).
+- The sequence bank test reads ints past Int64; new big-int probes on the
+  CP, CK, CJ and CH sequence domains (8,538 calls): Polars parameters
+  carriers read as pandas' (round CL) with `cannot fit 'int' into an
+  index-sized integer`, nocc `ea_count0` None/non-dict, nocc counts as
+  Python ints, `return_dict` truthiness. 255 -> 161, carried.
+- four_eyes with a literal case key and three or more activities resolves
+  the third pair's inputs (activities 0-2, or 0-3 with more) before the
+  `literal_right` duplicate.
+- Fresh seeds 2026120100-11: one call, a reference-nondeterministic rework
+  row order (declared); 2026120112-23: one call, fixed (the four_eyes
+  order above).
+
+In the suite: new `docs/polars-filter-dh-bank.json.gz` and
+`docs/polars-sequence-filter-dh-big-bank.json.gz` with their ctests. The
+probes, big-int sequence domains and fresh banks are in the project files
+under `review-harness/round-dh/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DI) should start by re-reviewing round DH:
+
+- DH's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the 161 sequence big-int calls DH carried (`out/s2-big-plseq*.jsonl`
+  in the harness): scalar keys that are not str (`pl.col(int)` fails
+  `invalid input for col`, a group or sort key is a literal; the str
+  overloads read them as column names today) and ints past Int128 in
+  values and parameters built as `pl.lit` (ends_with and prefix values,
+  rework `min_occurrences`, nocc case-key lists);
+- attribute counts over list and tuple keys (probe `dh/specs/a1.py`, 636
+  of 880 calls refused natively; observations in DH1-5);
+- the `literal` list item where the frame has a `literal` column, and in
+  eager calls (still refused);
+- maybe the majority outcome of the partition race (DF1-7);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DG's targets, taken in DH (findings DH1-1 to DH1-6): DG's CI run, the
+fresh seeds, the big-int LTL/between/timestamp/variants calls and a first
+big-int probe of the sequence filters. Not taken (carried to DI): the
+`literal` item with a frame `literal` column or eager, the partition race,
+equal-size joins and the older CJ, CF and CD items.
+
+Previous list for round DH (kept for its older items):
 
 Next round (DH) should start by re-reviewing round DG:
 
