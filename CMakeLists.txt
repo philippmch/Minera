@@ -1458,6 +1458,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_review_dr2_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_dr2_tests COMMAND minera_review_dr2_tests)
 
+  add_executable(minera_review_ds1_tests src/backend/tests/test_review_ds1.cpp)
+  target_link_libraries(minera_review_ds1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_ds1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_ds1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_ds1_tests COMMAND minera_review_ds1_tests)
+
   add_executable(minera_resource_profiles_tests
     src/backend/tests/test_resource_profiles.cpp
   )
@@ -3871,6 +3877,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_dr_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dr-bank.json.gz")
   set_tests_properties(minera_pandas_filter_dr_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DS: tuple bounds of the case performance and case size filters made
+  # numpy arrays (ragged nesting, str leaves, broadcasting with the cases and
+  # the assignment checks; probes c1-c4).
+  add_test(NAME minera_pandas_filter_ds_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-ds-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_ds_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

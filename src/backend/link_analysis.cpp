@@ -17,9 +17,127 @@
 #include <stdexcept>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 namespace minera {
 namespace {
+
+// A CPython (3.11) set of row numbers (non-negative ints hash to
+// themselves), modelled for its iteration order (round DS): add probes
+// linearly within ten slots when they fit, then perturbs (i * 5 + 1 +
+// perturb, perturb >>= 5), and grows to the smallest power of two above
+// four times its size once filled to 3/5; a copy (`set_copy`) merges into
+// an empty set, which takes the other's slots as they are when the tables
+// match in size and reinserts them in table order otherwise; a merge first
+// presizes for both sets' sizes (no overlap assumed) when that would fill it
+// to 3/5, then adds the other's keys in table order. There are no deletions,
+// so no dummy slots.
+class RowSet {
+ public:
+  RowSet() : table_(8) {}
+
+  [[nodiscard]] std::size_t size() const noexcept { return used_; }
+
+  void add(std::size_t key) {
+    const auto mask = table_.size() - 1;
+    std::size_t perturb = key;
+    std::size_t i = key & mask;
+    while (true) {
+      std::size_t probes = i + 9 <= mask ? 9 : 0;
+      for (std::size_t j = i;; ++j) {
+        auto& slot = table_[j];
+        if (!slot.used) {
+          slot = {key, true};
+          ++used_;
+          if (++fill_ * 5 >= mask * 3) resize(used_ > 50000 ? used_ * 2 : used_ * 4);
+          return;
+        }
+        if (slot.key == key) return;
+        if (probes == 0) break;
+        --probes;
+      }
+      perturb >>= 5;
+      i = (i * 5 + 1 + perturb) & mask;
+    }
+  }
+
+  // set.union(other) (a copy of this set, then a merge of `other`); the
+  // union with itself only copies.
+  [[nodiscard]] RowSet united(const RowSet& other) const {
+    RowSet result;
+    result.merge(*this);
+    if (&other != this) result.merge(other);
+    return result;
+  }
+
+  // The keys in iteration (table) order.
+  [[nodiscard]] std::vector<std::size_t> order() const {
+    std::vector<std::size_t> keys;
+    for (const auto& slot : table_)
+      if (slot.used) keys.push_back(slot.key);
+    return keys;
+  }
+
+ private:
+  struct Slot {
+    std::size_t key = 0;
+    bool used = false;
+  };
+
+  static void insert_clean(std::vector<Slot>& table, std::size_t key) {
+    const auto mask = table.size() - 1;
+    std::size_t perturb = key;
+    std::size_t i = key & mask;
+    while (true) {
+      std::size_t probes = i + 9 <= mask ? 9 : 0;
+      for (std::size_t j = i;; ++j) {
+        if (!table[j].used) {
+          table[j] = {key, true};
+          return;
+        }
+        if (probes == 0) break;
+        --probes;
+      }
+      perturb >>= 5;
+      i = (i * 5 + 1 + perturb) & mask;
+    }
+  }
+
+  void resize(std::size_t minused) {
+    std::size_t size = 8;
+    while (size <= minused) size <<= 1;
+    // The 8-slot table stays in place when it has no dummies.
+    if (size == 8 && table_.size() == 8) return;
+    std::vector<Slot> grown(size);
+    for (const auto& slot : table_)
+      if (slot.used) insert_clean(grown, slot.key);
+    table_ = std::move(grown);
+    fill_ = used_;
+  }
+
+  void merge(const RowSet& other) {
+    if (&other == this || other.used_ == 0) return;
+    if ((fill_ + other.used_) * 5 >= (table_.size() - 1) * 3) resize((used_ + other.used_) * 2);
+    if (fill_ == 0 && table_.size() == other.table_.size()) {
+      table_ = other.table_;
+      fill_ = other.fill_;
+      used_ = other.used_;
+      return;
+    }
+    if (fill_ == 0) {
+      for (const auto& slot : other.table_)
+        if (slot.used) insert_clean(table_, slot.key);
+      fill_ = used_ = other.used_;
+      return;
+    }
+    for (const auto& slot : other.table_)
+      if (slot.used) add(slot.key);
+  }
+
+  std::vector<Slot> table_;
+  std::size_t fill_ = 0;
+  std::size_t used_ = 0;
+};
 
 struct Row {
   const Trace* trace = nullptr;
@@ -430,49 +548,63 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
   }
   // groupby(...).first() orders the kept pairs by source.
   if (options.keep_first_occurrence) std::sort(sources.begin(), sources.end());
-  std::map<std::size_t, std::set<std::size_t>> associations;
-  for (const auto& [source, targets] : added) associations[source].insert(targets.begin(), targets.end());
-  std::set<std::size_t> grown;
 
+  // The (source, target) rows: each source's targets in its set's
+  // iteration order (python::number_set_order for a set filled one by one).
+  std::vector<std::pair<std::size_t, std::size_t>> relation;
   if (options.propagate) {
+    // Round DS, modelled black-box (review-harness round-ds, pr/): the
+    // sources' sets, filled in merge order, grow by `set.union` with their
+    // targets' sets, pass after pass until none grows: the sources in the
+    // order they first appear in the merge of the in column with the out
+    // column (the self-merge with its sides swapped, after the look-forward
+    // filter), each source's targets in ascending order as they stood when
+    // the source's turn began, a union kept only when it grows the set. The
+    // sets' iteration order then follows CPython's table (RowSet). It
+    // agrees with pm4py on 868 of 871 swept calls; the rest stay declared.
+    std::map<std::size_t, RowSet> sets;
+    for (const auto& [source, targets] : added) {
+      auto& set = sets[source];
+      for (const auto target : targets) set.add(target);
+    }
+    std::vector<std::size_t> order;
+    std::set<std::size_t> placed;
+    for (const auto& [target_index, source_index] : detail::pandas_inner_merge_order(
+             in_keys, out_keys, frame && merge_numeric, monotonic(false), monotonic(true))) {
+      if (options.look_forward && target_index <= source_index) continue;
+      if (sets.contains(source_index) && placed.insert(source_index).second) order.push_back(source_index);
+    }
+    for (const auto& [source, set] : sets)
+      if (placed.insert(source).second) order.push_back(source);
     bool changed = true;
     while (changed) {
       changed = false;
-      for (auto& [source, linked] : associations) {
-        std::vector<std::size_t> additions;
-        for (const auto target : linked) {
-          const auto next = associations.find(target);
-          if (next == associations.end()) continue;
-          for (const auto candidate : next->second) {
-            if (!linked.contains(candidate)) additions.push_back(candidate);
-          }
-        }
-        for (const auto target : additions) {
-          if (linked.insert(target).second) {
-            changed = true;
-            grown.insert(source);
-            ++association_count;
-            if (association_count > options.max_links)
-              throw std::invalid_argument("link analysis exceeded max_links");
-          }
+      for (const auto source : order) {
+        auto targets = sets[source].order();
+        std::sort(targets.begin(), targets.end());
+        for (const auto target : targets) {
+          const auto next = sets.find(target);
+          if (next == sets.end()) continue;
+          auto& current = sets[source];
+          auto grown = current.united(next->second);
+          if (grown.size() <= current.size()) continue;
+          association_count += grown.size() - current.size();
+          if (association_count > options.max_links)
+            throw std::invalid_argument("link analysis exceeded max_links");
+          current = std::move(grown);
+          changed = true;
         }
       }
     }
-  }
-
-  // The (source, target) rows: a set's iteration order for the targets
-  // added one by one; a set propagation grew (built by set unions) lists
-  // its targets ascending, its order is not modelled (declared).
-  std::vector<std::pair<std::size_t, std::size_t>> relation;
-  for (const auto source : sources) {
-    if (grown.contains(source)) {
-      for (const auto target : associations[source]) relation.emplace_back(source, target);
-      continue;
+    for (const auto source : sources)
+      for (const auto target : sets[source].order()) relation.emplace_back(source, target);
+  } else {
+    for (const auto source : sources) {
+      const auto& targets = added[source];
+      std::vector<python::Scalar> values;
+      for (const auto target : targets) values.push_back(python::integer(static_cast<std::int64_t>(target)));
+      for (const auto i : python::number_set_order(values)) relation.emplace_back(source, targets[i]);
     }
-    const auto& targets = added[source];
-    std::vector<python::Scalar> values;
-    for (const auto target : targets) values.push_back(python::integer(static_cast<std::int64_t>(target)));
-    for (const auto i : python::number_set_order(values)) relation.emplace_back(source, targets[i]);
   }
   std::vector<detail::PandasMergeKey> row_keys, relation_keys;
   for (std::size_t index = 0; index < rows.size(); ++index) row_keys.push_back(std::to_string(index));

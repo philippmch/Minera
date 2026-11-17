@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DR (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DS (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6627,8 +6627,9 @@ Full suite 602 passed; no fixture changed (2,673 responses). The device
 check on the Mac was skipped (the Mac was not linked).
 
 Round DR re-reviewed DQ (Review DR1). DQ's commit 6e35984 ran CI run
-44169814298: Python, verifier and frontend green, and the macOS job green
-for the first time since DO. DR followed pandas' merge order into the
+44169814298: Python, verifier, frontend and Linux green (the Linux job had
+finished before DR pushed, contrary to the next list), and the macOS job
+green for the first time since DO. DR followed pandas' merge order into the
 other modules and replayed a batch of fresh seeds:
 - The merge's plain order (probes r1, 451 calls, and r2, 947 calls of
   `eventually_follows` list bounds): when both key arrays are
@@ -6660,6 +6661,80 @@ fresh banks are in the project files under `review-harness/round-dr/`.
 
 Full suite 604 passed; no fixture changed (2,673 responses). The device
 check on the Mac was skipped (the Mac was not linked).
+
+Round DS re-reviewed DR (Review DS1). DR's commit c56ad7b ran CI run
+44186475483: Python, verifier, frontend, Linux and macOS green, Windows
+still building when DS pushed; DQ's Windows job finished green, so all six
+DQ jobs passed. DS took DR's carried merges and the propagated link order:
+- Temporal profile conformance on a frame (3,000 server calls with
+  partial profiles): the per-case deviation order already agreed; an empty
+  profile makes pandas raise `KeyError: '<activity key>'` and Polars a
+  column-not-found error (native listed the cases). Fixed;
+  `minera_review_ds1_tests` binds 209 calls.
+- Link analysis under PROPAGATE: Gauss-Seidel passes over the sources in
+  the in/out merge's first-appearance order, each source's targets united
+  in ascending order from the set as its turn began, a union kept only
+  when it grows; CPython's `set.union` table (copy, then set_merge with
+  its presizing and equal-size slot copy) modelled as `RowSet`. 1,600 of
+  1,600 small-domain and 1,197 of 1,200 larger-domain calls in exact order
+  (3 declared, equal as sets). `minera_review_dr2_tests` and the OCEL
+  links bank now bind exact order (the bank's three declared calls sorted).
+- OCEL flattening: row order agrees (3,000 random OCELs); an OCEL without
+  relations, objects or events now raises pm4py's reader/flattening
+  errors instead of flattening to an empty log.
+- Tuple bounds of the pandas case performance and case size filters
+  (fresh pandas CK 2026121221 case 125; probes c1-c4, 2,220 calls): the
+  tuple becomes a numpy array first (ragged nesting raises the
+  inhomogeneous-shape error, str leaves have no comparison loop), then
+  broadcasts with the cases, compares leaf by leaf and must come out one
+  value per case. c1 154 -> 0, c2 96 -> 0, c3/c4 0.
+- Fresh seeds 2026121200-11: five calls, the declared struct cast race;
+  2026121212-23: three calls, the pandas CK one above and two equal-size
+  join orders (sequence CJ 2026121219 case 301 `suffixes`, CK 2026121218
+  case 510 `rework`; 24 reruns each gave both orders, declared).
+
+In the suite: new `docs/pandas-filter-ds-bank.json.gz` (2,220 calls) with
+`minera_pandas_filter_ds_bank_parity_tests`, `minera_review_ds1_tests`, and
+relation-free flattening in `minera_ocel_transform_tests`. The probes, the
+sweeps, the dumps and the fresh banks are in the project files under
+`review-harness/round-ds/`.
+
+Full suite 605 passed before the flattening and tuple-bound fixes; after
+them the 90 OCEL and pandas tests (606 tests in all with the new bank)
+passed again; no fixture changed (2,673 responses). The device check on
+the Mac was skipped (the Mac was not linked).
+
+Next round (DT) should start by re-reviewing round DS:
+
+- DS's CI run and DR's Windows job (still building when DS pushed);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- tuple bounds in the other pandas filters that compare a Series with a
+  bound (the numeric attribute filters, paths performance, the sequence
+  filters' size bounds): DS modelled numpy's array rules only in the case
+  performance and case size filters;
+- degenerate OCELs elsewhere: files without relations, objects or events
+  through the other OCEL endpoints and the XML and SQLite readers (pm4py's
+  XML readers raise AttributeError and its SQLite reader `No objects to
+  concatenate` on a relation-free log);
+- link analysis under PROPAGATE without look-forward and first occurrences
+  (three declared calls; a key-level pass where sources sharing an in key
+  share their result fits some of them);
+- the keep-once relative occurrence count with a dict case key naming
+  several existing columns, the nanosecond window at pandas' int64 range
+  ends, the eager paths performance race (DO1-2), the thread-count quirk
+  of DN1-6 (all declared);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DR's targets, taken in DS (findings DS1-1 to DS1-6): DR's CI run and
+DQ's Windows job, the fresh seeds, the temporal profile and flattening
+merges, the PROPAGATE order (all but three calls). Not taken (carried to
+DT): the declared items, the CU list, the new dtypes and the open choices.
+
+Previous list for round DS (kept for its older items):
 
 Next round (DS) should start by re-reviewing round DR:
 

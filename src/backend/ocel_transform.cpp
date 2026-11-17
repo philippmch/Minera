@@ -976,6 +976,20 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
           "OCEL flatten events require unique ids");
   }
 
+  // pm4py's readers keep no event and no object of a log without relations,
+  // and its flattening then raises on the frames' column types: a log without
+  // events cannot be read (the timestamp column is missing), one without
+  // objects has no type column, and one without relations merges a str case
+  // column with a float64 one (round DS, observed black-box through the OCEL
+  // 1.0 and 2.0 JSON readers; a log whose relations miss the type flattens to
+  // no trace).
+  if (log.events.empty()) throw std::invalid_argument("KeyError: 'ocel:timestamp'");
+  if (log.objects.empty()) throw std::invalid_argument("KeyError: 'ocel:type'");
+  if (log.relations.empty())
+    throw std::invalid_argument(
+        "ValueError: You are trying to merge on str and float64 columns for key 'case:concept:name'. If you "
+        "wish to proceed you should use pd.concat");
+
   // Keep relation rows rather than collapsing them: duplicate associations
   // are repeated event occurrences in the flattened log.
   std::map<std::string, std::size_t> selected_object_rank;

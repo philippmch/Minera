@@ -277,40 +277,55 @@ std::vector<bool> duration_mask(const std::vector<double>& durations,const std::
   const auto number=native_attribute_number(item);return lower?value>=number:value<=number;
  };
  std::vector<bool> result(n);
- // Round CK: a one-item tuple holding a nested list or tuple is a numpy
- // array of shape (1, ...): its items compare with every case, and the
- // two-dimensional result does not fit the index.
- if(bound.container==AttributeContainerKind::kTuple&&bound.children.size()==1&&!bound.children[0].is_null&&
-    (bound.children[0].container==AttributeContainerKind::kList||bound.children[0].container==AttributeContainerKind::kTuple)){
-  std::vector<std::size_t> shape{1};std::vector<const EventAttribute*> level{&bound.children[0]};
-  while(true){
-   std::optional<std::size_t> width;bool regular=true;
-   for(const auto* e:level){
-    if(e->is_null||(e->container!=AttributeContainerKind::kList&&e->container!=AttributeContainerKind::kTuple)){regular=false;break;}
-    if(width&&*width!=e->children.size()){regular=false;break;}
-    width=e->children.size();
-   }
-   if(!regular||!width)break;
-   shape.push_back(*width);std::vector<const EventAttribute*> next;
+ // Round DS (probes ds c1, c2; fresh pandas CK 2026121221 case 125): a tuple
+ // is made a numpy array before the comparison. Lists and tuples nest as
+ // dimensions while every item of a level is one and all have one length;
+ // a level mixing them, or lengths, is ragged and raises. Leaves holding a
+ // str (and no other object) make a str array, which has no comparison loop
+ // with the numbers. Otherwise the shape broadcasts with the cases' (n,),
+ // every leaf compares with its cases in C order (a non-number raises), and
+ // the result is assigned to the cases: its first dimension must be n and
+ // it must be one-dimensional.
+ if(bound.container==AttributeContainerKind::kTuple){
+  const auto is_sequence=[](const EventAttribute* e){return !e->is_null&&(e->container==AttributeContainerKind::kList||e->container==AttributeContainerKind::kTuple);};
+  const auto python_shape=[](const std::vector<std::size_t>& shape){
+   std::string out="(";for(std::size_t i=0;i<shape.size();++i)out+=(i?", ":"")+std::to_string(shape[i]);
+   return out+(shape.size()==1?",)":")");
+  };
+  std::vector<std::size_t> shape{bound.children.size()};std::vector<const EventAttribute*> level;
+  for(const auto& c:bound.children)level.push_back(&c);
+  while(!level.empty()){
+   const bool any=std::any_of(level.begin(),level.end(),is_sequence);
+   if(!any)break;
+   const bool all=std::all_of(level.begin(),level.end(),is_sequence);
+   const auto width=level.front()->children.size();
+   if(!all||std::any_of(level.begin(),level.end(),[&](const EventAttribute* e){return e->children.size()!=width;}))
+    error("ValueError","setting an array element with a sequence. The requested array has an inhomogeneous shape after "+std::to_string(shape.size())+" dimensions. The detected shape was "+python_shape(shape)+" + inhomogeneous part.");
+   shape.push_back(width);std::vector<const EventAttribute*> next;
    for(const auto* e:level)for(const auto& c:e->children)next.push_back(&c);
    level=std::move(next);
   }
-  if(shape.back()!=1&&shape.back()!=n&&n!=1){
+  const auto plain=[](const EventAttribute* e){return !e->is_null&&e->container==AttributeContainerKind::kScalar&&!is_native_na_attribute(*e)&&(numeric(*e)||text_value(*e));};
+  if(std::all_of(level.begin(),level.end(),plain)&&std::any_of(level.begin(),level.end(),[](const EventAttribute* e){return text_value(*e);}))
+   error("UFuncTypeError",std::string("ufunc '")+(lower?"greater_equal":"less_equal")+"' did not contain a loop with signature matching types (<class 'numpy.dtypes."+(sizes?"Int64DType":"Float64DType")+"'>, <class 'numpy.dtypes.StrDType'>) -> None");
+  const auto last=shape.back();
+  if(last!=n&&last!=1&&n!=1){
    std::string dims="(";for(std::size_t i=0;i<shape.size();++i)dims+=(i?",":"")+std::to_string(shape[i]);
-   error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) "+dims+") ");
+   error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) "+dims+(shape.size()==1?",) ":") "));
   }
-  for(const auto* item:level)for(std::size_t i=0;i<n;++i)compare(durations[cases[i]],*item);
-  error("ValueError","Length of values (1) does not match length of index ("+std::to_string(n)+")");
+  auto broadcast=shape;broadcast.back()=last==1?n:last;
+  const std::size_t outer=level.empty()?0:level.size()/last;
+  for(std::size_t o=0;o<outer;++o)
+   for(std::size_t j=0;j<broadcast.back();++j)(void)compare(durations[cases[n==1?0:j]],*level[o*last+(last==1?0:j)]);
+  if(broadcast.front()!=n)error("ValueError","Length of values ("+std::to_string(broadcast.front())+") does not match length of index ("+std::to_string(n)+")");
+  if(broadcast.size()>1)error("ValueError","Data must be 1-dimensional, got ndarray of shape "+python_shape(broadcast)+" instead");
+  for(std::size_t i=0;i<n;++i)result[i]=compare(durations[cases[i]],*level[last==1?0:i]);
+  return result;
  }
- if(bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple){
+ if(bound.container==AttributeContainerKind::kList){
   const auto k=bound.children.size();
-  if(bound.container==AttributeContainerKind::kList&&k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");
-  if(bound.container==AttributeContainerKind::kTuple&&k!=n&&k!=1){
-   // One case broadcasts to the tuple, whose result is assigned to that case.
-   if(n==1)error("ValueError","Length of values ("+std::to_string(k)+") does not match length of index (1)");
-   error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) ("+std::to_string(k)+",) ");
-  }
-  for(std::size_t i=0;i<n;++i)result[i]=compare(durations[cases[i]],bound.children[k==n?i:0]);
+  if(k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");
+  for(std::size_t i=0;i<n;++i)result[i]=compare(durations[cases[i]],bound.children[i]);
   return result;
  }
  for(std::size_t i=0;i<n;++i)result[i]=compare(durations[cases[i]],bound);

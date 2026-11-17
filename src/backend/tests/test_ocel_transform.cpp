@@ -523,6 +523,25 @@ void flatten_contract() {
     threw = true;
   }
   assert(threw);
+
+  // Round DS: pm4py's readers and flattening on logs without relations,
+  // objects or events.
+  const auto flatten_error = [](const minera::Ocel& input) {
+    try {
+      (void)minera::flatten_ocel_to_event_log(input, "order");
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what());
+    }
+    return std::string();
+  };
+  auto unrelated = log;
+  unrelated.relations.clear();
+  assert(flatten_error(unrelated).starts_with(
+      "ValueError: You are trying to merge on str and float64 columns for key 'case:concept:name'."));
+  unrelated.objects.clear();
+  assert(flatten_error(unrelated) == "KeyError: 'ocel:type'");
+  unrelated.events.clear();
+  assert(flatten_error(unrelated) == "KeyError: 'ocel:timestamp'");
 }
 
 }  // namespace

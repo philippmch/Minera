@@ -30702,10 +30702,11 @@ Tests:
 ## Review DR1: re-review of round DQ, pandas' merge order in the LTL list bounds and link analysis, list keys in the pandas attribute filters, fresh seeds (2026-11-17)
 
 Round DR checked DQ's CI (run 44169814298 on 6e35984: the Python,
-verifier and frontend jobs green, and the macOS job green for the first
-time since round DO), looked for pandas' merge order in the other modules
-that read a merge of non-unique keys in row order, and replayed a batch of
-fresh seeds. The device check on the Mac was skipped (the Mac was not
+verifier, frontend and Linux jobs green, the Linux job the first on the
+vendored time zone database, and the macOS job green for the first time
+since round DO; the Linux job was missing here until round DS), looked
+for pandas' merge order in the other modules that read a merge of
+non-unique keys in row order, and replayed a batch of fresh seeds. The device check on the Mac was skipped (the Mac was not
 linked).
 
 - **DR1-1 The merge's plain order on sorted keys** (`eventually_follows`
@@ -30796,3 +30797,118 @@ Tests:
 - Full suite: 604 tests passed. Python script and frontend tests not
   rerun (scripts and frontend unchanged); the workbench fixture replay
   gave 2,673 responses unchanged.
+
+## Review DS1: re-review of round DR, pandas' merge order in the temporal profile conformance and the OCEL flattening, the set order of propagated links, tuple bounds of the pandas case filters, fresh seeds (2026-11-17)
+
+Round DS checked DR's CI (run 44186475483 on c56ad7b: the Python,
+verifier, frontend, Linux and macOS jobs green, the Windows job still
+building when DS pushed) and DQ's Windows job (run 44169814298: green, so
+all six DQ jobs passed), took the merges DR carried, modelled the target
+order of propagated link sets, and replayed two batches of fresh seeds. The
+device check on the Mac was skipped (the Mac was not linked).
+
+- **DS1-1 Temporal profile conformance on a frame** (`/api/analyze-behavior`
+  family `temporal_conformance`, variant `dataframe`, on CSV uploads with
+  profiles that lack some activity pairs; harness `ds/tc/m1.py`, `m2.py`,
+  2,400 calls against a Python port of the native order, and `tc1.py`,
+  3,000 server calls). pm4py merges the row pairs with the profile's frame
+  on the two activity columns; the per-case deviation order already agreed
+  (2,926 server calls). The other 74 calls had an empty profile, whose frame has no columns: pandas raises
+  `KeyError: '<activity key>'`, Polars (a LazyFrame) a column-not-found
+  error, after the frame's own columns were checked; native listed every
+  case without deviations. Now raised the same way
+  (`temporal_profile.cpp`); the EventLog variant still lists the cases.
+- **DS1-2 Link analysis under PROPAGATE** (`/api/link-analysis` on dense
+  CSV uploads, every flag combination, exact order; `ds/pr/sw1.py`, seeds
+  0-199 over small domains and 7000-7149 over domains up to 30 rows).
+  Observed black-box: the propagation passes over the sources in the order
+  they first appear in the merge of the in keys with the out keys (after
+  the look-forward filter), unites each source's set with the set of each
+  of its targets in ascending target order (the targets taken as the set
+  stood when the source's turn began), keeps a union only when it grows
+  the set, and repeats the passes until nothing changes. The sets are
+  CPython sets, so each source lists its targets in the iteration order of
+  a table built by `set.union` (copy, then `set_merge`: an equal-size
+  table copied slot by slot into an empty one, otherwise presized and
+  inserted in table order); `link_analysis.cpp` models that table
+  (`RowSet`). Small domains: 1,600 of 1,600 calls in exact order (28 were
+  only equal as sets before); larger domains: 1,197 of 1,200 (1,092
+  before); a Python port agrees on 868 of 871 calls. The three left are
+  declared below.
+- **DS1-3 OCEL flattening.** The flattened frame's row order agrees with
+  the native order on 3,000 random OCELs with relations (`ds/fl/fz2.py`).
+  An OCEL without relations is new: pm4py's OCEL 1.0 and 2.0 JSON readers
+  keep no event and no object of it, and `ocel_flattening` then raises
+  `ValueError: You are trying to merge on str and float64 columns for key
+  'case:concept:name'. ...` (with objects declared) or
+  `KeyError: 'ocel:type'` (without objects); a log without events cannot
+  be read (`KeyError: 'ocel:timestamp'`). Native returned empty logs; now
+  `flatten_ocel_to_event_log` raises the same three errors
+  (`ocel_transform.cpp`). A log whose relations miss the object type still
+  flattens to no trace, as in pm4py.
+- **DS1-4 Tuple bounds of the pandas case filters** (fresh pandas CK
+  2026121221 case 125: `filter_case_performance` with the bound
+  `({}, [{...}])`; probes `ds/specs/c1.py`-`c4.py`, 2,220 calls on frames
+  of one to three cases). pandas hands a tuple bound to numpy, which makes
+  it an array before comparing: lists and tuples nest as dimensions while
+  every item of a level is one and all have one length, and a level that
+  mixes them or their lengths raises `setting an array element with a
+  sequence. The requested array has an inhomogeneous shape after D
+  dimensions. The detected shape was (...) + inhomogeneous part.`; leaves
+  holding a str and no other object make a str array, for which the
+  comparison has no loop (`UFuncTypeError: ufunc 'greater_equal' did not
+  contain a loop with signature matching types (<class
+  'numpy.dtypes.Float64DType'>, <class 'numpy.dtypes.StrDType'>) -> None`,
+  Int64DType for the case sizes) whatever the shapes; otherwise the array
+  broadcasts with the cases (`operands could not be broadcast together
+  with shapes (n,) (a,b) `), every leaf compares with its cases in C order
+  (a non-number raises its TypeError), and the result is assigned to the
+  cases: its first dimension must be n (`Length of values (a) does not
+  match length of index (n)`) and it must be one-dimensional (`Data must
+  be 1-dimensional, got ndarray of shape (a, b) instead`). Native raised
+  the length error before comparing and treated nested items as objects.
+  Modelled in `pandas_case_filter.cpp` for `filter_case_performance` and
+  `filter_on_case_size` (lists keep their own rule: one item per case,
+  compared item by item). c1: 154 -> 0 of 180; c2: 96 -> 0 of 240; c3 and
+  c4 (random nesting, 1,800 calls) 0.
+- **DS1-5 Fresh seeds.** Batch 2026121200-11 (twelve banks): five calls,
+  all the struct cast partition race the bank test accepts (Polars CJ
+  2026121203 two calls, CK 2026121201 three; declared since CJ). Batch
+  2026121212-23 (twelve banks): three calls. The pandas CK call is DS1-4.
+  Polars sequence CJ 2026121219 case 301 (`suffixes.apply`) and CK
+  2026121218 case 510 (`rework.apply`) return two rows in the order of an
+  equal-size join: 24 reruns of each in the reference gave both orders
+  (12/12 and 13/11; declared). Every other call replays clean.
+- **DS1-6 Doc fix.** DR1's text said DQ's Linux job was still running when
+  DR pushed; it had passed (corrected above).
+
+Declared:
+- Link analysis under PROPAGATE without look-forward and first
+  occurrences: three calls of the larger sweep (and three of the OCEL
+  links bank, links-001, -008 and -009 doc-ref/001) list one grown set in
+  an order the native pass order does not reach; their pairs agree as sets
+  (the bank compares those three sorted within each source).
+- The equal-size join order of the Polars sequence filters (DS1-5), as
+  before.
+- Still declared from earlier rounds: the keep-once relative occurrence
+  count with a dict case key naming several columns (DQ1-5), the
+  nanosecond window at pandas' int64 range ends (DQ1-2), dateutil-only
+  date strings (DP1-4, DQ1-4), the eager paths performance race (DO1-2),
+  the thread-count quirk of DN1-6 and the struct cast race.
+
+Tests:
+- New: `minera_review_ds1_tests` (209 DataFrame temporal conformance calls
+  on CSV uploads with partial profiles, plus the empty-profile errors of
+  the frame, view and LazyFrame variants); `docs/pandas-filter-ds-bank.json.gz`
+  (2,220 calls of c1-c4), replayed by
+  `minera_pandas_filter_ds_bank_parity_tests`; flattening without
+  relations, objects or events in `minera_ocel_transform_tests`.
+- `minera_review_dr2_tests` binds its PROPAGATE calls in pm4py's exact
+  order (42 expectations regenerated); `minera_ocel_links_parity_tests`
+  binds the propagated calls in exact order except the three declared.
+- All 24 docs pandas table banks replay clean with the changes, and every
+  call of both fresh batches replays clean or is declared.
+- Full suite: 605 tests passed before the flattening and tuple-bound
+  fixes; after them the 90 OCEL and pandas tests (606 in all) passed
+  again. Python script and frontend tests not rerun (scripts and frontend
+  unchanged); the workbench fixture replay gave 2,673 responses unchanged.

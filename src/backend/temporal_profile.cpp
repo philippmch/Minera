@@ -1007,12 +1007,24 @@ TemporalConformanceResult conform_temporal_profile_log(
   return conform_log(log, profile, options, false);
 }
 
-TemporalConformanceResult conform_temporal_profile_dataframe(
-    const EventTable& table, const TemporalProfile& profile,
-    const TemporalProfileOptions& options) {
+namespace {
+
+// pm4py's frame conformance merges the row pairs with the profile's frame on
+// the two activity columns; the frame of an empty profile has no columns, so
+// pandas raises KeyError on the activity key and Polars a column-not-found
+// error, after the frame's own columns were checked (round DS, observed
+// black-box; the EventLog conformance lists every case without deviations).
+TemporalConformanceResult conform_table(const EventTable& table, const TemporalProfile& profile,
+                                        const TemporalProfileOptions& options, bool lazy) {
   std::vector<std::size_t> case_first_rows;
   PairRanks ranks;
   auto log = temporal_table_to_log(table, options, &case_first_rows, &ranks);
+  if (profile.entries.empty()) {
+    if (lazy)
+      throw std::invalid_argument("unable to find column \"" + options.activity_attribute +
+                                  "\"; valid columns: []");
+    throw std::invalid_argument("KeyError: '" + options.activity_attribute + "'");
+  }
   // pm4py's DataFrame conformance lists the cases in the order of their
   // first rows (an XES upload's frame in file order), not by case id, and
   // takes its durations as pandas Timedeltas (round BJ, observed black-box);
@@ -1038,6 +1050,14 @@ TemporalConformanceResult conform_temporal_profile_dataframe(
                      ranks.empty() ? nullptr : &ranks);
 }
 
+}  // namespace
+
+TemporalConformanceResult conform_temporal_profile_dataframe(
+    const EventTable& table, const TemporalProfile& profile,
+    const TemporalProfileOptions& options) {
+  return conform_table(table, profile, options, false);
+}
+
 TemporalConformanceResult conform_temporal_profile(
     const EventDataView& data, const TemporalProfile& profile,
     const TemporalProfileOptions& options) {
@@ -1051,8 +1071,7 @@ TemporalConformanceResult conform_temporal_profile(
       return conform_temporal_profile_dataframe(*data.table(), profile,
                                                 options);
     case EventDataKind::kLazyEventTable:
-      return conform_temporal_profile_dataframe(
-          data.lazy_table()->materialize(), profile, options);
+      return conform_table(data.lazy_table()->materialize(), profile, options, true);
   }
   throw std::invalid_argument("temporal profile: unsupported event-data input");
 }

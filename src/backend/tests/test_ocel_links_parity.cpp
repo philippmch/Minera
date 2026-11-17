@@ -2,7 +2,8 @@
 // (docs/ocel-links-bank.json.gz). Link analysis: seeded event tables through
 // the public link_analysis.algorithm.apply with the default columns and with
 // doc->ref links under every LOOK_FORWARD/KEEP_FIRST_OCCURRENCE/PROPAGATE
-// combination, bound by the generated index pairs in order. Interleavings:
+// combination, bound by the generated index pairs in order (three propagated
+// calls sorted within sources, declared). Interleavings:
 // seeded related left/right logs through the public interleavings
 // algorithm.apply, bound by every row's activities, timestamps, indices,
 // direction and elapsed seconds in order; naive timestamps raise.
@@ -276,9 +277,10 @@ Json interleavings_case(const BankCase& item) {
 
 // Link rows come grouped by source; within a source the reference lists the
 // targets in a CPython set's iteration order, which the native analysis gives
-// (round DR). A set grown by propagation's set unions lists its targets in an
-// order that is not modelled (declared), so with PROPAGATE the targets are
-// compared sorted.
+// (round DR), also for the sets grown by propagation's set unions (round DS).
+// Three propagated calls without look-forward or first occurrences list a
+// grown set in an order the native pass order does not reach (declared): those
+// compare the targets sorted within each source.
 Json sorted_within_sources(const Json& pairs) {
   auto out = pairs;
   std::stable_sort(out.items.begin(), out.items.end(), [](const Json& a, const Json& b) {
@@ -305,7 +307,8 @@ Json iso_rows(const Json& rows) {
 }
 
 // The bound projection of a reference outcome: link pairs (in order, or
-// sorted within sources when propagated) or interleaving rows.
+// sorted within sources for the declared propagated calls) or interleaving
+// rows.
 Json projection(const Json& expected, bool propagate) {
   Json out;
   out.kind = Json::kObject;
@@ -319,7 +322,8 @@ std::string difference(const BankCase& item, const std::function<Json()>& produc
   Json actual;
   actual.kind = Json::kObject;
   std::string message;
-  const bool propagate = item.name.starts_with("links-") && item.call.ends_with("1") && item.call != "default";
+  const bool propagate = item.call == "doc-ref/001" &&
+                         (item.name == "links-001" || item.name == "links-008" || item.name == "links-009");
   try {
     actual.fields["value"] = produce();
     if (propagate) actual.fields["value"] = sorted_within_sources(actual.fields["value"]);
