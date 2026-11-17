@@ -30012,3 +30012,122 @@ Tests:
   the fix). Python script tests not rerun (scripts unchanged); the
   workbench fixture replay gave 2,673 responses unchanged (the eager
   overloads serve the workbench's DataFrame inputs).
+
+## Review DM1: re-review of round DL, the Polars sequence filters on eager DataFrames, eager table probes over set and big-int domains, fresh seeds (2026-11-17)
+
+Round DM checked DL's CI (run 44072270011 on 032458e6: green on all six
+jobs), took the eager area on to the Polars sequence filters, ran the
+earlier rounds' set, big-int, literal-column and empty-frame table probes
+on eager frames and replayed two batches of fresh seeds. The device check
+on the Mac was skipped (the Mac was offline).
+
+- **DM1-1 The Polars sequence filters on eager DataFrames** (new; the
+  sequence bank driver now calls each module's `EventTable` overload for a
+  case marked `"eager"` and the new `LazyEventTable` overloads otherwise;
+  domain `dm/dom/_probe_eager_seq_domain.py` over the base, CP, CK, CJ,
+  CH, typed, CB and CC sequence domains, probes q1b-q8, seeds 902-909,
+  81,030 calls). First replay: 4,853 differing. Observed and modelled
+  (`polars_sequence_filters.cpp`; the outermost eager call strips the
+  resolved plan except a group_by's over its eager input, as
+  `polars_eager_diagnostic.hpp` does for the table filters):
+  - the module helpers that end in `.collect()` fail there on a
+    DataFrame (`'DataFrame' object has no attribute 'collect'`):
+    `get_end_activities`, `filter_df_on_end_activities_nocc` without
+    `ea_count0`, both `get_variants_df`, and `traces.apply` and
+    `ends_with.apply` after their sort and group_by ran;
+  - the variant filters sort by [case, timestamp] first: a str case key
+    and the timestamp resolve before the group_by builds pl.col(activity)
+    (so a list of dicts as the activity key fails after a missing
+    timestamp), and a literal case key (a dict's struct, a list's list, an
+    int, float or bool) fails the sort's ShapeError unless the frame has
+    one row; the group_by's own key literals are built when agg runs,
+    after the aggregation's pl.col(activity) (an int past the Int128
+    range as the case key fails after a non-str activity key);
+  - an empty prefix or suffix list joins a LazyFrame of case ids onto the
+    DataFrame (`expected \`other\` to be a 'DataFrame', not 'LazyFrame'`);
+    the join on a None case key, and an empty key list's missing join
+    keys, fail after the filter's comparisons ran;
+  - boundary filters run the group_by before the values' literal is built
+    (a key selecting no column then builds the literal before the filter
+    misses its alias); `activity_split` runs the case's cum_count before
+    the activities' literal and builds the separator after the split
+    columns ran; a list case key resolves each name there (`"x" not
+    found`), two distinct names repeat `_row_within_case`, no name fails
+    the running count over `[]` on a frame with rows
+    (`at least one key is required in a group_by operation`), one name
+    reaches the alias's TypeError after the separator is built (probe
+    `dm/as1.py`);
+  - rework: the activity filter runs first, then the group_by (its own
+    plan over the filtered frame; a dict case key is its struct literal),
+    then the count filter builds its literal; a list case key beside a
+    literal activity key repeats `literal` in that group_by, the
+    `apply_activity_set` dict or list activity key included (also on a
+    LazyFrame); `pl.col({})` as the activity key fails the filter with no
+    plan;
+  - a scalar int activity in `activity_split` is pl.lit's own literal,
+    which refuses one past the Int128 range on a LazyFrame too
+    (`integer too large for Polars`; a list holds 2**127 as UInt128;
+    probe `dm/as2.py`).
+  q1b-q8 0 differing; five `rework.apply` calls whose two cases have the
+  same size come back in either order (reruns of the first in the
+  reference gave both), marked unordered. The lazy twin of q1b and all 27
+  docs Polars sequence banks (now on the lazy overloads) replay clean.
+- **DM1-2 Eager sequence probes over the set, scalar, big-int and
+  None/NaN/datetime domains** (probes e911-e928, seeds 911-928, the CK, CP,
+  CJ, CH and base set domains, the CK, CP, CJ and CH big-int, scalar and
+  None/NaN/datetime domains; 17 probes, 69,980 calls). First replay
+  393 differing (the set probes first captured without a fixed hash seed
+  in the main process, so their listed set order was wrong; recaptured
+  under PYTHONHASHSEED=0). After the fixes above, two calls differ: a set
+  holding NaN iterates in an order its listing cannot pin (NaN hashes by
+  identity), declared as before. A second round over the eight base
+  domains (probes r931-r938, seeds 931-938, 42,769 calls): 0 differing,
+  one more equal-size rework join marked unordered.
+- **DM1-3 Eager table probes over the set, big-int, `literal`-column and
+  empty-frame domains** (domain `dl/dom/_probe_eager_table_domain.py` over
+  the earlier rounds' probe domains, probes t941-t960). The top
+  activities filter on an eager frame calls `DataFrame.head(n)` on the
+  sorted counts after the group_by ran and before the missing collect():
+  Python compares n with 0 (a set, list, str or None fails it), a float
+  fails the integer conversion unless a negative one keeps no row, an int
+  past the UInt64 range overflows; a set activity key's items resolve in
+  the group_by's own plan first (`polars_attributes_filter.cpp`, probe
+  `dm/sp1.py`; 73 calls -> 0). Eighteen probes (t941-t948 over the base,
+  CK, CN, CJ, CH, CI, CF and CG set domains, t951-t955 over the CK, CN,
+  CJ, CH and CI big-int domains, t956-t957 over the CK and CN
+  `literal`-column domains, t958-t960 over the CK, CN and CJ domains on
+  frames cut to no row or one row; seeds 941-960): 138 calls carried to
+  round DN (attributes 41, cases 35, variants 30, between 16, LTL 14,
+  paths and timestamp one each; dumps `dm/out/t9*.jsonl` in the harness).
+  The classes seen: the variants filters' sort by [case, timestamp] runs
+  before pl.col reads a set, list or scalar activity key (as DM1-1 found
+  for the sequence filters); a dict bound holding a 128-bit int compares
+  as `struct[1]` in the eager case filters (`cannot perform '<='
+  comparison`); a set bound fails `head(n)`'s comparison before the
+  empty case key's join; the between filter's separator literal is built
+  after its `is_in` check; the attribute value counts and the relative
+  occurrence reach the missing collect() before a list or dict key's
+  hash; LTL case keys past the Int128 range fail their literal before
+  the sort; one `attr_value_different_persons` call is refused natively.
+  All 47 docs Polars table banks replay clean with the change.
+- **DM1-4 Fresh seeds.** Batch 1 (2026120600-11, twelve banks) and batch 2
+  (2026120612-23, twelve banks): one `attributes.apply` call in each CJ
+  table bank (2026120603 case 34, 2026120615 case 144) keeps two
+  equal-size cases and comes back in either row order (30 reference reruns
+  of each, under hash seeds 0 and 1, gave both orders), declared; the rest
+  0 differing.
+
+Declared:
+- The equal-size join orders of DM1-1, DM1-2 and DM1-4 (the reference
+  itself varies).
+- The two NaN-set orders of DM1-2 (left out of the bank).
+
+Tests:
+- New: `docs/polars-sequence-filter-dm-eager-bank.json.gz` (16,439 calls
+  in 7,602 eager cases: every error signature of q1b-q8, e911-e928 and
+  r931-r938 up to ten calls each, every 25th value call), replayed by
+  `minera_polars_sequence_filter_dm_eager_bank_parity_tests`.
+- `test_review_ca1.cpp` held two LazyFrame messages of the sequence
+  filters while calling the `EventTable` overload; the checks now call the
+  `LazyEventTable` overloads.
+- Full suite: 591 tests passed. Python script tests not rerun (scripts unchanged); the workbench fixture replay gave 2,673 responses unchanged.

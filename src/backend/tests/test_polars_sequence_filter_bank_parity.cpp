@@ -369,6 +369,7 @@ Json typed_value(const PandasFilterValue& v) {
 }
 
 Json table_node(const EventTable& table) { return jtagged("table", jstring(serialize_event_table_input_json(table))); }
+Json table_node(const LazyEventTable& table) { return table_node(table.materialize()); }
 
 // Expected tables travel as the reference's event-table JSON; they compare
 // through the native carrier's canonical serialization.
@@ -447,7 +448,8 @@ Json polars_filtering_constants_module(const std::string& name) {
   throw std::runtime_error("unbound constant " + name);
 }
 
-Json start_activities_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json start_activities_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply")
     return table_node(polars_start_activities_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   return constant(function);
@@ -467,7 +469,8 @@ bool scalar_activity_tag(const Json* node) {
   return scalar_case_tag(node) || tag == "n" || tag == "w" || tag == "date";
 }
 
-Json end_activities_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
+template <typename Table>
+Json end_activities_module(const std::string& function, const Table& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
     return table_node(polars_end_activities_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   const auto glue = keyword_text(kwargs, "case_id_glue", "case:concept:name");
@@ -565,7 +568,8 @@ std::optional<std::pair<PandasFilterValue, PandasFilterValue>> set_variants_keys
   return std::pair{c ? value_of(*c) : PandasFilterValue::of("case:concept:name"),
                    a ? value_of(*a) : PandasFilterValue::of("concept:name")};
 }
-Json traces_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
+template <typename Table>
+Json traces_module(const std::string& function, const Table& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
     return table_node(polars_trace_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1), true)));
   if (function == "get_variants_df") {
@@ -580,12 +584,14 @@ Json traces_module(const std::string& function, const EventTable& df, const Args
   }
   return constant(function);
 }
-Json starts_with_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json starts_with_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply")
     return table_node(polars_starts_with_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   return constant(function);
 }
-Json ends_with_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
+template <typename Table>
+Json ends_with_module(const std::string& function, const Table& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
     return table_node(polars_ends_with_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1), true)));
   if (function == "get_variants_df") {
@@ -600,31 +606,37 @@ Json ends_with_module(const std::string& function, const EventTable& df, const A
   }
   return constant(function);
 }
-Json rework_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json rework_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply") return table_node(polars_rework_filter_apply(df, parameters_of(*args.at(0))));
   if (function == "apply_activity_set")
     return table_node(polars_rework_filter_apply_activity_set(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   return constant(function);
 }
-Json prefixes_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json prefixes_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply") return table_node(polars_prefix_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   return constant(function);
 }
-Json suffixes_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json suffixes_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply") return table_node(polars_suffix_filter_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   return constant(function);
 }
-Json consecutive_act_case_grouping_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json consecutive_act_case_grouping_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply") return table_node(polars_consecutive_act_case_grouping_apply(df, parameters_of(*args.at(0))));
   throw std::runtime_error("unbound function " + function);
 }
-Json timestamp_case_grouping_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json timestamp_case_grouping_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply") return table_node(polars_timestamp_case_grouping_apply(df, parameters_of(*args.at(0))));
   if (function == "PARAMETER_CONSTANT_TIMESTAMP_KEY") return typed("s", std::string(kPolarsFilterTimestampKeyParameter));
   if (function == "DEFAULT_TIMESTAMP_KEY") return typed("s", std::string(kPolarsFilterDefaultTimestampKey));
   return constant(function);
 }
-Json activity_split_module(const std::string& function, const EventTable& df, const Args& args) {
+template <typename Table>
+Json activity_split_module(const std::string& function, const Table& df, const Args& args) {
   if (function == "apply") return table_node(polars_activity_split_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
   throw std::runtime_error("unbound function " + function);
 }
@@ -682,6 +694,10 @@ int main(int argc, char** argv) try {
   for (const auto& item : bank.at("cases").items) {
     ++case_index;
     const auto df = parse_event_table_json(serialize(item.at("source")));
+    // Round DM: a case marked "eager" calls the EventTable overloads (pm4py
+    // on an eager DataFrame), any other the LazyFrame ones.
+    const bool eager = item.get("eager") && item.at("eager").boolean;
+    const auto lazy = LazyEventTable::from_table(df);
     for (const auto& node : item.at("calls").items) {
       const auto qualified = node.at("function").text;
       const auto dot = qualified.find('.');
@@ -707,17 +723,17 @@ int main(int argc, char** argv) try {
         return run_call([&]() -> Json {
           const auto& args = call_args;
         if (module == "polars_filtering_constants") return polars_filtering_constants_module(function);
-        if (module == "start_activities") return start_activities_module(function, df, args);
-        if (module == "end_activities") return end_activities_module(function, df, args, kwargs);
-        if (module == "traces") return traces_module(function, df, args, kwargs);
-        if (module == "starts_with") return starts_with_module(function, df, args);
-        if (module == "ends_with") return ends_with_module(function, df, args, kwargs);
-        if (module == "rework") return rework_module(function, df, args);
-        if (module == "prefixes") return prefixes_module(function, df, args);
-        if (module == "suffixes") return suffixes_module(function, df, args);
-        if (module == "consecutive_act_case_grouping") return consecutive_act_case_grouping_module(function, df, args);
-        if (module == "timestamp_case_grouping") return timestamp_case_grouping_module(function, df, args);
-        if (module == "activity_split") return activity_split_module(function, df, args);
+        if (module == "start_activities") return eager ? start_activities_module(function, df, args) : start_activities_module(function, lazy, args);
+        if (module == "end_activities") return eager ? end_activities_module(function, df, args, kwargs) : end_activities_module(function, lazy, args, kwargs);
+        if (module == "traces") return eager ? traces_module(function, df, args, kwargs) : traces_module(function, lazy, args, kwargs);
+        if (module == "starts_with") return eager ? starts_with_module(function, df, args) : starts_with_module(function, lazy, args);
+        if (module == "ends_with") return eager ? ends_with_module(function, df, args, kwargs) : ends_with_module(function, lazy, args, kwargs);
+        if (module == "rework") return eager ? rework_module(function, df, args) : rework_module(function, lazy, args);
+        if (module == "prefixes") return eager ? prefixes_module(function, df, args) : prefixes_module(function, lazy, args);
+        if (module == "suffixes") return eager ? suffixes_module(function, df, args) : suffixes_module(function, lazy, args);
+        if (module == "consecutive_act_case_grouping") return eager ? consecutive_act_case_grouping_module(function, df, args) : consecutive_act_case_grouping_module(function, lazy, args);
+        if (module == "timestamp_case_grouping") return eager ? timestamp_case_grouping_module(function, df, args) : timestamp_case_grouping_module(function, lazy, args);
+        if (module == "activity_split") return eager ? activity_split_module(function, df, args) : activity_split_module(function, lazy, args);
         throw std::runtime_error("unbound module " + module);
         });
       };

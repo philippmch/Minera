@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DL (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DM (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6399,6 +6399,80 @@ are in the project files under `review-harness/round-dl/`.
 
 No fixture changed. The device check on the Mac was skipped (the Mac was
 offline).
+
+Round DM re-reviewed DL (Review DM1). DL's commit 032458e6 ran CI run
+44072270011 (green on all six jobs). DM took the eager area on to the
+Polars sequence filters, ran the earlier set, big-int, `literal`-column and
+empty-frame table probes on eager frames and replayed two batches of fresh
+seeds:
+- The Polars sequence filters on eager DataFrames (the sequence bank
+  driver now calls each module's `EventTable` overload for an eager case
+  and new `LazyEventTable` overloads otherwise). The helpers that end in
+  `.collect()` fail there; the variant filters sort by [case, timestamp]
+  before the group_by builds pl.col(activity) (a literal case key fails the
+  sort's ShapeError unless the frame has one row) and build the group_by
+  keys' literals when agg runs; an empty prefix or suffix list joins a
+  LazyFrame onto the DataFrame; joins on a None case key and an empty key
+  list fail after the comparisons; `activity_split` runs its columns step
+  by step (list case keys: missing names, a repeated `_row_within_case`,
+  no name over rows, then the separator and the alias); rework runs the
+  activity filter, the group_by and the count filter in turn. Two lazy
+  fixes came with it: a scalar int activity past the Int128 range in
+  `activity_split`, and a list case key beside an `apply_activity_set`
+  dict or list activity key repeating `literal`. Probes q1b-q8 (81,030
+  calls) 4,853 -> 0; seventeen probes over the set, scalar, big-int and
+  None/NaN/datetime sequence domains 393 -> 2 (NaN sets, declared); eight
+  fresh-seed probes 0; seven equal-size rework joins marked unordered.
+- Eager table probes over the set, big-int, `literal`-column and
+  empty-frame domains: the top activities filter follows
+  `DataFrame.head(n)` before the missing collect() (73 calls -> 0).
+  Eighteen probes leave 138 calls carried to DN (attributes 41, cases 35,
+  variants 30, between 16, LTL 14, paths and timestamp one each).
+- Fresh seeds 2026120600-11 and 2026120612-23: one `attributes.apply`
+  call in each CJ table bank comes back in either row order in the
+  reference itself (declared); the rest 0.
+
+In the suite: new `docs/polars-sequence-filter-dm-eager-bank.json.gz`
+(16,439 calls) with its ctest; `test_review_ca1.cpp` calls the lazy
+overloads for its two LazyFrame messages. The probes, the eager sequence
+domain, the dumps of the carried table calls and the fresh banks are in
+the project files under `review-harness/round-dm/`.
+
+No fixture changed. The device check on the Mac was skipped (the Mac was
+offline).
+
+Next round (DN) should start by re-reviewing round DM:
+
+- DM's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the 138 eager table calls DM carried (DM1-3; banks and dumps
+  `dm/out/t9*.json.gz` and `dm/out/t9*.jsonl` in the harness, replay with
+  `dm/trq.sh TAG`): the variants filters' sort before pl.col of a set,
+  list or scalar activity key; dict bounds holding 128-bit ints in the
+  case filters (`cannot perform '<=' comparison ... struct[1]`); a set
+  bound in `filter_on_ncases` before the empty key's join; the between
+  separator after `is_in`; attribute value counts and relative occurrence
+  reaching collect() before a list or dict key's hash; LTL case keys past
+  Int128 before the sort; one native refusal in
+  `attr_value_different_persons`;
+- eager sequence probes over the `literal`-column domains (round DK's
+  `dk/dom/_probe_plseq_lit_domain.py`) and empty eager frames;
+- maybe the majority outcome of the partition race (DF1-7, seen again in
+  DI, DJ and DK; the reference itself varies);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DL's targets, taken in DM (findings DM1-1 to DM1-4): DL's CI run, the
+fresh seeds, the Polars sequence filters on eager DataFrames and the eager
+table probes (set, big-int, `literal`-column, empty frames; part carried).
+Not taken (carried to DN): the partition race, the CU list and the open
+choices.
+
+Previous list for round DM (kept for its older items):
 
 Next round (DM) should start by re-reviewing round DL:
 

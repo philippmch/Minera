@@ -1759,6 +1759,33 @@ void check_head(const EventAttribute& maximum) {
   if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","Python int too large to convert to C long");
   if(n>TokenInteger(std::numeric_limits<std::uint32_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
 }
+// Round DM: on an eager frame filter_df_keeping_spno_activities calls
+// DataFrame.head(n) on the sorted counts (after the group_by ran) before the
+// missing collect(): Python compares n with 0 first (a value that is no
+// number fails it, None too), a float fails the integer conversion unless a
+// negative one keeps no row, an int past the UInt64 range overflows (probe
+// dm/sp1.py; as polars_case_filter's eager_head).
+std::size_t group_height(const EventTable& source,const EventAttribute& attr) {
+  if(source.rows.empty())return 0;
+  std::vector<std::size_t> columns;
+  if(text(attr)){if(const auto at=index_of(source,attr.value))columns.push_back(*at);}
+  else for(const auto& item:attr.children)if(text(item))if(const auto at=index_of(source,item.value))columns.push_back(*at);
+  if(columns.empty())return 1;
+  std::unordered_set<std::string> seen;
+  for(const auto& row:source.rows){std::string key;for(const auto c:columns){const auto& cell=row[c];key+=(!cell||cell->is_null?std::string("\x01"):"v"+cell->value)+"\x02";}seen.insert(key);}
+  return seen.size();
+}
+[[noreturn]] void eager_collect(const EventTable& source,const PolarsAttributesFilterCall& call,const EventAttribute& attr) {
+  if(call.operation==Op::kTopActivities) {
+    const auto n=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
+    if(!integer(n)&&!boolean(n)&&!real(n))fail("TypeError","apply","'<' not supported between instances of '"+(null(n)?std::string("NoneType"):core_type(n))+"' and 'int'");
+    if(real(n)) {
+      const auto value=number(n);
+      if(!(value<0&&static_cast<double>(group_height(source,attr))+value<=0))fail("TypeError","apply","'float' object cannot be interpreted as an integer");
+    } else if(integer(n)&&TokenInteger(std::numeric_limits<std::uint64_t>::max())<exact(n))fail("OverflowError","apply","int too big to convert");
+  }
+  fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+}
 StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttributesFilterCall& call,const EventAttribute& attr,bool eager) {
   const auto op=call.operation;const auto& options=call.options;const auto& items=attr.children;
   const bool once=op==Op::kRelative&&options.keep_once_per_case&&truth(*options.keep_once_per_case);
@@ -1773,7 +1800,7 @@ StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttribu
     if(op==Op::kTopActivities&&!eager)check_head(call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt}));
     const bool top=op==Op::kTopActivities&&!eager;
     resolve_list_keys(source,items,top?"'slice'":"'group_by'",frame_plan(source),top?std::vector<std::string>{"'group_by'","'select'","'slice'"}:std::vector<std::string>{"'group_by'"});
-    if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+    if(eager)eager_collect(source,call,attr);
     for(std::size_t i=0;i<source.size();++i)rows.push_back(i);
     frame=source;
   } else {
@@ -1792,7 +1819,7 @@ StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttribu
     frame=source;frame.columns={source.columns[*case_column],"literal"};frame.dtypes={source.dtypes[*case_column],"List"};
     for(std::size_t i=0;i<source.columns.size();++i)if(own(i)){frame.columns.push_back(source.columns[i]);frame.dtypes.push_back(source.dtypes[i]);}
     resolve_list_keys(frame,items,"'group_by'",aggregate_plan(source,*case_column,attr),{"'group_by'"});
-    if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+    if(eager)eager_collect(source,call,attr);
     // The first row of each case (a null case is a group too), reindexed to
     // the aggregated columns.
     frame.rows.clear();std::unordered_set<std::string> seen;
@@ -1932,7 +1959,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     if(dict_items&&op!=Op::kTopActivities&&!mapping(attr.children.front())&&!(countoptions.keep_once_per_case&&truth(*countoptions.keep_once_per_case))) {
       for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
         fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'group_by'",frame_plan(source),{"'group_by'"}));
-      if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+      if(eager)eager_collect(source,call,attr);
       if(op==Op::kRelative) {
         // Round CR: the denominator, then the stake times it, then each
         // count against that threshold; no count leaves pl.col(attribute)
@@ -1958,7 +1985,9 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       // Round DB: group_by(set) takes the set's items as keys; head(n) checks
       // its bound while the plan is built, the slice resolves the columns,
       // then the collected frame refuses a set as a column selector.
-      if(detail::polars_lit::set_argument(attr)&&!eager) {
+      // Round DM: on an eager frame the group_by resolves the keys (its own
+      // plan over the frame) before head(n) and the missing collect().
+      if(detail::polars_lit::set_argument(attr)) {
         // Round DC: group_by builds each item that is no str as a literal
         // first: a nested set is refused, a tuple builds its Series.
         for(const auto& item:attr.children) {
@@ -1968,7 +1997,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
           if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
         }
         const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
-        if(!null(maximum)) {
+        if(!null(maximum)&&!eager) {
           if((text(maximum)||collection(maximum))&&truth(maximum))fail("TypeError","apply","'<' not supported between instances of '"+core_type(maximum)+"' and 'int'");
           if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
           const auto n=exact(maximum);
@@ -1978,16 +2007,18 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
         // its place, a second item that is no str repeats the name `literal`
         // (CI set probe case 265).
         std::size_t literals=0;
-        const std::vector<std::string> nodes{"'group_by'","'select'","'slice'"};
+        const auto nodes=eager?std::vector<std::string>{"'group_by'"}:std::vector<std::string>{"'group_by'","'select'","'slice'"};
+        const std::string node=eager?"'group_by'":"'slice'";
         for(const auto& item:attr.children) {
-          if(text(item)){if(!index_of(source,item.value))fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved("'slice'",frame_plan(source),nodes));continue;}
-          if(++literals==2)fail("DuplicateError","apply","group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved("'slice'",frame_plan(source),nodes));
+          if(text(item)){if(!index_of(source,item.value))fail("ColumnNotFoundError","apply",column_prefix(source,item.value)+resolved(node,frame_plan(source),nodes));continue;}
+          if(++literals==2)fail("DuplicateError","apply","group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved(node,frame_plan(source),nodes));
         }
+        if(eager)eager_collect(source,call,attr);
         fail("TypeError","apply",detail::polars_lit::set_selector_error(attr));
       }
-      if(collection(attr)) {if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");fail("AttributeError","apply","'DataFrame' object has no attribute 'to_list'");}
+      if(collection(attr)) {if(eager)eager_collect(source,call,attr);fail("AttributeError","apply","'DataFrame' object has no attribute 'to_list'");}
       if(text(attr)&&!index_of(source,attr.value))fail("ColumnNotFoundError","apply",column_prefix(source,attr.value)+resolved(eager?"'group_by'":"'slice'",frame_plan(source),eager?std::vector<std::string>{"'group_by'"}:std::vector<std::string>{"'group_by'","'select'","'slice'"}));
-      if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+      if(eager)eager_collect(source,call,attr);
       if(null(attr))fail("TypeError","apply","cannot select columns using key of type 'NoneType': None");
       if(integer(attr)) {
         // Round DG: the literal key's one group, unless head(0) or an empty
@@ -1998,7 +2029,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       }
     }
     schema=counts_schema(source,attr,countoptions,op==Op::kRelative,false,eager);
-    if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+    if(eager)eager_collect(source,call,attr);
     // Round DB: grouped by several set items, the counts pair each group's
     // first key with its second, which the threshold compares; then
     // pl.col(set) checks its items (probe set-pltblck-2 case 201).

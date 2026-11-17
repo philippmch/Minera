@@ -175,7 +175,8 @@ void polars_check_filter_parameters_carrier(const PolarsFilterValue& parameters,
 [[nodiscard]] EventTable polars_activity_split_apply(const EventTable& df, const PolarsFilterValue& activity,
                                                      const PolarsFilterParameters& parameters = std::nullopt);
 
-// LazyFrame entry points: the same filters over a materialized LazyEventTable.
+// LazyFrame entry points: the same filters over a materialized LazyEventTable,
+// rendering a LazyFrame's resolved plans.
 [[nodiscard]] LazyEventTable polars_start_activities_apply(const LazyEventTable& df, const PolarsFilterValue& values,
                                                            const PolarsFilterParameters& parameters = std::nullopt);
 [[nodiscard]] LazyEventTable polars_end_activities_apply(const LazyEventTable& df, const PolarsFilterValue& values,
@@ -199,5 +200,45 @@ void polars_check_filter_parameters_carrier(const PolarsFilterValue& parameters,
     const LazyEventTable& df, const PolarsFilterParameters& parameters = std::nullopt);
 [[nodiscard]] LazyEventTable polars_activity_split_apply(const LazyEventTable& df, const PolarsFilterValue& activity,
                                                          const PolarsFilterParameters& parameters = std::nullopt);
+// Round DM: the remaining entry points on a LazyFrame. The EventTable
+// overloads above are pm4py's filters called on an eager DataFrame: each
+// statement runs as it is called (no resolved plan in a failure but a
+// group_by's), and the trace, ends_with and end-activity count helpers
+// fail on the eager frame's missing collect().
+[[nodiscard]] LazyEventTable polars_filter_df_on_end_activities(
+    const LazyEventTable& df, const PolarsFilterValue& values, const std::string& case_id_glue = "case:concept:name",
+    const std::string& activity_key = "concept:name", const PolarsFilterValue& positive = PolarsFilterValue::of(true));
+[[nodiscard]] LazyEventTable polars_filter_df_on_end_activities(const LazyEventTable& df, const PolarsFilterValue& values,
+                                                                const PolarsFilterValue& case_id_glue,
+                                                                const PolarsFilterValue& activity_key,
+                                                                const PolarsFilterValue& positive);
+[[nodiscard]] PolarsFilterValue polars_get_end_activities(const LazyEventTable& df,
+                                                          const std::string& case_id_key = "case:concept:name",
+                                                          const std::string& activity_key = "concept:name");
+[[nodiscard]] PolarsFilterValue polars_get_end_activities(const LazyEventTable& df, const PolarsFilterValue& case_id_key,
+                                                          const PolarsFilterValue& activity_key);
+[[nodiscard]] PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
+    const LazyEventTable& df, const PolarsFilterValue& nocc,
+    const std::optional<PolarsFilterValue>& ea_count0 = std::nullopt,
+    const std::string& case_id_glue = "case:concept:name", const std::string& activity_key = "concept:name",
+    bool return_dict = false, const std::optional<PolarsFilterValue>& most_common_variant = std::nullopt);
+[[nodiscard]] PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
+    const LazyEventTable& df, const PolarsFilterValue& nocc, const std::optional<PolarsFilterValue>& ea_count0,
+    const PolarsFilterValue& case_id_glue, const PolarsFilterValue& activity_key, bool return_dict,
+    const std::optional<PolarsFilterValue>& most_common_variant);
+[[nodiscard]] LazyEventTable polars_trace_filter_get_variants_df(const LazyEventTable& df,
+                                                                 const std::string& case_id_key = "case:concept:name",
+                                                                 const std::string& activity_key = "concept:name");
+[[nodiscard]] LazyEventTable polars_ends_with_filter_get_variants_df(const LazyEventTable& df,
+                                                                     const std::string& case_id_key = "case:concept:name",
+                                                                     const std::string& activity_key = "concept:name");
+[[nodiscard]] LazyEventTable polars_trace_filter_get_variants_df(const LazyEventTable& df,
+                                                                 const PolarsFilterValue& case_id_key,
+                                                                 const PolarsFilterValue& activity_key);
+[[nodiscard]] LazyEventTable polars_ends_with_filter_get_variants_df(const LazyEventTable& df,
+                                                                     const PolarsFilterValue& case_id_key,
+                                                                     const PolarsFilterValue& activity_key);
+[[nodiscard]] LazyEventTable polars_rework_filter_apply_activity_set(
+    const LazyEventTable& df, const PolarsFilterValue& activities, const PolarsFilterParameters& parameters = std::nullopt);
 
 }  // namespace minera

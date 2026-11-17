@@ -175,8 +175,11 @@ EventTable enum_frame() {
 
 void polars_enum_sequence_filters() {
   const auto source = enum_frame();
+  // Round DM: the resolved plans are the LazyFrame's (the EventTable
+  // overloads model pm4py on an eager DataFrame).
+  const auto lazy = LazyEventTable::from_table(source);
   check_error<PolarsSequenceFilterError>(
-      "Polars trace variants on an Enum activity", [&] { (void)polars_trace_filter_get_variants_df(source, kCase, kActivity); },
+      "Polars trace variants on an Enum activity", [&] { (void)polars_trace_filter_get_variants_df(lazy, kCase, kActivity); },
       "InvalidOperationError",
       "attempted list join with non-string dtype: list[enum]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'with_columns' "
       "<---\nAGGREGATE[maintain_order: true]\n  [col(\"concept:name\").implode().alias(\"variant_list\"), len().alias(\"count\")] BY "
@@ -185,7 +188,7 @@ void polars_enum_sequence_filters() {
       "'with_columns'\n");
   const auto values = PolarsFilterValue::list({PolarsFilterValue::of("a"), PolarsFilterValue::of("x"), PolarsFilterValue::none()});
   check_error<PolarsSequenceFilterError>(
-      "Polars start activities outside the Enum categories", [&] { (void)polars_start_activities_apply(source, values, {}); },
+      "Polars start activities outside the Enum categories", [&] { (void)polars_start_activities_apply(lazy, values, {}); },
       "InvalidOperationError",
       "conversion from `str` to `enum` failed in column '' for 1 out of 3 values: [\"x\"]\n\nEnsure that all values in the input column are "
       "present in the categories of the enum datatype.\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nFILTER "

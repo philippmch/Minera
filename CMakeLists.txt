@@ -3245,6 +3245,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_dk_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dk-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_dk_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DM: every Polars sequence filter on eager DataFrames (cases marked
+  # "eager"; probes q1b-q8 over the base, CP, CK, CJ, CH, typed, CB and CC
+  # domains and the eager set/scalar/big-int/None probes).
+  add_test(NAME minera_polars_sequence_filter_dm_eager_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dm-eager-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_dm_eager_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
