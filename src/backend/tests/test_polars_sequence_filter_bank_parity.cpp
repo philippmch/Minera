@@ -453,6 +453,20 @@ Json start_activities_module(const std::string& function, const EventTable& df, 
   return constant(function);
 }
 
+// Round DI: a key given as an int, float or bool (a case key) or as any
+// scalar other than a str (an activity key) goes through the
+// PolarsFilterValue overloads too.
+bool scalar_case_tag(const Json* node) {
+  if (!node) return false;
+  const auto& tag = node->fields.begin()->first;
+  return tag == "i" || tag == "f" || tag == "b";
+}
+bool scalar_activity_tag(const Json* node) {
+  if (!node) return false;
+  const auto& tag = node->fields.begin()->first;
+  return scalar_case_tag(node) || tag == "n" || tag == "w" || tag == "date";
+}
+
 Json end_activities_module(const std::string& function, const EventTable& df, const Args& args, const Json& kwargs) {
   if (function == "apply")
     return table_node(polars_end_activities_apply(df, value_of(*args.at(0)), parameters_of(*args.at(1))));
@@ -465,7 +479,8 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
     const auto* act = keyword(kwargs, "activity_key");
     const auto* list_glue = keyword(kwargs, "case_id_glue");
     const auto tag = [](const Json* node) { return node ? node->fields.begin()->first : std::string("s"); };
-    if (tag(list_glue) == "l" || tag(list_glue) == "t" || tag(list_glue) == "S" || tag(act) == "S") {
+    if (tag(list_glue) == "l" || tag(list_glue) == "t" || tag(list_glue) == "S" || tag(act) == "S" || tag(act) == "l" || tag(act) == "t" ||
+        scalar_case_tag(list_glue) || scalar_activity_tag(act)) {
       return table_node(polars_filter_df_on_end_activities(df, value_of(*args.at(0)), list_glue ? value_of(*list_glue) : PandasFilterValue::of("case:concept:name"),
                                                            act ? value_of(*act) : PandasFilterValue::of("concept:name"),
                                                            positive ? value_of(*positive) : PandasFilterValue::of(true)));
@@ -479,6 +494,8 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
     const auto& tag = node->fields.begin()->first;
     return tag == "S" || tag == "l" || tag == "t";
   };
+  const auto listed_case = [&](const Json* node) { return listed_key(node) || scalar_case_tag(node); };
+  const auto listed_activity = [&](const Json* node) { return listed_key(node) || scalar_activity_tag(node); };
   const auto* act_node = keyword(kwargs, "activity_key");
   if (function == "filter_df_on_end_activities_nocc") {
     const auto* counts = keyword(kwargs, "ea_count0");
@@ -506,7 +523,7 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
                                                      activity, want, variant ? std::optional(value_of(*variant)) : std::nullopt);
     };
     const auto out = [&] {
-      if (!listed_key(glue_node) && !listed_key(act_node)) return str_call();
+      if (!listed_case(glue_node) && !listed_activity(act_node)) return str_call();
       try {
         return polars_filter_df_on_end_activities_nocc(
             df, value_of(*args.at(0)), counts ? std::optional(value_of(*counts)) : std::nullopt,
@@ -524,7 +541,7 @@ Json end_activities_module(const std::string& function, const EventTable& df, co
   }
   if (function == "get_end_activities") {
     const auto* case_node = keyword(kwargs, "case_id_key");
-    if (listed_key(case_node) || listed_key(act_node)) try {
+    if (listed_case(case_node) || listed_activity(act_node)) try {
         return typed_value(polars_get_end_activities(df, case_node ? value_of(*case_node) : PandasFilterValue::of("case:concept:name"),
                                                      act_node ? value_of(*act_node) : PandasFilterValue::of("concept:name")));
       } catch (const PolarsSequenceFilterError&) {
@@ -543,7 +560,8 @@ std::optional<std::pair<PandasFilterValue, PandasFilterValue>> set_variants_keys
   const auto* c = keyword(kwargs, "case_id_key");
   const auto* a = keyword(kwargs, "activity_key");
   const auto tag = [](const Json* node) { return node ? node->fields.begin()->first : std::string("s"); };
-  if (tag(c) != "S" && tag(a) != "S") return std::nullopt;
+  const auto listed = [&](const Json* node) { return tag(node) == "S" || tag(node) == "l" || tag(node) == "t"; };
+  if (!listed(c) && !listed(a) && !scalar_case_tag(c) && !scalar_activity_tag(a)) return std::nullopt;
   return std::pair{c ? value_of(*c) : PandasFilterValue::of("case:concept:name"),
                    a ? value_of(*a) : PandasFilterValue::of("concept:name")};
 }

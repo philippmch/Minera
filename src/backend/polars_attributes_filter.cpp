@@ -1328,6 +1328,7 @@ EventTable filtered(const EventTable& source,const Predicate& query) {
 }
 // Round DC: `pairs` holds several keys of get_attribute_values, whose dict
 // maps each group's first key value to its second (probe dc/ga1).
+bool plain_list_key(const EventAttribute& attr);
 struct CountColumn { std::optional<std::size_t> column, cases;EventAttribute literal;std::string dtype;bool once=false,literal_case=false;std::vector<EventAttribute> pairs; };
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw);
 // Round DC: the plain keys of several items get_attribute_values groups by
@@ -1449,8 +1450,22 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
       resolve_pair_keys(source,attr.children,groupnodes);
       result.pairs=attr.children;return result;
     }
+    // Round DI: get_attribute_values over one key item counts that item; a
+    // list or tuple item is a List literal, which the dict cannot take as a
+    // key (probe dh/specs/a1.py).
+    if(pairs&&!result.once&&attr.children.size()==1&&!mapping(attr.children.front())&&!detail::polars_lit::set_argument(attr.children.front())) {
+      const auto& item=attr.children.front();
+      if(sequence_item(item)){if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);fail("TypeError","apply","unhashable type: 'list'");}
+      return counts_schema(source,item,options,relative,pairs);
+    }
     // Round DC: get_attribute_values with several plain keys (probe dc/ga1).
     if(pairs&&!result.once&&attr.children.size()>=2&&std::all_of(attr.children.begin(),attr.children.end(),pair_item)){
+      resolve_pair_keys(source,attr.children,groupnodes);result.pairs=attr.children;return result;
+    }
+    // Round DI: several items with a list or tuple after the first: its
+    // List literal is a key like any other (probe di/specs/a3.py).
+    if(pairs&&!result.once&&attr.children.size()>=2&&plain_list_key(attr)) {
+      for(const auto& item:attr.children)if(sequence_item(item))if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);
       resolve_pair_keys(source,attr.children,groupnodes);result.pairs=attr.children;return result;
     }
     for(const auto& item:attr.children)if(text(item)&&!index_of(source,item.value))
@@ -1479,7 +1494,12 @@ PolarsAttributeCounts pair_counts(const EventTable& source,const CountColumn& co
   if(sequence_item(col.pairs.front())){if(source.size())fail("TypeError","apply","unhashable type: 'list'");return {};}
   std::vector<std::optional<std::size_t>> at;
   for(const auto& item:col.pairs)at.push_back(text(item)?index_of(source,item.value):std::nullopt);
-  const auto value=[&](std::size_t i,std::size_t row){return at[i]?clean_value(cell(source,row,*at[i])):clean_value(col.pairs[i]);};
+  const auto value=[&](std::size_t i,std::size_t row){
+    auto v=at[i]?clean_value(cell(source,row,*at[i])):clean_value(col.pairs[i]);
+    // Round DI: a tuple literal comes back as a Python list.
+    if(v.container==AttributeContainerKind::kTuple)v.container=AttributeContainerKind::kList;
+    return v;
+  };
   std::unordered_set<std::string> seen;PolarsAttributeCounts out;
   const auto nan=[](const EventAttribute& v){return !null(v)&&real(v)&&std::isnan(number(v));};
   for(std::size_t row=0;row<source.size();++row) {
@@ -1555,6 +1575,263 @@ bool variant_contains(const EventAttribute& variant,const EventAttribute& key) {
   fail("TypeError","apply","argument of type '"+core_type(variant)+"' is not iterable");
 }
 struct StatisticalSelection { EventAttribute attribute,values; bool unchanged=false,from_cache=false; };
+// Round DI: a list or tuple key of plain items (no dict, no set item) as the
+// statistics filters group by it (probes di/k8-k15, dh/specs/a1.py): a str
+// item is that column, any other item a literal named `literal`; the counts
+// dict maps each group's first key to its second (to the group's count for one
+// key), a later group replacing an earlier one.
+bool plain_list_key(const EventAttribute& attr) {
+  if((attr.container!=AttributeContainerKind::kList&&attr.container!=AttributeContainerKind::kTuple)||attr.children.empty())return false;
+  return std::none_of(attr.children.begin(),attr.children.end(),[](const EventAttribute& item){return mapping(item)||detail::polars_lit::set_argument(item);});
+}
+std::string key_name(const EventAttribute& item){return text(item)?item.value:std::string("literal");}
+[[noreturn]] void duplicate_key(const std::string& name,const std::string& node,const std::string& plan,const std::vector<std::string>& nodes) {
+  fail("DuplicateError","apply","group_by keys contained duplicate output name '"+name+"'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved(node,plan,nodes));
+}
+// The keys resolve in order against `frame`: a missing name fails at its
+// place, a repeated output name there.
+void resolve_list_keys(const EventTable& frame,const std::vector<EventAttribute>& items,const std::string& node,const std::string& plan,const std::vector<std::string>& nodes) {
+  std::vector<std::string> names;
+  for(const auto& item:items) {
+    if(text(item)&&!index_of(frame,item.value))fail("ColumnNotFoundError","apply",column_prefix(frame,item.value)+resolved(node,plan,nodes));
+    const auto name=key_name(item);
+    if(std::find(names.begin(),names.end(),name)!=names.end())duplicate_key(name,node,plan,nodes);
+    names.push_back(name);
+  }
+}
+// One dict entry: the key and every value a group gave it (several when
+// groups share a first key; the groups come in no fixed order).
+struct ListEntry { EventAttribute key; std::vector<EventAttribute> values; };
+bool python_key_equal(const EventAttribute& a,const EventAttribute& b) {
+  // Each NaN is a key of its own (Polars hands out distinct float objects).
+  const auto nan=[](const EventAttribute& v){return !null(v)&&!collection(v)&&real(v)&&std::isnan(number(v));};
+  if(nan(a)||nan(b))return false;
+  if(collection(a)||collection(b))return false;
+  return scalar_equal(a,b);
+}
+// The groups of `rows` by the key items in their first places: (first row,
+// count); a key of literals only keeps its group on an empty frame (row
+// npos).
+using ListGroups=std::vector<std::pair<std::size_t,std::size_t>>;
+constexpr std::size_t kNoRow=static_cast<std::size_t>(-1);
+ListGroups list_groups(const EventTable& frame,const std::vector<std::size_t>& rows,const std::vector<EventAttribute>& items) {
+  std::vector<std::optional<std::size_t>> at;
+  for(const auto& item:items)at.push_back(text(item)?index_of(frame,item.value):std::nullopt);
+  if(rows.empty()&&std::none_of(at.begin(),at.end(),[](const auto& a){return a.has_value();}))return {{kNoRow,0}};
+  ListGroups out;std::unordered_map<std::string,std::size_t> position;
+  for(const auto row:rows) {
+    std::string key;
+    for(std::size_t i=0;i<at.size();++i)if(at[i]){
+      // The per-case frame's `literal` column holds one List value.
+      const auto& dtype=source_dtype(frame,*at[i]);
+      const auto k=dtype=="List"?std::string("L"):group_key(cell(frame,row,*at[i]),dtype);key+=std::to_string(k.size())+":"+k;
+    }
+    auto [it,inserted]=position.emplace(key,out.size());if(inserted)out.push_back({row,0});
+    ++out[it->second].second;
+  }
+  return out;
+}
+// The dict entries of the groups.
+std::vector<ListEntry> list_entries(const EventTable& frame,const ListGroups& groups,const std::vector<EventAttribute>& items) {
+  // A list or tuple literal comes back as a Python list.
+  const auto value=[&](std::size_t i,std::size_t row){
+    auto v=text(items[i])&&row!=kNoRow?clean_value(cell(frame,row,*index_of(frame,items[i].value))):clean_value(items[i]);
+    if(v.container==AttributeContainerKind::kTuple)v.container=AttributeContainerKind::kList;
+    return v;
+  };
+  std::vector<ListEntry> out;
+  for(const auto& [row,count]:groups) {
+    auto first=value(0,row);
+    if(collection(first))fail("TypeError","apply","unhashable type: 'list'");
+    auto second=items.size()==1?count_value(count):value(1,row);
+    const auto found=std::find_if(out.begin(),out.end(),[&](const ListEntry& e){return python_key_equal(e.key,first);});
+    if(found==out.end())out.push_back(ListEntry{std::move(first),{std::move(second)}});
+    else found->values.push_back(std::move(second));
+  }
+  return out;
+}
+// The AGGREGATE a per-case count groups by [case, key list] (a List literal)
+// as its plan prints it.
+std::string aggregate_plan(const EventTable& source,std::size_t case_column,const EventAttribute& attr) {
+  std::string out="AGGREGATE[maintain_order: false]\n  [";bool first=true;
+  for(std::size_t i=0;i<source.columns.size();++i){if(i==case_column)continue;if(!first)out+=", ";first=false;out+="col("+quote(source.columns[i])+").first()";}
+  std::vector<detail::polars_lit::Value> values;for(const auto& item:attr.children)values.push_back(detail::polars_lit::value_of(item,true));
+  const bool nested=std::any_of(attr.children.begin(),attr.children.end(),[](const EventAttribute& v){return collection(v);});
+  out+="] BY [col("+quote(source.columns[case_column])+"), "+detail::polars_lit::literal_list_display(nested?detail::polars_lit::nested_list_literal(values):detail::polars_lit::list_literal(values))+"]\n  FROM\n  "+frame_plan(source);
+  return out;
+}
+// Round DI: df[key list] on the collected counts frame (width keys + 1,
+// `height` rows), as Polars 1.44.1 indexes a DataFrame by a list (probes
+// di/k9-k11); a frame always comes back, which has no to_list.
+[[noreturn]] void frame_list_index(const EventAttribute& attr,std::size_t height,const std::function<std::string()>& cell_type) {
+  const auto& items=attr.children;
+  const auto width=items.size()+1;const auto& first=items.front();
+  if(boolean(first)&&!collection(first)&&!null(first))
+    fail("ValueError","apply","expected "+std::to_string(width)+" values when selecting columns by boolean mask, got "+std::to_string(items.size()));
+  // A pair (row, name) selects one cell: on an empty frame nothing is read,
+  // so pl.col(key) fails next; else the cell, which has no to_list (probe
+  // di/k16).
+  if(attr.container==AttributeContainerKind::kTuple&&items.size()==2&&!text(first)) {
+    if(height==0){(void)col_selector_unmodelled(attr);throw std::invalid_argument("Native Polars attribute counts: a tuple key selector");}
+    if(!integer(first)||collection(first)){
+      if(null(first)||real(first))fail("TypeError","apply","cannot select elements using key of type '"+python_type(first)+"': "+detail::polars_lit::object_repr(detail::polars_lit::value_of(first,true)));
+      throw std::invalid_argument("Native Polars attribute counts: a tuple key selector");
+    }
+    const auto i=exact(first);
+    if(i>TokenInteger(std::numeric_limits<std::int64_t>::max())||i<TokenInteger(std::numeric_limits<std::int64_t>::min()))fail("OverflowError","apply","Python int too large to convert to C long");
+    const auto n=static_cast<std::int64_t>(i);const auto h=static_cast<std::int64_t>(height);
+    if(n<-h||n>=h)fail("IndexError","apply","index "+i.decimal()+" is out of bounds for sequence of length "+std::to_string(height));
+    fail("AttributeError","apply","'"+cell_type()+"' object has no attribute 'to_list'");
+  }
+  if(text(first)) {
+    for(const auto& item:items)if(!text(item))fail("TypeError","apply",null(item)?"'None' is not an instance of 'str'":"'"+pyo3_type(item)+"' object is not an instance of 'str'");
+    fail("AttributeError","apply","'DataFrame' object has no attribute 'to_list'");
+  }
+  if(integer(first)&&!collection(first)&&!null(first)) {
+    const auto i=exact(first);
+    if(i>TokenInteger(std::numeric_limits<std::int64_t>::max())||i<TokenInteger(std::numeric_limits<std::int64_t>::min()))fail("OverflowError","apply","Python int too large to convert to C long");
+    const auto n=static_cast<std::int64_t>(i);
+    if(items.size()>=2) {
+      // Rows by position mixed with names: the position is checked against
+      // the width, then the name fails as an index.
+      if(n<-static_cast<std::int64_t>(width)||n>=static_cast<std::int64_t>(width))fail("IndexError","apply","index "+i.decimal()+" is out of bounds for sequence of length "+std::to_string(width));
+      fail("TypeError","apply","'"+pyo3_type(items[1])+"' object cannot be interpreted as an integer");
+    }
+    if(n>=(std::int64_t{1}<<32))fail("ValueError","apply","index positions should be smaller than 2^32");
+    if(n<=-(std::int64_t{1}<<32))fail("ValueError","apply","index positions should be greater than or equal to -2^32");
+    const auto h=static_cast<std::int64_t>(height);
+    if(n>=0){if(n>=h)fail("OutOfBoundsError","apply","gather indices are out of bounds");}
+    else if(n+h<0)fail("InvalidOperationError","apply","conversion from `i64` to `u32` failed in column 'literal' for 1 out of 1 values: ["+std::to_string(n+h)+"]\n\nThis error occurred in the following expression:\n\t.when([(col(\"\")) < (0)]).then([("+std::to_string(h)+") + (col(\"\"))]).otherwise(col(\"\")).strict_cast(UInt32)\n");
+    fail("AttributeError","apply","'DataFrame' object has no attribute 'to_list'");
+  }
+  fail("TypeError","apply","cannot select columns using Sequence with elements of type '"+python_type(first)+"'");
+}
+void check_head(const EventAttribute& maximum) {
+  if(null(maximum))return;
+  if((text(maximum)||collection(maximum))&&truth(maximum))fail("TypeError","apply","'<' not supported between instances of '"+core_type(maximum)+"' and 'int'");
+  if(!integer(maximum)&&!boolean(maximum))fail("TypeError","apply","'"+core_type(maximum)+"' object cannot be interpreted as an integer");
+  const auto n=exact(maximum);
+  if(n<0)fail("ValueError","apply","negative slice lengths ("+n.decimal()+") are invalid for LazyFrame");
+  if(n>TokenInteger(std::numeric_limits<std::int64_t>::max()))fail("OverflowError","apply","Python int too large to convert to C long");
+  if(n>TokenInteger(std::numeric_limits<std::uint32_t>::max()))fail("OverflowError","apply","number too large to fit in target type");
+}
+StatisticalSelection list_key_stats(const EventTable& source,const PolarsAttributesFilterCall& call,const EventAttribute& attr,bool eager) {
+  const auto op=call.operation;const auto& options=call.options;const auto& items=attr.children;
+  const bool once=op==Op::kRelative&&options.keep_once_per_case&&truth(*options.keep_once_per_case);
+  StatisticalSelection selection;selection.attribute=attr;selection.values.container=AttributeContainerKind::kList;
+  const auto sequence=[](const EventAttribute& v){return v.container==AttributeContainerKind::kList||v.container==AttributeContainerKind::kTuple;};
+  std::vector<std::size_t> rows;
+  EventTable frame;
+  if(!once) {
+    // Each item that is no str is a literal built with the plan; a list or
+    // tuple item builds its Series.
+    for(const auto& item:items)if(sequence(item))if(const auto error=detail::polars_lit::argument_literal_fault(item))fail(error->type,"apply",error->message);
+    if(op==Op::kTopActivities&&!eager)check_head(call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt}));
+    const bool top=op==Op::kTopActivities&&!eager;
+    resolve_list_keys(source,items,top?"'slice'":"'group_by'",frame_plan(source),top?std::vector<std::string>{"'group_by'","'select'","'slice'"}:std::vector<std::string>{"'group_by'"});
+    if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+    for(std::size_t i=0;i<source.size();++i)rows.push_back(i);
+    frame=source;
+  } else {
+    // Per case: group_by([case, key list]) builds the list's Series (a List
+    // literal), keeps each case's first row, then groups those by the list.
+    const auto& case_key=options.case_id_key;
+    if(!text(case_key))throw std::invalid_argument("Native Polars per-case counts over a key list need a str case key");
+    if(const auto error=detail::polars_lit::argument_literal_fault(attr))fail(error->type,"apply",error->message);
+    const auto case_column=index_of(source,case_key.value);
+    if(!case_column)fail("ColumnNotFoundError","apply",column_prefix(source,case_key.value)+resolved("'group_by'",frame_plan(source),{"'group_by'","'group_by'"}));
+    // A str item `literal` reads the List literal column (the key list).
+    if(std::find(source.columns.begin(),source.columns.end(),"literal")!=source.columns.end())
+      throw std::invalid_argument("Native Polars per-case counts over a key list on a frame with a `literal` column");
+    if(source.rows.empty())throw std::invalid_argument("Native Polars per-case counts over a key list on an empty frame");
+    frame=source;frame.columns={source.columns[*case_column],"literal"};frame.dtypes={source.dtypes[*case_column],"List"};
+    for(std::size_t i=0;i<source.columns.size();++i)if(i!=*case_column){frame.columns.push_back(source.columns[i]);frame.dtypes.push_back(source.dtypes[i]);}
+    resolve_list_keys(frame,items,"'group_by'",aggregate_plan(source,*case_column,attr),{"'group_by'"});
+    if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
+    // The first row of each case (a null case is a group too), reindexed to
+    // the aggregated columns.
+    frame.rows.clear();std::unordered_set<std::string> seen;
+    const auto case_dtype=source_dtype(source,*case_column);
+    for(std::size_t i=0;i<source.size();++i) {
+      if(!seen.insert(group_key(cell(source,i,*case_column),case_dtype)).second)continue;
+      auto listed=attr;listed.container=AttributeContainerKind::kList;
+      std::vector<std::optional<EventAttribute>> row{source.rows[i][*case_column],listed};
+      for(std::size_t c=0;c<source.columns.size();++c)if(c!=*case_column)row.push_back(source.rows[i][c]);
+      frame.rows.push_back(std::move(row));
+    }
+    for(std::size_t i=0;i<frame.size();++i)rows.push_back(i);
+  }
+  const auto groups=list_groups(frame,rows,items);
+  if(op==Op::kTopActivities) {
+    // The counts frame holds one row per group, cut by head(n).
+    const auto maximum=call.maximum.value_or(EventAttribute{"","25",AttributeKind::kInt});
+    std::size_t height=groups.size();
+    if(!null(maximum)&&exact(maximum)<TokenInteger(height))height=static_cast<std::size_t>(static_cast<std::int64_t>(exact(maximum)));
+    // A (row, name) pair reads one cell of that column: its Python type,
+    // when every group agrees.
+    const auto cell_type=[&]{
+      const auto& name=items[1];
+      if(!text(name))throw std::invalid_argument("Native Polars attribute counts: a tuple key selector");
+      std::optional<std::string> type;
+      for(const auto& [row,count]:groups) {
+        const auto v=row==kNoRow?nil():cell(frame,row,*index_of(frame,name.value));
+        const auto t=core_type(v);
+        if(type&&*type!=t)throw std::invalid_argument("Native Polars attribute counts: a tuple key cell of mixed types");
+        type=t;
+      }
+      return type.value_or("NoneType");
+    };
+    frame_list_index(attr,height,cell_type);
+  }
+  const auto entries=list_entries(frame,groups,items);
+  EventAttribute threshold;
+  if(op==Op::kRelative) {
+    const bool case_denominator=!options.keep_once_per_case||truth(*options.keep_once_per_case);
+    const std::size_t denominator=case_denominator?distinct_case_count(source,options.case_id_key):source.size();
+    if(entries.empty())return selection;
+    const auto& stake=*call.stake;
+    if(null(stake)||date(stake)||mapping(stake)||stake.container==AttributeContainerKind::kSet||stake.container==AttributeContainerKind::kFrozenSet)fail("TypeError","apply","unsupported operand type(s) for *: '"+core_type(stake)+"' and 'int'");
+    // The stake times the denominator: a str repeats, an int stays an int.
+    if(text(stake)){std::string repeated;for(std::size_t i=0;i<denominator;++i)repeated+=stake.value;threshold=EventAttribute{"",repeated};}
+    else if(collection(stake)){
+      if(std::any_of(entries.begin(),entries.end(),[](const ListEntry& e){return std::any_of(e.values.begin(),e.values.end(),[](const EventAttribute& v){return collection(v);});}))
+        throw std::invalid_argument("Native Polars relative occurrence over a key list: a list against a repeated list stake");
+      threshold=stake;
+    }
+    else if(integer(stake)||boolean(stake))threshold=EventAttribute{"",(exact(stake)*TokenInteger(static_cast<std::int64_t>(denominator))).decimal(),AttributeKind::kInt};
+    else {threshold=EventAttribute{"",real_text(number(stake)*static_cast<double>(denominator)),AttributeKind::kFloat};threshold.typed_value=number(stake)*static_cast<double>(denominator);}
+  } else threshold=*call.threshold;
+  // Each entry against the threshold: the dict holds one value per key, so a
+  // key whose groups compare differently is outside the model; so are two
+  // different errors (the first in dict order is raised).
+  std::vector<std::string> errors;
+  for(const auto& entry:entries) {
+    std::optional<bool> admitted;std::optional<std::string> error;
+    for(const auto& value:entry.values) {
+      std::optional<bool> a;std::optional<std::string> e;
+      try{a=python_ge(value,threshold);}catch(const PolarsAttributesFilterError& x){e=x.type+"\n"+x.message;}
+      if((admitted||error)&&(a!=admitted||e!=error))throw std::invalid_argument("Native Polars attribute counts on a key list: groups sharing a first key compare differently");
+      admitted=a;error=e;
+    }
+    if(error){if(std::find(errors.begin(),errors.end(),*error)==errors.end())errors.push_back(*error);continue;}
+    bool keep=*admitted;
+    if(!keep&&call.most_common_variant&&!null(*call.most_common_variant))keep=variant_contains(*call.most_common_variant,entry.key);
+    if(keep)selection.values.children.push_back(entry.key);
+  }
+  if(errors.size()>1)throw std::invalid_argument("Native Polars attribute counts on a key list: several comparison errors in dict order");
+  if(errors.size()==1){const auto cut=errors.front().find('\n');fail(errors.front().substr(0,cut),"apply",errors.front().substr(cut+1));}
+  selection.unchanged=op==Op::kThreshold&&selection.values.children.size()==entries.size();
+  return selection;
+}
+// Round DI: pl.col(key list) as the statistics filters select by it: an item
+// that is no str fails pl.col; one name is that column; several names expand
+// the predicate (refused by predicate()).
+EventAttribute list_selector(const EventAttribute& attr) {
+  (void)col_selector_unmodelled(attr);
+  const auto names=distinct_names(attr);
+  if(names.children.size()==1)return EventAttribute{"",names.children.front().value};
+  return names;
+}
 StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilterCall& call,bool eager) {
   const auto op=call.operation;const auto& options=call.options;const auto attr=op==Op::kRelative?options.attribute_key:options.activity_key;
   StatisticalSelection selection;selection.attribute=attr;selection.values.container=AttributeContainerKind::kList;
@@ -1630,6 +1907,8 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
       // frame comes back as given (fresh CK bank 2026112701 case 237).
       if(op==Op::kThreshold){selection.unchanged=true;return selection;}
     }
+    // Round DI: a list or tuple key of plain items (probe dh/specs/a1.py).
+    if(!dict_items&&plain_list_key(attr))return list_key_stats(source,call,attr,eager);
     if(op==Op::kTopActivities) {
       // Round DB: group_by(set) takes the set's items as keys; head(n) checks
       // its bound while the plan is built, the slice resolves the columns,
@@ -1757,8 +2036,14 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
 }
 EventTable stats_output(const EventTable& source,const PolarsAttributesFilterCall& call,const StatisticalSelection& selection,bool eager) {
   if(selection.unchanged)return source;
-  if(call.operation==Op::kRelative)col_selector(selection.attribute);
-  auto filtering=call;filtering.operation=Op::kEvents;filtering.values=selection.values;filtering.options.attribute_key=col_key(selection.attribute,source.columns);
+  auto filtering=call;filtering.operation=Op::kEvents;filtering.values=selection.values;
+  // Round DI: pl.col(key list): one name is that column, several expand the
+  // predicate, which the filter refuses as ambiguous.
+  if(plain_list_key(selection.attribute))filtering.options.attribute_key=list_selector(selection.attribute);
+  else {
+    if(call.operation==Op::kRelative)col_selector(selection.attribute);
+    filtering.options.attribute_key=col_key(selection.attribute,source.columns);
+  }
   if(call.operation!=Op::kRelative)filtering.options.positive=EventAttribute{"","true",AttributeKind::kBoolean};
   return select_rows(source,matching(source,predicate(source,filtering,eager,selection.from_cache?nullptr:&selection.values.children)));
 }
@@ -1787,7 +2072,7 @@ LazyPolarsAttributesFilterResult invoke_polars_attributes_filter(const LazyEvent
     // predicate over the original source. Diagnostics keep the source kind.
     const auto materialized=source.materialize();const auto selected=stats(materialized,call,false);
     // pl.col(attribute) is built while apply runs, so a bad selector fails there.
-    if(call.operation==Op::kRelative&&!selected.unchanged)col_selector(selected.attribute);
+    if(call.operation==Op::kRelative&&!selected.unchanged){if(plain_list_key(selected.attribute))(void)list_selector(selected.attribute);else col_selector(selected.attribute);}
     return deferred(source,[call,selected](const auto& table){return stats_output(table,call,selected,false);});
   }
   return deferred(source,[call](const auto& table){const auto query=predicate(table,call,false);return filtered(table,query);},case_projection(meta,call));

@@ -3229,6 +3229,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_dh_big_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dh-big-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_dh_big_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DI: the 161 big-int calls DH carried and int, float and bool keys
+  # (probes scal-plseq{cp,ck,cj,ch}-1, less 122 carried calls).
+  add_test(NAME minera_polars_sequence_filter_di_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-di-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_di_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3450,6 +3455,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dh_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dh-bank.json.gz")
   set_tests_properties(minera_polars_filter_dh_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DI: list and tuple keys in the attribute counts (probes dh/a1 and
+  # di/a3, less the calls that follow the reference's random group order).
+  add_test(NAME minera_polars_filter_di_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-di-bank.json.gz")
+  set_tests_properties(minera_polars_filter_di_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

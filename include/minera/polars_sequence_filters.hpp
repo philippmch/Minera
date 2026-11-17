@@ -89,8 +89,10 @@ struct PolarsEndActivitiesNocc {
 // Round DC: the keys given as a str or a set, list or tuple: the case key
 // groups by each item (a str a column, any other item a literal named
 // `literal`), the activity key is pl.col of its names; the filtering step is
-// polars_filter_df_on_end_activities with the same keys. Other key values
-// throw std::invalid_argument.
+// polars_filter_df_on_end_activities with the same keys. Round DI: an int,
+// float or bool case key is a literal named `literal` (an int past Int128
+// fails its pl.lit); an activity key that is no str fails pl.col. Other key
+// values throw std::invalid_argument.
 [[nodiscard]] PolarsFilterValue polars_get_end_activities(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                           const PolarsFilterValue& activity_key);
 [[nodiscard]] PolarsEndActivitiesNocc polars_filter_df_on_end_activities_nocc(
@@ -112,7 +114,10 @@ struct PolarsEndActivitiesNocc {
 // literal (pl.lit refuses a set); a set activity key is read by pl.col (its
 // items must be str; one existing name selects that column). Other values,
 // and other set activity keys, are outside the native domain
-// (std::invalid_argument).
+// (std::invalid_argument). Round DI: a list or tuple activity key is read as
+// a set is; an int, float or bool case key is a literal in pm4py's sort and
+// group_by (as polars_rework_filter_apply and the end-activity helpers read
+// it).
 [[nodiscard]] EventTable polars_trace_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                              const PolarsFilterValue& activity_key);
 [[nodiscard]] EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,

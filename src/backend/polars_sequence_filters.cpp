@@ -181,7 +181,12 @@ std::string col_item_type(const Value& v) {
   return "object";
 }
 // pl.col on a list: every item a str, or the first item names the type.
+// Round DI: pl.col on a scalar other than a str or a dict (None, a bool, an
+// int, a float, a date) fails on its type (probes di/k1-k5).
 void check_col_list(const Value* key) {
+  if (key && key->kind != Kind::kString && key->kind != Kind::kDict && key->kind != Kind::kList && key->kind != Kind::kTuple &&
+      key->kind != Kind::kSet)
+    fail("TypeError", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + col_item_type(*key) + "'.");
   if (!key || (key->kind != Kind::kList && key->kind != Kind::kTuple && key->kind != Kind::kSet) || key->items.empty()) return;
   const auto& first = key->items.front();
   if (first.kind != Kind::kString)
@@ -325,9 +330,43 @@ const Value* list_case(const PolarsFilterParameters& p) {
   const auto* v = case_key_value(p);
   return list_value(v) ? v : nullptr;
 }
-// The list literal as a plan shows it (["c"], [1, null]).
+// Round DI: a case key given as an int, float or bool is one pl.lit literal
+// where pm4py groups, sorts or joins by it, so it filters as a one-item list
+// does (probes di/k1-k5), except that plans print it as the scalar
+// (`dyn int: 5`, not `[5]`), that an int past the Int128 range fails pl.lit
+// (`integer too large`, where a list's Series overflows) and that pl.col
+// refuses it with the scalar message. The model carries it as a one-item
+// list marked by kScalarKey in its text.
+constexpr char kScalarKey = '\x03';
+bool scalar_literal(const Value* v) { return v && (v->kind == Kind::kInt || v->kind == Kind::kFloat || v->kind == Kind::kBool); }
+bool scalar_list(const Value& v) {
+  return v.kind == Kind::kList && v.items.size() == 1 && v.text.size() == 1 && v.text.front() == kScalarKey;
+}
+Value scalar_as_list(const Value& v) {
+  auto out = Value::list({v});
+  out.text = std::string(1, kScalarKey);
+  return out;
+}
+// pl.lit of a scalar int past the Int128 range.
+void scalar_range(const Value& v) {
+  if (v.kind == Kind::kInt && !v.text.empty())
+    detail::polars_lit::scalar_int_range(EventAttribute{"", v.text, AttributeKind::kInt});
+}
+// The list literal as a plan shows it (["c"], [1, null]); a scalar key as
+// its literal (dyn int: 5).
 std::string list_display(const Value& key) {
+  if (scalar_list(key)) {
+    scalar_range(key.items.front());
+    return gk::key_text(gk::literal_item(key.items.front()));
+  }
   return detail::polars_lit::literal_list_display(detail::polars_lit::list_literal(key.items));
+}
+// The case key's literal where the whole key is one literal (the variant
+// filters' sort, rework's group_by): a list's strict Series, or a scalar.
+void case_literal_built(const Value& key) {
+  if (scalar_list(key)) return scalar_range(key.items.front());
+  set_literal_error(key);
+  (void)detail::polars_lit::list_literal(key.items);
 }
 gk::Keys list_keys(const EventTable& df, const Value& key, const Plan& plan, const std::string& node = "group_by keys") {
   return gk::resolve_values(
@@ -915,16 +954,25 @@ Counts end_counts(const EventTable& df, const std::string& case_glue, const std:
 // names repeat the alias. Literal keys only group the whole frame into one
 // row, an empty frame included (its end activity null).
 Counts end_counts(const EventTable& df, const Value& case_key, const Value& act_value) {
+  // Round DI: an int, float or bool case key groups as its literal (probe
+  // di/k5), as a one-item list does.
+  if (scalar_literal(&case_key)) {
+    scalar_range(case_key);
+    return end_counts(df, scalar_as_list(case_key), act_value);
+  }
   const bool listed = list_value(&case_key);
   if (!listed && case_key.kind != Kind::kString)
     throw std::invalid_argument("Native Polars end activity counts outside the observed case key domain");
-  if (!list_value(&act_value) && act_value.kind != Kind::kString)
+  // Round DI: pl.col refuses a scalar activity key other than a str (below).
+  if (act_value.kind == Kind::kDict)
     throw std::invalid_argument("Native Polars end activity counts outside the observed activity key domain");
+  // Round DI: the case key's literals, then pl.col of the activity, before
+  // the repeated-name refusal (probe big-plseqck case 138).
+  if (listed) (void)gk::build_values(case_key.items);
+  check_col_list(&act_value);
   if (act_value.kind == Kind::kList || act_value.kind == Kind::kTuple)
     if (by_names(key_text(&act_value, "")).size() != act_value.items.size())
       throw std::invalid_argument("Native Polars end activity counts outside the observed domain: a repeated activity name");
-  if (listed) (void)gk::build_values(case_key.items);
-  check_col_list(&act_value);
   auto act_key = key_text(&act_value, "");
   std::optional<gk::Keys> keys;
   std::size_t case_column = 0;
@@ -1301,11 +1349,8 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // literal (built first), the select and join after it take its items as
   // keys (probe cp/k5).
   const auto* list_key = list_case(parameters);
-  std::optional<Literal> case_literal;
-  if (list_key) {
-    set_literal_error(*list_key);
-    case_literal = list_literal(list_key->items);
-  }
+  // Round DI: a scalar case key groups as its own literal (dyn int: 5).
+  if (list_key) case_literal_built(*list_key);
   // Round CU (fresh CK bank 2026111806): group_by([case, activity]) builds
   // a dict case key's struct literal; the select by the dict fails once the
   // count filter is built (below).
@@ -1317,9 +1362,10 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   // given as a dict or list is a literal there (one constant group per case).
   const auto* act_value = activity_key_value(parameters);
   // Round DB: a set there is refused by pl.lit (below).
+  // Round DI: so is a scalar other than a str (None included; probe di/k4).
   const bool literal_act =
       act_value && (act_value->kind == Kind::kDict || act_value->kind == Kind::kList || act_value->kind == Kind::kTuple ||
-                    act_value->kind == Kind::kSet);
+                    act_value->kind == Kind::kSet || scalar_literal(act_value) || act_value->kind == Kind::kNone);
   const bool constant_act = !activities && literal_act;
   // Round CP: group_by([case, activity]) builds the literal of a dict or
   // list activity key in apply_activity_set too (its pl.col filter resolves
@@ -1332,7 +1378,8 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   if (raw_act && raw_act->kind == Kind::kSet) set_literal_error(*raw_act);
   if (literal_act && act_value->kind != Kind::kDict) {
     set_literal_error(*act_value);
-    (void)list_literal(act_value->items);
+    if (scalar_literal(act_value) || act_value->kind == Kind::kNone) scalar_range(*act_value);
+    else (void)list_literal(act_value->items);
   }
   if (raw_act && raw_act->kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(*raw_act)) fail("TypeError", *error);
@@ -1342,7 +1389,10 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
   const auto minimum = parameter_or(parameters, "MIN_OCCURRENCES", "min_occurrences", Value::of(std::int64_t{2}));
   std::optional<detail::polars_lit::Literal> minimum_list;
   set_literal_error(minimum);
-  if (minimum.kind == Kind::kList) minimum_list = list_literal(minimum.items);
+  // Round DI: a tuple is the same Series literal; pl.lit refuses an int past
+  // the Int128 range (probe di/k6).
+  if (minimum.kind == Kind::kList || minimum.kind == Kind::kTuple) minimum_list = list_literal(minimum.items);
+  scalar_range(minimum);
   if (minimum.kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(minimum)) fail("TypeError", *error);
   if (dict_case) dict_argument_error();
@@ -1400,20 +1450,21 @@ EventTable rework(const EventTable& df, const PolarsFilterParameters& parameters
     };
     // A dict compares as a struct (the count cast to it, probe cp bank).
     std::string comparison;
-    if (minimum.kind == Kind::kList) comparison = "col(\"count\") >= " + detail::polars_lit::literal_list_display(*minimum_list);
+    if (minimum_list) comparison = "col(\"count\") >= " + detail::polars_lit::literal_list_display(*minimum_list);
     else if (minimum.kind == Kind::kDict) {
       const auto ops = detail::polars_lit::struct_operands("count", "UInt32", detail::polars_lit::struct_model(minimum, "UInt32"));
       comparison = ops.lhs + " >= " + ops.rhs;
     } else
       comparison = detail::polars_lit::comparison_plan("count", std::string("UInt32"), minimum, detail::polars_lit::CompareOp::kGe);
     const auto source = activities ? plan.above + "\n  " + frame_plan(df.columns) : frame_plan(df.columns);
-    const auto aggregate = "AGGREGATE[maintain_order: false]\n  [len().alias(\"count\")] BY [" + detail::polars_lit::literal_list_display(*case_literal) +
+    const auto aggregate = "AGGREGATE[maintain_order: false]\n  [len().alias(\"count\")] BY [" + list_display(*list_key) +
                            ", " + (constant_act ? std::string("literal") : "col(" + quote(act_key) + ")") + "]\n  FROM\n  " + indent(source, 2);
     const auto filtered = "FILTER " + comparison + "\nFROM\n  " + indent(aggregate, 2);
     // The select resolves the items on the aggregated frame.
     EventTable grouped;
     grouped.columns = {"literal", constant_act ? std::string("literal") : act_key, "count"};
-    grouped.dtypes = {"List", constant_act ? std::string("List") : dtype_of(df, act), "UInt32"};
+    grouped.dtypes = {scalar_list(*list_key) ? gk::literal_item(list_key->items.front()).dtype : std::string("List"),
+                      constant_act ? std::string("List") : dtype_of(df, act), "UInt32"};
     const Plan select_plan{"join", {"select", "unique", "join right", "join"}, {}, {}, filtered};
     (void)list_keys(grouped, *list_key, select_plan, "projections");
     // The join resolves them on the source frame.
@@ -1495,7 +1546,14 @@ enum class KeyChecks {
   kColumns,    // pl.col on both keys
   kSplit,      // group_by(case), then pl.col on both keys
 };
-PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterParameters& raw, KeyChecks checks) {
+PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterParameters& given, KeyChecks checks) {
+  // Round DI: a scalar case key (int, float, bool) where pm4py groups, sorts
+  // or joins by it is carried as a marked one-item list (scalar_as_list).
+  auto raw = given;
+  if (checks != KeyChecks::kColumns && checks != KeyChecks::kSplit && scalar_literal(case_key_value(raw)))
+    for (auto& p : *raw)
+      if (p.enum_member ? p.key == "CASE_ID_KEY" : p.key == kPolarsFilterCaseIdKeyParameter)
+        if (scalar_literal(&p.value)) p.value = scalar_as_list(p.value);
   const auto* case_value = case_key_value(raw);
   const auto* activity_value = activity_key_value(raw);
   switch (checks) {
@@ -1509,10 +1567,7 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
       // Round CP: a list case key is the sort's list literal (variant
       // filters), then the group_by keys' literals.
       if (list_value(case_value)) {
-        if (checks == KeyChecks::kGrouped) {
-          set_literal_error(*case_value);
-          (void)list_literal(case_value->items);
-        }
+        if (checks == KeyChecks::kGrouped) case_literal_built(*case_value);
         (void)gk::build_values(case_value->items);
       }
       check_col_list(activity_value);
@@ -1699,7 +1754,11 @@ namespace {
 std::pair<std::string, std::string> variants_df_keys(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                      const PolarsFilterValue& activity_key) {
   if (case_id_key.kind == Kind::kSet) set_literal_error(case_id_key);
-  if (case_id_key.kind != Kind::kString || (activity_key.kind != Kind::kString && activity_key.kind != Kind::kSet))
+  // Round DI: pl.col reads a list or tuple activity key as it reads a set's
+  // items, and refuses a scalar other than a str (probe di/k5).
+  const bool listed = activity_key.kind == Kind::kSet || activity_key.kind == Kind::kList || activity_key.kind == Kind::kTuple;
+  if (case_id_key.kind == Kind::kString && activity_key.kind != Kind::kDict) check_col_list(&activity_key);
+  if (case_id_key.kind != Kind::kString || (activity_key.kind != Kind::kString && !listed))
     throw std::invalid_argument("Polars get_variants_df keys other than a str or a set are outside the native domain");
   check_col_list(&activity_key);
   if (activity_key.kind == Kind::kString) return {case_id_key.text, activity_key.text};
@@ -1713,15 +1772,42 @@ std::pair<std::string, std::string> variants_df_keys(const EventTable& df, const
     return {case_id_key.text, key_text(&activity_key, "")};
   throw std::invalid_argument("Polars get_variants_df set activity keys other than one existing name are outside the native domain");
 }
+// Round DI: an int, float or bool case key is the sort's literal (an int
+// past the Int128 range fails it), then pl.col refuses a scalar activity key
+// other than a str (probe di/k5); the plan resolves the timestamp and the
+// activity under the sort, which then fails on a frame of more than one row.
+// A list or tuple case key builds its strict Series literal there, then
+// each item's group_by literal, as in the variant filters.
+[[noreturn]] void literal_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key, const PolarsFilterValue& activity_key,
+                                      const Plan& sort_plan, const Plan& agg_plan) {
+  const auto key = scalar_literal(&case_id_key) ? scalar_as_list(case_id_key) : case_id_key;
+  case_literal_built(key);
+  (void)gk::build_values(key.items);
+  check_col_list(&activity_key);
+  if (activity_key.kind != Kind::kString)
+    throw std::invalid_argument("Polars get_variants_df with a literal case key and a key list or dict activity key is outside the native domain");
+  const auto v = variants_of(df, "", activity_key.text, sort_plan, agg_plan, nullptr, &key);
+  // Round DI: the trace variants' list join resolves with the plan, so a
+  // non-String activity column fails before the sort runs (probe
+  // scal-plseqcp-1 case 22).
+  if (&sort_plan == &kTraceSortPlan) require_string_activities(df, v, "", activity_key.text);
+  if (v.shape) sort_shape_error(df);
+  throw std::invalid_argument("Polars get_variants_df of one row with a literal case key is outside the native domain");
+}
+bool literal_case_key(const PolarsFilterValue& key) {
+  return scalar_literal(&key) || key.kind == Kind::kList || key.kind == Kind::kTuple;
+}
 }  // namespace
 
 EventTable polars_trace_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                const PolarsFilterValue& activity_key) {
+  if (literal_case_key(case_id_key)) literal_variants_df(df, case_id_key, activity_key, kTraceSortPlan, kTraceAggPlan);
   const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
   return polars_trace_filter_get_variants_df(df, c, a);
 }
 EventTable polars_ends_with_filter_get_variants_df(const EventTable& df, const PolarsFilterValue& case_id_key,
                                                    const PolarsFilterValue& activity_key) {
+  if (literal_case_key(case_id_key)) literal_variants_df(df, case_id_key, activity_key, kSuffixSortPlan, kSuffixAggPlan);
   const auto [c, a] = variants_df_keys(df, case_id_key, activity_key);
   return polars_ends_with_filter_get_variants_df(df, c, a);
 }
@@ -1765,13 +1851,15 @@ EventTable polars_trace_filter_apply(const EventTable& df, const PolarsFilterVal
     // which a list cannot be (a tuple is a missing key); with none matching,
     // pl.col(key) is built, then the empty frame keyed by the key.
     const auto& key = *list_case(parameters);
+    // Round DI: a scalar case key (an int, float or bool) is hashable.
+    const auto& named = scalar_list(key) ? key.items.front() : key;
     if (!matched.empty()) {
-      if (const auto t = unhashable(key)) fail("TypeError", "unhashable type: '" + *t + "'");
-      fail("KeyError", value_repr(key));
+      if (const auto t = unhashable(named)) fail("TypeError", "unhashable type: '" + *t + "'");
+      fail("KeyError", value_repr(named));
     }
-    check_col_list(&key);
+    if (!scalar_list(key)) check_col_list(&key);
     if (key.items.empty()) fail("IndexError", "list index out of range");
-    if (const auto t = unhashable(key)) fail("TypeError", "unhashable type: '" + *t + "'");
+    if (const auto t = unhashable(named)) fail("TypeError", "unhashable type: '" + *t + "'");
     fail("TypeError", "Series name must be a string");
   }
   return join_case_list(df, v.case_column, matched, positive_of(parameters));
@@ -1830,6 +1918,8 @@ EventTable polars_ends_with_filter_apply(const EventTable& df, const PolarsFilte
   // dict's TypeError), the String casts fail after.
   if (!joined)
     for (const auto& item : admitted_suffixes.items) {
+      // Round DI: pl.lit refuses an int past the Int128 range (probe di/k6).
+      if (item.kind == Kind::kInt) scalar_range(item);
       if (item.kind == Kind::kList || item.kind == Kind::kTuple) (void)list_literal(item.items);
       else if (item.kind == Kind::kSet) set_literal_error(item);  // round DB: pl.lit refuses a set
       else if (item.kind == Kind::kDict)
@@ -1902,7 +1992,7 @@ EventTable list_filter(const EventTable& df, const PolarsFilterValue& patterns,
     // Round CP: the empty frame of case ids is keyed by the case key, which
     // a list cannot be; a hashable tuple then names the Series.
     if (const auto* key = list_case(parameters)) {
-      if (const auto t = unhashable(*key)) fail("TypeError", "unhashable type: '" + *t + "'");
+      if (const auto t = unhashable(scalar_list(*key) ? key->items.front() : *key)) fail("TypeError", "unhashable type: '" + *t + "'");
       fail("TypeError", "Series name must be a string");
     }
     const auto case_glue = case_key(parameters);
@@ -2202,6 +2292,17 @@ EventTable polars_rework_filter_apply(const EventTable& df, const PolarsFilterPa
 EventTable polars_rework_filter_apply_activity_set(const EventTable& df, const PolarsFilterValue& activities,
                                                    const PolarsFilterParameters& raw_parameters) {
   const auto parameters = checked_keys(df, raw_parameters, KeyChecks::kReworkSet);
+  // Round DI: the activities are iterated after pl.col(activity) is built
+  // and before any literal (probe di/k7).
+  switch (activities.kind) {
+    case Kind::kNone:
+    case Kind::kBool:
+    case Kind::kInt:
+    case Kind::kFloat:
+    case Kind::kDatetime:
+    case Kind::kDate: fail("TypeError", "'" + col_item_type(activities) + "' object is not iterable");
+    default: break;
+  }
   // The is_in literal is built before group_by(case).
   (void)list_literal(activities.items);
   return rework(df, parameters, &activities, raw_parameters);
@@ -2288,10 +2389,18 @@ EventTable polars_consecutive_act_case_grouping_apply(const EventTable& df,
 struct GroupingKey {
   std::optional<std::size_t> column;
   std::optional<LitValue> literal;
+  std::string dtype;  // the literal's dtype where it is no LitType's own (a dyn int)
 };
 std::optional<LitValue> grouping_literal(const Value* key) {
   // Round DB: pl.lit refuses a set key.
   if (key) set_literal_error(*key);
+  // Round DI: a scalar other than a str groups as its literal (probes
+  // di/k1-k4; an int past the Int128 range fails pl.lit).
+  if (key && (scalar_literal(key) || key->kind == Kind::kNone)) {
+    scalar_range(*key);
+    const auto item = gk::literal_item(*key);
+    return LitValue{item.type, item.value};
+  }
   if (!key || (key->kind != Kind::kList && key->kind != Kind::kTuple && key->kind != Kind::kDict)) return std::nullopt;
   if (key->kind == Kind::kDict)
     if (const auto error = detail::polars_lit::dict_literal_error(*key)) fail("TypeError", *error);
@@ -2310,6 +2419,9 @@ EventTable polars_timestamp_case_grouping_apply(const EventTable& df, const Pola
   GroupingKey keys[2];
   keys[0].literal = grouping_literal(case_key_value(parameters));
   keys[1].literal = grouping_literal(ts_value);
+  const Value* given[2] = {case_key_value(parameters), ts_value};
+  for (int i = 0; i < 2; ++i)
+    if (given[i] && (scalar_literal(given[i]) || given[i]->kind == Kind::kNone)) keys[i].dtype = gk::literal_item(*given[i]).dtype;
   if (keys[0].literal && keys[1].literal)
     fail("DuplicateError",
          "group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the "
@@ -2343,7 +2455,7 @@ EventTable polars_timestamp_case_grouping_apply(const EventTable& df, const Pola
       if (!df.categorical_dtypes.empty()) out.categorical_dtypes.push_back(df.categorical_dtypes[*key.column]);
     } else {
       out.columns.push_back("literal");
-      if (!df.dtypes.empty()) out.dtypes.push_back(detail::polars_lit::frame_dtype(key.literal->type));
+      if (!df.dtypes.empty()) out.dtypes.push_back(key.dtype.empty() ? detail::polars_lit::frame_dtype(key.literal->type) : key.dtype);
       if (!df.categorical_dtypes.empty()) out.categorical_dtypes.emplace_back();
     }
   }

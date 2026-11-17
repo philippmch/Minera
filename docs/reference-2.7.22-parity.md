@@ -29567,3 +29567,129 @@ Tests:
 - Full suite: 580 tests, all passing (the table bank's test passed on its
   own after the bank was renamed during the run); Python script tests 406;
   workbench fixtures 2,673 unchanged.
+
+## Review DI1: re-review of round DH, scalar keys in the Polars sequence filters, list and tuple keys in the attribute counts, fresh seeds (2026-11-17)
+
+Round DI checked DH's CI (run 43989318482 on 9ad1ecb: green on all six jobs),
+replayed every docs bank against the changed code, modelled the big-int
+sequence calls DH carried and the attribute counts over list and tuple
+keys, probed the sequence filters with scalar keys of every kind and
+replayed two batches of fresh seeds. The device check on the Mac was
+skipped (no device linked).
+
+- **DI1-1 Scalar keys in the Polars sequence filters** (DH's big-int
+  probes `dom/_probe_plseq{cp,ck,cj,ch}_big_domain.py`, seed 1, the 161
+  calls DH carried). An int, float or bool given as a key now reaches the
+  `PolarsFilterValue` overloads instead of the str ones, which read it as
+  a column name:
+  - an activity or timestamp key that is no str fails `pl.col` (`invalid
+    input for col ... got 'int'`); a case key is a literal named
+    `literal` in pm4py's sort, group_by and join (the sort plan prints
+    `dyn int: 5`, a group by it is one group, the end-activity helpers,
+    `timestamp_case_grouping` and rework read the literal's own dtype);
+  - an int past Int128 fails its `pl.lit` (`integer too large for
+    Polars`) where the module builds one: ends_with and prefix values,
+    rework `min_occurrences` (a tuple builds the same Series literal as a
+    list), the items of nocc case-key lists and of the group keys
+    (`polars_group_keys.hpp` build_values);
+  - `rework.apply_activity_set` with a None, bool, int, float or datetime
+    activity argument fails `'int' object is not iterable` (by its type)
+    after the keys are checked.
+  161 -> 0.
+- **DI1-2 Scalar keys of every kind** (new probe domains
+  `dom/_probe_plseq{cp,ck,cj,ch}_scal_domain.py`, seed 1, 150 cases each,
+  8,490 calls: ints in and past the Int64 and Int128 ranges, floats with
+  NaN and -0.0, bools, None and datetimes in every key position of the
+  parameters and the key keywords). First replay: 159 differing. Fixed:
+  a NaN case key's sort literal (Rust prints `NaN` and `inf`;
+  `rust_float` failed on them), and prefixes and suffixes, whose empty
+  frame of case ids is keyed by the case key: a scalar key is hashable,
+  so the Series name check fails (`Series name must be a string`), and
+  the trace variants with a literal case key on a frame whose activity
+  column is not String: the list join's dtype check is part of resolving
+  the plan, so it fails (`attempted list join with non-string dtype`)
+  before the sort's length check. 159 -> 113, carried to DJ: datetime
+  keys (77; the sequence bank test routes them to the str overloads,
+  which read the datetime's text as a column name) and None or NaN case
+  keys in the start and end activity, prefix, suffix, rework, trace and
+  variants calls, with a NaN `case_id_glue` in the end-activity nocc
+  filter (36).
+- **DI1-3 Attribute counts over list and tuple keys** (DH's probe
+  `dh/specs/a1.py`, 880 calls, and new probe `di/specs/a3.py`, 1,280
+  calls over eight frames with nested lists, tuples of one to three
+  items, int and str stakes and thresholds). Observed on the reference
+  (black-box probes `di/k8.py` to `di/k16.py`) and modelled
+  (`list_key_stats` in `polars_attributes_filter.cpp`):
+  - `group_by(list)` spreads the items: a str is that column, any other
+    item a literal named `literal` (a list or tuple item a List
+    literal); a missing name fails at its place, a repeated output name
+    `DuplicateError`;
+  - the counts dict is `{row[0]: row[1]}` over the groups (one item:
+    `{value: count}`); a List first key is unhashable; a tuple literal
+    comes back as a Python list;
+  - the threshold filter keeps the keys whose value is `>= thresh` (a
+    str, None or list value fails `TypeError`) and returns the frame
+    unchanged when all pass; otherwise, as the relative filter always
+    does, it filters by `pl.col(list).is_in(values)`: an item that is no
+    str fails `pl.col`, one name is that column, several names fail
+    `ComputeError: The predicate passed to 'LazyFrame.filter' expanded to
+    multiple expressions` with the values listed;
+  - the relative filter's stake times the denominator stays an int for
+    an int stake and repeats a str stake;
+  - per case (`keep_once_per_case`), `group_by([case, list])` reads the
+    list as one strict Series literal (a List column named `literal`),
+    keeps each case's first row, then groups that frame by the list (a
+    missing name fails against `[case, literal, other columns]` with the
+    AGGREGATE plan; a str item `literal` reads the List column);
+  - the top-activities filter indexes the collected counts frame (keys
+    and `len`, `head(n)` rows) by the list as Polars 1.44.1 indexes a
+    DataFrame: a bool first item is a column mask (`expected k+1 values
+    when selecting columns by boolean mask, got k`); str items select
+    columns (a later item that is no str: `'int' object is not an
+    instance of 'str'`, `'None' is not an instance of 'str'`); an int
+    first item selects rows by position (`gather indices are out of
+    bounds`, `index positions should be smaller than 2^32`, a negative
+    position past the height fails its UInt32 cast, beside a name
+    `'str' object cannot be interpreted as an integer` or `index i is out
+    of bounds for sequence of length k+1`); a two-item tuple with an int
+    or None first is a (row, name) cell, and on an empty frame nothing is
+    read, so `pl.col(tuple)` fails next; a frame or cell has no
+    `to_list`; `get_attribute_values` over one item counts that item.
+  a1 636 -> 14, a3 1,280 calls -> 87 differing, all declared below.
+- **DI1-4 Fresh seeds.** Batch 1 (2026120200-11, twelve banks): one
+  differing call, the rework row order declared below. Batch 2 (2026120212-23, twelve banks): one differing call,
+  the struct-cast partition race of DF1-7 (fresh CJ 2026120215 case 292,
+  `apply_numeric_events` with `{'r1': {'r1': 1/3}}` and 60 on an Int64
+  column of three present rows in an eight-column frame): the bank holds
+  the cast error (`Cannot cast from struct to other types`), while six
+  reruns of the capture cell and 150 direct runs (`di/k20.py`, also under
+  load) all raised the comparison error the native raises from the empty
+  first partition (`di/k19.py`: any frame of fewer than four rows and at
+  least four columns gives it). Declared.
+- All docs banks replayed with the changed code: 0 mismatches.
+
+Declared:
+- Attribute counts over a key list whose groups share a first key with
+  different second values (a1 14, a3 87 calls): the dict keeps the last
+  group's value, the threshold and relative filters compare it, and the
+  first comparison error in dict order is raised, so the outcome follows
+  the reference's group order, which changes from process to process
+  (six runs of one call gave six dicts). Native refuses these calls.
+- The partition race of DF1-7 (fresh CJ 2026120215 case 292).
+- `rework.apply` with `positive={}` on a String case column holding a
+  null case (fresh sequence CK 2026120206 case 313): the same rows in
+  another order; the reference's order varies from run to run (8 reruns:
+  5 in the native's order, 3 in the bank's), as DH's Boolean-case rework.
+
+Tests:
+- New: `docs/polars-filter-di-bank.json.gz` (probes a1 and a3 less their
+  101 declared calls, 2,059 calls) and
+  `docs/polars-sequence-filter-di-bank.json.gz` (DH's 161 carried
+  big-int calls and the four scalar-key probes less their 113 carried
+  calls, 8,538 calls), replayed by `minera_polars_filter_di_bank_parity_tests`
+  and `minera_polars_sequence_filter_di_bank_parity_tests`.
+- Full suite: 582 tests. The full run passed 581; the one failure was
+  the DI sequence bank, rebound with the trace-variants fix while the run
+  was going. After the rebuild all 95 Polars and sequence tests pass, that
+  one included. Python script tests 406 (scripts unchanged); workbench
+  fixtures 2,673 unchanged.

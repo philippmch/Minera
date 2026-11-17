@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DH (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DI (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6251,6 +6251,70 @@ under `review-harness/round-dh/`.
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DI re-reviewed DH (Review DI1). DH's commit 9ad1ecb ran CI run
+43989318482 (green on all six jobs). DI modelled the sequence calls DH carried
+and the attribute counts over list and tuple keys, probed the sequence
+filters with scalar keys of every kind and replayed two batches of fresh
+seeds:
+- An int, float or bool key reaches the sequence filters'
+  `PolarsFilterValue` overloads (the bank test routes it there): an
+  activity or timestamp key fails `pl.col`, a case key is a literal named
+  `literal` in pm4py's sort, group_by and join, and an int past Int128
+  fails its `pl.lit` in values, `min_occurrences` and group-key items.
+  DH's 161 -> 0.
+- New scalar-key probes on the CP, CK, CJ and CH sequence domains (8,490
+  calls): NaN sort literals print `NaN`, prefixes and suffixes refuse a
+  scalar case key as a Series name, the trace variants fail the list
+  join on a non-String activity column before the literal sort. 159 ->
+  113, carried (datetime keys, None or NaN case keys, NaN nocc glue).
+- Attribute counts over list and tuple keys (`list_key_stats`): the
+  group_by spread, the `{row[0]: row[1]}` dict, the threshold and relative
+  comparisons and `pl.col(list)` selection (one name, or the ambiguous
+  multi-expression filter), per-case counts over the List literal and the
+  first row of each case, and `df[list]` on the top-activities counts
+  frame. a1 636 -> 14, new a3 1,280 calls -> 87; all left follow the
+  reference's random group order (declared).
+- Fresh seeds 2026120200-11: one call, a reference-nondeterministic rework
+  row order (declared); 2026120212-23: one call, the DF1-7 struct-cast
+  partition race (declared).
+
+In the suite: new `docs/polars-filter-di-bank.json.gz` and
+`docs/polars-sequence-filter-di-bank.json.gz` with their ctests. The
+probes, scalar-key sequence domains and fresh banks are in the project
+files under `review-harness/round-di/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DJ) should start by re-reviewing round DI:
+
+- DI's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the 113 scalar-key sequence calls DI carried (`out/s4-scal-plseq*.jsonl`
+  in the harness): datetime keys (77; route them to the `PolarsFilterValue`
+  overloads and model the datetime literal in the sort and group_by
+  plans), None or NaN case keys in the start/end activity, prefix,
+  suffix, rework, trace and variants calls, NaN `case_id_glue` in the
+  nocc filter;
+- per-case attribute counts over a key list on frames with a `literal`
+  column or no rows, and a list item inside such a key (still refused);
+- the `literal` list item where the frame has a `literal` column, and in
+  eager calls (still refused);
+- maybe the majority outcome of the partition race (DF1-7);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DH's targets, taken in DI (findings DI1-1 to DI1-4): DH's CI run,
+the fresh seeds, the 161 sequence big-int calls and the attribute counts
+over list keys. Not taken (carried to DJ): the `literal` item with a frame
+`literal` column or eager, the partition race, equal-size joins and the
+older CJ, CF and CD items.
+
+Previous list for round DI (kept for its older items):
 
 Next round (DI) should start by re-reviewing round DH:
 

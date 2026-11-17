@@ -1529,6 +1529,10 @@ inline std::optional<Value> cast_to(const Value& v, const std::string& dtype, co
 // Rust's Display of a double: the shortest digits that read back, without
 // an exponent.
 inline std::string rust_float(double v) {
+  // Round DI: Rust prints a NaN as NaN and the infinities as inf, -inf (a
+  // NaN case key's sort literal, probe scal-plseq).
+  if (std::isnan(v)) return "NaN";
+  if (std::isinf(v)) return v < 0 ? "-inf" : "inf";
   char buffer[64];
   for (int precision = 1; precision <= 17; ++precision) {
     std::snprintf(buffer, sizeof(buffer), "%.*e", precision - 1, v);

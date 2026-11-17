@@ -178,10 +178,16 @@ Keys resolve(const EventAttribute& key, const std::vector<std::string>& columns,
 
 // Round CP: the same keys given as Python values (the Polars sequence
 // filters' parameters): a str item names a column, any other is a literal.
+// Round DI: each item is its own pl.lit, which refuses an int past the
+// Int128 range (`integer too large`, before a Series would overflow; probes
+// big-plseq*).
 inline std::vector<std::optional<Item>> build_values(const std::vector<polars_lit::Value>& key) {
   std::vector<std::optional<Item>> out;
-  for (const auto& value : key)
+  for (const auto& value : key) {
+    if (value.kind == polars_lit::Kind::kInt && !value.text.empty())
+      polars_lit::scalar_int_range(EventAttribute{"", value.text, AttributeKind::kInt});
     out.push_back(value.kind == polars_lit::Kind::kString ? std::nullopt : std::optional<Item>(literal_item(value)));
+  }
   return out;
 }
 template <typename Missing, typename Duplicate>
