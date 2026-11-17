@@ -215,6 +215,36 @@ void negative_transition_hours() {
   }
 }
 
+// Round DQ: historic offsets as Python zoneinfo reads the OS TZif files
+// (libstdc++ 13's tzdata.zi database read LMT offsets west of Greenwich as
+// east of it and disagreed in 217 of 599 zones, hence the portable backend
+// on POSIX). MSVC's ICU database is not compared.
+void historic_offsets_follow_zoneinfo() {
+#if !defined(_MSC_VER)
+  struct Expected { std::string_view zone; std::int64_t utc; std::int64_t offset; };
+  static constexpr Expected kExpected[] = {
+      {"Europe/London", -5364662400, -75},              // 1800-01-01T00:00Z, LMT
+      {"Europe/Berlin", -2422094400, 3208},             // 1893-03-31T12:00Z, LMT
+      {"Africa/Casablanca", 1554724800, 3600},          // 2019-04-08T12:00Z
+      {"America/Indiana/Tell_City", 1158926400, -18000},  // 2006-09-22T12:00Z
+      {"Asia/Nicosia", 905688000, 10800},               // 1998-09-13T12:00Z
+      {"Atlantic/Canary", 335016000, 3600},             // 1980-08-13T12:00Z
+      {"Europe/Dublin", -902059200, 3600},              // 1941-06-01T12:00Z
+      {"Europe/Dublin", -681134400, 3600},              // 1948-06-01T12:00Z
+      {"Australia/Sydney", -9223329600, 36292},         // 1677-09-21T12:00Z, LMT
+      {"America/New_York", -5364662400, -17762},        // 1800-01-01T00:00Z, LMT
+  };
+  for (const auto& expected : kExpected) {
+    const auto got = zd::info_at_utc(expected.zone, expected.utc).offset_seconds;
+    if (got != expected.offset)
+      std::fprintf(stderr, "%.*s at %lld: offset %lld, zoneinfo %lld\n", static_cast<int>(expected.zone.size()),
+                   expected.zone.data(), static_cast<long long>(expected.utc), static_cast<long long>(got),
+                   static_cast<long long>(expected.offset));
+    assert(got == expected.offset);
+  }
+#endif
+}
+
 // A unique wall time reports no second offset at all.
 void unique_local_times_have_no_second_offset() {
   for (const std::int64_t wall_time : {kJanuary15, kJuly15, std::int64_t{2162808000}}) {
@@ -242,6 +272,7 @@ int main() {
   recurring_rules_after_2037();
   negative_transition_hours();
   unique_local_times_have_no_second_offset();
+  historic_offsets_follow_zoneinfo();
   unknown_zones_are_rejected();
   if (os_release_differences != 0)
     std::fprintf(stderr, "%d values follow the OS tz release (declared, review AY3)\n", os_release_differences);

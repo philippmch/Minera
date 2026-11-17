@@ -223,7 +223,7 @@ bool truth(const EventAttribute& value) {
 std::vector<EventAttribute> iter(const EventAttribute& value) {
   if (value.container == AttributeContainerKind::kContainer) {
     std::vector<EventAttribute> keys;
-    for (const auto& child : value.children) keys.push_back({"", child.key});
+    for (const auto& child : value.children) keys.push_back(dict_entry_key(child));
     return keys;
   }
   if (collection(value)) return value.children;
@@ -239,7 +239,21 @@ std::vector<EventAttribute> iter(const EventAttribute& value) {
   fail("TypeError", "apply", "'" + core_type(value) + "' object is not iterable");
 }
 EventAttribute item(const EventAttribute& value, std::size_t at) {
-  if (value.container == AttributeContainerKind::kContainer) fail("KeyError", "apply", std::to_string(at));
+  // Round DQ: dict[at] finds a key equal to the int (a bool or float one
+  // too, as Python compares them; probe dq/tq1).
+  if (value.container == AttributeContainerKind::kContainer) {
+    for (const auto& child : value.children) {
+      if (!child.typed_key) continue;
+      const auto key = dict_entry_key(child);
+      if (key.container != AttributeContainerKind::kScalar || null(key) || !(integer(key) || boolean(key) || real(key))) continue;
+      if (number(key) != static_cast<double>(at)) continue;
+      auto out = child;
+      out.key.clear();
+      out.typed_key.reset();
+      return out;
+    }
+    fail("KeyError", "apply", std::to_string(at));
+  }
   if (text(value) || value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple) {
     const auto values = iter(value);
     if (at < values.size()) return values[at];
@@ -318,6 +332,10 @@ std::vector<std::string> validate_apply(const EventAttribute& value, bool perfor
     // (probe dn/p1).
     if (key->container == AttributeContainerKind::kList || key->container == AttributeContainerKind::kTuple)
       if (const auto error = detail::polars_lit::argument_literal_fault(*key)) fail(error->type, "apply", error->message);
+    // Round DQ: and a dict key's struct literal, which a key that is not a
+    // str refuses (probe dq/q1).
+    if (mapping(*key))
+      if (const auto error = detail::polars_lit::dict_literal_error(*key)) fail("TypeError", "apply", *error);
   }
   // Round CM: a dict case key fails its group_by after the attribute
   // selector is built and before the timestamp one.

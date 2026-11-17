@@ -254,6 +254,16 @@ std::string col_item_type(const Value& v) {
 // Round DI: pl.col on a scalar other than a str or a dict (None, a bool, an
 // int, a float, a date) fails on its type (probes di/k1-k5).
 void check_col_list(const Value* key) {
+  // Round DQ: pl.col(dict) is pl.col of its keys as a list, which a key that
+  // is not a str refuses (probe dq/tq2).
+  if (key && key->kind == Kind::kDict &&
+      std::any_of(key->entries.begin(), key->entries.end(), [](const auto& e) { return e.first.kind != Kind::kString; })) {
+    std::vector<Value> names;
+    for (const auto& entry : key->entries) names.push_back(entry.first);
+    const auto listed = Value::list(std::move(names));
+    check_col_list(&listed);
+    return;
+  }
   if (key && key->kind != Kind::kString && key->kind != Kind::kDict && key->kind != Kind::kList && key->kind != Kind::kTuple &&
       key->kind != Kind::kSet)
     fail("TypeError", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + col_item_type(*key) + "'.");
@@ -1877,8 +1887,10 @@ PolarsFilterParameters checked_keys(const EventTable& df, const PolarsFilterPara
       check_col_list(activity_value);
       break;
     case KeyChecks::kSplit:
-      check_dict_argument(case_value);
+      // Round DQ: pl.col(case) is built before the dict is refused, so a
+      // dict with a key that is not a str fails it (probe dq/tq2).
       check_col_list(case_value);
+      check_dict_argument(case_value);
       // Round DO: on an eager frame the case's cum_count runs before the
       // activity's pl.col is built (see polars_activity_split_apply).
       if (!eager()) check_col_list(activity_value);

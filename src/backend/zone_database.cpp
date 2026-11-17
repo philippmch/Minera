@@ -18,6 +18,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <climits>
+#ifndef MINERA_STD_TZDB_LINKS
+#define MINERA_STD_TZDB_LINKS 0
+#endif
 namespace tz = date;
 #else
 namespace tz = std::chrono;
@@ -101,12 +104,26 @@ const Zone& locate(std::string_view name) {
   std::lock_guard<std::mutex> lock(mutex);
   if (const auto found = cache.find(name); found != cache.end()) return *found->second;
   auto zone = std::make_unique<Zone>();
-  zone->table = date::locate_zone(std::string(name));  // throws std::runtime_error
+  std::string file(name);
+  try {
+    zone->table = date::locate_zone(file);  // throws std::runtime_error
+  } catch (const std::runtime_error&) {
+#if MINERA_STD_TZDB_LINKS
+    // Round DQ: a backward link the OS zoneinfo lacks reads its target's
+    // TZif file (the standard library's tzdata.zi still lists the link).
+    const auto* linked = std::chrono::locate_zone(file);  // throws std::runtime_error
+    if (linked->name() == file) throw;
+    file = std::string(linked->name());
+    zone->table = date::locate_zone(file);
+#else
+    throw;
+#endif
+  }
   // The final table entry extends to year::max; its begin is the last
   // explicit transition.
   zone->last_transition =
       zone->table->get_info(date::sys_seconds{date::sys_days{date::year{9000} / 1 / 1}}).begin;
-  if (const auto footer = tzif_footer(std::string(name))) {
+  if (const auto footer = tzif_footer(file)) {
     // Without its rule the zone would freeze its last offset forever, so an
     // unreadable footer is an error, not a fallback.
     try {

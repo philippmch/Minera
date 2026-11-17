@@ -378,20 +378,80 @@ bool dict_bounds(const EventAttribute& boundaries,std::size_t steps){
  }
  return false;
 }
+// Round DQ: the chains come from an inner merge of the kept chains with the
+// next step's events on the case key, then the events before the chain's
+// last one are dropped, and so are the chains holding a missing case or
+// timestamp (which join the merge, a missing key matching a missing one).
+// pandas orders such a merge by the left row, then the right one, except
+// that it groups the rows by key label first (a missing key last) and,
+// when the merge has exactly as many rows as the left side, puts them back
+// by the left rows' label order (so rows of keys without a match shift the
+// rest). A numeric key (numbers, bools, datetimes, categories) takes its
+// labels from the right side first and merges a right side of distinct
+// present keys in plain order; a str or object key labels the left side
+// first (fresh pandas CN LTL bank 2026121023 case 588; fuzzed over every
+// dtype, missing keys and timestamps, dq/mo).
+using MergeKey=std::optional<std::string>;
+std::vector<std::pair<std::size_t,std::size_t>> merge_order(const std::vector<MergeKey>& lk,const std::vector<MergeKey>& rk,bool numeric){
+ std::vector<std::pair<std::size_t,std::size_t>> result;
+ std::unordered_map<std::string,std::size_t> labels;
+ const auto label=[&](const MergeKey& k)->std::optional<std::size_t>{
+  if(!k)return std::nullopt;
+  auto it=labels.find(*k);if(it!=labels.end())return it->second;
+  const auto n=labels.size();labels.emplace(*k,n);return n;
+ };
+ if(numeric){
+  for(const auto& k:rk)label(k);
+  if(labels.size()==rk.size()){
+   for(std::size_t i=0;i<lk.size();++i)if(lk[i]){const auto it=labels.find(*lk[i]);if(it!=labels.end())result.emplace_back(i,it->second);}
+   return result;
+  }
+ }
+ std::vector<std::optional<std::size_t>> left;for(const auto& k:lk)left.push_back(label(k));
+ std::vector<std::optional<std::size_t>> right;for(const auto& k:rk)right.push_back(label(k));
+ const auto na=labels.size();
+ std::vector<std::size_t> llab;for(const auto& l:left)llab.push_back(l.value_or(na));
+ std::vector<std::vector<std::size_t>> rows(na+1);
+ for(std::size_t j=0;j<rk.size();++j)rows[right[j].value_or(na)].push_back(j);
+ std::vector<std::size_t> sorter(lk.size());
+ for(std::size_t i=0;i<sorter.size();++i)sorter[i]=i;
+ std::stable_sort(sorter.begin(),sorter.end(),[&](std::size_t a,std::size_t b){return llab[a]<llab[b];});
+ for(const auto i:sorter)for(const auto j:rows[llab[i]])result.emplace_back(i,j);
+ if(result.size()==lk.size()){
+  std::vector<std::pair<std::size_t,std::size_t>> placed(result.size());
+  for(std::size_t q=0;q<result.size();++q)placed[sorter[q]]=result[q];
+  return placed;
+ }
+ std::stable_sort(result.begin(),result.end(),[](const auto& a,const auto& b){return a.first<b.first;});
+ return result;
+}
 std::unordered_set<std::string> listed_steps(const EventTable& source,const std::vector<EventAttribute>& anchors,const std::vector<std::size_t>& columns,const std::vector<std::size_t>& valid,const EventAttribute& boundaries){
- // Every chain is built first (merge order: by the first event's row, then
- // the next one's), then each step keeps the chains within its bounds.
+ // Every chain is built first (in merge order), then each step keeps the
+ // chains within its bounds.
  std::vector<std::vector<std::size_t>> chains;
- for(const auto row:valid)if(matches_at(cell(source,row,columns[1]),anchors[0],row))chains.push_back({row});
+ std::vector<bool> kept(source.size(),false);
+ for(const auto row:valid)kept[row]=true;
+ // Rows with a missing activity match no step.
+ const auto step_rows=[&](const EventAttribute& anchor){
+  std::vector<std::size_t> rows;
+  for(std::size_t row=0;row<source.size();++row)if(!missing(cell(source,row,columns[1]))&&matches_at(cell(source,row,columns[1]),anchor,row))rows.push_back(row);
+  return rows;
+ };
+ const auto key=[&](std::size_t row)->MergeKey{const auto& v=cell(source,row,columns[0]);if(missing(v))return std::nullopt;return group_key(v);};
+ for(const auto row:step_rows(anchors[0]))chains.push_back({row});
+ const auto dtype=source.dtypes.empty()?std::string("object"):source.dtypes[columns[0]];
+ const bool numeric=dtype!="str"&&dtype!="object"&&!dtype.starts_with("string");
  for(std::size_t i=0;i+1<anchors.size();++i){
+  const auto right=step_rows(anchors[i+1]);
+  std::vector<MergeKey> lk,rk;
+  for(const auto& chain:chains)lk.push_back(key(chain.back()));
+  for(const auto row:right)rk.push_back(key(row));
   std::vector<std::vector<std::size_t>> next;
-  for(const auto& chain:chains){
-   const auto last=chain.back();
-   const auto key=group_key(cell(source,last,columns[0]));
-   for(const auto row:valid){
-    if(row<=last||group_key(cell(source,row,columns[0]))!=key||!matches_at(cell(source,row,columns[1]),anchors[i+1],row))continue;
-    auto longer=chain;longer.push_back(row);next.push_back(std::move(longer));
-   }
+  for(const auto& [l,r]:merge_order(lk,rk,numeric)){
+   if(right[r]<=chains[l].back())continue;
+   auto longer=chains[l];longer.push_back(right[r]);
+   if(!std::all_of(longer.begin(),longer.end(),[&](std::size_t row){return kept[row];}))continue;
+   next.push_back(std::move(longer));
   }
   chains=std::move(next);
  }

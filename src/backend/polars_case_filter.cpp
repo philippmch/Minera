@@ -179,7 +179,9 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(options.timestamp_key) + "'.");
   // Round CO: pl.col of a list timestamp key fails before the bounds build
   // their literals (case 98 of the CL bank).
-  const auto& time = options.timestamp_key;
+  // Round DQ: pl.col reads a dict with a key that is not a str as the list
+  // of its keys (probe dq/tq1).
+  const auto time = keys::typed_dict_list(options.timestamp_key);
   // Round DB: pl.col reads a set's items like a list's.
   if (op == Operation::kPerformance && (time.container == AttributeContainerKind::kList || time.container == AttributeContainerKind::kTuple ||
                                         detail::polars_lit::set_argument(time))) {

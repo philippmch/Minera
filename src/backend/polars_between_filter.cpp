@@ -130,7 +130,7 @@ std::vector<EventAttribute> anchors(const EventAttribute& value) {
   if (!collection(value)) return {value};
   if (value.container != AttributeContainerKind::kContainer) return value.children;
   std::vector<EventAttribute> keys;
-  for (const auto& child : value.children) keys.push_back(EventAttribute{"", child.key});
+  for (const auto& child : value.children) keys.push_back(dict_entry_key(child));
   return keys;
 }
 namespace lit = detail::polars_lit;
@@ -168,8 +168,11 @@ void col_items(const EventAttribute& value) {
 }
 // Round CM: pl.col(dict) selects the dict's names like pl.col(list); a list
 // item that is not a str fails as pl.col reports it.
-std::string activity_key(const EventAttribute& value, const std::vector<std::string>& columns, bool* several = nullptr) {
-  if (text(value)) return value.value;
+std::string activity_key(const EventAttribute& raw, const std::vector<std::string>& columns, bool* several = nullptr) {
+  if (text(raw)) return raw.value;
+  // Round DQ: a dict with a key that is not a str is pl.col of its keys as a
+  // list (probe dq/tq1).
+  const auto value = keys::typed_dict_list(raw);
   // Round DB: pl.col reads a set's items like a list's.
   if (value.container == AttributeContainerKind::kList || value.container == AttributeContainerKind::kTuple || detail::polars_lit::set_argument(value))
     col_items(value);
@@ -188,6 +191,10 @@ void validate_apply(const EventAttribute& act1, const EventAttribute& act2, cons
   if (null(key)) fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (!text(key)) {
     // Round CL: a dict case key is refused as a positional argument.
+    // Round DQ: after the sort builds its struct literal, which a key that
+    // is not a str refuses (probe dq/q1).
+    if (key.container == AttributeContainerKind::kContainer)
+      if (const auto error = detail::polars_lit::dict_literal_error(key)) fail("TypeError", "apply", *error);
     if (key.container == AttributeContainerKind::kContainer)
       fail("TypeError", "apply",
            "Cannot pass a dictionary as a single positional argument.\n"

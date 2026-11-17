@@ -227,6 +227,10 @@ struct EventAttribute {
   bool scalar_children_list = false;
   // Set by the XES importer only; native containers keep their structure.
   XesPublicShape xes_public_shape = XesPublicShape::kNative;
+  // A dict entry's key when it is not a str (an int, float, bool, None or
+  // tuple key of a Python dict argument): `key` keeps its text, this its
+  // typed value. Null for a str key and outside dict arguments.
+  std::shared_ptr<const EventAttribute> typed_key;
 
   bool operator==(const EventAttribute& other) const {
     if (key != other.key || value != other.value || kind != other.kind ||
@@ -238,6 +242,9 @@ struct EventAttribute {
         first_class_state != other.first_class_state ||
         first_class_source_key != other.first_class_source_key)
       return false;
+    if (static_cast<bool>(typed_key) != static_cast<bool>(other.typed_key) ||
+        (typed_key && !(*typed_key == *other.typed_key)))
+      return false;
     if (const auto* left = std::get_if<double>(&typed_value)) {
       const auto* right = std::get_if<double>(&other.typed_value);
       if (right && std::isnan(*left) && std::isnan(*right)) return true;
@@ -245,6 +252,15 @@ struct EventAttribute {
     return typed_value == other.typed_value;
   }
 };
+
+// The Python key of a dict entry: its typed key when it has one, else the
+// str its key text names.
+inline EventAttribute dict_entry_key(const EventAttribute& entry) {
+  if (!entry.typed_key) return EventAttribute{"", entry.key};
+  EventAttribute out = *entry.typed_key;
+  out.key.clear();
+  return out;
+}
 
 // True when the attribute's kind or native payload marks the pandas.NA
 // extension value. Transport writers validate that these two markers agree.

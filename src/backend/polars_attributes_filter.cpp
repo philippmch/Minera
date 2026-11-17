@@ -198,8 +198,9 @@ std::string membership_expr(const std::string& key,const EventAttribute& values,
       // Round CI: a dict's keys as Python iterates them (a repeated key once,
       // in its first place).
       EventAttribute keys=values;keys.container=AttributeContainerKind::kList;keys.children.clear();
+      // Round DQ: a key that is not a str keeps its type (typed_key).
       for(const auto& v:values.children)
-        if(std::none_of(keys.children.begin(),keys.children.end(),[&](const EventAttribute& k){return k.value==v.key;}))keys.children.push_back(EventAttribute{"",v.key});
+        if(std::none_of(keys.children.begin(),keys.children.end(),[&](const EventAttribute& k){return k==dict_entry_key(v);}))keys.children.push_back(dict_entry_key(v));
       operand=expression_literal(keys);
     } else operand=expression_literal(values);
   } else operand=expression_literal(values,true)+".implode()";
@@ -219,6 +220,13 @@ std::optional<std::size_t> index_of(const EventTable& table,const std::string& n
 // The pl.col checks Python makes; true where a non-empty key list remains
 // that the native selector cannot model.
 bool col_selector_unmodelled(const EventAttribute& value) {
+  // Round DQ: a dict with a key that is not a str is checked as the list of
+  // its keys (probe dq/tq1).
+  if(mapping(value)&&std::any_of(value.children.begin(),value.children.end(),[](const EventAttribute& c){return c.typed_key!=nullptr;})) {
+    EventAttribute list{value.key,""};list.container=AttributeContainerKind::kList;
+    for(const auto& child:value.children)list.children.push_back(dict_entry_key(child));
+    return col_selector_unmodelled(list);
+  }
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
   // Round CL: pl.col of a list names the first item's type when it is not a
   // str, else the first later item that is not one.
@@ -333,7 +341,7 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
     // so several existing names expand the predicate (probe dp/tp3).
     if(selecting&&mapping(call.options.attribute_key)&&!call.options.attribute_key.children.empty()) {
       EventAttribute names{call.options.attribute_key.key,""};names.container=AttributeContainerKind::kList;
-      for(const auto& item:call.options.attribute_key.children)names.children.push_back(EventAttribute{"",item.key});
+      for(const auto& item:call.options.attribute_key.children)names.children.push_back(dict_entry_key(item));
       call.options.attribute_key=names;
     }
     const bool listed=selecting&&name_list(call.options.attribute_key);
@@ -1236,7 +1244,7 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     else if(query.container==AttributeContainerKind::kContainer) {
       EventAttribute keys=query;keys.container=AttributeContainerKind::kList;keys.children.clear();
       for(const auto& v:query.children)
-        if(std::none_of(keys.children.begin(),keys.children.end(),[&](const EventAttribute& k){return k.value==v.key;}))keys.children.push_back(EventAttribute{"",v.key});
+        if(std::none_of(keys.children.begin(),keys.children.end(),[&](const EventAttribute& k){return k==dict_entry_key(v);}))keys.children.push_back(dict_entry_key(v));
       operand=expression_literal(keys);
     } else if(collection(query)) {
       auto listed=query;listed.container=AttributeContainerKind::kList;operand=expression_literal(listed);
@@ -1257,7 +1265,10 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     if(cells||collection(query)) {
       // Statistics filter on the column's own values as Python reads them.
       const auto value=cells?detail::polars_lit::Value::list(detail::polars_lit::python_values(*cells,p.dtype)):detail::polars_lit::value_of(query,true);
-      p.literal=detail::polars_lit::literal_of(value);
+      // Round DQ: a dict's keys that pl.Series cannot build strictly (a str
+      // beside an int) fail that build on an eager frame too (probe dq/tq1).
+      try{p.literal=detail::polars_lit::literal_of(value);}
+      catch(const PolarsSequenceFilterError& error){fail(error.type,phase(eager),error.message);}
       const bool empty_argument=cells?cells->empty():query.children.empty();
       if(!(positive_now&&empty_argument)) {
         try {
@@ -1687,7 +1698,7 @@ PolarsAttributeCounts cache_counts(const PolarsAttributeCountCache& cache) {
     return normalized;
   }
   const auto& v=std::get<EventAttribute>(cache);if(!collection(v)||v.container!=AttributeContainerKind::kContainer)fail("AttributeError","apply","'"+core_type(v)+"' object has no attribute 'items'");
-  PolarsAttributeCounts out;for(const auto& child:v.children)out.push_back({EventAttribute{"",child.key},child});return out;
+  PolarsAttributeCounts out;for(const auto& child:v.children)out.push_back({dict_entry_key(child),child});return out;
 }
 bool python_ge(const EventAttribute& a,const EventAttribute& b) {
   const bool an=integer(a)||boolean(a)||real(a),bn=integer(b)||boolean(b)||real(b);
@@ -1700,7 +1711,7 @@ bool python_ge(const EventAttribute& a,const EventAttribute& b) {
 }
 bool variant_contains(const EventAttribute& variant,const EventAttribute& key) {
   if(collection(variant)) {
-    if(variant.container==AttributeContainerKind::kContainer){for(const auto& child:variant.children)if(text(key)&&key.value==child.key)return true;return false;}
+    if(variant.container==AttributeContainerKind::kContainer){for(const auto& child:variant.children)if(child.typed_key?scalar_equal(dict_entry_key(child),key):text(key)&&key.value==child.key)return true;return false;}
     for(const auto& child:variant.children)if(scalar_equal(child,key))return true;return false;
   }
   if(text(variant)) {
@@ -2014,6 +2025,26 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
   const bool explicit_cache=op==Op::kThreshold&&call.count_cache&&!(std::holds_alternative<EventAttribute>(*call.count_cache)&&null(std::get<EventAttribute>(*call.count_cache)));
   CountColumn schema;
   if(!explicit_cache) {
+    // Round DQ: per case, group_by([case, attribute]) builds both keys in
+    // order (a dict's struct, a list's Series, a scalar's pl.lit), so two
+    // keys that are no str repeat the name `literal` as the group_by
+    // resolves, before the counts or the denominator read anything (fresh
+    // CK bank 2026121001 case 608, probes dq/tq4 and dq/tq5). A dict case
+    // key whose struct literal fails fails first, whatever the attribute.
+    if(op==Op::kRelative&&options.keep_once_per_case&&truth(*options.keep_once_per_case)&&mapping(options.case_id_key))
+      if(const auto error=detail::polars_lit::dict_literal_error(options.case_id_key))fail("TypeError","apply",*error);
+    if(op==Op::kRelative&&options.keep_once_per_case&&truth(*options.keep_once_per_case)&&!text(options.case_id_key)&&!text(attr)&&
+       !mapping(attr)&&!detail::polars_lit::set_argument(attr)&&!detail::polars_lit::set_argument(options.case_id_key)) {
+      const auto built=[](const EventAttribute& key){
+        if(mapping(key))if(const auto error=detail::polars_lit::dict_literal_error(key))fail("TypeError","apply",*error);
+        if(key.container==AttributeContainerKind::kList||key.container==AttributeContainerKind::kTuple)
+          if(const auto error=detail::polars_lit::argument_literal_error(key))fail("TypeError","apply",*error);
+        if(detail::polars_lit::scalar_too_large(key))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
+      };
+      built(options.case_id_key);built(attr);
+      fail("DuplicateError","apply","group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+
+           resolved("'group_by'",frame_plan(source),eager?std::vector<std::string>{"'group_by'"}:std::vector<std::string>{"'group_by'","'group_by'"}));
+    }
     // Round DP: per case, group_by([case, dict]) builds the case key's
     // literal first, a set refused there; on an eager frame the group_by
     // runs with the dict's struct literal, so a missing case column fails
@@ -2022,13 +2053,16 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
     if(mapping(attr)&&op==Op::kRelative&&options.keep_once_per_case&&truth(*options.keep_once_per_case)) {
       const auto& key=options.case_id_key;
       if(detail::polars_lit::set_argument(key))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
+      // Round DQ: lazily too the group_by builds the case key's literal (a
+      // dict's struct, a list's Series), then the dict's struct literal,
+      // which a key that is not a str refuses (probe dq/q2).
+      if(mapping(key))if(const auto error=detail::polars_lit::dict_literal_error(key))fail("TypeError","apply",*error);
+      if(key.container==AttributeContainerKind::kList||key.container==AttributeContainerKind::kTuple)
+        if(const auto error=detail::polars_lit::argument_literal_error(key))fail("TypeError","apply",*error);
+      if(detail::polars_lit::scalar_too_large(key))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
+      if(const auto error=detail::polars_lit::dict_literal_error(attr))fail("TypeError","apply",*error);
       if(eager) {
         const std::vector<std::string> groupnodes{"'group_by'","'group_by'"};
-        if(mapping(key))if(const auto error=detail::polars_lit::dict_literal_error(key))fail("TypeError","apply",*error);
-        if(key.container==AttributeContainerKind::kList||key.container==AttributeContainerKind::kTuple)
-          if(const auto error=detail::polars_lit::argument_literal_error(key))fail("TypeError","apply",*error);
-        if(detail::polars_lit::scalar_too_large(key))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
-        if(const auto error=detail::polars_lit::dict_literal_error(attr))fail("TypeError","apply",*error);
         if(text(key)&&!index_of(source,key.value))fail("ColumnNotFoundError","apply",column_prefix(source,key.value)+resolved("'group_by'",frame_plan(source),groupnodes));
         if(!text(key))fail("DuplicateError","apply","group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names."+resolved("'group_by'",frame_plan(source),groupnodes));
       }

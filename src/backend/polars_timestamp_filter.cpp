@@ -203,7 +203,10 @@ std::string bound_text(const ParsedExactTimestamp& v) {
 }
 namespace keys = detail::polars_keys;
 // Round CM: the key as pl.col reads it (a dict selects its names).
-EventAttribute selector(const EventAttribute& value,const std::vector<std::string>& columns,bool several=false) {
+EventAttribute selector(const EventAttribute& raw,const std::vector<std::string>& columns,bool several=false) {
+  // Round DQ: pl.col reads a dict with a key that is not a str as the list of
+  // its keys (probe dq/tq1).
+  const auto value=keys::typed_dict_list(raw);
   if(!text(value)&&!collection(value))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(value)+"'.");
   // pl.col of a list reads every item as a column name (round CD).
   if(collection(value)&&value.container!=AttributeContainerKind::kContainer){

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DP (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DQ (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6579,6 +6579,81 @@ probes, the dumps and the fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped (the Mac was
 not linked).
+
+Round DQ re-reviewed DP (Review DQ1). DP's commit bb51ec2 ran CI run
+44139462790: five jobs green, the macOS job cancelled after 15 minutes
+without a runner (no step ran). DQ probed dicts with keys that are no str
+in the Polars filters, date strings against pandas datetime64 columns of
+other units and zones, and the time zone database, and replayed two
+batches of fresh seeds:
+- Dicts with keys that are no str (probes tq1, 3,276 calls eagerly and
+  lazily in the table filters, tq2, 3,096 calls each way in the sequence
+  filters, tq3, 270 each way): the bank transport keeps a dict key's type
+  now (`EventAttribute::typed_key`); pl.col(dict) is pl.col of its keys'
+  list, and where a filter builds the key's literal with the expression, a
+  dict with such a key fails pl.lit before group_by, over or join refuse
+  the dict; dict literals keep Python-equal keys once (tuple keys no
+  longer collapse); `paths.apply` iterates a dict of paths by its typed
+  keys. tq1 2,126/2,096 -> 0, tq2 1,800/2,170 -> 0.
+- Date strings against datetime64 columns of other units and zones (n4,
+  11,556 calls; n5, 3,600 calls with nanosecond and range-edge texts):
+  nanosecond texts parse at nanosecond resolution and must fit pandas'
+  int64 range (after localizing into an aware column, or as the local
+  wall time after converting into it); zones that keep DST in 9999 raise
+  NotImplementedError past year 9999. n4 66 -> 0, n5 102 -> 72, all in the
+  declared one-day window at the range ends (pandas is erratic there in
+  290 of 599 zones).
+- The time zone database: libstdc++ 13's tzdata.zi disagreed with the OS
+  zoneinfo (what Python reads) in 217 of 599 zones, so POSIX builds use
+  the vendored date/tz over the OS zoneinfo (Windows keeps MSVC's), with
+  backward links the OS lacks resolved through the standard library;
+  `minera_zone_database_tests` pins ten historic offsets.
+- dateutil-only date strings: not modelled (kept declared).
+- Fresh seeds 2026121000-11: one call, the keep-once relative occurrence
+  count with two keys that are no str (DuplicateError `literal`; probes
+  tq4 and tq5); 2026121012-23: one call, `eventually_follows` with a list
+  time bound where pandas' inner merge reorders the chains (label
+  grouping, the equal-length reordering, numeric keys labelled from the
+  right, missing keys and timestamps joining the merge; fuzzed over every
+  dtype, probes n6 and n7). Both fixed; everything else replays clean.
+
+In the suite: new `docs/polars-filter-dq-bank.json.gz` (8,018 calls),
+`docs/polars-sequence-filter-dq-bank.json.gz` (6,192 calls) and
+`docs/pandas-filter-dq-bank.json.gz` (16,852 calls) with their ctests. The
+probes, the fuzzers (`mo/`), the dumps and the fresh banks are in the
+project files under `review-harness/round-dq/`.
+
+Full suite 602 passed; no fixture changed (2,673 responses). The device
+check on the Mac was skipped (the Mac was not linked).
+
+Next round (DR) should start by re-reviewing round DQ:
+
+- DQ's CI run (the first with the macOS job since DO, and the first
+  Linux run on the vendored time zone database);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- pandas' merge order elsewhere: the other pandas filters and statistics
+  that return or iterate a merge of non-unique keys in merge order (the
+  equal-length reordering of DQ1-5 changes row order, not row sets);
+- the keep-once relative occurrence count with a dict case key naming
+  several existing columns (declared, outside the native domain);
+- the nanosecond window at pandas' int64 range ends (declared);
+- the eager paths performance race on frames of four rows or more (DO1-2,
+  declared) and the thread-count quirk of DN1-6 (declared);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DP's targets, taken in DQ (findings DQ1-1 to DQ1-5): DP's CI run,
+the fresh seeds, dicts with keys that are no str and tuple-keyed dicts in
+`paths.apply`, date strings against datetime64 columns of other units and
+zones, and the dateutil question; also the time zone database. Not taken
+(carried to DR): the eager paths race, the thread-count quirk of DN1-6,
+the CU list, the new dtypes and the open choices.
+
+Previous list for round DQ (kept for its older items):
 
 Next round (DQ) should start by re-reviewing round DP:
 

@@ -42,6 +42,20 @@ inline bool plain_text(const EventAttribute& v) {
   return v.container == AttributeContainerKind::kScalar && !v.is_null && v.kind == AttributeKind::kString;
 }
 
+// Round DQ: a dict with a key that is not a str is pl.col of its keys as a
+// list of them (the list checks refuse it, probe dq/tq1); any other key is
+// returned unchanged.
+inline bool typed_dict(const EventAttribute& key) {
+  return dict_key(key) && std::any_of(key.children.begin(), key.children.end(), [](const EventAttribute& c) { return c.typed_key != nullptr; });
+}
+inline EventAttribute typed_dict_list(const EventAttribute& key) {
+  if (!typed_dict(key)) return key;
+  EventAttribute list{key.key, ""};
+  list.container = AttributeContainerKind::kList;
+  for (const auto& child : key.children) list.children.push_back(dict_entry_key(child));
+  return list;
+}
+
 // The key as pl.col reads it: a dict becomes the list of its names; a
 // non-empty list of str names becomes the one existing name, the first
 // missing name behind the by-name marker, or stays a list when it names
@@ -50,6 +64,7 @@ inline bool plain_text(const EventAttribute& v) {
 inline EventAttribute col_key(const EventAttribute& key, const std::vector<std::string>& columns) {
   if (key.container == AttributeContainerKind::kScalar) return key;
   std::vector<std::string> names;
+  if (typed_dict(key)) return col_key(typed_dict_list(key), columns);
   if (dict_key(key)) {
     for (const auto& child : key.children)
       if (std::find(names.begin(), names.end(), child.key) == names.end()) names.push_back(child.key);

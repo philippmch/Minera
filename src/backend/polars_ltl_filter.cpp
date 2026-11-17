@@ -201,7 +201,7 @@ bool truth(const EventAttribute& value) {
 std::vector<EventAttribute> iter(const EventAttribute& value) {
   if (value.container == AttributeContainerKind::kContainer) {
     std::vector<EventAttribute> keys;
-    for (const auto& child : value.children) keys.push_back({"", child.key});
+    for (const auto& child : value.children) keys.push_back(dict_entry_key(child));
     return keys;
   }
   if (collection(value)) return value.children;
@@ -470,6 +470,10 @@ void dict_argument(const EventAttribute& key) {
 void list_key_literal(const EventAttribute& key) {
   // Round DB: pl.lit refuses a set key.
   if (!key.is_null && detail::polars_lit::set_argument(key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
+  // Round DQ: a dict key is a struct literal there, which a key that is not
+  // a str (or a field that cannot be built) refuses.
+  if (!key.is_null && key.container == AttributeContainerKind::kContainer)
+    if (const auto error = detail::polars_lit::dict_literal_error(key)) fail("TypeError", "apply", *error);
   if (key.is_null || (key.container != AttributeContainerKind::kList && key.container != AttributeContainerKind::kTuple)) return;
   if (const auto error = detail::polars_lit::argument_literal_fault(key)) fail(error->type, "apply", error->message);
 }
@@ -642,17 +646,17 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
   // Round DL: on an eager frame the sort builds a dict case key as a struct
   // literal (a literal sort key), and the dict is refused only after it.
   if (sequence_rule(out.operation)) {
-    if (!eager_source) dict_argument(o.case_id_key);
-    else if (o.case_id_key.container == AttributeContainerKind::kContainer)
-      if (const auto error = detail::polars_lit::dict_literal_error(o.case_id_key)) fail("TypeError", "apply", *error);
     // Round DN: the sort builds each key's literal (a scalar past the Int128
     // range refused); on an eager frame it runs before the window spreads a
     // list case key into its items (t9 probes, probe dn/l1).
+    // Round DQ: lazily too the sort's literals (a dict's struct, which a key
+    // that is not a str refuses, the timestamp key's after the case key's)
+    // are built before the window refuses a dict case key (probe dq/q1).
     list_key_literal(o.case_id_key);
     scalar_range(o.case_id_key);
     list_key_literal(o.timestamp_key);
     scalar_range(o.timestamp_key);
-    if (!eager_source) spread_key(o.case_id_key);
+    if (!eager_source) { dict_argument(o.case_id_key); spread_key(o.case_id_key); }
   }
   if (eager_source && sequence_rule(out.operation)) { eager_sort(*eager_source, o); spread_key(o.case_id_key); dict_argument(o.case_id_key); }
   if (sequence_rule(out.operation) && null(o.case_id_key))
@@ -741,6 +745,15 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (out.operation == Op::kFourEyes) first_pair_join();
     const bool eager_group = eager_source && out.operation == Op::kDifferentPersons;
     if (null(o.case_id_key) && !eager_group) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
+    // Round DQ: attr_value_different_persons builds group_by([case,
+    // resource])'s literals (a dict's struct, which a key that is not a str
+    // refuses) before a dict case key is refused (probe dq/q2).
+    if (out.operation == Op::kDifferentPersons && keys::dict_key(o.case_id_key)) {
+      list_key_literal(o.case_id_key);
+      if (detail::polars_lit::set_argument(o.resource_key)) fail("TypeError", "apply", detail::polars_lit::kSetLiteralError);
+      list_key_literal(o.resource_key);
+      scalar_range(o.resource_key);
+    }
     dict_argument(o.case_id_key);
     list_key_literal(o.case_id_key);
     // Round DN: a scalar case key past the Int128 range fails its pl.lit

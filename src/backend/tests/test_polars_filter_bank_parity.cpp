@@ -317,7 +317,12 @@ EventAttribute to_attribute(const Json& node, std::string key = {}) {
     out.container = AttributeContainerKind::kContainer;
     // Repeated keys were merged as dict(pairs) when the bank was read
     // (bank_dict_pairs.hpp).
-    for (const auto& pair : value.items) out.children.push_back(to_attribute(pair.items.at(1), body(pair.items.at(0)).text));
+    for (const auto& pair : value.items) {
+      auto child = to_attribute(pair.items.at(1), body(pair.items.at(0)).text);
+      // Round DQ: a key that is not a str travels typed (typed_key).
+      if (tag_of(pair.items.at(0)) != "s") child.typed_key = std::make_shared<const EventAttribute>(to_attribute(pair.items.at(0)));
+      out.children.push_back(std::move(child));
+    }
   } else {
     throw std::runtime_error("unsupported typed argument tag " + tag);
   }

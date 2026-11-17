@@ -233,7 +233,7 @@ std::string group_key(const std::optional<EventAttribute>& cell, const std::stri
   throw std::invalid_argument("Unsupported native Polars case dtype: " + dtype);
 }
 std::vector<EventAttribute> iter(const EventAttribute& value) {
-  if(value.container==AttributeContainerKind::kContainer){std::vector<EventAttribute> keys;for(const auto& child:value.children)keys.push_back({"",child.key});return keys;}
+  if(value.container==AttributeContainerKind::kContainer){std::vector<EventAttribute> keys;for(const auto& child:value.children)keys.push_back(dict_entry_key(child));return keys;}
   if(collection(value))return value.children;
   if(text(value)){std::vector<EventAttribute> chars;for(std::size_t i=0;i<value.value.size();){const auto c=static_cast<unsigned char>(value.value[i]);const auto n=c<0x80?1:c<0xe0?2:c<0xf0?3:4;chars.push_back({"",value.value.substr(i,n)});i+=n;}return chars;}
   fail("TypeError","apply","'"+core_type(value)+"' object is not iterable");
@@ -284,6 +284,9 @@ bool listed_key(const EventAttribute& key);
 // list activity key names the first item that is not a str (pl.col), and a
 // dict or list of names resolves by name in grouped().
 void validate(const PolarsVariantsFilterOptions& options,bool statistics=false,bool eager=false){
+  // Round DQ: the sort builds a dict case key's struct literal first, which a
+  // key that is not a str refuses (probe dq/q1).
+  if(keys::dict_key(options.case_id_key))if(const auto error=detail::polars_lit::dict_literal_error(options.case_id_key))fail("TypeError","apply",*error);
   if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());
   // Round CN: a list or tuple case key is a Series literal (built strictly)
   // before anything else is read.
@@ -299,7 +302,9 @@ void validate(const PolarsVariantsFilterOptions& options,bool statistics=false,b
     for(const auto& item:options.case_id_key.children)
       if(detail::polars_lit::scalar_too_large(item))fail("InvalidOperationError","apply",detail::polars_lit::kIntegerTooLarge);
   if(!text(options.activity_key)&&!collection(options.activity_key))fail("TypeError","apply","invalid input for `col`\n\nExpected `str` or `DataType`, got '"+python_type(options.activity_key)+"'.");
-  const auto& act=options.activity_key;
+  // Round DQ: pl.col reads a dict with a key that is not a str as the list
+  // of its keys (probe dq/tq1).
+  const auto act=keys::typed_dict_list(options.activity_key);
   // Round DB: pl.col reads a set's items like a list's.
   if(act.container==AttributeContainerKind::kList||act.container==AttributeContainerKind::kTuple||detail::polars_lit::set_argument(act)){
     if(!act.children.empty()&&!text(act.children.front()))fail("TypeError","apply","invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '"+python_type(act.children.front())+"'.");

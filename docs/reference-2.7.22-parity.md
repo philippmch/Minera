@@ -30561,3 +30561,140 @@ Tests:
 - Full suite: 599 tests passed. Python script and frontend tests not
   rerun (scripts and frontend unchanged); the workbench fixture replay
   gave 2,673 responses unchanged.
+
+## Review DQ1: re-review of round DP, dicts with keys that are no str in the Polars filters, date strings against datetime64 columns of other units and zones, the time zone database, fresh seeds (2026-11-17)
+
+Round DQ checked DP's CI (run 44139462790 on bb51ec2: five jobs green;
+the macOS job was cancelled after 15 minutes without a runner, before any
+step ran, so DQ's push runs it again), probed dicts whose keys are no str
+as keys in the Polars table and sequence filters, date strings against
+pandas datetime64 columns of other units and zones, and replayed two
+batches of fresh seeds. The device check on the Mac was skipped (the Mac
+was not linked).
+
+- **DQ1-1 Dicts with keys that are no str as keys in the Polars filters**
+  (probe `dq/specs/tq1.py`, 3,276 calls eagerly and lazily: `{1: "a"}`,
+  `{None: 1}`, `{(1, 2): "a"}` and mixed dicts as attribute, case,
+  activity, timestamp and resource keys in every table filter, and
+  tuple-keyed dicts in `paths.apply`; `tq2.py`, 3,096 calls each way, in
+  the sequence filters; `tq3.py`, 270 calls each way, typed-key dicts
+  beside str-key dicts and lists). The bank transport now keeps a dict
+  key's type (`EventAttribute::typed_key`, read by `dict_entry_key`), so
+  the native filters see the key Python sees. Observed and modelled
+  (`polars_key_selection.hpp`, `polars_lit_model.hpp` and the LTL,
+  variants, paths, between, case, timestamp, attribute and sequence
+  filters):
+  - pl.col(dict) is pl.col of the list of its keys, so a key that is no
+    str fails as in a list (`invalid input for 'col'`, `got iterable of
+    type 'int'`, or `'int' object is not an instance of 'str'`);
+  - where the filter builds the key list's literal while the expression is
+    built (the case and timestamp keys of the LTL sequence rules, the
+    variants filters, `paths.apply`, the between filter, the resource of
+    `attr_value_different_persons`, the per-case relative occurrence
+    counts), a dict with a key that is no str fails pl.lit (`cannot create
+    expression literal for value of type dict`, with its hint), before
+    group_by, over or join refuse the dict (`Cannot pass a dictionary as a
+    single positional argument`), on a LazyFrame and on a DataFrame;
+  - a dict literal keeps keys that are equal in Python once (a str by its
+    text, others by value), so tuple keys no longer collapse into one;
+  - `paths.apply` iterates a dict of paths by its keys (tuples carried with
+    their type) and indexes a dict path by its keys 0 and 1 (`KeyError`
+    otherwise);
+  - the eager attribute filters report a literal's own error instead of a
+    native failure.
+  tq1: 2,126 lazy and 2,096 eager calls -> 0; tq2: 1,800 and 2,170 -> 0;
+  tq3 -> 0.
+- **DQ1-2 Date strings against datetime64 columns of other units and
+  zones** (probe `probe/specs/n4.py`, 11,556 calls over six CK frames with
+  `s`, `ms`, `us` and `ns` columns, naive, UTC and Europe/Berlin, in the
+  numeric, timestamp, case performance, paths performance and LTL
+  filters; `n5.py`, 3,600 calls with nanosecond texts and texts at the
+  edges of pandas' int64 nanosecond range,
+  [1677-09-21 00:12:43.145224193, 2262-04-11 23:47:16.854775807]).
+  Observed on pandas 3.0.5 and modelled (`pandas_attributes_filter.cpp`):
+  - a text with more than six fraction digits is parsed at nanosecond
+    resolution, so its instant must lie in the int64 nanosecond range;
+  - a naive text localized into an aware column must have its instant in
+    that range (fixed offsets too); a microsecond text in a zone with
+    transitions is refused when its instant falls below the range;
+  - an aware nanosecond text converted to the column's zone must have its
+    local wall time in the range;
+  - in zones that still keep DST in 9999, a localized instant in year
+    10000 or later raises `NotImplementedError` (`Localizing Timestamps
+    which are outside the range of Python's standard library datetime is
+    not supported`); checked over all 599 zones (1,111 values and 87
+    errors, all matching).
+  n4: 66 -> 0; n5: 102 -> 72, all native refusals of the declared window
+  below.
+- **DQ1-3 The time zone database.** libstdc++ 13's database, parsed from
+  its tzdata.zi, disagreed with the OS zoneinfo that Python, pandas and
+  Polars read in 217 of 599 zones (local mean time offsets such as
+  Europe/London's -0:01:15 read as positive, the backzone data of the
+  TZif build, DST periods such as Asia/Nicosia's in 1998). On POSIX
+  systems the build now uses the vendored date/tz over the OS zoneinfo
+  (Windows keeps MSVC's database); a backward link the OS zoneinfo lacks
+  (Ubuntu 24.04 moved links such as US/Eastern to tzdata-legacy) resolves
+  through the standard library's links, as Python falls back to its
+  tzdata package. `minera_zone_database_tests` pins ten historic offsets
+  to Python's zoneinfo.
+- **DQ1-4 dateutil.** Texts only pandas' dateutil fallback reads (month
+  names, `1e3`, free shapes) stay refused natively: a subset would leave
+  the rest of dateutil's grammar declared all the same, and no domain
+  feeds such texts from user data.
+- **DQ1-5 Fresh seeds.** Batch 1 (2026121000-11, twelve banks): one call,
+  the keep-once relative occurrence count with an empty dict as the case
+  key and a float as the attribute key (CK 2026121001 case 608). The
+  per-case group_by builds both keys in order (a dict's struct, a list's
+  Series, a scalar's pl.lit), so two keys that are no str repeat the name
+  `literal` (DuplicateError, `'group_by'` twice lazily, once eagerly)
+  before the counts or the denominator read anything, and a dict case key
+  whose literal fails fails first whatever the attribute key (probes
+  `tq4.py`, 200 calls each way, and `tq5.py`, 264 calls each way, over
+  dict, list, tuple, scalar and None case keys and literal attribute
+  keys; tq4: 68 lazy and 30 eager calls -> 2 lazy, declared below; tq5:
+  224 and 168 -> 0). Batch 2
+  (2026121012-23, twelve banks): one call, `eventually_follows` with a
+  list time bound on a frame where pandas' merge reorders the chains
+  (pandas CN 2026121023 case 588). Modelled (`pandas_ltl_filter.cpp`) and
+  fuzzed against the reference over every dtype: the chains come from an
+  inner merge of the kept chains with the next step's events on the case
+  key; pandas groups the rows by key label (a missing key last) and, when
+  the merge has exactly as many rows as its left side, puts them back by
+  the left rows' label order, so the rows of keys without a match shift
+  the rest; a numeric key (numbers, bools, datetimes, categories, masked
+  dtypes) takes its labels from the right side first and merges a right
+  side of distinct present keys in plain order, a str or object key
+  labels the left side first; rows with a missing case key or timestamp
+  join the merge and their chains are dropped after it (probes `n6.py`,
+  876 calls, and `n7.py`, 892 calls, list bounds that match each chain in
+  that order over CN frames with str, int and float case keys -> 0).
+  Every other call of both batches replays clean.
+
+Declared:
+- A nanosecond date string whose wall time lies within a day of the ends
+  of pandas' int64 nanosecond range, against an aware datetime64 column
+  in a zone with transitions (DQ1-2): pandas wraps or refuses it
+  erratically there (290 of 599 zones); refused natively.
+- The keep-once relative occurrence count with a dict case key naming
+  several existing columns (DQ1-5, two lazy calls): outside the native
+  domain, as before.
+- Still declared from earlier rounds: dateutil-only date strings (DP1-4,
+  DQ1-4), the eager paths performance race on four rows or more (DO1-2),
+  the thread-count quirk of DN1-6.
+
+Tests:
+- New: `docs/polars-filter-dq-bank.json.gz` (8,018 calls in 26 cases:
+  tq1, tq3, tq4 and tq5 eagerly and lazily, the two declared calls left
+  out), `docs/polars-sequence-filter-dq-bank.json.gz` (6,192 calls in 12
+  cases: tq2 eagerly and lazily) and `docs/pandas-filter-dq-bank.json.gz`
+  (16,852 calls in 114 cases: n4, n5 without the declared window, n6 and
+  n7), replayed by `minera_polars_filter_dq_bank_parity_tests`,
+  `minera_polars_sequence_filter_dq_bank_parity_tests` and
+  `minera_pandas_filter_dq_bank_parity_tests`;
+  `minera_zone_database_tests` checks the historic offsets.
+- All 116 docs Polars table, Polars sequence, pandas table and pandas
+  sequence banks replay clean with the changes, and every call of both
+  fresh batches replays clean.
+- Full suite: 602 tests passed. Python script and frontend tests not
+  rerun (scripts and frontend unchanged); the workbench fixture replay
+  gave 2,673 responses unchanged.

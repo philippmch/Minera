@@ -1654,7 +1654,7 @@ inline Value value_of(const EventAttribute& a, bool huge = false) {
   if (a.is_null || is_native_na_attribute(a)) return Value::none();
   if (a.container == AttributeContainerKind::kContainer) {
     std::vector<std::pair<Value, Value>> entries;
-    for (const auto& child : a.children) entries.emplace_back(Value::of(child.key), value_of(child, huge));
+    for (const auto& child : a.children) entries.emplace_back(child.typed_key ? value_of(dict_entry_key(child), huge) : Value::of(child.key), value_of(child, huge));
     return Value::dict(std::move(entries));
   }
   if (a.container != AttributeContainerKind::kScalar) {
@@ -1731,7 +1731,13 @@ inline Literal literal_of(const Value& v) {
     // Round CI: a repeated key once, in its first place (Python's dict).
     std::vector<Value> keys;
     for (const auto& [k, _] : v.entries)
-      if (std::none_of(keys.begin(), keys.end(), [&](const Value& x) { return x.text == k.text; })) keys.push_back(k);
+      // Round DQ: as Python compares keys (a key that is not a str by value,
+      // a tuple item by item; probe dq/tq1).
+      if (std::none_of(keys.begin(), keys.end(), [&](const Value& x) {
+            if (x.kind == Kind::kString && k.kind == Kind::kString) return x.text == k.text;
+            return pandas_filter_values_equal(x, k);
+          }))
+        keys.push_back(k);
     return list_literal(keys);
   }
   return list_literal(v.items);
@@ -2264,6 +2270,13 @@ struct StructField {
 // the whole dict with PolarsSequenceFilterError).
 inline std::vector<StructField> struct_fields(const Value& value) {
   std::vector<const std::pair<Value, Value>*> last;
+  // Round DQ: Polars builds struct fields from str keys only; any other key
+  // (an int, None, a tuple) fails the literal (probe dq/tq1).
+  for (const auto& e : value.entries)
+    if (e.first.kind != Kind::kString)
+      fail("TypeError",
+           "cannot create expression literal for value of type dict.\n\nHint: Pass `allow_object=True` to accept any value and create "
+           "a literal of type Object.");
   for (const auto& e : value.entries) {
     const auto at = std::find_if(last.begin(), last.end(), [&](const auto* f) { return f->first.text == e.first.text; });
     if (at != last.end()) *at = &e;

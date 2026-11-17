@@ -519,10 +519,16 @@ Json paths_module(const std::string& function, const EventTable& df, const Args&
   throw std::runtime_error("unbound function " + function);
 }
 
+// Round DQ: a parameters argument left out is Python's default None.
+const Json& parameters_at(const Args& args, std::size_t index) {
+  static const Json none = jtagged("n", Json{});
+  return index < args.size() ? *args.at(index) : none;
+}
+
 Json timestamp_module(const std::string& function, const EventTable& df, const Args& args) {
   using P = PandasTimestampFilterParameter;
-  if (function == "apply") return table_node(apply_pandas_timestamp_filter(df, mapping_of(*args.at(0))));
-  if (function == "apply_auto_filter") return table_node(auto_filter_pandas_timestamp(df, mapping_of(*args.at(0))));
+  if (function == "apply") return table_node(apply_pandas_timestamp_filter(df, mapping_of(parameters_at(args, 0))));
+  if (function == "apply_auto_filter") return table_node(auto_filter_pandas_timestamp(df, mapping_of(parameters_at(args, 0))));
   const auto& last = *args.back();
   const auto run = [&](auto&& call) { return is_mapping(last) ? call(parameters_of<P>(last)) : call(to_attribute(last)); };
   if (function == "filter_traces_attribute_in_timeframe")

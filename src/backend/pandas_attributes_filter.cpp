@@ -19,6 +19,7 @@
 #include "minera/token_integer.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
+#include "zone_database.hpp"
 namespace minera { namespace {
 [[noreturn]] void error(std::string kind,std::string message){throw PandasAttributesFilterError(std::move(kind),std::move(message));}
 std::string string_key_repr(std::string_view value) {
@@ -383,7 +384,9 @@ std::string exact_instant_text(const ParsedExactTimestamp& at){
 // and minutes (with or without a colon), seconds and a fraction (nine digits
 // kept), then Z, an offset or UTC (a space allowed before). A field out of
 // range fails (no fallback rescues it); nullopt: not one of these shapes.
-struct TextTimestamp{bool refused=false;std::optional<ParsedExactTimestamp> at;};
+// Round DQ: nano marks a fraction of more than six digits, which pandas
+// parses at nanosecond resolution (probe dq/n4).
+struct TextTimestamp{bool refused=false;std::optional<ParsedExactTimestamp> at;bool nano=false;};
 std::optional<TextTimestamp> iso_text_timestamp(std::string_view s){
  std::size_t p=0;
  const auto digits=[&](std::size_t lo,std::size_t hi,int& out)->bool{
@@ -391,7 +394,7 @@ std::optional<TextTimestamp> iso_text_timestamp(std::string_view s){
   while(p<s.size()&&n<hi&&std::isdigit(static_cast<unsigned char>(s[p]))){out=out*10+(s[p]-'0');++p;++n;}
   return n>=lo;
  };
- int year=0,month=1,day=1,hour=0,minute=0,second=0;std::uint32_t nanos=0;
+ int year=0,month=1,day=1,hour=0,minute=0,second=0;std::uint32_t nanos=0;bool nano=false;
  const auto start=p;
  if(!digits(4,4,year))return std::nullopt;
  bool range=true;
@@ -417,7 +420,7 @@ std::optional<TextTimestamp> iso_text_timestamp(std::string_view s){
   if(p<s.size()&&s[p]==':'){++p;if(!digits(2,2,minute))return std::nullopt;
    if(p<s.size()&&s[p]==':'){++p;if(!digits(2,2,second))return std::nullopt;
     if(p<s.size()&&s[p]=='.'){++p;std::size_t n=0;while(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p]))){if(n<9)nanos=nanos*10+static_cast<std::uint32_t>(s[p]-'0');++n;++p;}
-     for(;n<9;++n)nanos*=10;}
+     nano=n>6;for(;n<9;++n)nanos*=10;}
    }
   }else if(p<s.size()&&std::isdigit(static_cast<unsigned char>(s[p]))){if(!digits(2,2,minute))return std::nullopt;}
   if(hour>23||minute>59||second>59)range=false;
@@ -441,7 +444,33 @@ std::optional<TextTimestamp> iso_text_timestamp(std::string_view s){
  if(!parsed)return std::nullopt;
  parsed->nanoseconds=nanos;
  if(aware){parsed->seconds-=static_cast<std::int64_t>(offset)*60;parsed->timezone_aware=true;parsed->offset_minutes=offset;}
- return TextTimestamp{false,parsed};
+ return TextTimestamp{false,parsed,nano};
+}
+// Round DQ: the int64 nanosecond range of pandas (Timestamp.min and max,
+// 1677-09-21 00:12:43.145224193 to 2262-04-11 23:47:16.854775807 UTC).
+bool before_nanosecond_range(const ParsedExactTimestamp& at){return at.seconds<-9223372037||(at.seconds==-9223372037&&at.nanoseconds<145224193);}
+bool after_nanosecond_range(const ParsedExactTimestamp& at){return at.seconds>9223372036||(at.seconds==9223372036&&at.nanoseconds>854775807);}
+// Round DQ: a wall clock within a day of that range's ends (where pandas'
+// int64 localization of a nanosecond value wraps or refuses unevenly in
+// zones with transitions; probe dq/edge.py over all 599 zones).
+bool near_nanosecond_edge(const ParsedExactTimestamp& at){return at.seconds<-9223372037+86400||at.seconds>9223372036-86400;}
+// Round DQ: the year past 9999 of an instant (10000-01-01T00:00:00Z on).
+bool past_year_9999(const ParsedExactTimestamp& at){return at.seconds>=253402300800;}
+// A zone whose offset changes over time (not a fixed Etc zone): its offset
+// before the first transition differs from a winter or summer one of 2021.
+bool zone_with_transitions(std::string_view zone){
+ try{
+  const auto early=::minera::zone_database::info_at_utc(zone,-9223372037).offset_seconds;
+  return early!=::minera::zone_database::info_at_utc(zone,1609459200).offset_seconds||early!=::minera::zone_database::info_at_utc(zone,1625097600).offset_seconds;
+ }catch(const std::runtime_error&){return false;}
+}
+// Round DQ: a zone still keeping daylight saving time in 9999 (its January
+// and July offsets differ), which pandas localizes through Python's datetime
+// past its last listed transition (probe over all 599 zones).
+bool zone_with_future_dst(std::string_view zone){
+ try{
+  return ::minera::zone_database::info_at_utc(zone,253371974400).offset_seconds!=::minera::zone_database::info_at_utc(zone,253387612800).offset_seconds;
+ }catch(const std::runtime_error&){return false;}
 }
 // Pandas refuses at once a text that reads as a number below 1000 (a float
 // of digits, then an optional fraction and exponent, spaces around), unless
@@ -482,13 +511,45 @@ EventAttribute datetime_text_bound(const EventAttribute& bound,const std::string
  if(!read)throw std::invalid_argument("a date string outside the ISO shapes against a pandas datetime64 column (pandas' dateutil fallback) is outside the native domain");
  if(read->refused)refuse();
  auto parsed=read->at;
+ // Round DQ: a nanosecond text must lie in the int64 nanosecond range (its
+ // wall clock, or its instant when it names an offset).
+ if(read->nano&&(before_nanosecond_range(*parsed)||after_nanosecond_range(*parsed)))refuse();
  const auto comma=dtype.find(", ");
  const bool aware=comma!=std::string::npos&&dtype.ends_with("]");
+ const auto zone=aware?dtype.substr(comma+2,dtype.size()-comma-3):std::string();
  if(aware&&!parsed->timezone_aware){
   const auto nanos=parsed->nanoseconds;
-  parsed=localize_timestamp_wall_time(*parsed,dtype.substr(comma+2,dtype.size()-comma-3));
+  const bool transitions=zone_with_transitions(zone);
+  if(read->nano&&transitions&&near_nanosecond_edge(*parsed))
+   throw std::invalid_argument("a nanosecond date string within a day of pandas' int64 range ends against a datetime64 column in a zone with transitions (pandas' localization wraps there) is outside the native domain");
+  parsed=localize_timestamp_wall_time(*parsed,zone);
   if(!parsed)refuse();
   parsed->nanoseconds=nanos;
+  // Round DQ: past its last transition a zone that keeps daylight saving
+  // time localizes through Python's datetime, which ends with 9999 (probe
+  // dq/n5: 9999-12-31 23:59:59.999999 in America/New_York).
+  if(past_year_9999(*parsed)&&zone_with_future_dst(zone))
+   error("NotImplementedError","Localizing Timestamps which are outside the range of Python's standard library datetime is not supported (year 10000 is out of range).");
+  // Round DQ: pandas localizes with the zone's transitions from
+  // Timestamp.min on, so in a zone with transitions a wall time whose
+  // instant falls before it is nonexistent (probe dq/n4: 1600-01-01 in
+  // Europe/Berlin, 1677-09-21 01:06:11 there).
+  if(before_nanosecond_range(*parsed)&&transitions)refuse();
+  // Round DQ: a nanosecond value's instant must lie in the int64 range, in
+  // a fixed zone too (probe dq/n5).
+  if(read->nano&&(before_nanosecond_range(*parsed)||after_nanosecond_range(*parsed)))refuse();
+ }else if(aware&&read->nano){
+  // Round DQ: an aware nanosecond value converts to the column's zone, whose
+  // wall clock must lie in the int64 range too (probe dq/n5: ...Z against
+  // Europe/London, whose LMT is behind UTC).
+  ParsedExactTimestamp local=*parsed;
+  if(zone.size()==9&&zone.starts_with("UTC")&&(zone[3]=='+'||zone[3]=='-')&&zone[6]==':'){
+   const int minutes=((zone[4]-'0')*10+(zone[5]-'0'))*60+(zone[7]-'0')*10+(zone[8]-'0');
+   local.seconds+=std::int64_t{zone[3]=='-'?-minutes:minutes}*60;
+  }else if(zone!="UTC"){
+   try{local.seconds+=::minera::zone_database::info_at_utc(zone,parsed->seconds).offset_seconds;}catch(const std::runtime_error&){}
+  }
+  if(before_nanosecond_range(local)||after_nanosecond_range(local))refuse();
  }
  if(!aware&&parsed->timezone_aware)refuse();
  return EventAttribute{bound.key,exact_instant_text(*parsed),AttributeKind::kDate};

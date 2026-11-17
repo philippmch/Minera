@@ -389,7 +389,13 @@ if(MINERA_PORTABLE_TZDB STREQUAL "AUTO")
     }
   ]] MINERA_HAS_STD_TZDB)
   set(CMAKE_REQUIRED_FLAGS "${_minera_tz_required_flags}")
-  if(MINERA_HAS_STD_TZDB)
+  # Round DQ: POSIX systems read the OS zoneinfo, the TZif files Python's
+  # zoneinfo (and so pandas and Polars' Python side) reads. libstdc++ 13's
+  # database, parsed from tzdata.zi, disagreed with them in 217 of 599
+  # zones (LMT offsets such as Europe/London's -0:01:15 read as positive,
+  # the backzone data of the TZif build, DST periods such as
+  # Asia/Nicosia's in 1998). Windows keeps MSVC's database.
+  if(MINERA_HAS_STD_TZDB AND WIN32)
     set(_minera_use_portable_tzdb OFF)
   else()
     set(_minera_use_portable_tzdb ON)
@@ -409,9 +415,18 @@ if(_minera_use_portable_tzdb)
   set_target_properties(minera_tzdb PROPERTIES POSITION_INDEPENDENT_CODE ON)
   target_link_libraries(minera_core PRIVATE minera_tzdb)
   # Only the seam sees date/tz, so the rest of the core keeps its flags.
+  # A name the OS zoneinfo lacks (Ubuntu 24.04 moved backward links such as
+  # US/Eastern to tzdata-legacy) resolves through the standard library's
+  # links when it has a database, as Python falls back to the tzdata
+  # package, whose backward links name the same targets.
+  if(MINERA_HAS_STD_TZDB)
+    set(_minera_tz_links 1)
+  else()
+    set(_minera_tz_links 0)
+  endif()
   set_source_files_properties(src/backend/zone_database.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/third_party/date/include"
-    COMPILE_DEFINITIONS "MINERA_PORTABLE_TZDB=1;USE_OS_TZDB=1;HAS_REMOTE_API=0")
+    COMPILE_DEFINITIONS "MINERA_PORTABLE_TZDB=1;MINERA_STD_TZDB_LINKS=${_minera_tz_links};USE_OS_TZDB=1;HAS_REMOTE_API=0")
   message(STATUS "Minera time zones: vendored date/tz over the OS zoneinfo")
 else()
   set_source_files_properties(src/backend/zone_database.cpp PROPERTIES
@@ -3267,6 +3282,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_dp_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dp-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_dp_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DQ: dicts with keys that are no str as case, activity and
+  # timestamp keys in the sequence filters (eager and lazy; probe tq2).
+  add_test(NAME minera_polars_sequence_filter_dq_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dq-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_dq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp
@@ -3535,6 +3555,14 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dp_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dp-bank.json.gz")
   set_tests_properties(minera_polars_filter_dp_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DQ: dicts with keys that are no str as attribute, case, activity,
+  # timestamp and resource keys in the table filters, tuple-keyed dicts in
+  # paths.apply, and literal case keys beside literal attribute keys in the
+  # keep-once relative occurrence counts (eager and lazy; probes tq1, tq3,
+  # tq4, tq5).
+  add_test(NAME minera_polars_filter_dq_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dq-bank.json.gz")
+  set_tests_properties(minera_polars_filter_dq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3823,6 +3851,13 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_dp_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dp-bank.json.gz")
   set_tests_properties(minera_pandas_filter_dp_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DQ: date strings against datetime64 columns of other units and
+  # zones in every pandas filter comparing timestamps (probes n4, n5), and
+  # list time bounds in eventually_follows matched chain by chain in pandas'
+  # merge order (probes n6, n7).
+  add_test(NAME minera_pandas_filter_dq_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dq-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_dq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp
