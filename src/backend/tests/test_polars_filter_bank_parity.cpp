@@ -777,7 +777,11 @@ Json cases_module(const std::string& function, const LazyEventTable& df, const A
   throw std::runtime_error("unbound function " + function);
 }
 
-Json ltl_module(const std::string& function, const LazyEventTable& df, const Args& args) {
+// Round DK: a case marked "eager" calls the LTL filters on the eager table
+// (pm4py's Polars LTL filters on a DataFrame), as the LTL workbench does for
+// a DataFrame input.
+template <typename Frame>
+Json ltl_module(const std::string& function, const Frame& df, const Args& args) {
   if (is_constant(function)) return constant(function);
   using Op = PolarsLtlFilterOperation;
   PolarsLtlFilterCall call;
@@ -1201,6 +1205,7 @@ int main(int argc, char** argv) try {
   for (const auto& item : bank.at("cases").items) {
     ++case_index;
     const auto df = parse_event_table_json(serialize(item.at("source")));
+    const bool eager = item.get("eager") && item.at("eager").boolean;
     for (const auto& node : item.at("calls").items) {
       const auto qualified = node.at("function").text;
       if (only && qualified.find(only) == std::string::npos) continue;
@@ -1217,7 +1222,7 @@ int main(int argc, char** argv) try {
           if (module == "attributes") return attributes_module(function, lazy, args, kwargs);
           if (module == "between") return between_module(function, lazy, args);
           if (module == "cases") return cases_module(function, lazy, args, kwargs);
-          if (module == "ltl") return ltl_module(function, lazy, args);
+          if (module == "ltl") return eager ? ltl_module(function, df, args) : ltl_module(function, lazy, args);
           if (module == "paths") return paths_module(function, lazy, args);
           if (module == "timestamp") return timestamp_module(function, lazy, args);
           if (module == "variants") return variants_module(function, lazy, args);

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DJ (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DK (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6322,6 +6322,76 @@ under `review-harness/round-dj/`.
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DK re-reviewed DJ (Review DK1). DJ's commit 7af4161 ran CI run
+44014854240 (green on all six jobs). DK
+modelled the LTL calls DJ left refused, probed `literal`-column frames across
+the other filters, took one new area and replayed two batches of fresh seeds:
+- LTL filters on frames with their own `literal` column: a list key's
+  List(String) literal against the frame's scalar `literal` column fails the
+  pair join's dtype check (`SchemaError`), a scalar literal key's first case
+  join names the right literal `literal_right` (the second join repeats it;
+  a returned frame appends `literal_right`), and a `literal` timestamp key
+  or `literal` case column beside a non-str timestamp repeats `literal` in a
+  select. DJ's 917 -> 0, new probe lt8 44 -> 0.
+- A Polars four_eyes or attr_value_different_persons case key naming the
+  resource column now fails the duplicate output name as pm4py does (it
+  answered a frame before, on any frame).
+- `literal`-column frames in the other filters: table filters 16,558 calls
+  0; sequence filters 8,812 calls, 15 timestamp_case_grouping calls fixed (a
+  literal key's `literal` replaces the frame's own column; a str key naming
+  it beside a literal key fails the duplicate name).
+- New area: the LTL filters on eager DataFrames (the workbench's DataFrame
+  input). The bank driver now replays cases marked `"eager"` through the
+  `EventTable` overload. Eager steps run at once: no resolved plan (except
+  attr_value_different_persons' group_bys, which show their eager input),
+  eventually_follows and A_next_B_next_C sort first (missing names, then the
+  literal-key ShapeError), four_eyes and attr_value_different_persons check
+  the [case, resource] step on the first activity's rows before the joins.
+  Probe le1 641 -> 1; probe le2 2,075 clean, 325 carried.
+- Fresh seeds 2026120400-23: four calls, all varying in the reference itself
+  (equal-size join and group_by row orders, the DF1-7 partition race;
+  declared).
+
+In the suite: new `docs/polars-filter-dk-ltl-bank.json.gz`,
+`docs/polars-sequence-filter-dk-bank.json.gz`,
+`docs/pandas-filter-dk-bank.json.gz` and
+`docs/polars-filter-dk-eager-ltl-bank.json.gz` with their ctests (589 tests).
+The probes, the eager and `literal`-frame domains, the le2 dump of the 325
+carried calls and the fresh banks are in the project files under
+`review-harness/round-dk/`.
+
+No fixture changed. The device check on the Mac was skipped again (no device
+linked).
+
+Next round (DL) should start by re-reviewing round DK:
+
+- DK's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the 325 eager LTL calls of probe `dk/le2.py` (dump `dk/le2-carried.jsonl`
+  in the harness): on an eager frame the first activity's filter runs
+  before the [case, resource] step (`cannot compare string with numeric
+  type`, list activity casts), a non-str resource key is a literal named
+  `literal` in that step, and four_eyes' resource suffix TypeErrors come
+  after it; then eager probes of the other Polars table filters (only the
+  LTL module calls the eager overload in the bank driver so far);
+- the one le1 call still refused (a None item beside present names in an
+  eager four_eyes list key);
+- maybe the majority outcome of the partition race (DF1-7, seen again in
+  DI, DJ and DK; the reference itself varies);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DJ's targets, taken in DK (findings DK1-1 to DK1-5): DJ's CI run, the
+fresh seeds, the 917 LTL calls on `literal` frames, and LTL calls on eager
+frames (a first pass, beyond the `literal` items). Not taken (carried to
+DL): the partition race, equal-size joins and the older CJ, CF and CD items.
+
+Previous list for round DK (kept for its older items):
 
 Next round (DK) should start by re-reviewing round DJ:
 

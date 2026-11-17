@@ -2498,18 +2498,27 @@ EventTable polars_timestamp_case_grouping_apply(const EventTable& df, const Pola
   const Value* given[2] = {case_key_value(parameters), ts_value};
   for (int i = 0; i < 2; ++i)
     if (given[i] && (scalar_literal(given[i]) || given[i]->kind == Kind::kNone)) keys[i].dtype = gk::literal_item(*given[i]).dtype;
-  if (keys[0].literal && keys[1].literal)
+  const auto duplicate_literal = [&] {
     fail("DuplicateError",
          "group_by keys contained duplicate output name 'literal'. It's possible that multiple expressions are returning the "
          "same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to avoid "
          "duplicate column names." +
              resolved("group_by", frame_plan(df.columns), {"group_by"}));
+  };
+  if (keys[0].literal && keys[1].literal) duplicate_literal();
   if (!keys[0].literal) keys[0].column = require(df, case_key(parameters), plan);
   if (!keys[1].literal)
     keys[1].column = require(df, ts_value ? key_text(ts_value, kPolarsFilterDefaultTimestampKey) : std::string(kPolarsFilterDefaultTimestampKey), plan);
+  // Round DK: on a frame with its own `literal` column, a str key naming it
+  // beside a literal key collides on the output name once both resolve (a
+  // missing column fails first), and a literal key's output replaces that
+  // column: pl.all() leaves out every key's output name (probe dk/slit1).
+  const bool any_literal = keys[0].literal || keys[1].literal;
+  for (const auto& key : keys)
+    if (any_literal && key.column && df.columns[*key.column] == "literal") duplicate_literal();
   std::vector<std::size_t> rest;
   for (std::size_t c = 0; c < df.columns.size(); ++c)
-    if (c != keys[0].column && c != keys[1].column) rest.push_back(c);
+    if (c != keys[0].column && c != keys[1].column && !(any_literal && df.columns[c] == "literal")) rest.push_back(c);
   std::vector<std::pair<Key, Key>> groups;
   std::map<std::pair<Key, Key>, std::vector<std::size_t>> rows;
   const auto group_value = [&](const GroupingKey& key, std::size_t i) { return key.column ? key_of(df.rows[i][*key.column]) : Key{}; };

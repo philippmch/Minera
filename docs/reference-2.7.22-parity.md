@@ -29795,3 +29795,113 @@ Tests:
   96 Polars and LTL tests again after it, the new LTL bank test included
   (585 tests in all). Python script tests not rerun (scripts unchanged);
   no workbench fixture changed (the fixture replay was not rerun).
+
+## Review DK1: re-review of round DJ, LTL filters on frames with a `literal` column, `literal`-column probes across the filters, LTL filters on eager DataFrames, fresh seeds (2026-11-17)
+
+Round DK checked DJ's CI (run 44014854240 on 7af4161: green on all six
+jobs), modelled the 917 LTL calls DJ left
+refused, probed the same frames across the other table and sequence filters,
+took one new area (the LTL filters on eager DataFrames, which the LTL
+workbench calls for a DataFrame input) and replayed two batches of fresh
+seeds. The device check on the Mac was skipped (no device linked).
+
+- **DK1-1 LTL filters on frames with their own `literal` column** (the 917
+  refused calls of probe `dj/lt7.py`, dump `cp/out/lt7d.jsonl`). Observed
+  and modelled (`polars_ltl_filter.cpp`):
+  - a list case key with a `literal` item: the chain selects the key's
+    columns by name, while the pair selections build its List(String)
+    literal named `literal`; joining that with the frame's own scalar
+    `literal` column fails `SchemaError: datatypes of join keys don't match
+    - `literal`: <dtype> on left does not match `literal`: list[str] on
+    right` once the pair join resolves (`literal_join_mismatch`,
+    `event_pair_plan`);
+  - a scalar literal case key in eventually_follows: the first case join
+    names the right side's literal `literal_right`, so the second activity's
+    join repeats it (`DuplicateError: column with name 'literal_right'
+    already exists`, template `kEventLiteralFrameJoin`), and the appended
+    literal column of a returned frame is `literal_right`
+    (`literal_output_name`, used by the lazy schema too);
+  - a timestamp key `literal`, and a case column named `literal` beside a
+    timestamp key that is no str, repeat `literal` in the first pair's
+    select (`DuplicateError: projections contained duplicate output name
+    'literal'`);
+  - four_eyes and attr_value_different_persons with a literal or list key
+    beside a resource column named `literal` fail that duplicate name.
+  917 -> 0; two equal-size join row orders are marked unordered.
+- **DK1-2 One column named by two roles** (new probe `dk/lt8.py`, 2,040
+  calls on `literal` frames; `dk/k2.py` on plain frames; `probe/specs/k1.py`
+  for pandas, 1,080 calls). A Polars four_eyes or
+  attr_value_different_persons call whose case key names the resource
+  column answered a frame natively, while pm4py fails `DuplicateError:
+  projections contained duplicate output name` (`group_by keys contained`)
+  as the plan resolves (a bug for any frame, not only `literal` ones).
+  lt8 44 -> 0 (three order-only calls marked unordered); k1 and k2 0.
+- **DK1-3 `literal`-column frames across the other filters** (new domains
+  `dk/dom/_probe_pltbl_lit_domain.py`, the CK table domain on frames with a
+  `literal` column, 16,558 calls; `dk/dom/_probe_plseq_lit_domain.py`, the
+  CK/CJ/CP scalar and CK None/NaN/datetime sequence domains on such frames,
+  seeds 1-4, 8,812 calls). The table probe replayed with 0 differing. The
+  sequence probe found 15 `timestamp_case_grouping.apply` calls where the
+  native built a frame with two `literal` columns (the replay aborted):
+  group_by leaves every key's output name out of `pl.all()`, so a literal
+  key's `literal` replaces the frame's own column, and a str key naming that
+  column beside a literal key fails `DuplicateError: group_by keys contained
+  duplicate output name 'literal'` once both keys resolve (a missing column
+  fails first; probes `dk/tcg.py`, `dk/tcg2.py`). 15 -> 0.
+- **DK1-4 LTL filters on eager DataFrames** (new; the bank driver calls the
+  `EventTable` overload for a case marked `"eager"`, as the LTL workbench
+  does for a DataFrame input; domain `dk/dom/_probe_polars_eager_domain.py`,
+  probe `dk/le1.py` with str, list and scalar keys on frames with and
+  without a `literal` column, 2,400 calls). First replay: 641 differing.
+  Observed and modelled:
+  - every step runs as it is called, so errors carry no resolved plan,
+    except attr_value_different_persons' two group_bys, which fail with the
+    plan of their eager input (`DF [...]` of the frame, or of the grouped
+    `[case, resource, count]` frame for the second one);
+  - eventually_follows and A_next_B_next_C sort by [case key, timestamp key]
+    first: a str key naming no column fails there, then a literal key (a
+    scalar, a list or tuple as its List literal, or both keys None) fails
+    `ShapeError: sort expressions must have same length as DataFrame`
+    unless the frame has one row, before the None-key window error
+    (`eager_sort`);
+  - four_eyes selects and attr_value_different_persons groups by [case key,
+    resource] on the first activity's rows at once: a missing str key fails
+    there (case key first), then one output name for both keys
+    (`eager_key_step`), before the later activities and the joins are built
+    (a None case key's join error comes after).
+  641 -> 1 (one call refused natively: a None item beside present names).
+  A second probe `dk/le2.py` (2,400 calls: attribute keys of other kinds,
+  numeric and list activity values, non-str resource keys, timestamp
+  boundaries, empty frames) leaves 325 differing, carried to DL: the first
+  activity's filter runs before the key step on an eager frame (`cannot
+  compare string with numeric type`, list casts), non-str resource keys are
+  literals named `literal` in that step, and the resource suffix
+  TypeErrors come after it.
+- **DK1-5 Fresh seeds.** Batch 1 (2026120400-11, twelve banks): two
+  differing calls, both varying in the reference itself: fresh CJ 2026120403
+  case 351 (A_next_B_next_C row order of an equal-size join) and fresh CH
+  2026120405 case 606 (four_eyes row order; six reruns in fresh processes
+  gave two different orders). Batch 2 (2026120412-23): fresh sequence CK
+  2026120418 case 366 (`rework.apply` on a Categorical case column: the bank
+  holds one row order, eight reruns all give the native's) and fresh CJ
+  2026120415 case 61 (the struct-cast partition race of DF1-7); the rest 0.
+- All docs banks replayed with the changed code: 0 mismatches.
+
+Declared:
+- The four fresh calls of DK1-5 (equal-size join and group_by row orders,
+  the DF1-7 partition race).
+
+Tests:
+- New: `docs/polars-filter-dk-ltl-bank.json.gz` (lt7's 917, lt8 and k2,
+  4,301 calls), `docs/polars-sequence-filter-dk-bank.json.gz` (the four
+  sequence probes, 8,761 calls), `docs/pandas-filter-dk-bank.json.gz` (k1,
+  1,080 calls) and `docs/polars-filter-dk-eager-ltl-bank.json.gz` (le1 and
+  le2 less their 326 differing calls, 4,474 calls in eager cases), replayed
+  by `minera_polars_filter_dk_ltl_bank_parity_tests`,
+  `minera_polars_sequence_filter_dk_bank_parity_tests`,
+  `minera_pandas_filter_dk_bank_parity_tests` and
+  `minera_polars_filter_dk_eager_ltl_bank_parity_tests`.
+- Full suite: 589 tests passed (in two runs: the first stopped after 196
+  tests when the container's worker restarted, the other 393 ran after).
+  Python script tests not rerun (scripts unchanged); no workbench fixture
+  changed (the fixture replay was not rerun).
