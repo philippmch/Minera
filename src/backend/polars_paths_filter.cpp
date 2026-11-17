@@ -1,4 +1,5 @@
 #include "minera/polars_paths_filter.hpp"
+#include "polars_eager_diagnostic.hpp"
 #include "polars_datetime.hpp"
 #include "polars_sort.hpp"
 #include "polars_list_literal.hpp"
@@ -481,15 +482,24 @@ void validate_bound(const EventAttribute& bound, bool upper, const PolarsPathsFi
   if (mergeable(lo) && mergeable(hi) && key(lo) == key(hi)) {
     const auto eq = "[(col(\"@@duration\")) == (" + literal(bound) + ")]";
     if (!text(bound)) message.replace(message.find("'" + cmp + "' "), cmp.size() + 3, "");
-    message += "\n\nThis error occurred in the following expression:\n\t" + eq + "\nwhile evaluating this larger expression:\n\t[(" + eq +
-               ") & ([(col(\"@@path\")) == (" + quote(path) + ")])]\n";
+    // Round DL: on an eager frame the predicate keeps its written order (the
+    // path test first; probe dl/p3).
+    const auto path_first = "[([(col(\"@@path\")) == (" + quote(path) + ")]) & (" + eq + ")]";
+    message += "\n\nThis error occurred in the following expression:\n\t" + eq + "\nwhile evaluating this larger expression:\n\t" +
+               (phase == "apply" ? path_first : "[(" + eq + ") & ([(col(\"@@path\")) == (" + quote(path) + ")])]") + "\n";
     fail(type, phase, message);
   }
   // A null bound folds away: after the failing bound it drops with the AND,
   // before it the failing bound keeps a null mask and the path test folds.
   const auto path_test = "[(col(\"@@path\")) == (" + quote(path) + ")]";
   std::string larger;
-  if (null(options.max_performance)) larger = "[(" + expression(bound, cmp) + ") & (" + path_test + ")]";
+  // Round DL: on an eager frame (no pushdown) the predicate stays as written,
+  // ((path & min) & max), a None bound a null column in place (probe dl/p3).
+  const std::string null_column = "null.repeat([col(\"@@duration\").len()])";
+  if (phase == "apply")
+    larger = "[([(" + path_test + ") & (" + (null(options.min_performance) ? null_column : expression(options.min_performance, ">=")) + ")]) & (" +
+             (null(options.max_performance) ? null_column : expression(options.max_performance, "<=")) + ")]";
+  else if (null(options.max_performance)) larger = "[(" + expression(bound, cmp) + ") & (" + path_test + ")]";
   else if (null(options.min_performance)) larger = "[(" + expression(bound, cmp) + ") & (null.repeat([col(\"@@duration\").len()]))]";
   else larger = "[([(" + expression(options.min_performance, ">=") + ") & (" + expression(options.max_performance, "<=") + ")]) & (" + path_test + ")]";
   message += "\n\nThis error occurred in the following expression:\n\t" + (node.empty() ? expression(bound, cmp) : node) + "\nwhile evaluating this larger expression:\n\t" + larger + "\n";
@@ -699,14 +709,21 @@ EventTable collect(const EventTable& source, const std::vector<std::string>& pat
       validate_bound(options.max_performance, true, options, paths.front(), phase, present);
     }
   }
-  // No admitted path keeps no case: a negative filter returns the frame as it is.
-  if (!performance && paths.empty() && !truth(options.positive)) return source;
+  // No admitted path keeps no case: a negative filter returns the frame as it
+  // is (round DL: the sorted frame on an eager one, which ran the sort).
+  const bool eager = phase == "apply";
+  if (!performance && paths.empty() && !truth(options.positive) && !eager) return source;
   std::vector<std::size_t> order(source.rows.size()); std::iota(order.begin(), order.end(), 0);
   // Polars' unstable multi-column sort leaves equal rows in its own order (round BX).
   polars_sort::sort_by_keys(order, [&](auto a, auto b) {
     const auto by_case = compare(source.rows[a][case_at], source.rows[b][case_at], case_kind, case_dictionary);
     return by_case ? by_case < 0 : compare(source.rows[a][*time_at], source.rows[b][*time_at], time_kind, time_dictionary) < 0;
   }, source.dtypes[case_at], source.dtypes[*time_at]);
+  if (!performance && paths.empty() && !truth(options.positive)) {
+    auto sorted = source; sorted.rows.clear();
+    for (const auto i : order) sorted.rows.push_back(source.rows[i]);
+    return sorted;
+  }
   auto result = source; result.rows.clear();
   for (std::size_t begin = 0; begin < order.size();) {
     auto end = begin + 1;
@@ -766,9 +783,42 @@ SortLiteral sort_literal(const PolarsPathsFilterOptions& raw, bool performance) 
   if (!keys::dict_key(raw.timestamp_key)) return std::nullopt;
   return detail::polars_lit::dict_literal_display(raw.timestamp_key);
 }
+// Round DL: on an eager frame the paths filters sort by the case and
+// timestamp keys as soon as the paths are read, before anything else
+// builds: Python builds a non-str key as a literal (a set refused, a list
+// strictly, a dict as a struct, an int past the Int128 range refused; None
+// is no key), the sort resolves a str case key, then a str timestamp key,
+// and a literal key of one row fails a frame of any other height (probe
+// dl/p2). The rest then runs as on a LazyFrame.
+void eager_sort(const EventTable& source, const PolarsPathsFilterOptions& options) {
+  namespace lit = detail::polars_lit;
+  bool literal = false;
+  for (const auto* key : {&options.case_id_key, &options.timestamp_key}) {
+    if (null(*key) || text(*key)) continue;
+    literal = true;
+    if (lit::set_argument(*key)) fail("TypeError", "apply", lit::kSetLiteralError);
+    if (key->container == AttributeContainerKind::kList || key->container == AttributeContainerKind::kTuple) {
+      if (const auto error = lit::argument_literal_error(*key)) fail("TypeError", "apply", *error);
+    } else if (key->container == AttributeContainerKind::kContainer) {
+      if (const auto error = lit::dict_literal_error(*key)) fail("TypeError", "apply", *error);
+    } else if (lit::scalar_too_large(*key)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);
+  }
+  for (const auto* key : {&options.case_id_key, &options.timestamp_key})
+    if (text(*key) && std::find(source.columns.begin(), source.columns.end(), key->value) == source.columns.end())
+      missing(source, key->value, false, options, std::nullopt, "apply");
+  if (literal && source.rows.size() != 1)
+    fail("ShapeError", "apply", "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
+}
 EventTable eager(const EventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& raw) {
-  auto parsed = validate_apply(path, performance, raw);
-  return collect(source, parsed, performance, keyed(raw, source.columns, performance), sort_literal(raw, performance), "apply");
+  try {
+    (void)paths(path, performance);
+    eager_sort(source, raw);
+    auto parsed = validate_apply(path, performance, raw);
+    return collect(source, parsed, performance, keyed(raw, source.columns, performance), sort_literal(raw, performance), "apply");
+  } catch (const PolarsPathsFilterError& error) {
+    // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).
+    throw PolarsPathsFilterError(error.type, error.phase, detail::polars_eager_diagnostic(error.message));
+  }
 }
 LazyEventTable lazy(const LazyEventTable& source, const EventAttribute& path, bool performance, const PolarsPathsFilterOptions& raw) {
   auto parsed = validate_apply(path, performance, raw);

@@ -1,4 +1,5 @@
 #include "minera/polars_timestamp_filter.hpp"
+#include "polars_eager_diagnostic.hpp"
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
@@ -223,7 +224,7 @@ EventAttribute selector(const EventAttribute& value,const std::vector<std::strin
 }
 namespace groups=detail::polars_group_keys;
 // Round CO: keys holds a non-str scalar or non-empty list case key once resolved.
-struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;std::vector<std::string> categories;std::optional<groups::Keys> keys;};
+struct Query {Operation op;ParsedExactTimestamp low,high;PolarsTimestampFilterOptions options;EventAttribute attribute,value;std::string attribute_dtype,time_dtype;std::vector<std::string> categories;std::optional<groups::Keys> keys;bool eager=false;};
 bool scalar_value(const Query& q){return q.value.container==AttributeContainerKind::kScalar;}
 // Round CD: the attribute comparison typed by the shared comparison model.
 lit::ScalarCheck attribute_check(const Query& q){
@@ -233,7 +234,7 @@ lit::ScalarCheck attribute_check(const Query& q){
 // a dict before the timestamp selector is built; the timeframe filter's
 // unique(case) after it.
 void case_dict(const PolarsTimestampFilterOptions& options){if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());}
-Query prepare(const std::vector<std::string>& columns,Operation op,const EventAttribute& low,const EventAttribute& high,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {
+Query prepare(const std::vector<std::string>& columns,Operation op,const EventAttribute& low,const EventAttribute& high,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={},bool eager=false) {
   Query q{op,bound(low),bound(high),options,attribute,value,{},{}};
   if(op==Operation::kContained||op==Operation::kIntersecting)case_dict(options);
   // Round DC: pl.col(attribute) == value builds the value's literal after
@@ -256,8 +257,10 @@ Query prepare(const std::vector<std::string>& columns,Operation op,const EventAt
   if(op==Operation::kAttribute&&keys::dict_key(options.case_id_key)&&(value.container==AttributeContainerKind::kList||value.container==AttributeContainerKind::kTuple)) {
     try{(void)lit::literal_of(lit::value_of(value));}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.what());}
   }
-  if(op==Operation::kAttribute)case_dict(options);
-  if(op!=Operation::kEvents&&null(options.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
+  // Round DL: on an eager frame the attribute filter runs before it selects
+  // the case key (collect).
+  if(op==Operation::kAttribute&&!eager)case_dict(options);
+  if(op!=Operation::kEvents&&null(options.case_id_key)&&!(eager&&op==Operation::kAttribute))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
   return q;
 }
 std::string compare_expr(const std::string& column,const std::string& op,const std::string& value) {return "[(col("+quote(column)+")) "+op+" ("+value+")]";}
@@ -351,6 +354,9 @@ bool mergeable_attribute(const Query& q,const std::string& expression) {
 // column (probe cw/w5).
 bool null_attribute(const Query& q){return q.op==Operation::kAttribute&&scalar_value(q)&&null(q.value);}
 bool time_first(const Query& q,const std::string& attribute) {
+  // Round DL: an eager frame's filter runs pm4py's predicate as written
+  // (no pushed-down predicates to combine): the attribute first.
+  if(q.eager)return false;
   // A cast column keeps both bounds (time_expr), so nothing merges.
   const bool merged=equal(q.low,q.high)&&!nanosecond_aware(q)&&!cast_time(q.time_dtype);
   const auto& time=q.options.timestamp_key.value;
@@ -360,6 +366,15 @@ bool time_first(const Query& q,const std::string& attribute) {
 std::string whole_expr(const Query& q) {
   const auto time=time_expr(q);if(q.op!=Operation::kAttribute)return time;
   const auto attribute=attribute_expr(q);
+  // Round DL: on an eager frame the predicate is pm4py's as written,
+  // (attribute == value) & (ts >= low) & (ts <= high), with equal bounds
+  // still merged into one == leaf (probe dl/t1).
+  if(q.eager) {
+    if(equal(q.low,q.high)&&!nanosecond_aware(q)&&!cast_time(q.time_dtype))return combined(attribute,"&",time);
+    const auto& column=q.options.timestamp_key.value;
+    return combined(combined(attribute,"&",time_compare(q,column,">=",time_bound(q,q.low,bound_text(q.low)))),"&",
+                    time_compare(q,column,"<=",time_bound(q,q.high,at_most_text(q))));
+  }
   return time_first(q,attribute)?combined(time,"&",attribute):combined(attribute,"&",time);
 }
 bool empty_case_key(const Query& q){return collection(q.options.case_id_key)&&q.options.case_id_key.children.empty();}
@@ -647,7 +662,7 @@ void several_columns(const EventTable& source,const Query& q,const std::string& 
   fail("ComputeError",phase,message+"This is ambiguous. Try to combine the predicates with the 'all_horizontal' or `any_horizontal' expression."+resolved(q.op,frame_plan(source),nodes(q.op)));
 }
 EventTable collect(const EventTable& source,const Query& query,const std::string& phase) {
-  auto q=query;
+  auto q=query;q.eager=phase=="apply";
   source.validate();if(source.index||source.dtypes.size()!=source.columns.size())throw std::invalid_argument("Native Polars timestamp filters require declared dtypes and no dataframe index");
   // Python builds the attribute value literal first (round DB: refusing a set).
   if(q.op==Operation::kAttribute&&lit::set_argument(q.value))fail("TypeError",phase,lit::kSetLiteralError);
@@ -705,9 +720,23 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   // of its case key, so a String timestamp column fails before a missing
   // or repeated case key (fresh CK bank 2026112401 case 349).
   if(q.op==Operation::kAttribute)time_resolution(source,time_at,q,phase);
+  // Round DL: on an eager frame the attribute filter runs before the case
+  // key is selected from its rows, so its comparisons fail first, the
+  // attribute's before the window's (probe dl/t1).
+  if(q.eager&&q.op==Operation::kAttribute&&attr_at) {
+    const bool fold=folded(q);
+    const auto fold_in=fold?fold_window(q):std::nullopt;
+    const bool window_empty=less(q.high,q.low);
+    if(fold&&!(fold_in&&!*fold_in))attribute_dtype(source,*attr_at,q,phase);
+    if(!fold&&!(window_empty&&!cast_time(q.time_dtype)&&!null_attribute(q))){attribute_dtype(source,*attr_at,q,phase);time_dtype(source,time_at,q,phase);}
+  }
   // Round DD: the attribute filter checks its join keys once the case
   // selection (its right side) resolved: a by-name attribute missing a
   // column fails first (set probe pltblcj-4 case 94).
+  if(q.eager&&q.op==Operation::kAttribute) {
+    case_dict(q.options);
+    if(null(q.options.case_id_key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
+  }
   if(q.op==Operation::kAttribute)no_join_keys();
   if(q.op==Operation::kAttribute&&listed)resolve_keys(true);
   if(q.op==Operation::kAttribute&&!listed)case_at=position(q.options.case_id_key.value,true);
@@ -791,7 +820,14 @@ EventTable collect(const EventTable& source,const Query& query,const std::string
   if(q.op!=Operation::kEvents)for(std::size_t i=0;i<source.rows.size();++i){const auto& g=groups[row_groups[i]];if(g.keep&&!g.absent){auto kept=source.rows[i];groups::append_cells(kept,*q.keys,source.rows[i]);result.rows.push_back(std::move(kept));}}
   return result;
 }
-EventTable eager(const EventTable& source,Operation op,const EventAttribute& lower,const EventAttribute& upper,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {return collect(source,prepare(source.columns,op,lower,upper,options,attribute,value),"apply");}
+EventTable eager(const EventTable& source,Operation op,const EventAttribute& lower,const EventAttribute& upper,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {
+  try {
+    return collect(source,prepare(source.columns,op,lower,upper,options,attribute,value,true),"apply");
+  } catch (const PolarsTimestampFilterError& error) {
+    // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).
+    throw PolarsTimestampFilterError(error.type, error.phase, detail::polars_eager_diagnostic(error.message));
+  }
+}
 LazyEventTable lazy(const LazyEventTable& source,Operation op,const EventAttribute& lower,const EventAttribute& upper,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={}) {
   const auto q=prepare(source.columns(),op,lower,upper,options,attribute,value);auto columns=source.columns(),dtypes=source.dtypes();auto categories=source.categorical_dtypes();
   if(op!=Operation::kEvents&&groups::modelled(options.case_id_key)){

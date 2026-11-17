@@ -180,21 +180,31 @@ void polars_timestamp_attribute() {
   const auto lo = text("2023-12-31 00:00:00"), hi = text("2024-01-02 00:00:00");
   check("Polars timestamp attribute Boolean == 'true'", eids(filter_polars_timestamp_attribute(source, text("flag"), text("true"), lo, hi)), "e0 e1 e2");
   check("Polars timestamp attribute Boolean == 'false'", eids(filter_polars_timestamp_attribute(source, text("flag"), text("false"), lo, hi)), "e0 e1");
+  // Round DL: the error checks below hold a LazyFrame's messages (pushed-down
+  // bounds, a resolved plan); an eager frame keeps pm4py's written order and
+  // shows no plan.
+  const auto lazy = LazyEventTable::from_table(source);
+  check_error<PolarsTimestampFilterError>(
+      "Polars timestamp attribute Int64 vs string on an eager frame",
+      [&] { (void)filter_polars_timestamp_attribute(source, text("n"), text("x"), lo, hi); }, "ComputeError",
+      "cannot compare string with numeric type (i64)\n\nThis error occurred in the following expression:\n\t[(col(\"n\")) == (\"x\")]\nwhile "
+      "evaluating this larger expression:\n\t[([([(col(\"n\")) == (\"x\")]) & ([(col(\"time:timestamp\")) >= (2023-12-31 00:00:00 UTC)])]) & "
+      "([(col(\"time:timestamp\")) <= (2024-01-02 00:00:00.000000999 UTC)])]\n");
   const auto numeric = [](const std::string& low, const std::string& high) {
     return "cannot compare string with numeric type (i64)\n\nThis error occurred in the following expression:\n\t[(col(\"n\")) == (\"x\")]\nwhile "
            "evaluating this larger expression:\n\t[([(col(\"n\")) == (\"x\")]) & ([([(col(\"time:timestamp\")) >= (" +
            low + " UTC)]) & ([(col(\"time:timestamp\")) <= (" + high + " UTC)])])]\n";
   };
   check_error<PolarsTimestampFilterError>(
-      "Polars timestamp attribute Int64 vs string on ns", [&] { (void)filter_polars_timestamp_attribute(source, text("n"), text("x"), lo, hi); },
+      "Polars timestamp attribute Int64 vs string on ns", [&] { (void)filter_polars_timestamp_attribute(lazy, text("n"), text("x"), lo, hi).materialize(); },
       "ComputeError", numeric("2023-12-31 00:00:00", "2024-01-02 00:00:00.000000999"));
   const auto at = text("2024-01-01 00:00:00");
   check_error<PolarsTimestampFilterError>(
       "Polars timestamp attribute Int64 vs string on ns, equal bounds",
-      [&] { (void)filter_polars_timestamp_attribute(source, text("n"), text("x"), at, at); }, "ComputeError",
+      [&] { (void)filter_polars_timestamp_attribute(lazy, text("n"), text("x"), at, at).materialize(); }, "ComputeError",
       numeric("2024-01-01 00:00:00", "2024-01-01 00:00:00.000000999"));
   check_error<PolarsTimestampFilterError>(
-      "Polars timestamp attribute Datetime vs string", [&] { (void)filter_polars_timestamp_attribute(source, text("d"), text("x"), lo, hi); },
+      "Polars timestamp attribute Datetime vs string", [&] { (void)filter_polars_timestamp_attribute(lazy, text("d"), text("x"), lo, hi).materialize(); },
       "InvalidOperationError",
       "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } or compare to a temporal "
       "column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\nFILTER col(\"d\") == \"x\"\nFROM\n  DF "

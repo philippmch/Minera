@@ -3493,6 +3493,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dk_eager_ltl_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dk-eager-ltl-bank.json.gz")
   set_tests_properties(minera_polars_filter_dk_eager_ltl_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DL: the other Polars table filters on eager DataFrames (cases
+  # marked "eager"; probes dl/e1-e7 over the base, CK, CN, CJ, CH and CI
+  # table domains).
+  add_test(NAME minera_polars_filter_dl_eager_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dl-eager-bank.json.gz")
+  set_tests_properties(minera_polars_filter_dl_eager_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

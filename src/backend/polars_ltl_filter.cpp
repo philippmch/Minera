@@ -556,11 +556,15 @@ void eager_sort(const EventTable& source, const PolarsLtlFilterOptions& o) {
 // Round DK: four_eyes selects and attr_value_different_persons groups by
 // [case key, resource] on the first activity's rows as soon as it is called
 // on an eager DataFrame: a str key naming no column fails there (case key
-// first), then two keys of one output name (`literal` for a key that is no
-// str), before the later activities and the joins are built; the group_by
-// runs through a lazy plan over the frame (probe dk/le1).
+// first), then two keys of one output name, before the later activities and
+// the joins are built; the group_by runs through a lazy plan over the frame
+// (probe dk/le1). Round DL: a key that is no str (None, a number, a list or
+// tuple) is a literal named `literal` there, so two of them, or one beside
+// a frame's own `literal` column named by the other, fail as duplicates
+// (probes dl/f1, dl/f2).
 void eager_key_step(const EventTable& source, const PolarsLtlFilterOptions& o, Op operation) {
-  if (!text(o.resource_key) || !text(o.attribute_key) || !column(source, o.attribute_key)) return;
+  const auto attribute = keys::col_key(o.attribute_key, source.columns);
+  if (!text(attribute) || keys::by_name(attribute.value) || !column(source, attribute)) return;
   const bool group = operation == Op::kDifferentPersons;
   const auto tail = [&]() -> std::string {
     if (!group) return {};
@@ -569,8 +573,48 @@ void eager_key_step(const EventTable& source, const PolarsLtlFilterOptions& o, O
   };
   for (const auto* key : {&o.case_id_key, &o.resource_key})
     if (text(*key) && !column(source, *key)) fail("ColumnNotFoundError", "apply", missing_message(source, key->value) + tail());
-  const auto name = text(o.case_id_key) ? o.case_id_key.value : std::string("literal");
-  if (name == o.resource_key.value) fail("DuplicateError", "apply", groups::duplicate_message(name, group ? "group_by keys" : "projections") + tail());
+  const auto name = [](const EventAttribute& key) { return text(key) ? key.value : std::string("literal"); };
+  if (name(o.case_id_key) == name(o.resource_key))
+    fail("DuplicateError", "apply", groups::duplicate_message(name(o.case_id_key), group ? "group_by keys" : "projections") + tail());
+}
+bool listed_key(const EventAttribute& key);
+// Round DL: on an eager DataFrame four_eyes' first pair join runs as it is
+// built (before the third activity's literal): a list or tuple case key
+// joins on its str items over the [literal, resource] selects, so the first
+// item naming neither fails there, before the later activities' filters
+// (probe dl le2: cases 4 and 5).
+void eager_pair_join(const EventTable& source, const PolarsLtlFilterOptions& o) {
+  const auto attribute = keys::col_key(o.attribute_key, source.columns);
+  if (!text(attribute) || keys::by_name(attribute.value) || !column(source, attribute)) return;
+  if (!listed_key(o.case_id_key) || !text(o.resource_key) || !column(source, o.resource_key)) return;
+  const auto& items = o.case_id_key.children;
+  if (!std::all_of(items.begin(), items.end(), [](const EventAttribute& v) { return groups::text_key(v) || (v.container == AttributeContainerKind::kScalar && null(v)); })) return;
+  EventTable selected;
+  selected.columns = {"literal", o.resource_key.value};
+  for (const auto& item : items)
+    if (groups::text_key(item) && !column(selected, item)) fail("ColumnNotFoundError", "apply", missing_message(selected, item.value));
+}
+void resolve_query(const EventTable& source, const Prepared& p, bool eager, std::size_t at);
+void compute_query(const EventTable& source, const Prepared& p, bool eager, std::size_t at);
+// Round DL: on an eager DataFrame each activity's filter runs as soon as it
+// is built, before the next activity's literal, the [case, resource] step
+// and the joins: a missing attribute column fails the first one, a list or
+// mismatched literal the one it belongs to (probes dl/f1, dl/f3, dl/f4).
+void eager_filter(const EventTable& source, Prepared p, std::size_t at) {
+  p.options.attribute_key = keys::col_key(p.options.attribute_key, source.columns);
+  const auto& attribute = p.options.attribute_key;
+  if (!text(attribute)) return;
+  // A dict or list key naming no column fails by name (probe dl/e2).
+  if (keys::by_name(attribute.value)) {
+    if (at == 0) fail("ColumnNotFoundError", "apply", keys::by_name_message(attribute.value));
+    return;
+  }
+  if (!column(source, attribute)) {
+    if (at == 0) fail("ColumnNotFoundError", "apply", missing_message(source, attribute.value, p.operation == Op::kEventuallyFollows));
+    return;
+  }
+  resolve_query(source, p, true, at);
+  compute_query(source, p, true, at);
 }
 Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>& columns, const EventTable* eager_source = nullptr) {
   if (!call.values) fail("TypeError", "apply", function_name(call.operation) + "() missing 1 required positional argument: '" +
@@ -588,8 +632,15 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     else if (entry.key == "timestamp_diff_boundaries") out.options.timestamp_diff_boundaries = entry.value;
   }
   const auto& o = out.options;
-  if (sequence_rule(out.operation)) { dict_argument(o.case_id_key); list_key_literal(o.case_id_key); list_key_literal(o.timestamp_key); spread_key(o.case_id_key); }
-  if (eager_source && sequence_rule(out.operation)) eager_sort(*eager_source, o);
+  // Round DL: on an eager frame the sort builds a dict case key as a struct
+  // literal (a literal sort key), and the dict is refused only after it.
+  if (sequence_rule(out.operation)) {
+    if (!eager_source) dict_argument(o.case_id_key);
+    else if (o.case_id_key.container == AttributeContainerKind::kContainer)
+      if (const auto error = detail::polars_lit::dict_literal_error(o.case_id_key)) fail("TypeError", "apply", *error);
+    list_key_literal(o.case_id_key); list_key_literal(o.timestamp_key); spread_key(o.case_id_key);
+  }
+  if (eager_source && sequence_rule(out.operation)) { eager_sort(*eager_source, o); dict_argument(o.case_id_key); }
   if (sequence_rule(out.operation) && null(o.case_id_key))
     fail("InvalidOperationError", "apply", "At least one of `partition_by` and `order_by` must be specified in `over`");
   if (out.operation == Op::kDifferentPersons) out.values = {out.original};
@@ -602,7 +653,10 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (out.operation != Op::kNext && out.operation != Op::kEventuallyFollows && out.values.size() > 1)
       for (std::size_t i = 0; i < out.values.size(); ++i) (void)item(out.original, i);
   }
-  if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1)) {
+  // Round DL: eventually_follows without activities never reads the
+  // attribute key (probe dl/f3).
+  if (out.operation != Op::kNext && (out.operation != Op::kFourEyes || out.values.size() > 1) &&
+      (out.operation != Op::kEventuallyFollows || !out.values.empty())) {
     if (!text(o.attribute_key) && !collection(o.attribute_key)) invalid_col(o.attribute_key);
     col_list(o.attribute_key);
     if (out.operation == Op::kDifferentPersons && (out.original.container == AttributeContainerKind::kSet || out.original.container == AttributeContainerKind::kFrozenSet))
@@ -615,6 +669,7 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
     if (null(o.case_id_key)) fail("ValueError", "apply", "must specify `on` OR `left_on` and `right_on`");
     dict_argument(o.case_id_key);
     spread_key(o.case_id_key);
+    if (eager_source) eager_pair_join(*eager_source, o);
     if (!text(o.resource_key) && !collection(o.resource_key)) invalid_col(o.resource_key);
     // Round DB: a set resource key is refused by pl.lit where a list one
     // is concatenated.
@@ -656,6 +711,7 @@ Prepared prepare(const PolarsLtlFilterCall& call, const std::vector<std::string>
           fail("TypeError", "apply", "cannot create expression literal for value of type dict.\n\nHint: Pass `allow_object=True` to accept any value and create a literal of type Object.");
         }
       }
+      if (eager_source) eager_filter(*eager_source, out, at);
     }
   if (out.operation == Op::kEventuallyFollows && out.values.size() > 1)
     for (std::size_t i = 0; i < out.values.size(); ++i) (void)item(out.original, i);
@@ -1065,10 +1121,13 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
     // Round DE: None beside the resource joins every pair on both items;
     // the third pair's join repeats the first item's _right copy (two
     // pairs never join: none_beside_name; probe de/lt3).
-    if (p.operation == Op::kFourEyes && items.size() == 2 && names.size() == 1 && names.front() == resource && p.values.size() >= 3 && !eager &&
-        column(source, o.resource_key) && std::none_of(source.columns.begin(), source.columns.end(), [&](const std::string& c) {
+    if (p.operation == Op::kFourEyes && items.size() == 2 && names.size() == 1 && names.front() == resource && p.values.size() >= 3 &&
+        // Round DL: an eager frame shows no plan, and its pairs join the
+        // [literal, resource] selects only, whatever else the frame holds
+        // (probe dk/le1 case 5).
+        column(source, o.resource_key) && (eager || std::none_of(source.columns.begin(), source.columns.end(), [&](const std::string& c) {
           return c == "literal" || c == "literal_right" || c == "literal_2" || c == resource + "_right" || c == resource + "_2";
-        })) {
+        }))) {
       const auto pairs = static_cast<std::ptrdiff_t>(p.values.size() * (p.values.size() - 1) / 2);
       std::vector<std::string> nodes{"join schema resolving", "join"};
       repeat(nodes, pairs - 3, {"join left", "join"});
@@ -1704,12 +1763,9 @@ void validate_schema(const EventTable& source, const Prepared& p, bool eager) {
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
   }
 }
-// Round CD: each activity filter compares the attribute column with one
-// value as Polars types it (detail::polars_lit::check_scalar): a str with a
-// temporal column fails while the plan resolves, a number with a string
-// column, mismatched temporal types and the like when the filter runs.
-void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only, bool first_only, bool coercion, std::size_t limit) {
-  if (p.operation == Op::kNext || (p.operation == Op::kFourEyes && p.values.size() < 2) || p.values.empty()) return;
+// One activity filter's resolve-stage error (a list literal cast to a
+// String column, a str against a temporal column and the like).
+void resolve_query(const EventTable& source, const Prepared& p, bool eager, std::size_t at) {
   namespace lit = detail::polars_lit;
   const auto ai = *column(source,p.options.attribute_key);
   const auto& declared = source.dtypes[ai];
@@ -1719,7 +1775,7 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
   const auto categories = category_list(source, ai);
   const auto phase=eager?"apply":"collect";
   const auto& key = p.options.attribute_key.value;
-  const auto resolve_fail = [&](std::size_t at, const std::string& prefix, const std::string& expression) {
+  const auto resolve_fail = [&](const std::string& prefix, const std::string& expression) {
     std::string tail;
     if (!eager) {
       if (p.operation == Op::kEventuallyFollows) tail = restack(render(kEventFilterTail,source,p,expression),eventually_stack(p,at,true));
@@ -1728,28 +1784,34 @@ void validate_queries(const EventTable& source, const Prepared& p, bool eager, b
     }
     fail("InvalidOperationError",phase,prefix+tail);
   };
+  const auto& query = p.values[at];
+  if (collection(query) && query.container != AttributeContainerKind::kContainer) {
+    if (stringy) {
+      // Round CE: the literal as pl.lit built it.
+      std::string inner = "Null", shown = literal(query);
+      try {
+        const auto built = lit::argument_literal(query);
+        inner = lit::debug_name(built.type);
+        shown = lit::literal_list_display(built);
+      } catch (const PolarsSequenceFilterError&) {}
+      resolve_fail("cannot cast List type (inner: '"+inner+"', to: 'String')","col("+quote(key)+") == "+shown+".cast(String)");
+    }
+    return;
+  }
+  const auto value = lit::value_of(query);
+  if (!lit::scalar_literal(value)) return;
+  const auto check = lit::check_scalar(key, declared, value, lit::CompareOp::kEq, &categories);
+  if (check.stage == lit::ScalarCheck::Stage::kResolve) resolve_fail(check.message, "col("+quote(key)+") == "+lit::scalar_display(value));
+}
+// Round CD: each activity filter compares the attribute column with one
+// value as Polars types it (detail::polars_lit::check_scalar): a str with a
+// temporal column fails while the plan resolves, a number with a string
+// column, mismatched temporal types and the like when the filter runs.
+void validate_queries(const EventTable& source, const Prepared& p, bool eager, bool resolution_only, bool first_only, bool coercion, std::size_t limit) {
+  if (p.operation == Op::kNext || (p.operation == Op::kFourEyes && p.values.size() < 2) || p.values.empty()) return;
   // The whole plan resolves before any filter runs.
   const auto count = std::min(limit, first_only ? std::min<std::size_t>(1, p.values.size()) : p.values.size());
-  for (std::size_t at = 0; at < count; ++at) {
-    const auto& query = p.values[at];
-    if (collection(query) && query.container != AttributeContainerKind::kContainer) {
-      if (stringy) {
-        // Round CE: the literal as pl.lit built it.
-        std::string inner = "Null", shown = literal(query);
-        try {
-          const auto built = lit::argument_literal(query);
-          inner = lit::debug_name(built.type);
-          shown = lit::literal_list_display(built);
-        } catch (const PolarsSequenceFilterError&) {}
-        resolve_fail(at,"cannot cast List type (inner: '"+inner+"', to: 'String')","col("+quote(key)+") == "+shown+".cast(String)");
-      }
-      continue;
-    }
-    const auto value = lit::value_of(query);
-    if (!lit::scalar_literal(value)) continue;
-    const auto check = lit::check_scalar(key, declared, value, lit::CompareOp::kEq, &categories);
-    if (check.stage == lit::ScalarCheck::Stage::kResolve) resolve_fail(at, check.message, "col("+quote(key)+") == "+lit::scalar_display(value));
-  }
+  for (std::size_t at = 0; at < count; ++at) resolve_query(source, p, eager, at);
   // Round CO: the first activity's filter runs below the literal sort, so
   // its compute errors come before the sort fails (probe p20, case 130 of
   // the CM seed 50 bank); the other activities' come after it (case 46 of

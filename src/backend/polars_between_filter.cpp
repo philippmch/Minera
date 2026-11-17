@@ -1,4 +1,5 @@
 #include "minera/polars_between_filter.hpp"
+#include "polars_eager_diagnostic.hpp"
 #include "polars_datetime.hpp"
 #include "polars_float_text.hpp"
 #include "polars_sort.hpp"
@@ -709,10 +710,42 @@ PolarsBetweenOptions resolve_polars_between_parameter_value(const EventAttribute
   return {};
 }
 
+namespace {
+// Round DL: on an eager frame pm4py's first statement, the sort by the case
+// key and time:timestamp, runs before anything else builds: Python builds a
+// non-str key as a literal (a set refused, a list strictly, an int past the
+// Int128 range refused, None no key), the sort resolves the case key, then
+// time:timestamp, and a literal key of one row fails a frame of any other
+// height (probe dl/b1). The rest then runs as on a LazyFrame.
+void eager_sort(const EventTable& source, const PolarsBetweenOptions& options) {
+  const auto& key = options.case_id_key;
+  const bool literal = !null(key) && !text(key);
+  if (literal) {
+    if (lit::set_argument(key)) fail("TypeError", "apply", lit::kSetLiteralError);
+    if (key.container == AttributeContainerKind::kContainer) {
+      if (const auto error = lit::dict_literal_error(key)) fail("TypeError", "apply", *error);
+    } else if (collection(key)) {
+      if (const auto error = lit::argument_literal_fault(key)) fail(error->type, "apply", error->message);
+    } else if (lit::scalar_too_large(key)) fail("InvalidOperationError", "apply", lit::kIntegerTooLarge);
+  }
+  const auto has = [&](const std::string& name) { return std::find(source.columns.begin(), source.columns.end(), name) != source.columns.end(); };
+  if (text(key) && !has(key.value)) missing(source, key.value, key.value, false, "apply");
+  if (!has("time:timestamp")) missing(source, "time:timestamp", text(key) ? key.value : std::string(), false, "apply");
+  if (literal && source.rows.size() != 1)
+    fail("ShapeError", "apply", "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
+}
+}  // namespace
+
 EventTable filter_polars_between(const EventTable& source, const EventAttribute& act1,
                                 const EventAttribute& act2, const PolarsBetweenOptions& options) {
-  validate_apply(act1, act2, options, source.columns);
-  return collect(source, act1, act2, options, "apply");
+  try {
+    eager_sort(source, options);
+    validate_apply(act1, act2, options, source.columns);
+    return collect(source, act1, act2, options, "apply");
+  } catch (const PolarsBetweenError& error) {
+    // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).
+    throw PolarsBetweenError(error.type, error.phase, detail::polars_eager_diagnostic(error.message));
+  }
 }
 LazyEventTable filter_polars_between(const LazyEventTable& source, const EventAttribute& act1,
                                     const EventAttribute& act2, const PolarsBetweenOptions& options) {

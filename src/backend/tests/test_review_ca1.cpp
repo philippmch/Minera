@@ -152,7 +152,9 @@ void polars_uint8_keys() {
   const auto lo = text("2023-12-31 00:00:00"), hi = text("2024-01-02 00:00:00");
   check_error<PolarsTimestampFilterError>(
       "Polars timestamp attribute UInt8 vs string",
-      [&] { (void)filter_polars_timestamp_attribute(source, text("U"), text("1"), lo, hi); }, "ComputeError",
+      // Round DL: a LazyFrame's message (pushed-down bounds); an eager frame
+      // keeps pm4py's written order (docs/polars-filter-dl-eager-bank).
+      [&] { (void)filter_polars_timestamp_attribute(LazyEventTable::from_table(source), text("U"), text("1"), lo, hi).materialize(); }, "ComputeError",
       "cannot compare string with numeric type (u8)\n\nThis error occurred in the following expression:\n\t[(col(\"U\")) == (\"1\")]\nwhile "
       "evaluating this larger expression:\n\t[([(col(\"U\")) == (\"1\")]) & ([([(col(\"time:timestamp\")) >= (2023-12-31 00:00:00 UTC)]) & "
       "([(col(\"time:timestamp\")) <= (2024-01-02 00:00:00 UTC)])])]\n");

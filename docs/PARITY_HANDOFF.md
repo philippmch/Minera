@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DK (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DL (2026-11-05 to 2026-11-17, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6363,6 +6363,67 @@ carried calls and the fresh banks are in the project files under
 
 No fixture changed. The device check on the Mac was skipped again (no device
 linked).
+
+Round DL re-reviewed DK (Review DL1). DK's commit 4358d93 ran CI run
+44024654681 (green on all six jobs). DL modelled the eager LTL calls DK
+left, took the eager area on to the other Polars table filters and replayed
+two batches of fresh seeds:
+- The eager LTL calls DK left: each activity's filter runs as it is built,
+  before the next activity's literal and the [case, resource] step; a key
+  that is no str is a literal named `literal` in that step (two such keys,
+  or one beside a `literal` column, fail as duplicates); four_eyes' first
+  pair join runs as it is built (a list key's first item naming no column
+  fails there, the resource suffix TypeErrors after it). le2's 325 and
+  le1's one refused call -> 0.
+- The other Polars table filters on eager DataFrames (attributes, cases,
+  timestamp, paths, between, variants; the bank driver now calls every
+  module's `EventTable` overload for an eager case). Each statement runs at
+  once, so an earlier step's error comes first and nothing is pushed down
+  across filter calls: predicates keep pm4py's written order and a None
+  bound stays in place as a null column (one filter call still merges equal
+  bounds and empties an empty interval); `filter_on_ncases` follows
+  `DataFrame.head(n)` (negative n, float, non-number and too-large n); the
+  between, paths and variants filters sort by [case, timestamp] first (a
+  literal key fails the sort's ShapeError unless the frame has one row);
+  the case size runs each bound as its own filter; an eager failure shows
+  no resolved plan except a group_by's over its eager input. Seven probes
+  over the base, CK, CN, CJ, CH and CI table domains (22,259 calls): e1 282
+  -> 0, all seven 0; one equal-size join order varying in the reference is
+  marked unordered.
+- Fresh seeds 2026120500-11 and 2026120512-23: 0.
+
+In the suite: new `docs/polars-filter-dl-eager-bank.json.gz` with its
+ctest; `docs/polars-filter-dk-eager-ltl-bank.json.gz` now holds the 326
+calls DK left out. The probes, the eager table domain and the fresh banks
+are in the project files under `review-harness/round-dl/`.
+
+No fixture changed. The device check on the Mac was skipped (the Mac was
+offline).
+
+Next round (DM) should start by re-reviewing round DL:
+
+- DL's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- more eager table probes: the set, big-int, None/NaN/datetime and
+  `literal`-column probes of earlier rounds on eager frames (so far only
+  the plain table domains ran eagerly), and empty eager frames;
+- the Polars sequence filters on eager DataFrames (the sequence bank driver
+  does not call the `EventTable` overloads for eager cases yet);
+- maybe the majority outcome of the partition race (DF1-7, seen again in
+  DI, DJ and DK; the reference itself varies);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet
+  (the table transport has no cells for them);
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DK's targets, taken in DL (findings DL1-1 to DL1-3): DK's CI run, the
+fresh seeds, the 325 eager LTL calls and the le1 refusal, and eager probes
+of the other Polars table filters. Not taken (carried to DM): the partition
+race, the CU list and the open choices.
+
+Previous list for round DL (kept for its older items):
 
 Next round (DL) should start by re-reviewing round DK:
 

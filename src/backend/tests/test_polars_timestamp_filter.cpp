@@ -100,8 +100,9 @@ void native_context_strict_boundaries_and_lazy_isolation() {
   PolarsTimestampFilterOptions options;options.case_id_key=null_value("");same_frame(filter_polars_timestamp_events(source,low,high,options),contained,"event case role is inert");
   same_frame(source,before,"native context/provenance/source preservation");
   // Error interpolation treats literal user text as bytes, including template-looking text.
+  // Round DL: a LazyFrame's message (an eager frame's shows no resolved plan).
   options.timestamp_key={"","%FRAME%"};
-  error_is([&]{(void)filter_polars_timestamp_events(source,low,high,options);},"ColumnNotFoundError","apply",
+  error_is([&]{(void)filter_polars_timestamp_events(LazyEventTable::from_table(source),low,high,options).materialize();},"ColumnNotFoundError","collect",
       "unable to find column \"%FRAME%\"; valid columns: [\"case:concept:name\", \"time:timestamp\", \"concept:name\", \"payload\"]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING THIS_NODE <---\nDF [\"case:concept:name\", \"time:timestamp\", \"concept:name\", \"payload\"]; PROJECT */4 COLUMNS","literal diagnostic text");
 }
 }  // namespace

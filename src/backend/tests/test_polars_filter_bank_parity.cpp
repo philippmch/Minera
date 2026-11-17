@@ -34,6 +34,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <type_traits>
 #include <memory>
 #include <cstdlib>
 #include <optional>
@@ -660,7 +661,8 @@ Json constant(const std::string& name) {
 }
 bool is_constant(const std::string& name) { return !name.empty() && std::all_of(name.begin(), name.end(), [](char c) { return c == '_' || (c >= 'A' && c <= 'Z'); }); }
 
-Json attributes_module(const std::string& function, const LazyEventTable& df, const Args& args, const Json& kwargs) {
+template <typename Frame>
+Json attributes_module(const std::string& function, const Frame& df, const Args& args, const Json& kwargs) {
   if (is_constant(function)) return constant(function);
   using Op = PolarsAttributesFilterOperation;
   PolarsAttributesFilterCall call;
@@ -672,7 +674,8 @@ Json attributes_module(const std::string& function, const LazyEventTable& df, co
   const auto run = [&]() -> Json {
     const auto result = invoke_polars_attributes_filter(df, call);
     if (const auto* counts = std::get_if<PolarsAttributeCounts>(&result)) return counts_node(*counts);
-    return table_node(std::get<LazyEventTable>(result));
+    using Table = std::conditional_t<std::is_same_v<Frame, EventTable>, EventTable, LazyEventTable>;
+    return table_node(std::get<Table>(result));
   };
   if (function == "apply" || function == "apply_events") {
     call.operation = function == "apply" ? Op::kTraces : Op::kEvents;
@@ -734,7 +737,8 @@ Json attributes_module(const std::string& function, const LazyEventTable& df, co
   throw std::runtime_error("unbound function " + function);
 }
 
-Json between_module(const std::string& function, const LazyEventTable& df, const Args& args) {
+template <typename Frame>
+Json between_module(const std::string& function, const Frame& df, const Args& args) {
   if (function == "apply") {
     const auto& last = *args.at(2);
     const auto options = is_mapping(last) ? resolve_polars_between_parameters(parameters_of<PolarsBetweenParameter>(last))
@@ -744,7 +748,8 @@ Json between_module(const std::string& function, const LazyEventTable& df, const
   throw std::runtime_error("unbound function " + function);
 }
 
-Json cases_module(const std::string& function, const LazyEventTable& df, const Args& args, const Json& kwargs) {
+template <typename Frame>
+Json cases_module(const std::string& function, const Frame& df, const Args& args, const Json& kwargs) {
   using P = PolarsCaseFilterParameter;
   if (function == "filter_case_performance") {
     const auto& last = *args.at(2);
@@ -779,7 +784,7 @@ Json cases_module(const std::string& function, const LazyEventTable& df, const A
 
 // Round DK: a case marked "eager" calls the LTL filters on the eager table
 // (pm4py's Polars LTL filters on a DataFrame), as the LTL workbench does for
-// a DataFrame input.
+// a DataFrame input. Round DL: and every other module's filters too.
 template <typename Frame>
 Json ltl_module(const std::string& function, const Frame& df, const Args& args) {
   if (is_constant(function)) return constant(function);
@@ -797,7 +802,8 @@ Json ltl_module(const std::string& function, const Frame& df, const Args& args) 
   return table_node(invoke_polars_ltl_filter(df, call));
 }
 
-Json paths_module(const std::string& function, const LazyEventTable& df, const Args& args) {
+template <typename Frame>
+Json paths_module(const std::string& function, const Frame& df, const Args& args) {
   if (is_constant(function)) return constant(function);
   using P = PolarsPathsFilterParameter;
   const auto& last = *args.at(1);
@@ -810,7 +816,8 @@ Json paths_module(const std::string& function, const LazyEventTable& df, const A
   throw std::runtime_error("unbound function " + function);
 }
 
-Json timestamp_module(const std::string& function, const LazyEventTable& df, const Args& args) {
+template <typename Frame>
+Json timestamp_module(const std::string& function, const Frame& df, const Args& args) {
   if (is_constant(function)) return constant(function);
   using P = PolarsTimestampFilterParameter;
   if (function == "apply") return table_node(apply_polars_timestamp_filter(df, mapping_of(*args.at(0))));
@@ -835,7 +842,8 @@ Json timestamp_module(const std::string& function, const LazyEventTable& df, con
   throw std::runtime_error("unbound function " + function);
 }
 
-Json variants_module(const std::string& function, const LazyEventTable& df, const Args& args) {
+template <typename Frame>
+Json variants_module(const std::string& function, const Frame& df, const Args& args) {
   if (is_constant(function)) return constant(function);
   using P = PolarsVariantsFilterParameter;
   const auto& last = *args.back();
@@ -894,13 +902,15 @@ std::optional<std::function<std::string(const EventTable::Row&)>> row_label(cons
 bool valid_ncases(const EventTable& df, const std::vector<std::string>& names, const Json& actual, long long k) {
   EventTable a_storage;
   const auto* a = table_of(actual, a_storage);
-  if (!a || k < 0) return false;
+  if (!a) return false;
   const auto label = row_label(df, names);
   if (!label) return false;
   std::set<std::string> distinct, kept;
   for (const auto& row : df.rows) distinct.insert((*label)(row));
   for (const auto& row : a->rows) kept.insert((*label)(row));
   if (kept.count("n")) return false;
+  // Round DL: an eager frame's head(-n) keeps all but the last n cases.
+  if (k < 0) k = std::max<long long>(0, static_cast<long long>(distinct.size()) + k);
   const auto want = std::min<std::size_t>(static_cast<std::size_t>(k), distinct.size());
   if (kept.size() != want && !(distinct.count("n") && want > 0 && kept.size() == want - 1)) return false;
   EventTable rebuilt = df;
@@ -1219,13 +1229,14 @@ int main(int argc, char** argv) try {
         return run_call([&]() -> Json {
           const auto& args = call_args;
           const auto lazy = LazyEventTable::from_table(df);
-          if (module == "attributes") return attributes_module(function, lazy, args, kwargs);
-          if (module == "between") return between_module(function, lazy, args);
-          if (module == "cases") return cases_module(function, lazy, args, kwargs);
+          // Round DL: an eager case calls every module on the eager table.
+          if (module == "attributes") return eager ? attributes_module(function, df, args, kwargs) : attributes_module(function, lazy, args, kwargs);
+          if (module == "between") return eager ? between_module(function, df, args) : between_module(function, lazy, args);
+          if (module == "cases") return eager ? cases_module(function, df, args, kwargs) : cases_module(function, lazy, args, kwargs);
           if (module == "ltl") return eager ? ltl_module(function, df, args) : ltl_module(function, lazy, args);
-          if (module == "paths") return paths_module(function, lazy, args);
-          if (module == "timestamp") return timestamp_module(function, lazy, args);
-          if (module == "variants") return variants_module(function, lazy, args);
+          if (module == "paths") return eager ? paths_module(function, df, args) : paths_module(function, lazy, args);
+          if (module == "timestamp") return eager ? timestamp_module(function, df, args) : timestamp_module(function, lazy, args);
+          if (module == "variants") return eager ? variants_module(function, df, args) : variants_module(function, lazy, args);
           throw std::runtime_error("unbound module " + module);
         });
       };

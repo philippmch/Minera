@@ -1,4 +1,5 @@
 #include "minera/polars_attributes_filter.hpp"
+#include "polars_eager_diagnostic.hpp"
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
@@ -268,7 +269,28 @@ bool name_list(const EventAttribute& key) {
   if(c!=AttributeContainerKind::kList&&c!=AttributeContainerKind::kTuple&&c!=AttributeContainerKind::kSet&&c!=AttributeContainerKind::kFrozenSet)return false;
   return !key.children.empty()&&std::all_of(key.children.begin(),key.children.end(),[](const EventAttribute& item){return keys::plain_text(item);});
 }
-PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::vector<std::string>& columns) {
+void list_literal(const EventAttribute& v) {
+  if(!collection(v)||v.container==AttributeContainerKind::kContainer)return;
+  try{(void)detail::polars_lit::literal_of(detail::polars_lit::value_of(v,true));}
+  catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
+}
+// Python builds the bound literals, then each stream filter's column and
+// literal; round CJ: a dict literal converts strictly (its TypeError).
+void numeric_literal(const EventAttribute& v) {
+  // Round DF: pl.lit refuses an int past the Int128 range (probe df/i1).
+  try{detail::polars_lit::scalar_int_range(v);}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
+  // Round DB: pl.lit refuses a set bound or stream value.
+  if(detail::polars_lit::set_argument(v))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
+  if(mapping(v)){if(const auto error=detail::polars_lit::dict_literal_error(v))fail("TypeError","apply",*error);return;}
+  list_literal(v);
+}
+void case_key_arguments(const EventAttribute& key) {
+  if(null(key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
+  // Round CM: unique(case) refuses a dict while the plan is built.
+  dict_argument(key);
+  if(!text(key)&&!collection(key)&&!integer(key))col_selector(key);
+}
+PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::vector<std::string>& columns,bool eager=false) {
   const auto op=call.operation;
   std::string required;
   if(op==Op::kTraces||op==Op::kEvents||op==Op::kOnValues){if(!call.values)required="values";}
@@ -316,48 +338,37 @@ PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::ve
       refused=collection(key)&&!key.children.empty();
       if(!refused)call.options.attribute_key=key;
     }
-    auto literal=[](const EventAttribute& v){
-      if(!collection(v)||v.container==AttributeContainerKind::kContainer)return;
-      try{(void)detail::polars_lit::literal_of(detail::polars_lit::value_of(v,true));}
-      catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
-    };
-    if(call.values)literal(*call.values);
+    if(call.values)list_literal(*call.values);
     // Round DG: pl.lit refuses a scalar value past the Int128 range too.
     if(call.values&&!collection(*call.values))try{detail::polars_lit::scalar_int_range(*call.values);}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
     if(numeric(op)) {
       // Python builds the bound literals, then each stream filter's column and
       // literal; round CJ: a dict literal converts strictly (its TypeError).
-      const auto scalar_literal=[&](const EventAttribute& v){
-        // Round DF: pl.lit refuses an int past the Int128 range (probe df/i1).
-        try{detail::polars_lit::scalar_int_range(v);}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
-        // Round DB: pl.lit refuses a set bound or stream value.
-        if(detail::polars_lit::set_argument(v))fail("TypeError","apply",detail::polars_lit::kSetLiteralError);
-        if(mapping(v)){if(const auto error=detail::polars_lit::dict_literal_error(v))fail("TypeError","apply",*error);return;}
-        literal(v);
-      };
-      scalar_literal(*call.lower);scalar_literal(*call.upper);
+      numeric_literal(*call.lower);numeric_literal(*call.upper);
       if(op==Op::kNumericTraces)for(auto [key,value]:std::vector<std::pair<std::optional<EventAttribute>*,const std::optional<EventAttribute>*>>{{&call.options.stream_filter_key1,&call.options.stream_filter_value1},{&call.options.stream_filter_key2,&call.options.stream_filter_value2}}) {
         if(!*key||null(**key))continue;
         // Round DB: a set stream key selects its names as pl.col does; round
         // DD: a list or tuple too (probe dd/sk2: one name is that column, a
         // repeated name counts once, a missing one fails by name, several
         // existing names expand the stream predicate, numeric_predicate).
-        (void)col_selector_unmodelled(**key);
-        if(collection(**key)&&!mapping(**key)) {
+        // Round DL: on an eager frame pl.col reads the stream key after the
+        // filters below it ran (numeric_predicate; probe dl/e6).
+        bool invalid=false;
+        if(!eager)(void)col_selector_unmodelled(**key);
+        else try{(void)col_selector_unmodelled(**key);}catch(const PolarsAttributesFilterError&){invalid=true;}
+        if(!invalid&&collection(**key)&&!mapping(**key)) {
           auto selected=keys::col_key(**key,columns);
           if(collection(selected)&&!selected.children.empty())selected=distinct_names(selected);
           **key=selected;
         }
-        if(*value)scalar_literal(**value);
+        // Round DL: on an eager frame the stream filters build their literal
+        // after the filters below them ran (numeric_predicate).
+        if(*value&&!eager)numeric_literal(**value);
       }
     }
-    if(traced(op)) {
-      const auto& key=call.options.case_id_key;
-      if(null(key))fail("ValueError","apply","must specify `on` OR `left_on` and `right_on`");
-      // Round CM: unique(case) refuses a dict while the plan is built.
-      dict_argument(key);
-      if(!text(key)&&!collection(key)&&!integer(key))col_selector(key);
-    }
+    // Round DL: on an eager frame the trace filter reads its case key after
+    // its filters ran (numeric_predicate).
+    if(traced(op)&&!eager)case_key_arguments(call.options.case_id_key);
     if(refused)throw std::invalid_argument("Native Polars attribute selector accepts only literal String or captured empty list");
   }
   return call;
@@ -1016,8 +1027,56 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
     fail(type,phase(eager),message+suffix);
   };
   Predicate p{call,0};std::vector<std::string> resolved_filters;
+  // Round CQ: the nodes run bottom-up, each on the rows the nodes below it
+  // keep (a null filter keeps none, so the nodes above it run on an empty
+  // frame). Polars filters a frame with an elementwise predicate in row
+  // partitions when the frame has at least as many columns as Polars has
+  // threads (4 on the host the reference banks were captured on): the first
+  // three hold n/4 rows each (none below 4 rows), the last the rest, and the
+  // first failing partition's error is raised. A struct cast fails only on a
+  // partition with a present cell, so on a partition without one a
+  // comparison error anywhere in the node wins over a cast left of it; a
+  // cast column's null structs are per partition too. A null filter
+  // (null.repeat) is not elementwise and filters the whole frame. The trace
+  // filters read only the projected case key and filter columns.
+  constexpr std::size_t kReferenceThreads=4;
+  std::vector<std::size_t> rows;
+  for(std::size_t i=0;i<source.size();++i)rows.push_back(i);
+  const auto run=[&](Expr node,std::size_t width) {
+    bool streamable=true;each_leaf(node,[&](const Leaf& l){if(null_leaf(l))streamable=false;});
+    std::vector<std::pair<std::size_t,std::size_t>> parts;
+    if(rows.empty()||!streamable||width<kReferenceThreads)parts.emplace_back(0,rows.size());
+    else {
+      const auto size=rows.size()/kReferenceThreads;
+      for(std::size_t i=0;i+1<kReferenceThreads;++i)parts.emplace_back(i*size,(i+1)*size);
+      parts.emplace_back((kReferenceThreads-1)*size,rows.size());
+    }
+    const auto mark=[&](std::size_t begin,std::size_t end) {
+      each_leaf(node,[&](Leaf& l) {
+        const auto c=index_of(source,l.column);
+        l.present=c&&std::any_of(rows.begin()+static_cast<std::ptrdiff_t>(begin),rows.begin()+static_cast<std::ptrdiff_t>(end),
+                                 [&](std::size_t r){return !detail::polars_lit::null_cell(source.rows[r][*c]);});
+      });
+    };
+    for(const auto& [begin,end]:parts) {
+      mark(begin,end);
+      const Expr* at=nullptr;
+      if(const auto error=first_error(node,at)) {
+        // Round CJ: a failing struct cast names the cast, inside the node.
+        if(!error->expression.empty())fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error->expression+"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n");
+        fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
+      }
+    }
+    std::vector<std::size_t> kept;
+    for(const auto& [begin,end]:parts) {
+      mark(begin,end);
+      for(std::size_t i=begin;i<end;++i)if(truth_of(node,source,rows[i])==1)kept.push_back(rows[i]);
+    }
+    rows=std::move(kept);
+  };
   for(std::size_t i=0;i<levels.size();++i) {
     const auto& key=*keys[i];
+    if(eager&&i>0){(void)col_selector_unmodelled(key);numeric_literal(compared[i]);}
     if(i==0&&collection(key)&&!key.children.empty()) {
       // Round DC: the bound predicate as Python wrote it, once per column.
       // Round DD: any bound as Python wrote its literal (probe set-ddsc-5).
@@ -1066,9 +1125,31 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
       if(bad){auto with=resolved_filters;with.push_back(plan_text(node,bad));fail_at(i,true,"InvalidOperationError",message,chain_plan(source,with));}
       resolved_filters.push_back(plan_text(node));p.chain.push_back(std::move(node));
     }
+    // Round DL: on an eager DataFrame each Python filter call runs as it is
+    // called, on the whole frame, its errors before the next call builds its
+    // literal and resolves (probes dl/n1-n3). The bounds simplify as one
+    // lazy node does (equal literals to ==, an empty interval empties the
+    // frame; not a dyn int); with a null bound they stay as written.
+    if(eager) {
+      const auto first=p.chain.size()-levels[i].size();
+      std::vector<Expr> items(p.chain.begin()+static_cast<std::ptrdiff_t>(first),p.chain.end());
+      bool nulls=false;for(const auto& item:items)each_leaf(item,[&](const Leaf& l){if(null_leaf(l))nulls=true;});
+      std::vector<Expr> nodes;
+      if(nulls) {
+        Expr node=items[0];
+        for(std::size_t k=1;k<items.size();++k)node=binary(std::move(node),"&",items[k]);
+        nodes.push_back(std::move(node));
+      } else {
+        bool empty=false;
+        nodes=pushdown(items,empty);
+        if(empty)rows.clear();
+      }
+      for(auto& node:nodes){p.merged.push_back(node);run(std::move(node),source.columns.size());}
+    }
   }
   if(trace) {
     const auto& role=call.options.case_id_key;
+    if(eager)case_key_arguments(role);
     if(collection(role)&&role.children.empty())fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
     const auto plan=[&]{return eager?std::string():resolved("'join'",chain_plan(source,resolved_filters),join_stack());};
     if(detail::polars_group_keys::modelled(role))p.keys=case_keys(source,role,eager,plan);
@@ -1078,65 +1159,21 @@ Predicate numeric_predicate(const EventTable& source,const PolarsAttributesFilte
       p.case_column=c;p.case_dtype=source_dtype(source,*c);
     }
   }
-  bool empty=false;
-  p.merged=pushdown(p.chain,empty);
-  // Round CE: an empty interval in the lowest node empties the frame; the
-  // filters above it still run (and raise) on the empty frame.
-  if(empty)p.empty=true;
-  // Round CQ: the nodes run bottom-up, each on the rows the nodes below it
-  // keep (a null filter keeps none, so the nodes above it run on an empty
-  // frame). Polars filters a frame with an elementwise predicate in row
-  // partitions when the frame has at least as many columns as Polars has
-  // threads (4 on the host the reference banks were captured on): the first
-  // three hold n/4 rows each (none below 4 rows), the last the rest, and the
-  // first failing partition's error is raised. A struct cast fails only on a
-  // partition with a present cell, so on a partition without one a
-  // comparison error anywhere in the node wins over a cast left of it; a
-  // cast column's null structs are per partition too. A null filter
-  // (null.repeat) is not elementwise and filters the whole frame. The trace
-  // filters read only the projected case key and filter columns.
-  constexpr std::size_t kReferenceThreads=4;
-  std::size_t width=source.columns.size();
-  if(trace&&!eager) {
-    std::set<std::string> used;
-    for(const auto& node:p.merged)each_leaf(node,[&](const Leaf& l){used.insert(l.column);});
-    if(p.keys){for(const auto& item:p.keys->items)if(!item.literal)used.insert(source.columns[item.column]);}
-    else if(p.case_column)used.insert(source.columns[*p.case_column]);
-    width=used.size();
-  }
-  std::vector<std::size_t> rows;
-  if(!p.empty)for(std::size_t i=0;i<source.size();++i)rows.push_back(i);
-  for(auto node:p.merged) {
-    bool streamable=true;each_leaf(node,[&](const Leaf& l){if(null_leaf(l))streamable=false;});
-    std::vector<std::pair<std::size_t,std::size_t>> parts;
-    if(rows.empty()||!streamable||width<kReferenceThreads)parts.emplace_back(0,rows.size());
-    else {
-      const auto size=rows.size()/kReferenceThreads;
-      for(std::size_t i=0;i+1<kReferenceThreads;++i)parts.emplace_back(i*size,(i+1)*size);
-      parts.emplace_back((kReferenceThreads-1)*size,rows.size());
+  if(!eager) {
+    bool empty=false;
+    p.merged=pushdown(p.chain,empty);
+    // Round CE: an empty interval in the lowest node empties the frame; the
+    // filters above it still run (and raise) on the empty frame.
+    if(empty){p.empty=true;rows.clear();}
+    std::size_t width=source.columns.size();
+    if(trace) {
+      std::set<std::string> used;
+      for(const auto& node:p.merged)each_leaf(node,[&](const Leaf& l){used.insert(l.column);});
+      if(p.keys){for(const auto& item:p.keys->items)if(!item.literal)used.insert(source.columns[item.column]);}
+      else if(p.case_column)used.insert(source.columns[*p.case_column]);
+      width=used.size();
     }
-    const auto mark=[&](std::size_t begin,std::size_t end) {
-      each_leaf(node,[&](Leaf& l) {
-        const auto c=index_of(source,l.column);
-        l.present=c&&std::any_of(rows.begin()+static_cast<std::ptrdiff_t>(begin),rows.begin()+static_cast<std::ptrdiff_t>(end),
-                                 [&](std::size_t r){return !detail::polars_lit::null_cell(source.rows[r][*c]);});
-      });
-    };
-    for(const auto& [begin,end]:parts) {
-      mark(begin,end);
-      const Expr* at=nullptr;
-      if(const auto error=first_error(node,at)) {
-        // Round CJ: a failing struct cast names the cast, inside the node.
-        if(!error->expression.empty())fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error->expression+"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n");
-        fail(error->first,phase(eager),error->second+"\n\nThis error occurred in the following expression:\n\t"+error_text(*at)+(node.leaf?"\n":"\nwhile evaluating this larger expression:\n\t"+error_text(node)+"\n"));
-      }
-    }
-    std::vector<std::size_t> kept;
-    for(const auto& [begin,end]:parts) {
-      mark(begin,end);
-      for(std::size_t i=begin;i<end;++i)if(truth_of(node,source,rows[i])==1)kept.push_back(rows[i]);
-    }
-    rows=std::move(kept);
+    for(const auto& node:p.merged)run(node,width);
   }
   p.keep.assign(source.size(),false);
   for(const auto r:rows)p.keep[r]=true;
@@ -1230,8 +1267,12 @@ Predicate predicate(const EventTable& source,const PolarsAttributesFilterCall& c
     if(!null(query))p.values.push_back(query);
     }
   }
+  // Round DL: on an eager frame the filter runs (and raises) before the
+  // trace filter selects its case key (probe dl/e7).
+  if(eager&&!p.collect_error.empty())fail("InvalidOperationError",phase(eager),p.collect_error);
   if(trace) {
     const auto& role=call.options.case_id_key;
+    if(eager)case_key_arguments(role);
     if(collection(role)&&role.children.empty())fail("InvalidOperationError",phase(eager),"expected join keys/predicates"+(eager?"":resolved("'join'","UNIQUE[maintain_order: false, keep_strategy: Any] BY None\n  DF []; PROJECT */0 COLUMNS",{"'join'"})));
     // Round CE: a scalar value as the resolved plan coerces it.
     std::optional<std::string> scalar;
@@ -1350,7 +1391,7 @@ void resolve_pair_keys(const EventTable& source,const std::vector<EventAttribute
     names.push_back(name);
   }
 }
-CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,const PolarsAttributesFilterOptions& options,bool relative=false,bool pairs=false) {
+CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,const PolarsAttributesFilterOptions& options,bool relative=false,bool pairs=false,bool eager=false) {
   CountColumn result;result.literal=attr;result.once=options.keep_once_per_case&&truth(*options.keep_once_per_case);
   // Round DG: an int key (or key item) past the Int128 range fails its
   // pl.lit while the plan is built (probe big-pltblcj).
@@ -1428,7 +1469,9 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
   if(collection(attr)) {
     // Round CH: an empty key list fails on its first item only after the
     // per-case group_by resolved (a missing case key fails first).
-    if(attr.children.empty()){if(result.once)(void)case_column();fail("IndexError","apply","tuple index out of range");}
+    // Round DL: on an eager frame the counts' .collect() fails first (probe
+    // dl/e3).
+    if(attr.children.empty()){if(result.once)(void)case_column();if(eager)return result;fail("IndexError","apply","tuple index out of range");}
     // A key list groups by each of its items; round CM: a dict item is
     // refused as unhashable first.
     if(!result.once&&!attr.children.empty()&&mapping(attr.children.front()))fail("TypeError","apply","unhashable type: 'dict'");
@@ -1954,7 +1997,7 @@ StatisticalSelection stats(const EventTable& source,const PolarsAttributesFilter
         fail("IndexError","apply","index "+exact(attr).decimal()+" is out of bounds for DataFrame of height "+(empty?"0":"1"));
       }
     }
-    schema=counts_schema(source,attr,countoptions,op==Op::kRelative);
+    schema=counts_schema(source,attr,countoptions,op==Op::kRelative,false,eager);
     if(eager)fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");
     // Round DB: grouped by several set items, the counts pair each group's
     // first key with its second, which the threshold compares; then
@@ -2063,10 +2106,15 @@ LazyEventTable deferred(const LazyEventTable& source,std::function<EventTable(co
 }  // namespace
 
 PolarsAttributesFilterResult invoke_polars_attributes_filter(const EventTable& source,const PolarsAttributesFilterCall& input) {
-  source.validate();const auto call=prepare(input,source.columns);
-  if(call.operation==Op::kCounts){const auto schema=counts_schema(source,*call.attribute,call.options,false,true);(void)schema;fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");}
-  if(statistics(call.operation)){const auto selected=stats(source,call,true);return stats_output(source,call,selected,true);}
-  const auto query=predicate(source,call,true);return filtered(source,query);
+  try {
+    source.validate();const auto call=prepare(input,source.columns,true);
+    if(call.operation==Op::kCounts){const auto schema=counts_schema(source,*call.attribute,call.options,false,true,true);(void)schema;fail("AttributeError","apply","'DataFrame' object has no attribute 'collect'");}
+    if(statistics(call.operation)){const auto selected=stats(source,call,true);return stats_output(source,call,selected,true);}
+    const auto query=predicate(source,call,true);return filtered(source,query);
+  } catch (const PolarsAttributesFilterError& error) {
+    // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).
+    throw PolarsAttributesFilterError(error.type, error.phase, detail::polars_eager_diagnostic(error.message));
+  }
 }
 LazyPolarsAttributesFilterResult invoke_polars_attributes_filter(const LazyEventTable& source,const PolarsAttributesFilterCall& input) {
   const auto call=prepare(input,source.columns());const auto meta=metadata_table(source);meta.validate();

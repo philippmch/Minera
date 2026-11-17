@@ -1,4 +1,5 @@
 #include "minera/polars_case_filter.hpp"
+#include "polars_eager_diagnostic.hpp"
 #include "polars_datetime.hpp"
 #include "polars_column_hint.hpp"
 #include "polars_key_selection.hpp"
@@ -29,6 +30,7 @@ enum class Operation { kCount, kSize, kPerformance };
   throw PolarsCaseFilterError(std::move(type), phase, std::move(message));
 }
 bool null(const EventAttribute& v) { return v.is_null || is_native_na_attribute(v); }
+EventAttribute none() { EventAttribute v; v.is_null = true; return v; }
 bool collection(const EventAttribute& v) { return v.container != AttributeContainerKind::kScalar; }
 bool boolean(const EventAttribute& v) { return v.kind == AttributeKind::kBoolean || std::holds_alternative<bool>(v.typed_value); }
 bool integer(const EventAttribute& v) { return v.kind == AttributeKind::kInt || std::holds_alternative<std::int64_t>(v.typed_value) || std::holds_alternative<std::uint64_t>(v.typed_value); }
@@ -167,7 +169,7 @@ void validate_literals(Operation op, const EventAttribute& low, const EventAttri
     }
   }
 }
-void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseFilterOptions& options) {
+void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseFilterOptions& options, bool eager = false) {
   if (op == Operation::kPerformance && truth(options.business_hours))
     fail("NotImplementedError", "apply", "Business hours calculation is not yet implemented for Polars filtering");
   // Round CO: group_by refuses a dict case key before anything else reads
@@ -185,7 +187,9 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
       fail("TypeError", "apply", "invalid input for `col`\n\nExpected iterable of type `str` or `DataType`, got iterable of type '" + python_type(time.children.front()) + "'.");
     for (const auto& item : time.children) if (!text(item)) fail("TypeError", "apply", null(item) ? "'None' is not an instance of 'str'" : "'" + pyo3_type(item) + "' object is not an instance of 'str'");
   }
-  if (op == Operation::kCount && !null(bound)) {
+  // Round DL: an eager frame calls DataFrame.head(n) after the group_by
+  // (eager_head).
+  if (op == Operation::kCount && !null(bound) && !eager) {
     // Round DB: head(n) compares a truthy str or container with 0 first; an
     // empty one fails the integer conversion.
     if ((text(bound) || collection(bound)) && truth(bound)) fail("TypeError", "apply", "'<' not supported between instances of '" + core_type(bound) + "' and 'int'");
@@ -227,7 +231,7 @@ std::string bound_literal(const EventAttribute& v, Operation op) {
   if (list_bound(v)) return detail::polars_lit::literal_list_display(detail::polars_lit::argument_literal(v, true));
   return literal(v);
 }
-void validate_bound(const EventAttribute& bound, const EventAttribute& other, bool upper, Operation op, const std::string& phase, bool present) {
+void validate_bound(const EventAttribute& bound, const EventAttribute& other, bool upper, Operation op, const std::string& phase, bool present, bool alone = false) {
   if (null(bound) || (!text(bound) && !collection(bound))) return;
   namespace lit = detail::polars_lit;
   const auto column = op == Operation::kSize ? "count" : "case_duration";
@@ -267,14 +271,20 @@ void validate_bound(const EventAttribute& bound, const EventAttribute& other, bo
     if (mapping(v)) return "d" + lit::struct_key(bound_struct(v, op));
     return text(v) ? "s" + v.value : "l" + lit::literal_list_key(lit::argument_literal(v, true));
   };
-  if (mergeable(other) && mergeable(bound) && key(bound) == key(other)) {
+  if (!alone && mergeable(other) && mergeable(bound) && key(bound) == key(other)) {
     if (!text(bound)) error.replace(error.find("'" + cmp + "' "), cmp.size() + 3, "");
     error += "\n\nThis error occurred in the following expression:\n\t[(col(" + quote(column) + ")) == (" + bound_literal(bound, op) + ")]\n";
     fail(type, phase, std::move(error));
   }
   const auto failing = node.empty() ? expression(bound, upper) : node;
   std::string root = expression(bound, upper);
-  if (null(other)) {
+  const std::string null_column = "null.repeat([col(" + quote(column) + ").len()])";
+  if (alone) {
+  } else if (null(other) && phase == "apply") {
+    // Round DL: on an eager frame a None bound stays in place as a null
+    // column (probe dl/c4).
+    root = upper ? "[(" + null_column + ") & (" + expression(bound, true) + ")]" : "[(" + expression(bound, false) + ") & (" + null_column + ")]";
+  } else if (null(other)) {
     if (upper) root = "[(" + expression(bound, true) + ") & (null.repeat([col(" + quote(column) + ").len()]))]";
   } else {
     root = "[(" + expression(upper ? other : bound, false) + ") & (" + expression(upper ? bound : other, true) + ")]";
@@ -337,7 +347,30 @@ groups::Keys case_keys(const EventTable& source, Operation op, const EventAttrib
                          });
   } catch (const PolarsSequenceFilterError& error) { fail(error.type, phase, error.message); }
 }
+// Round DL: on an eager frame filter_on_ncases calls DataFrame.head(n) on
+// the sorted case counts, after the group_by resolved: Python compares n
+// with 0 first (any non-number fails it, None too), a negative n keeps all
+// but the last -n rows (none past the height), a float that stays positive
+// fails the integer conversion, and n past the UInt64 range fails it
+// (probe dl/c2).
+std::size_t eager_head(const EventAttribute& n, std::size_t height) {
+  if (!integer(n) && !boolean(n) && !real(n))
+    fail("TypeError", "apply", "'<' not supported between instances of '" + (null(n) ? std::string("NoneType") : core_type(n)) + "' and 'int'");
+  if (real(n)) {
+    const auto value = number(n);
+    if (value < 0 && static_cast<double>(height) + value <= 0) return 0;
+    fail("TypeError", "apply", "'float' object cannot be interpreted as an integer");
+  }
+  const auto count = exact(n);
+  if (count < TokenInteger(0)) {
+    const auto rest = TokenInteger(static_cast<std::int64_t>(height)) + count;
+    return rest < TokenInteger(0) ? 0 : static_cast<std::size_t>(std::stoull(rest.decimal()));
+  }
+  if (TokenInteger(std::numeric_limits<std::uint64_t>::max()) < count) fail("OverflowError", "apply", "int too big to convert");
+  return TokenInteger(static_cast<std::int64_t>(height)) < count ? height : static_cast<std::size_t>(std::stoull(count.decimal()));
+}
 EventTable collect(const EventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& options, const std::string& phase) {
+  const bool eager = phase == "apply";
   source.validate();
   if (source.index || source.dtypes.size() != source.columns.size()) throw std::invalid_argument("Native Polars case filters require declared dtypes and no dataframe index");
   if (collection(options.case_id_key) && options.case_id_key.children.empty())
@@ -379,17 +412,27 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
     return (integer(v) || boolean(v)) && exact(v) >= TokenInteger(std::numeric_limits<std::int64_t>::min()) &&
            exact(v) <= TokenInteger(std::numeric_limits<std::int64_t>::max());
   };
-  const bool folded = op != Operation::kCount &&
+  // Round DL: on an eager frame the case size runs its bounds as separate
+  // filter calls (probe dl/c1): nothing folds.
+  const bool separate = eager && op == Operation::kSize;
+  const bool folded = op != Operation::kCount && !separate &&
       ((text(low) && text(high) && high.value < low.value) ||
        (int_literal(low) && int_literal(high) && exact(high) < exact(low)) ||
        (date(low) && date(high) && date_micros(high) < date_micros(low)));
-  if (op == Operation::kPerformance && !folded) validate_time_dtype(source.dtypes[time_at], phase);
+  // Round DL: on an eager frame the group_by and the duration's with_columns
+  // run before the filter builds its bound literals, whatever the bounds
+  // (probe dl/c3); the case size builds each bound with its own filter.
+  if (op == Operation::kPerformance && (!folded || eager)) validate_time_dtype(source.dtypes[time_at], phase);
+  if (eager && op != Operation::kCount) validate_literals(op, low, separate ? none() : high);
   if (op != Operation::kCount && !folded) {
     // Whether the count or the duration has a present cell (a dict bound's
     // cast fails only then).
     const bool present = op == Operation::kSize ? !source.rows.empty() : std::any_of(source.rows.begin(), source.rows.end(), [&](const auto& row) { return row[time_at] && !null(*row[time_at]); });
-    validate_bound(low, high, false, op, phase, present);
-    if (op == Operation::kPerformance || !null(high)) validate_bound(high, low, true, op, phase, present);
+    if (separate) validate_bound(low, none(), false, op, phase, present, true);
+    else {
+      validate_bound(low, high, false, op, phase, present);
+      if (op == Operation::kPerformance || !null(high)) validate_bound(high, low, true, op, phase, present);
+    }
   }
   // Durations count whole seconds of the column unit (round BW).
   const auto time_unit = op == Operation::kPerformance ? polars_datetime::column_unit(source.dtypes[time_at]) : polars_datetime::Unit::kMicroseconds;
@@ -411,7 +454,17 @@ EventTable collect(const EventTable& source, Operation op, const EventAttribute&
   if (op == Operation::kCount) {
     std::vector<std::size_t> order(groups.size()); std::iota(order.begin(), order.end(), 0);
     std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) { return groups[a].count > groups[b].count; });
-    for (std::size_t i = 0; i < order.size() && (null(low) || TokenInteger(i) < exact(low)); ++i) groups[order[i]].keep = true;
+    const auto limit = eager ? std::optional<std::size_t>(eager_head(low, groups.size())) : std::nullopt;
+    for (std::size_t i = 0; i < order.size() && (limit ? i < *limit : null(low) || TokenInteger(i) < exact(low)); ++i) groups[order[i]].keep = true;
+  } else if (separate) {
+    // The lower bound's filter, then the upper bound's on the cases it kept.
+    for (auto& group : groups) group.keep = compare_bound(static_cast<std::int64_t>(group.count), low, false);
+    if (!null(high)) {
+      validate_literals(op, high, none());
+      const bool present = std::any_of(groups.begin(), groups.end(), [](const Group& group) { return group.keep; });
+      validate_bound(high, none(), true, op, phase, present, true);
+      for (auto& group : groups) group.keep = group.keep && compare_bound(static_cast<std::int64_t>(group.count), high, true);
+    }
   } else for (auto& group : groups) {
     const auto value = op == Operation::kSize ? std::optional<std::int64_t>{static_cast<std::int64_t>(group.count)} : group.first ? std::optional<std::int64_t>{(*group.last - *group.first) / polars_datetime::per_second(time_unit)} : std::nullopt;
     group.keep = !folded && value && compare_bound(*value, low, false) && ((op == Operation::kSize && null(high)) || compare_bound(*value, high, true));
@@ -470,10 +523,14 @@ LazyEventTable lazy(const LazyEventTable& source, Operation op, const EventAttri
   }, source.attributes(), source.metadata(), std::nullopt, std::move(dtypes), source.index(), std::move(categories));
 }
 EventTable eager(const EventTable& source, Operation op, const EventAttribute& low, const EventAttribute& high, const PolarsCaseFilterOptions& raw) {
-  validate_apply(op, low, raw);
-  validate_literals(op, low, high);
-  const auto options = keyed(raw, op, source.columns);
-  return collect(source, op, low, high, options, "apply");
+  try {
+    validate_apply(op, low, raw, true);
+    const auto options = keyed(raw, op, source.columns);
+    return collect(source, op, low, high, options, "apply");
+  } catch (const PolarsCaseFilterError& error) {
+    // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).
+    throw PolarsCaseFilterError(error.type, error.phase, detail::polars_eager_diagnostic(error.message));
+  }
 }
 std::vector<PolarsCaseFilterParameter> parameter_value(const EventAttribute& value) {
   if (null(value)) return {};

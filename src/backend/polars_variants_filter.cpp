@@ -1,4 +1,5 @@
 #include "minera/polars_variants_filter.hpp"
+#include "polars_eager_diagnostic.hpp"
 #include "polars_group_keys.hpp"
 #include "polars_datetime.hpp"
 #include "polars_float_text.hpp"
@@ -517,7 +518,15 @@ EventTable with_literal(EventTable table,const PolarsVariantsFilterOptions& opti
   for(auto& row:table.rows)row.push_back(item->cell);
   return table;
 }
-std::optional<EventTable> literal_collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
+// Round DL: the admitted variants as Python joins them; on an eager frame
+// the join runs after the sort and group_by ran (probe dl/v1), so collect
+// builds them once those resolved.
+struct Labels {
+  const std::vector<std::string>* ready=nullptr;const EventAttribute* values=nullptr;
+  mutable std::optional<std::vector<std::string>> made;
+  const std::vector<std::string>& get() const {if(ready)return *ready;if(!made)made=admitted(*values);return *made;}
+};
+std::optional<EventTable> literal_collect(const EventTable& source,const Labels& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
   const auto& key=options.case_id_key;
   if(!(listed_key(key)&&!key.children.empty())&&!integer(key))return std::nullopt;
   const auto items=key_items(key);
@@ -551,10 +560,10 @@ std::optional<EventTable> literal_collect(const EventTable& source,const std::ve
     fail("ColumnNotFoundError",phase,missing_prefix(act.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n"+literal_sort_plan(source,options,"col(\"time:timestamp\")")+
          contexts({"group_by","filter","select","join right","join"}));
   }
-  if(!labels.empty()&&source.rows.size()!=1)shape();
+  if(!labels.get().empty()&&source.rows.size()!=1)shape();
   bool matched=false;
   if(names){
-    if(!labels.empty()){
+    if(!labels.get().empty()){
       const auto& row=source.rows.front();
       bool absent=false;
       for(const auto& item:items){
@@ -563,7 +572,7 @@ std::optional<EventTable> literal_collect(const EventTable& source,const std::ve
       }
       const auto at=static_cast<std::size_t>(std::find(source.columns.begin(),source.columns.end(),act.value)-source.columns.begin());
       std::string label;if(row[at]&&!null(*row[at])&&source.dtypes[at]!="Null")label=string_cast(*row[at],source.dtypes[at]);
-      matched=!absent&&std::find(labels.begin(),labels.end(),label)!=labels.end();
+      matched=!absent&&std::find(labels.get().begin(),labels.get().end(),label)!=labels.get().end();
     }
   } else {
     matched=!null(items.front());
@@ -571,10 +580,11 @@ std::optional<EventTable> literal_collect(const EventTable& source,const std::ve
   if(matched==truth(options.positive))return with_literal(source,options);
   auto result=source;result.rows.clear();return with_literal(std::move(result),options);
 }
-EventTable collect(const EventTable& source,const std::vector<std::string>& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
+EventTable collect(const EventTable& source,const Labels& labels,const PolarsVariantsFilterOptions& options,const std::string& phase){
   if(const auto result=literal_collect(source,labels,options,phase))return *result;
   const auto groups=grouped(source,options,false,phase);std::unordered_map<std::string,bool> matches;
-  for(const auto& group:groups.groups)matches.emplace(group.key,!group.absent&&std::find(labels.begin(),labels.end(),group.label)!=labels.end());
+  (void)labels.get();
+  for(const auto& group:groups.groups)matches.emplace(group.key,!group.absent&&std::find(labels.get().begin(),labels.get().end(),group.label)!=labels.get().end());
   auto result=source;result.rows.clear();
   // The kept case ids join back in sorted case order. An inner join whose
   // source frame is no taller than that list yields the list's order, each
@@ -582,7 +592,7 @@ EventTable collect(const EventTable& source,const std::vector<std::string>& labe
   // The list holds a null case whose variant matches too, though a null key
   // never joins (round CD).
   std::vector<std::string> kept;std::size_t listed=0;
-  for(const auto& group:groups.groups){if(matches.at(group.key))kept.push_back(group.key);if(group.absent&&std::find(labels.begin(),labels.end(),group.label)!=labels.end())++listed;}
+  for(const auto& group:groups.groups){if(matches.at(group.key))kept.push_back(group.key);if(group.absent&&std::find(labels.get().begin(),labels.get().end(),group.label)!=labels.get().end())++listed;}
   listed+=kept.size();
   // Round CT: a one-row NaN float case key joins nothing (probe ct/j1).
   if(truth(options.positive)&&detail::polars_group_keys::one_row_nan_join(source,groups.case_at,listed))return result;
@@ -596,7 +606,7 @@ LazyEventTable lazy(const LazyEventTable& source,std::vector<std::string> labels
   validate(options);
   auto columns=source.columns();auto dtypes=source.dtypes();auto categorical=source.categorical_dtypes();
   if(const auto item=joined_literal(options)){columns.push_back("literal");if(!dtypes.empty())dtypes.push_back(item->dtype);if(!categorical.empty())categorical.push_back(std::nullopt);}
-  return LazyEventTable(columns,[source,labels=std::move(labels),options](const auto& consume){const auto result=collect(source.materialize(),labels,options,"collect");for(const auto& row:result.rows)consume(row);},source.attributes(),source.metadata(),std::nullopt,dtypes,source.index(),categorical);
+  return LazyEventTable(columns,[source,labels=std::move(labels),options](const auto& consume){const auto result=collect(source.materialize(),Labels{&labels},options,"collect");for(const auto& row:result.rows)consume(row);},source.attributes(),source.metadata(),std::nullopt,dtypes,source.index(),categorical);
 }
 bool py_equal(const Cell& a,const Cell& b){if(!a||null(*a))return !b||null(*b);if(!b||null(*b))return false;if((integer(*a)||boolean(*a))&&(integer(*b)||boolean(*b)))return exact(*a)==exact(*b);if((real(*a)||integer(*a)||boolean(*a))&&(real(*b)||integer(*b)||boolean(*b)))return number(*a)==number(*b);if(date(*a)&&date(*b))return compare(a,b,Dtype::kDate)==0;return text(*a)&&text(*b)?a->value==b->value:a==b;}
 bool py_less(const Cell& a,const Cell& b){
@@ -665,9 +675,37 @@ PolarsVariantsFilterOptions statistics_parameters(const std::vector<PolarsVarian
 }  // namespace
 
 PolarsVariantsFilterOptions resolve_polars_variants_filter_parameters(const std::vector<PolarsVariantsFilterParameter>& values){PolarsVariantsFilterOptions options;for(bool enum_key:{false,true})for(const auto& value:values){if(value.enum_key!=enum_key)continue;if(value.key=="pm4py:param:case_id_key")options.case_id_key=value.value;else if(value.key=="pm4py:param:activity_key")options.activity_key=value.value;else if(value.key=="pm4py:param:timestamp_key")options.timestamp_key=value.value;else if(value.key=="positive")options.positive=value.value;}return options;}
-EventTable filter_polars_variants(const EventTable& source,const EventAttribute& values,const PolarsVariantsFilterOptions& options){validate(options);return collect(source,admitted(values),options,"apply");}
+// Round DL: on an eager frame the sort by [case key, timestamp] runs before
+// group_by refuses a dict case key: the dict is a struct literal there, the
+// sort resolves the timestamp column (time:timestamp, or the statistics'
+// timestamp key), then fails a frame of any height but one (probe dl/v1).
+void eager_dict_sort(const EventTable& source,const PolarsVariantsFilterOptions& options,bool statistics){
+  if(!keys::dict_key(options.case_id_key))return;
+  if(const auto error=detail::polars_lit::dict_literal_error(options.case_id_key))fail("TypeError","apply",*error);
+  const EventAttribute time=statistics?options.timestamp_key:EventAttribute{"","time:timestamp",AttributeKind::kString};
+  if(text(time)&&std::find(source.columns.begin(),source.columns.end(),time.value)==source.columns.end())fail("ColumnNotFoundError","apply",missing_prefix(time.value,source.columns));
+  if(source.rows.size()!=1)fail("ShapeError","apply","sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");
+}
+EventTable filter_polars_variants(const EventTable& source,const EventAttribute& values,const PolarsVariantsFilterOptions& options){
+  try {
+    eager_dict_sort(source,options,false);
+    validate(options);return collect(source,Labels{nullptr,&values},options,"apply");
+  } catch (const PolarsVariantsFilterError& error) {
+    // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).
+    throw PolarsVariantsFilterError(error.type, error.phase, detail::polars_eager_diagnostic(error.message));
+  }
+}
 LazyEventTable filter_polars_variants(const LazyEventTable& source,const EventAttribute& values,const PolarsVariantsFilterOptions& options){validate(options);return lazy(source,admitted(values),options);}
-EventTable filter_polars_variants_top_k(const EventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options){validate(options,true);(void)top_labels(source,maximum,options,true);throw std::logic_error("Unreachable eager Polars top-k");}
+EventTable filter_polars_variants_top_k(const EventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options){
+  try {
+    eager_dict_sort(source,options,true);
+    validate(options,true);(void)top_labels(source,maximum,options,true);
+  } catch (const PolarsVariantsFilterError& error) {
+    // Round DL: an eager frame's diagnostics (polars_eager_diagnostic.hpp).
+    throw PolarsVariantsFilterError(error.type, error.phase, detail::polars_eager_diagnostic(error.message));
+  }
+  throw std::logic_error("Unreachable eager Polars top-k");
+}
 LazyEventTable filter_polars_variants_top_k(const LazyEventTable& source,const EventAttribute& maximum,const PolarsVariantsFilterOptions& options){
   validate(options,true);auto labels=top_labels(source.materialize(),maximum,options,false);
   validate(options);return lazy(source,std::move(labels),options);
@@ -689,8 +727,7 @@ LazyEventTable filter_polars_variants_from_list_parameters(const LazyEventTable&
 LazyEventTable filter_polars_variants_from_list_parameter_value(const LazyEventTable& s,const EventAttribute& v,const EventAttribute& p){return filter_polars_variants_from_list_parameters(s,v,parameters(p));}
 LazyEventTable filter_polars_variants_from_list(const LazyEventTable&,std::nullopt_t,const PolarsVariantsFilterOptions&){missing_argument("apply_from_variant_list","variants");}
 EventTable filter_polars_variants_top_k_parameters(const EventTable& source,const EventAttribute& maximum,const std::vector<PolarsVariantsFilterParameter>& values) {
-  const auto statistics=statistics_parameters(values);validate(statistics,true);
-  (void)top_labels(source,maximum,statistics,true);throw std::logic_error("Unreachable eager Polars top-k");
+  return filter_polars_variants_top_k(source,maximum,statistics_parameters(values));
 }
 EventTable filter_polars_variants_top_k_parameter_value(const EventTable& s,const EventAttribute& v,const EventAttribute& p){return filter_polars_variants_top_k_parameters(s,v,parameters(p));}
 EventTable filter_polars_variants_top_k(const EventTable&,std::nullopt_t,const PolarsVariantsFilterOptions&){missing_argument("filter_variants_top_k","k");}

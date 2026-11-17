@@ -29905,3 +29905,110 @@ Tests:
   tests when the container's worker restarted, the other 393 ran after).
   Python script tests not rerun (scripts unchanged); no workbench fixture
   changed (the fixture replay was not rerun).
+
+## Review DL1: re-review of round DK, the eager LTL calls DK carried, the other Polars table filters on eager DataFrames, fresh seeds (2026-11-17)
+
+Round DL checked DK's CI (run 44024654681 on 4358d93: green on all six
+jobs), modelled the 326 eager LTL calls DK left (le2's 325 carried and le1's
+one refused), took the eager area on to every other Polars table filter and
+replayed two batches of fresh seeds. The device check on the Mac was skipped
+(the Mac was offline).
+
+- **DL1-1 The eager LTL calls DK left** (probe `dk/le2.py`, dump
+  `dk/le2-carried.jsonl`; `dk/le1.py` case 5; new probes `dl/f1.py` to
+  `dl/f4.py`). Observed and modelled (`polars_ltl_filter.cpp`):
+  - each activity's filter runs as soon as it is built, before the next
+    activity's literal, the [case, resource] step and the joins: a missing
+    attribute column fails the first one, a list or mismatched literal
+    (`cannot compare string with numeric type`, list casts) the one it
+    belongs to (`eager_filter`);
+  - a key that is no str (None, a number, a list or tuple) is a literal
+    named `literal` in the [case, resource] step, so two of them, or one
+    beside a frame's own `literal` column named by the other, fail as
+    duplicate output names (`eager_key_step`);
+  - four_eyes' first pair join runs as it is built, before the third
+    activity's literal: a list or tuple case key joins on its str items over
+    the [literal, resource] selects, so the first item naming neither fails
+    there (the le1 call: a None item beside present names), and the
+    resource suffix TypeErrors come after it (`eager_pair_join`);
+  - the sort builds a dict case key as a struct literal before the dict is
+    refused; eventually_follows without activities never reads the
+    attribute key.
+  le2 325 -> 0, le1 1 -> 0; the DK eager LTL bank now holds all 4,800 calls.
+- **DL1-2 The other Polars table filters on eager DataFrames** (new; the
+  bank driver now calls the `EventTable` overload of every module for a
+  case marked `"eager"`; domain `dl/dom/_probe_eager_table_domain.py` over
+  the base, CK, CN, CJ, CH and CI table domains, probes `dl/e1` to `dl/e7`,
+  seeds 777-783, 22,259 calls). First replay of e1 (CK): 282 differing; the
+  other six probes, replayed after e1's fixes, left a few calls each.
+  Observed and modelled:
+  - each pm4py statement runs as it is called, on the whole frame, so an
+    earlier step's error comes before a later step builds its literals, and
+    no predicate is pushed down across filter calls: a predicate keeps
+    pm4py's written order (the attribute before the timestamp window, the
+    path test before its bounds, `((path & min) & max)`), and a None bound
+    stays in place as a null column (`null.repeat`). Within one filter call
+    the bounds still simplify as one lazy node does (equal str or list
+    bounds merge to `==`, an empty interval empties the frame; a dyn int
+    bound is not merged) (probes `dl/n1-n3`, `dl/p3`, `dl/t1`, `dl/c4`);
+  - attributes: the stream filters build their literal and read the stream
+    key after the filters below them ran, the trace filter reads its case
+    key after its filters ran, and an empty key list's counts fail at their
+    `.collect()` first (probes `dl/e3`, `dl/e6`, `dl/e7`);
+  - cases: `filter_on_ncases` calls `DataFrame.head(n)` on the sorted case
+    counts after the group_by resolved: Python compares n with 0 first (any
+    non-number fails it, None too), a negative n keeps all but the last -n
+    rows, a float that stays positive fails the integer conversion, an n
+    past the UInt64 range fails it (`eager_head`, probe `dl/c2`); the case
+    size runs each bound as its own filter call, after the group_by and the
+    duration's with_columns (probes `dl/c1`, `dl/c3`);
+  - between and paths: the first statement sorts by the case key and the
+    timestamp key: Python builds a non-str key as a literal (a set refused,
+    a list strictly, a dict as a struct, an int past the Int128 range
+    refused, None no key), the sort resolves a str case key, then the
+    timestamp key, and a literal key fails `ShapeError: sort expressions
+    must have same length as DataFrame` unless the frame has one row
+    (`eager_sort`, probes `dl/b1`, `dl/p2`); an empty negative path list
+    returns the sorted frame;
+  - timestamp: the attribute filter of `filter_traces_attribute_in_timeframe`
+    runs before the case key is selected from its rows, so its comparisons
+    fail first, and a dict or None case key fails at the join after it;
+  - variants: the sort by [case key, timestamp] runs before group_by refuses
+    a dict case key (the dict a struct literal there; the statistics'
+    timestamp key for `filter_variants_top_k`), and the admitted variants
+    are built after the sort and group_by (probe `dl/v1`);
+  - diagnostics: a failing eager step shows no resolved plan; a group_by
+    runs through its own lazy plan over its eager input frame, so a failure
+    whose context stack starts at that group_by keeps the frame as its plan
+    (`polars_eager_diagnostic.hpp`).
+  All seven probes 0 differing. One `attributes.apply` call of e7 (two
+  cases with the same resource, a Float32 case column) varies in the
+  reference itself: 14 reruns gave both row orders (equal-size join), so
+  it is marked unordered.
+- **DL1-3 Fresh seeds.** Batch 1 (2026120500-11, twelve banks) and batch 2
+  (2026120512-23, twelve banks): 0 differing.
+- All 46 docs Polars table banks replayed with the changed code: 0
+  mismatches.
+
+Declared:
+- The e7 `attributes.apply` row order of DL1-2 (equal-size join in the
+  reference).
+
+Tests:
+- New: `docs/polars-filter-dl-eager-bank.json.gz` (probes e1-e7, 22,259
+  calls in eager cases), replayed by
+  `minera_polars_filter_dl_eager_bank_parity_tests`;
+  `docs/polars-filter-dk-eager-ltl-bank.json.gz` now holds DK's 326 left
+  calls too (4,800 calls).
+- Four older tests held a LazyFrame's message while calling the eager
+  overload (`test_review_bx1.cpp` and `test_review_ca1.cpp`: the timestamp
+  attribute filter's pushed-down bounds and a join plan;
+  `test_polars_timestamp_filter.cpp`, also built into the timestamp
+  workbench test: a resolved plan for a missing timestamp key). The
+  reference gives those messages only on a LazyFrame (an eager frame keeps
+  the written bounds and shows no plan), so the checks now call the lazy
+  overload; bx1 gained one eager check.
+- Full suite: 590 tests passed (586 in the full run, the four above after
+  the fix). Python script tests not rerun (scripts unchanged); the
+  workbench fixture replay gave 2,673 responses unchanged (the eager
+  overloads serve the workbench's DataFrame inputs).
