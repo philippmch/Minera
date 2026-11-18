@@ -31374,3 +31374,132 @@ Tests:
 - Full suite: 614 of 614 tests passed on the first run. The workbench
   fixture replay gave 2,673 responses unchanged. Python script and
   frontend tests not rerun (scripts and frontend unchanged).
+
+## Review DX1: re-review of round DW, list case keys in the pandas sequence filters (groupby, set_index, df[key]), the Index repr of a KeyError, dict keys that are no str in Polars list literals, fresh seeds (2026-11-18)
+
+Round DX checked DW's CI (run 44249031454 on 2d155f3d: green on all six
+jobs, Windows included), took DW's found item (list case keys in the pandas
+sequence filters) and replayed a batch of fresh seeds. The device check on
+the Mac was skipped (the Mac was not linked).
+
+Native answered every list case key of the pandas sequence filters with
+`KeyError: ''`. pm4py hands the key to pandas as the table filters do
+(DW1-1 to DW1-3), and the sequence filters now read it with the same shared
+model (`src/backend/pandas_list_key.hpp`; probes `dx/pp/mk_s1.py` and
+`mk_s2.py`, observed black-box on pandas 3 in the reference venv):
+
+- **DX1-1 Start and end activities, starts/ends with, traces, rework.**
+  `groupby(key)` builds the groupers of DW1-2: one listed column groups as
+  the column, several by all of them, an array as long as the frame by its
+  values, a dict over the index labels, None or a set as a callable; an
+  empty key is `No group keys passed!`; a key of labels shorter than the
+  frame fails on its first unknown label (`KeyError: 'x'`). The trace and
+  variant filters then keep rows by `set_index(key)`: list items are arrays
+  (`Length mismatch: Expected N rows, received array of length M`), other
+  items labels (`None of [...] are in the columns`), several items with
+  list values do not hash, and one 2-D list item keeps its lists, so no row
+  of it matches a tuple group (a negative filter keeps every row). A
+  float16 column refuses the aggregation as before.
+- **DX1-2 Prefixes and suffixes.** The positions per case are built per
+  group, then `reset_index` names the levels (the column name, else
+  `level_i`, or `index`): a name the frame already has fails `cannot insert
+  X, already exists`, any other key `unhashable type: 'list'`.
+- **DX1-3 The timestamp grouping.** The whole case key is one item of
+  `groupby([key, timestamp])`: the levels come back first (a column under
+  its name, any other as `level_i`), then the columns no level names, each
+  level typed as its distinct values infer; a level with no value is
+  numpy's float64 when it is an empty array or one of float NaNs only, and
+  int64 (empty frame) or object otherwise.
+- **DX1-4 The activity split.** `df[key]` (DW1-1), then the cases of the
+  key's frame walked flattened row by row as in DW1-4 (`index R is out of
+  bounds for axis 0 with size N`, then `Columns must be same length as
+  key`; one listed column of a one-row frame splits as the column); a NaT
+  of a datetime column stays a NaT in the object array.
+- **DX1-5 The consecutive grouping.** `df[key]`, then a duplicate listed
+  column fails `cannot reindex on an axis with duplicate labels`.
+- **DX1-6 The KeyError's Index.** `None of [Index(...)] are in the
+  [columns]` prints the Index as pandas does: one line when it fits 80
+  columns, else wrapped after `Index([` with the items right-justified to
+  one width (not str items), more than 100 items cut to ten at each end
+  around `...` with `, length=N` (modeled and fuzzed against pandas: 12,000
+  random Indexes, `dx/ir/`). This holds for every `df[list]` of DW1-1 too.
+- **DX1-7 The plain-key rule** (DW1-2, shared with the table filters): a
+  set item does not break a key of labels as long as the frame; looked up
+  as a label it fails `unhashable type: 'set'`. Every earlier pandas bank
+  replays unchanged.
+- **DX1-8 Polars list literals with dict keys that are no str.** A list
+  case key inside another list (`sort([key, "time:timestamp"])` of the
+  variant filters, `group_by([key, timestamp])`) is a list literal, and
+  Polars converts every value of a list before it builds any type: a dict
+  key that is no str (each entry's key, then its value, depth first; a
+  set's items are not read) fails the whole list (`'int' object is not an
+  instance of 'str'`, `'None' is not an instance of 'str'`). Native built a
+  struct with an empty field name, so the String Series failed later or
+  the dict was taken as a scalar literal. Probe `dx/pp/mk_p1.py` (48 keys
+  on each case's own calls, Polars sequence CK seed 2026121781): 132 of
+  3,295 calls differed, now 0.
+- **DX1-9 Fresh seeds.** Batch 2026121700-11 (twelve banks): the pandas
+  CK, CN and sequence banks and eight of the nine Polars banks replay
+  clean. One Polars call differs: `attributes.apply` on two cases, an inner join
+  without `maintain_order`, whose row order varies between runs (24 direct
+  reruns: 9 and 15; the capture's six runs agreed by chance).
+
+- **DX1-10 List cells in the Polars filter bank replay.** The capture
+  encodes a List column (the `literal` column a list case key adds) as
+  list cells of scalar items since the sequence domains learned it; the
+  table filter bank test still refused every native list cell as
+  unrepresentable. It now checks cells as the capture encodes them: the
+  other columns first, cell by cell, then the List columns row by row,
+  refusing an item that is itself a container. Probe `dx/pp/mk_p2.py` (48
+  keys on each case's own calls, Polars table CK seed 2026121782): of
+  15,462 calls 996 differed, 791 of them only by this refusal.
+
+Probes: `s1` (DW's probe, 30 keys, sequence CK seed 2026121610) 6,029 of
+7,230 calls differed, now 70, all declared below; `s2` (48 keys, seed
+2026121801, 63 cases) and `s3` (seed 2026121777, 16 cases) 80 of 5,472
+and 8 of 1,488, all declared.
+
+Found, not taken (next round):
+- List case keys in the Polars table filters (probe p2, 205 of 15,462
+  calls): the LTL filters answer list items with their "outside the
+  observed domain" error where Polars fails on duplicate `literal` output
+  names, joins on repeated keys, sort lengths or comparisons; the
+  attribute filters' selector refuses several listed columns
+  (`attributes.apply`, `apply_numeric`, the relative occurrence filter);
+  dict and set items in the attribute and timestamp filters fail as
+  literals in pm4py before the comparison native reports; a few
+  timestamp and case performance calls.
+
+Declared:
+- The consecutive grouping with a list case key whose listed columns are
+  distinct: pm4py adds `df[key] + df[activity]`, a DataFrame plus a Series
+  that aligns the Series' row labels with the frame's columns; the errors
+  that follow depend on each pair of dtypes (`ufunc 'add' did not contain a
+  loop`, `Concatenation operation is not implemented for NumPy arrays`,
+  `cannot add DatetimeArray and DatetimeArray`, ...). Native raises
+  `NotImplementedError` (158 calls of s1 to s3; pm4py raises in all of
+  them).
+- Still declared from earlier rounds: the row mask, dict and list stake
+  keys of DW1, the equal-size join order of the Polars sequence filters
+  and the Polars inner join order (DX1-9), the keep-once relative
+  occurrence count with a dict case key naming several columns (DQ1-5),
+  the nanosecond window at pandas' int64 range ends (DQ1-2), dateutil-only
+  date strings (DP1-4, DQ1-4), the eager paths performance race (DO1-2),
+  the thread-count quirk of DN1-6, the struct cast race and the CSV
+  timestamp texts outside the ISO family (DV1-2).
+
+Tests:
+- New: `minera_review_dx1_tests` (list keys in the start activities,
+  trace, prefix, timestamp grouping, activity split and consecutive
+  filters, the Index repr, the Polars dict keys, checked against pm4py),
+  `docs/pandas-sequence-filter-dx-bank.json.gz` (13,986 calls of s1 to s3
+  without the declared ones) with
+  `minera_pandas_sequence_filter_dx_bank_parity_tests`, and
+  `docs/polars-sequence-filter-dx-bank.json.gz` (probe p1, 3,456 calls)
+  with `minera_polars_sequence_filter_dx_bank_parity_tests`; every earlier
+  pandas filter and sequence bank replays unchanged.
+- Full suite: 617 of 617 tests passed on the first run; after the bank
+  test's list-cell change (DX1-10) the 52 Polars filter bank tests passed
+  again. The workbench fixture replay gave 2,673 responses unchanged.
+  Python script and frontend tests not rerun (scripts and frontend
+  unchanged).

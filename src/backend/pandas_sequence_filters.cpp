@@ -20,6 +20,7 @@
 #include "minera/timestamp.hpp"
 #include "python_scalar.hpp"
 #include "numpy_object_sort.hpp"
+#include "pandas_list_key.hpp"
 #include "pandas_numpy_view.hpp"
 #include "pandas_range_index.hpp"
 #include "zone_database.hpp"
@@ -927,6 +928,260 @@ EventTable keep_cases(const EventTable& df, std::size_t case_column, const std::
   return subset(df, keep);
 }
 
+// ------------------------------------------------------------------ list case keys
+
+// Round DX (probe dw/s1, observed black-box): pm4py hands a list case key to
+// pandas as it is. groupby(key) builds one grouper per item (the shared
+// model of pandas_list_key.hpp: column labels, arrays as long as the frame,
+// dicts mapping the index labels, None and sets called on them) and
+// factorizes them when it aggregates; set_index(key) takes list items as
+// arrays and other items as column labels. A row belongs to the group of
+// its grouper values (a row with a missing one is in no group); the filters
+// then keep rows as for a column key, through a synthetic key column.
+
+// A key as the shared model reads it.
+EventAttribute key_attribute(const Value& v) {
+  EventAttribute out{"", ""};
+  switch (v.kind) {
+    case Kind::kNone: out.is_null = true; break;
+    case Kind::kBool:
+      out.kind = AttributeKind::kBoolean;
+      out.value = v.boolean ? "True" : "False";
+      out.typed_value = v.boolean;
+      break;
+    case Kind::kInt:
+      out.kind = AttributeKind::kInt;
+      out.value = std::to_string(v.integer);
+      out.typed_value = v.integer;
+      break;
+    case Kind::kFloat:
+      out.kind = AttributeKind::kFloat;
+      out.value = std::isnan(v.real) ? "NaN" : python::float_repr(v.real);
+      out.typed_value = v.real;
+      break;
+    case Kind::kString: out.value = v.text; break;
+    case Kind::kList:
+    case Kind::kTuple:
+    case Kind::kSet:
+      out.container = v.kind == Kind::kList    ? AttributeContainerKind::kList
+                      : v.kind == Kind::kTuple ? AttributeContainerKind::kTuple
+                                               : AttributeContainerKind::kSet;
+      for (const auto& item : v.items) out.children.push_back(key_attribute(item));
+      break;
+    case Kind::kDict:
+      out.container = AttributeContainerKind::kContainer;
+      for (const auto& [k, x] : v.entries) {
+        auto child = key_attribute(x);
+        child.key = pandas_filter_value_str(k);
+        out.children.push_back(std::move(child));
+      }
+      break;
+    case Kind::kDatetime:
+    case Kind::kDate:
+      out.kind = AttributeKind::kDate;
+      out.value = pandas_filter_value_str(v);
+      out.typed_value = NativeDate{out.value};
+      break;
+  }
+  return out;
+}
+
+// Python's repr of a key item.
+std::string attribute_repr(const EventAttribute& v) {
+  if (v.is_null) return "None";
+  const auto join = [&](const char* open, const char* close, bool tuple) {
+    std::string out = open;
+    for (std::size_t i = 0; i < v.children.size(); ++i) out += (i ? ", " : "") + attribute_repr(v.children[i]);
+    if (tuple && v.children.size() == 1) out += ",";
+    return out + close;
+  };
+  switch (v.container) {
+    case AttributeContainerKind::kList: return join("[", "]", false);
+    case AttributeContainerKind::kTuple: return join("(", ")", true);
+    case AttributeContainerKind::kSet:
+    case AttributeContainerKind::kFrozenSet: return v.children.empty() ? "set()" : join("{", "}", false);
+    case AttributeContainerKind::kContainer: {
+      std::string out = "{";
+      for (std::size_t i = 0; i < v.children.size(); ++i)
+        out += (i ? ", " : "") + py_repr(v.children[i].key) + ": " + attribute_repr(v.children[i]);
+      return out + "}";
+    }
+    default: break;
+  }
+  if (const auto* b = std::get_if<bool>(&v.typed_value)) return *b ? "True" : "False";
+  if (const auto* i = std::get_if<std::int64_t>(&v.typed_value)) return std::to_string(*i);
+  if (const auto* d = std::get_if<double>(&v.typed_value)) return std::isnan(*d) ? "nan" : python::float_repr(*d);
+  if (v.kind == AttributeKind::kString) return py_repr(v.value);
+  return v.value;
+}
+
+// The identity of a present grouper value: equal values (1, 1.0, True) one
+// identity, tuples item by item.
+std::string value_identity(const EventAttribute& v) {
+  if (v.container == AttributeContainerKind::kTuple || v.container == AttributeContainerKind::kFrozenSet) {
+    std::string out = "(";
+    for (const auto& child : v.children) out += (child.is_null ? std::string("N") : value_identity(child)) + "\x1e";
+    return out + ")";
+  }
+  const auto key = key_of(v);
+  return std::to_string(key.tag) + key.text;
+}
+
+bool missing_value(const Cell& cell) {
+  if (null_cell(cell)) return true;
+  return cell->container == AttributeContainerKind::kScalar && detail::pandas_list_nan(*cell);
+}
+
+struct ListCaseKey {
+  const Value* source = nullptr;
+  EventAttribute key;
+  std::vector<detail::PandasListGrouper> groupers;
+  std::size_t rows = 0;
+
+  explicit ListCaseKey(const Value& value) : source(&value), key(key_attribute(value)) {}
+
+  static bool applies(const Value& value) { return value.kind == Kind::kList; }
+
+  // groupby(key) over `rows` rows of df; an empty key groups only an empty
+  // frame.
+  void group(const EventTable& df, std::size_t count) {
+    rows = count;
+    if (key.children.empty()) {
+      if (count) fail("ValueError", "No group keys passed!");
+      return;
+    }
+    groupers = detail::pandas_list_groupers(
+        key, count, [&](const EventAttribute& item) -> std::optional<std::size_t> {
+          if (!detail::pandas_list_text(item)) return std::nullopt;
+          return find_column(df, item.value);
+        },
+        attribute_repr, fail);
+  }
+  const Value& item_value(const detail::PandasListGrouper& g) const {
+    return source->items[static_cast<std::size_t>(g.item - key.children.data())];
+  }
+  // The value of grouper g at row `row` (the frame's row `source_row`).
+  Cell value(const EventTable& df, const detail::PandasListGrouper& g, std::size_t row, std::size_t source_row,
+             const std::vector<EventTableIndexLabel>& labels) const {
+    using GK = detail::PandasListGrouper::Kind;
+    if (g.kind == GK::kColumn) return df.rows[source_row][g.column];
+    if (g.kind == GK::kArray) return g.values[row];
+    if (g.kind == GK::kMapping) {
+      const auto* label = std::get_if<EventAttribute>(&labels[source_row].value);
+      if (!label) return std::nullopt;
+      for (const auto& [k, x] : item_value(g).entries) {
+        const auto* lk = scalar_of(k) ? &k : nullptr;
+        if (!lk || null_cell(*label)) continue;
+        if (py_equal(scalar_of(*label), *scalar_of(k))) return key_attribute(x);
+      }
+      return std::nullopt;
+    }
+    return std::nullopt;
+  }
+  // Factorizing the groupers (when the groupby aggregates): deep arrays and
+  // unhashable values fail, grouper by grouper.
+  void factorize(const EventTable& df, const std::vector<std::size_t>& source_rows) const {
+    const auto labels = labels_of(df);
+    for (const auto& g : groupers)
+      detail::pandas_list_factorize(g, source_rows.size(), [&](const detail::PandasListGrouper& grouper, std::size_t i) {
+        const auto cell = value(df, grouper, i, source_rows[i], labels);
+        return cell ? *cell : EventAttribute{"", ""};
+      }, fail);
+  }
+  // Each row's group identity (std::nullopt: a missing grouper value).
+  std::vector<std::optional<std::string>> identities(const EventTable& df, const std::vector<std::size_t>& source_rows) const {
+    const auto labels = labels_of(df);
+    std::vector<std::optional<std::string>> out(source_rows.size());
+    for (std::size_t i = 0; i < source_rows.size(); ++i) {
+      std::string id;
+      bool present = true;
+      for (const auto& g : groupers) {
+        const auto cell = value(df, g, i, source_rows[i], labels);
+        if (missing_value(cell)) { present = false; break; }
+        id += value_identity(*cell) + "\x1f";
+      }
+      if (present) out[i] = std::move(id);
+    }
+    return out;
+  }
+  // The single column a one-item key names.
+  std::optional<std::size_t> single_column() const {
+    if (groupers.size() == 1 && groupers.front().kind == detail::PandasListGrouper::Kind::kColumn) return groupers.front().column;
+    return std::nullopt;
+  }
+};
+
+std::vector<std::size_t> all_rows(const EventTable& df) {
+  std::vector<std::size_t> out(df.size());
+  std::iota(out.begin(), out.end(), std::size_t{0});
+  return out;
+}
+
+// df.set_index(list key): a dict or set item is refused, labels naming no
+// column fail together, then an array must be as long as the frame.
+void list_set_index(const EventTable& df, const Value& key) {
+  if (key.items.empty() && !df.empty())
+    fail("ValueError", "Length mismatch: Expected axis has " + std::to_string(df.size()) + " elements, new values have 0 elements");
+  set_index_key(key);
+  std::vector<std::string> missing;
+  for (const auto& item : key.items) {
+    if (item.kind == Kind::kList) continue;
+    if (item.kind == Kind::kString && find_column(df, item.text)) continue;
+    missing.push_back(attribute_repr(key_attribute(item)));
+  }
+  if (!missing.empty()) {
+    std::string list = "[";
+    for (std::size_t i = 0; i < missing.size(); ++i) list += (i ? ", " : "") + missing[i];
+    key_error("None of " + list + "] are in the columns");
+  }
+  for (const auto& item : key.items)
+    if (item.kind == Kind::kList && item.items.size() != df.size())
+      fail("ValueError", "Length mismatch: Expected " + std::to_string(df.size()) + " rows, received array of length " +
+                             std::to_string(item.items.size()));
+  // Two or more items make a MultiIndex, whose arrays factorize: a list
+  // value does not hash. One array alone is an Index of its values as they
+  // are (lists stay lists).
+  if (key.items.size() > 1)
+    for (const auto& item : key.items)
+      if (item.kind == Kind::kList)
+        for (const auto& value : item.items)
+          if (value.kind == Kind::kList) fail("TypeError", "unhashable type: 'list'");
+}
+
+// The identities set_index(key).index.isin(groups) compares: the group
+// identities, except that a lone array's list values (which groupby read as
+// tuples) are lists in the index and equal no group.
+std::vector<std::optional<std::string>> index_identities(const Value& key, std::vector<std::optional<std::string>> ids) {
+  if (key.items.size() != 1 || key.items.front().kind != Kind::kList) return ids;
+  const auto& values = key.items.front().items;
+  for (std::size_t i = 0; i < ids.size() && i < values.size(); ++i)
+    if (values[i].kind == Kind::kList) ids[i] = "\x02" + std::to_string(i);
+  return ids;
+}
+
+// The frame with one more (last) column holding each row's group identity.
+const std::string kListCaseColumn = "\x01minera:list-case-key";
+EventTable with_case_column(const EventTable& df, const std::vector<std::optional<std::string>>& ids) {
+  EventTable out = df;
+  out.columns.push_back(kListCaseColumn);
+  if (!out.dtypes.empty()) out.dtypes.push_back("object");
+  if (!out.categorical_dtypes.empty()) out.categorical_dtypes.emplace_back();
+  for (std::size_t i = 0; i < out.rows.size(); ++i) {
+    auto cell = string_cell(kListCaseColumn, ids[i].value_or(std::string()));
+    cell.is_null = !ids[i];
+    out.rows[i].push_back(std::move(cell));
+  }
+  return out;
+}
+EventTable without_case_column(EventTable df) {
+  if (df.columns.empty() || df.columns.back() != kListCaseColumn) return df;
+  df.columns.pop_back();
+  if (!df.dtypes.empty()) df.dtypes.pop_back();
+  if (!df.categorical_dtypes.empty()) df.categorical_dtypes.pop_back();
+  for (auto& row : df.rows) row.pop_back();
+  return df;
+}
+
 // Case ids in first-appearance order with their row positions.
 struct Cases {
   std::vector<Key> order;
@@ -1222,32 +1477,59 @@ EventTable boundary_filter(const EventTable& df, const Value& raw_values, const 
   // dict activity key does not hash as the groupby selection; scalar values
   // fail isin; a dict's keys are the values; a categorical isin hashes the
   // values; set_index then refuses a dict case key.
+  const auto isin_values = [&](std::size_t act) {
+    if (raw_values.kind != Kind::kList && raw_values.kind != Kind::kTuple && raw_values.kind != Kind::kDict &&
+        raw_values.kind != Kind::kSet)
+      fail("TypeError", "only list-like objects are allowed to be passed to isin(), you passed a `" +
+                            short_type_name(raw_values) + "`");
+    // Round DA: isin lists a set in its iteration order.
+    Value values = raw_values.kind == Kind::kSet ? Value::list(raw_values.items) : raw_values;
+    if (raw_values.kind == Kind::kDict) {
+      values = Value::list({});
+      for (const auto& entry : raw_values.entries) values.items.push_back(entry.first);
+    }
+    const auto dtype = column_dtype(df, act);
+    if (dtype == "category")
+      for (const auto& item : values.items)
+        if (const auto type = unhashable_type(item)) fail("TypeError", "unhashable type: '" + *type + "'");
+    if ((dtype == "str" || dtype == "string") && raw_values.kind != Kind::kDict) check_string_isin(values.items);
+    return values;
+  };
+  const auto kept_cases = [&](const EventTable& table, std::size_t case_column, std::size_t act, const Value& values) {
+    const auto dtype = column_dtype(table, act);
+    const auto cases = cases_of(table, case_column);
+    const auto boundary = boundary_activities(table, cases, act, end);
+    std::set<Key> kept;
+    const bool converts = datetime_list_converts(values, dtype);
+    for (const auto& [key, a] : boundary)
+      if (boundary_isin(a, values, dtype, converts)) kept.insert(key);
+    return kept;
+  };
+  // Round DX: a list case key groups by its items' groupers.
+  if (ListCaseKey::applies(case_glue)) {
+    ListCaseKey list(case_glue);
+    list.group(df, df.size());
+    const auto act = selection_key(df, act_key);
+    const auto rows = all_rows(df);
+    list.factorize(df, rows);
+    for (const auto& g : list.groupers)
+      if (g.kind == detail::PandasListGrouper::Kind::kColumn) reject_float16_aggregation(df, g.column, !end, inferred_dtype(df, act));
+    const auto values = isin_values(act);
+    list_set_index(df, case_glue);
+    const auto ids = list.identities(df, rows);
+    const auto keyed = with_case_column(df, ids);
+    const auto column = keyed.columns.size() - 1;
+    const auto kept = kept_cases(keyed, column, act, values);
+    if (const auto single = list.single_column()) require_case_index(df, *single);
+    return without_case_column(keep_cases(with_case_column(df, index_identities(case_glue, ids)), column, kept, truthy(positive)));
+  }
   const auto case_column = groupby_key(df, case_glue);
   const auto act = selection_key(df, act_key);
   if (case_column) reject_float16_aggregation(df, *case_column, !end, inferred_dtype(df, act));
-  if (raw_values.kind != Kind::kList && raw_values.kind != Kind::kTuple && raw_values.kind != Kind::kDict &&
-      raw_values.kind != Kind::kSet)
-    fail("TypeError", "only list-like objects are allowed to be passed to isin(), you passed a `" +
-                          short_type_name(raw_values) + "`");
-  // Round DA: isin lists a set in its iteration order.
-  Value values = raw_values.kind == Kind::kSet ? Value::list(raw_values.items) : raw_values;
-  if (raw_values.kind == Kind::kDict) {
-    values = Value::list({});
-    for (const auto& entry : raw_values.entries) values.items.push_back(entry.first);
-  }
-  const auto dtype = column_dtype(df, act);
-  if (dtype == "category")
-    for (const auto& item : values.items)
-      if (const auto type = unhashable_type(item)) fail("TypeError", "unhashable type: '" + *type + "'");
-  if ((dtype == "str" || dtype == "string") && raw_values.kind != Kind::kDict) check_string_isin(values.items);
+  const auto values = isin_values(act);
   set_index_key(case_glue);
   if (!case_column) return subset(df, std::vector<bool>(df.size(), !truthy(positive)));
-  const auto cases = cases_of(df, *case_column);
-  const auto boundary = boundary_activities(df, cases, act, end);
-  std::set<Key> kept;
-  const bool converts = datetime_list_converts(values, dtype);
-  for (const auto& [key, a] : boundary)
-    if (boundary_isin(a, values, dtype, converts)) kept.insert(key);
+  const auto kept = kept_cases(df, *case_column, act, values);
   require_case_index(df, *case_column);
   return keep_cases(df, *case_column, kept, truthy(positive));
 }
@@ -1616,17 +1898,40 @@ EventTable variant_filter(const EventTable& df, const Value& admitted, const Pan
                           VariantMode mode) {
   // Round CL: a dict case key groups nothing (no case keeps a row unless
   // negative); a dict activity key does not hash as the groupby selection.
-  const auto grouped = groupby_key(
-      df, literal_first_key(parameters, "CASE_ID_KEY", kPandasFilterCaseIdKeyParameter, kPandasFilterCaseConceptName));
-  const auto act = selection_key(
-      df, literal_first_key(parameters, "ACTIVITY_KEY", kPandasFilterActivityKeyParameter, kPandasFilterDefaultNameKey));
+  const auto case_value =
+      literal_first_key(parameters, "CASE_ID_KEY", kPandasFilterCaseIdKeyParameter, kPandasFilterCaseConceptName);
+  const auto act_value =
+      literal_first_key(parameters, "ACTIVITY_KEY", kPandasFilterActivityKeyParameter, kPandasFilterDefaultNameKey);
   const bool positive = truthy(parameter_or(parameters, "POSITIVE", "positive", Value::of(true)));
+  // Round DX: a list case key groups by its items' groupers (through a
+  // synthetic key column, dropped again from the result).
+  std::optional<ListCaseKey> list;
+  EventTable keyed;
+  if (ListCaseKey::applies(case_value)) {
+    list.emplace(case_value);
+    list->group(df, df.size());
+  }
+  const auto grouped = list ? std::optional<std::size_t>(df.columns.size()) : groupby_key(df, case_value);
+  const auto act = selection_key(df, act_value);
+  std::vector<std::optional<std::string>> ids;
+  if (list) {
+    const auto rows = all_rows(df);
+    list->factorize(df, rows);
+    for (const auto& g : list->groupers)
+      if (g.kind == detail::PandasListGrouper::Kind::kColumn) reject_float16_groupby(df, g.column);
+    ids = list->identities(df, rows);
+    keyed = with_case_column(df, ids);
+    // No group at all: nothing is selected or indexed.
+    if (std::none_of(ids.begin(), ids.end(), [](const auto& id) { return id.has_value(); }))
+      return subset(df, std::vector<bool>(df.size(), !positive));
+  }
+  const auto& table = list ? keyed : df;
   if (!grouped) return subset(df, std::vector<bool>(df.size(), !positive));
   const auto case_column = *grouped;
-  reject_float16_groupby(df, case_column);
+  if (!list) reject_float16_groupby(df, case_column);
   // The case variants are joined before the admitted patterns, which are
   // not read at all without a case.
-  const auto case_variants = variants(df, case_column, act);
+  const auto case_variants = variants(table, case_column, act);
   std::vector<std::string> patterns;
   if (!case_variants.empty())
     for (const auto& item : admitted.items) patterns.push_back(join_pattern(item, mode));
@@ -1642,6 +1947,11 @@ EventTable variant_filter(const EventTable& df, const Value& admitted, const Pan
       if (ok) break;
     }
     if (ok) kept.insert(key);
+  }
+  if (list) {
+    list_set_index(df, case_value);
+    if (const auto single = list->single_column()) require_case_index(df, *single);
+    return without_case_column(keep_cases(with_case_column(df, index_identities(case_value, ids)), case_column, kept, positive));
   }
   require_case_index(df, case_column);
   return keep_cases(df, case_column, kept, positive);
@@ -1692,12 +2002,45 @@ EventTable position_filter(const EventTable& df, const Value& activity, const Pa
   // the index labels), df[act], df[act] == activity (a list, tuple or dict
   // activity can fail there), the first/last choice, then a dict case key
   // fails to hash.
+  const bool first = first_or_last.kind == Kind::kString && first_or_last.text == "first";
+  const bool last = first_or_last.kind == Kind::kString && first_or_last.text == "last";
+  // Round DX: a list case key. The positions come from a groupby over the
+  // frame (cumcount), the occurrences from a groupby over the matching rows
+  // (an array must then be as long as they are); reset_index inserts the
+  // levels again (a column named twice already exists), and selecting
+  // [key, index] does not hash the list.
+  if (ListCaseKey::applies(case_value)) {
+    ListCaseKey whole(case_value);
+    whole.group(df, df.size());
+    whole.factorize(df, all_rows(df));
+    const auto act = getitem_key(df, activity_key(parameters));
+    const auto matching = series_equals(df, act, activity);
+    const auto filtered = subset(df, matching);
+    ListCaseKey occurrences(case_value);
+    occurrences.group(filtered, filtered.size());
+    if (!first && !last) fail("AttributeError", "'DataFrameGroupBy' object has no attribute 'reset_index'");
+    occurrences.factorize(filtered, all_rows(filtered));
+    std::set<std::string> columns{"@@index_in_trace"};
+    std::set<std::size_t> grouping;
+    for (const auto& g : occurrences.groupers)
+      if (g.kind == detail::PandasListGrouper::Kind::kColumn) grouping.insert(g.column);
+    for (std::size_t c = 0; c < df.columns.size(); ++c)
+      if (!grouping.count(c)) columns.insert(df.columns[c]);
+    const auto levels = occurrences.groupers.size();
+    for (std::size_t l = levels; l-- > 0;) {
+      const auto& g = occurrences.groupers[l];
+      const auto name = g.kind == detail::PandasListGrouper::Kind::kColumn ? df.columns[g.column]
+                        : levels > 1                                      ? "level_" + std::to_string(l)
+                        : columns.count("index")                          ? std::string("level_0")
+                                                                          : std::string("index");
+      if (!columns.insert(name).second) fail("ValueError", "cannot insert " + name + ", already exists");
+    }
+    fail("TypeError", "unhashable type: 'list'");
+  }
   const auto grouped = groupby_key(df, case_value);
   const auto act = getitem_key(df, activity_key(parameters));
   const auto matching = series_equals(df, act, activity);
   if (grouped) require_sorted_groupby(df, *grouped);
-  const bool first = first_or_last.kind == Kind::kString && first_or_last.text == "first";
-  const bool last = first_or_last.kind == Kind::kString && first_or_last.text == "last";
   if (!first && !last) fail("AttributeError", "'DataFrameGroupBy' object has no attribute 'reset_index'");
   if (!grouped) hash_key(case_value);
   const auto case_column = *grouped;
@@ -2214,6 +2557,24 @@ std::optional<bool> datetime_run_key(const EventTable& df, std::size_t left, std
 }
 
 EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
+  // Round DX (probe dw/s1): a list case key is read as df[key]
+  // (pandas_list_key.hpp), then the activity column. The run key then adds
+  // that frame and the activity series, aligned on the frame's columns,
+  // which a column named twice refuses to reindex. The addition itself (its
+  // column alignment and per-block NumPy and extension-array operations) is
+  // outside the captured native domain (declared, Review DX1).
+  if (ListCaseKey::applies(case_key(parameters))) {
+    const auto listed = case_key(parameters).items.empty()
+                            ? std::vector<std::size_t>{}
+                            : detail::pandas_getitem_list(df.columns, key_attribute(case_key(parameters)), df.size(),
+                                                          attribute_repr, [](const std::string& m) { return py_repr(m); }, fail);
+    (void)getitem_key(df, activity_key(parameters));
+    std::set<std::size_t> seen;
+    for (const auto c : listed)
+      if (!seen.insert(c).second) fail("ValueError", "cannot reindex on an axis with duplicate labels");
+    fail("NotImplementedError",
+         "adding a list case key's frame and the activity column is outside the captured native domain");
+  }
   // Round CL: df[case] then df[act] (a dict key is refused as an indexer).
   const auto case_column = getitem_key(df, case_key(parameters));
   const auto act = getitem_key(df, activity_key(parameters));
@@ -2356,6 +2717,93 @@ std::string inferred_key_dtype(const std::vector<Cell>& unique_cases) {
   return dtype;
 }
 
+// Round DX: groupby(key, sort=False).first() (or last()).reset_index() for
+// a list `key` of groupers (see pandas_timestamp_case_grouping_apply).
+EventTable list_timestamp_grouping(const EventTable& df, const Value& key, bool first, bool last) {
+  ListCaseKey list(key);
+  list.group(df, df.size());
+  if (!first && !last) fail("AttributeError", "'NoneType' object has no attribute 'reset_index'");
+  const auto rows = all_rows(df);
+  list.factorize(df, rows);
+  using GK = detail::PandasListGrouper::Kind;
+  std::set<std::size_t> grouping;
+  for (const auto& g : list.groupers)
+    if (g.kind == GK::kColumn) grouping.insert(g.column);
+  std::vector<std::size_t> others;
+  for (std::size_t c = 0; c < df.columns.size(); ++c)
+    if (!grouping.count(c)) others.push_back(c);
+  for (const auto& g : list.groupers)
+    if (g.kind == GK::kColumn) {
+      for (const auto c : others) reject_float16_aggregation(df, g.column, first, column_dtype(df, c));
+      reject_float16_groupby(df, g.column);
+    }
+  const auto ids = list.identities(df, rows);
+  std::vector<std::vector<std::size_t>> groups;
+  std::map<std::string, std::size_t> group_of;
+  for (std::size_t i = 0; i < df.size(); ++i) {
+    if (!ids[i]) continue;
+    const auto [it, added] = group_of.emplace(*ids[i], groups.size());
+    if (added) groups.emplace_back();
+    groups[it->second].push_back(i);
+  }
+  auto out = merge_groups(df, groups, first, others);
+  const auto labels = labels_of(df);
+  // Each level: its values (the first-seen member of each equal-value class
+  // over all rows) and the dtype their distinct values infer.
+  for (std::size_t l = list.groupers.size(); l-- > 0;) {
+    const auto& g = list.groupers[l];
+    const auto name = g.kind == GK::kColumn ? df.columns[g.column] : "level_" + std::to_string(l);
+    std::map<std::string, Cell> representative;
+    std::vector<Cell> unique;
+    for (std::size_t i = 0; i < df.size(); ++i) {
+      auto cell = list.value(df, g, i, i, labels);
+      if (missing_value(cell)) continue;
+      cell->key = name;
+      if (representative.emplace(value_identity(*cell), cell).second) unique.push_back(cell);
+    }
+    std::string dtype = g.kind == GK::kColumn ? column_dtype(df, g.column) : std::string("object");
+    // A level with no value: an empty array (or one of float NaNs only) is
+    // numpy's float64; a mapping or callable maps no label (int64 on an
+    // empty frame, else object).
+    if (dtype == "object" && unique.empty()) {
+      const bool float_array = g.kind == GK::kArray && std::all_of(g.values.begin(), g.values.end(), [](const auto& v) {
+                                 return v.container == AttributeContainerKind::kScalar && detail::pandas_list_nan(v);
+                               });
+      dtype = float_array ? "float64" : df.empty() ? "int64" : "object";
+    } else if (dtype == "object") {
+      dtype = inferred_key_dtype(unique);
+    }
+    std::vector<Cell> cells;
+    for (const auto& members : groups) {
+      auto cell = list.value(df, g, members.front(), members.front(), labels);
+      cell = representative.at(value_identity(*cell));
+      const auto n = scalar_number(*cell);
+      if (dtype == "float64") cell = float_cell(name, n.real);
+      else if (dtype == "int64" && n.kind == ScalarNumber::kInteger) cell = int_cell(name, n.integer);
+      else if (dtype == "uint64" && n.kind == ScalarNumber::kInteger) {
+        auto u = make_cell(name, std::to_string(n.unsigned_integer), AttributeKind::kInt);
+        u.typed_value = n.unsigned_integer;
+        cell = std::move(u);
+      }
+      cells.push_back(std::move(cell));
+    }
+    out.columns.insert(out.columns.begin(), name);
+    if (!df.dtypes.empty()) out.dtypes.insert(out.dtypes.begin(), dtype);
+    if (!out.categorical_dtypes.empty() || (g.kind == GK::kColumn && g.column < df.categorical_dtypes.size() &&
+                                            df.categorical_dtypes[g.column])) {
+      if (out.categorical_dtypes.empty()) out.categorical_dtypes.resize(out.columns.size() - 1);
+      out.categorical_dtypes.insert(out.categorical_dtypes.begin(),
+                                    g.kind == GK::kColumn && g.column < df.categorical_dtypes.size()
+                                        ? df.categorical_dtypes[g.column]
+                                        : std::nullopt);
+    }
+    for (std::size_t r = 0; r < out.rows.size(); ++r) out.rows[r].insert(out.rows[r].begin(), cells[r]);
+  }
+  if (std::none_of(out.categorical_dtypes.begin(), out.categorical_dtypes.end(), [](const auto& d) { return d.has_value(); }))
+    out.categorical_dtypes.clear();
+  return out;
+}
+
 EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
   const auto case_value = case_key(parameters);
   const auto timestamp_value = key_parameter(parameters, "TIMESTAMP_KEY", "pm4py:param:timestamp_key", "time:timestamp");
@@ -2364,6 +2812,12 @@ EventTable pandas_timestamp_case_grouping_apply(const EventTable& df, const Pand
   const auto filter_type = parameter_or(parameters, "FILTER_TYPE", "filter_type", Value::of("first"));
   const bool first = filter_type.kind == Kind::kString && filter_type.text == "first";
   const bool last = filter_type.kind == Kind::kString && filter_type.text == "last";
+  // Round DX (probe dw/s1): a list key is one item of groupby([case,
+  // timestamp]) (pandas_list_key.hpp: an array as long as the frame). The
+  // levels come back first (a column's under its name, any other as
+  // level_i), then the columns no level names.
+  if (case_value.kind == Kind::kList || timestamp_value.kind == Kind::kList)
+    return list_timestamp_grouping(df, Value::list({case_value, timestamp_value}), first, last);
   // Round CL (observed black-box): groupby([case, timestamp]) with a dict
   // key maps the index labels, so no group forms; a list key is an array
   // grouper that needs one item per row (and then does not hash). The
@@ -2674,11 +3128,51 @@ bool numpy_equals(const NumpyCase& value, const NumericDtype& view, const python
   return own_negative == negative && own_magnitude == magnitude;
 }
 
+namespace {
+EventTable activity_split(const EventTable& df, std::size_t case_column, std::size_t act,
+                          const PandasFilterValue& activity, const PandasFilterParameters& parameters,
+                          std::optional<std::size_t> bound);
+}  // namespace
+
 EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterValue& activity,
                                        const PandasFilterParameters& parameters) {
+  const auto case_value = case_key(parameters);
+  // Round DX (probe dw/s1): a list case key is read as df[key]
+  // (pandas_list_key.hpp), its cases as that frame's array flattened row by
+  // row (N rows times k columns). The walk over them is the one-column walk
+  // and reads past the frame's rows when k > 1 ("index R is out of
+  // bounds"); writing the labels back to the k columns fails unless the
+  // frame holds one row and the key one column, which is the one-column
+  // split.
+  if (ListCaseKey::applies(case_value)) {
+    const auto listed = case_value.items.empty()
+                            ? std::vector<std::size_t>{}
+                            : detail::pandas_getitem_list(df.columns, key_attribute(case_value), df.size(), attribute_repr,
+                                                          [](const std::string& m) { return py_repr(m); }, fail);
+    const auto act = getitem_key(df, activity_key(parameters));
+    // An empty key selects no column: nothing is walked or written.
+    if (listed.empty()) return df;
+    if (listed.size() == 1 && df.size() == 1) return activity_split(df, listed.front(), act, activity, parameters, std::nullopt);
+    std::vector<std::size_t> columns(listed.begin(), listed.end());
+    columns.push_back(act);
+    const auto view = detail::numpy_view_of(df, columns);
+    auto flat = detail::pandas_list_flat_cases(view, listed);
+    flat.columns.push_back(df.columns[act]);
+    if (!flat.dtypes.empty()) flat.dtypes.push_back(view.dtypes[act]);
+    for (std::size_t r = 0; r < flat.rows.size(); ++r) flat.rows[r].push_back(r < df.size() ? view.rows[r][act] : Cell{});
+    (void)activity_split(flat, 0, 1, activity, parameters, df.size());
+    fail("ValueError", "Columns must be same length as key");
+  }
   // Round CL: df[case] then df[act] (a dict key is refused as an indexer).
-  const auto case_column = getitem_key(df, case_key(parameters));
+  const auto case_column = getitem_key(df, case_value);
   const auto act = getitem_key(df, activity_key(parameters));
+  return activity_split(df, case_column, act, activity, parameters, std::nullopt);
+}
+
+namespace {
+EventTable activity_split(const EventTable& df, std::size_t case_column, std::size_t act,
+                          const PandasFilterValue& activity, const PandasFilterParameters& parameters,
+                          std::optional<std::size_t> bound) {
   const auto mode = parameter_or(parameters, "CUT_MODE", "cut_mode", Value::of("this"));
   const auto separator_value = parameter_or(parameters, "SUBCASE_CONCAT_STR", "subcase_concat_str", Value::of("##@@"));
   const auto separator = separator_value.text;
@@ -2803,10 +3297,19 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     std::vector<python::Scalar> cases;
     cases.reserve(df.size());
     for (const auto& row : nv.rows) cases.push_back(scalar_of(row[case_column]));
+    // Round DX: a flattened key frame's object array holds NaT for a
+    // datetime column's gap, which orders against nothing and equals
+    // nothing.
+    std::vector<bool> nat(df.size(), false);
+    if (bound)
+      for (std::size_t i = 0; i < df.size(); ++i) {
+        const auto& cell = nv.rows[i][case_column];
+        nat[i] = cell && cell->is_null && cell->kind == AttributeKind::kDate;
+      }
     std::vector<std::size_t> order;
     try {
       order = detail::numpy_object_stable_argsort(cases.size(), [&](std::size_t a, std::size_t b) {
-        return python::compare(cases[a], cases[b]);
+        return nat[a] || nat[b] ? 0 : python::compare(cases[a], cases[b]);
       });
     } catch (const python::TypeError& error) {
       fail("TypeError", error.what());
@@ -2814,9 +3317,9 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     for (std::size_t start = 0; start < order.size();) {
       std::size_t end = start + 1;
       while (end < order.size() && !(is_nan(cases[order[end]]) || is_nan(cases[order[end - 1]])) &&
-             py_equal(cases[order[end]], cases[order[end - 1]]))
+             !nat[order[end]] && !nat[order[end - 1]] && py_equal(cases[order[end]], cases[order[end - 1]]))
         ++end;
-      runs.push_back({order[start], end - start, python::str(cases[order[start]])});
+      runs.push_back({order[start], end - start, nat[order[start]] ? std::string("NaT") : python::str(cases[order[start]])});
       start = end;
     }
   }
@@ -2908,11 +3411,14 @@ EventTable pandas_activity_split_apply(const EventTable& df, const PandasFilterV
     std::int64_t count = 0;
     for (std::size_t j = run.first; j < run.first + run.size; ++j) {
       const auto before = count;
+      if (bound && j >= *bound)
+        fail("IndexError", "index " + std::to_string(j) + " is out of bounds for axis 0 with size " + std::to_string(*bound));
       if (is_cut(nv.rows[j][act])) ++count;
       out.rows[written++][case_column] = string_cell(name, label + std::to_string(this_row ? count : before));
     }
   }
   return out;
 }
+}  // namespace
 
 }  // namespace minera

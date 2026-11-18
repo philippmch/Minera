@@ -432,13 +432,28 @@ bool int128_cell(const EventAttribute& cell) {
   const auto b = std::from_chars(text.data(), end, u);
   return !(a.ec == std::errc{} && a.ptr == end) && !(b.ec == std::errc{} && b.ptr == end);
 }
+// Round DX: the capture now encodes a List column as list cells of scalar
+// items (polars_sequence_filter_domain.table_json, the `literal` column of a
+// list case key): it encodes the other columns first, cell by cell, then the
+// List columns row by row, refusing an item that is itself a container.
+void check_cell(const EventAttribute& cell) {
+  if (cell.container == AttributeContainerKind::kScalar && int128_cell(cell))
+    throw Unrepresentable("no native cell for 128-bit int");
+  if (cell.container == AttributeContainerKind::kScalar) return;
+  throw Unrepresentable(std::string("no native cell for ") + (cell.container == AttributeContainerKind::kContainer ? "dict" : cell.container == AttributeContainerKind::kTuple ? "tuple" : "list"));
+}
 void check_cells(const EventTable& table) {
+  std::vector<bool> lists(table.columns.size(), false);
+  for (std::size_t c = 0; c < table.columns.size() && c < table.dtypes.size(); ++c)
+    lists[c] = table.dtypes[c].rfind("List(", 0) == 0;
   for (const auto& row : table.rows)
-    for (const auto& cell : row) {
-      if (cell && cell->container == AttributeContainerKind::kScalar && int128_cell(*cell))
-        throw Unrepresentable("no native cell for 128-bit int");
-      if (!cell || cell->container == AttributeContainerKind::kScalar) continue;
-      throw Unrepresentable(std::string("no native cell for ") + (cell->container == AttributeContainerKind::kContainer ? "dict" : cell->container == AttributeContainerKind::kTuple ? "tuple" : "list"));
+    for (std::size_t c = 0; c < row.size(); ++c)
+      if (row[c] && !(c < lists.size() && lists[c])) check_cell(*row[c]);
+  for (const auto& row : table.rows)
+    for (std::size_t c = 0; c < row.size(); ++c) {
+      if (!row[c] || !(c < lists.size() && lists[c]) || row[c]->is_null) continue;
+      if (row[c]->container != AttributeContainerKind::kList) check_cell(*row[c]);
+      for (const auto& item : row[c]->children) check_cell(item);
     }
 }
 

@@ -1056,11 +1056,37 @@ inline Literal from_values_strict(const std::vector<LitValue>& values) {
   }
   return {type, build_strict(type, values)};
 }
+// Round DX (probe dx/pp/mk_p1.py): Polars converts every value of a list
+// before it builds any type, and a dict's keys become struct field names,
+// so the first dict key that is not a str (depth first: each entry's key,
+// then its value; a set's items are not read) fails the whole list.
+inline void check_struct_keys(const Value& v) {
+  if (v.kind == Kind::kDict) {
+    for (const auto& [key, value] : v.entries) {
+      if (key.kind == Kind::kNone) fail("TypeError", "'None' is not an instance of 'str'");
+      if (key.kind != Kind::kString) {
+        const char* type = key.kind == Kind::kBool       ? "bool"
+                           : key.kind == Kind::kInt      ? "int"
+                           : key.kind == Kind::kFloat    ? "float"
+                           : key.kind == Kind::kTuple    ? "tuple"
+                           : key.kind == Kind::kDate     ? "date"
+                           : key.kind == Kind::kDatetime ? "datetime"
+                           : key.kind == Kind::kSet      ? "frozenset"
+                                                         : "object";
+        fail("TypeError", std::string("'") + type + "' object is not an instance of 'str'");
+      }
+      check_struct_keys(value);
+    }
+  } else if (v.kind == Kind::kList || v.kind == Kind::kTuple) {
+    for (const auto& item : v.items) check_struct_keys(item);
+  }
+}
 // A list's items as one Series level builds them (a nested list item's, or
 // the elements of pl.lit's list).
 inline Literal nested_list_literal(const std::vector<Value>& items) {
   using K = LitType::K;
   if (items.empty()) return {};
+  for (const auto& item : items) check_struct_keys(item);
   std::vector<LitValue> values;
   std::size_t next = 0;
   while (next < items.size()) {

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DW (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–DX (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6854,6 +6854,79 @@ bank replays unchanged and the workbench fixture replay gave 2,673
 responses unchanged. Python script and frontend tests not rerun (scripts
 and frontend unchanged). The device check on the Mac was skipped (the Mac
 was not linked).
+
+Round DX re-reviewed DW (Review DX1). DW's CI run 44249031454: green on
+all six jobs.
+DX took DW's found item, list case keys in the pandas sequence filters,
+with the shared model of DW (`src/backend/pandas_list_key.hpp`):
+- start/end activities, starts/ends with, traces, rework: `groupby(key)`
+  groupers (empty key `No group keys passed!`, a short key's first unknown
+  label), then `set_index(key)` in the trace and variant filters (a lone
+  2-D item keeps its lists, so no row matches a tuple group);
+- prefixes and suffixes: `reset_index` name collisions (`cannot insert X,
+  already exists`), else `unhashable type: 'list'`;
+- the timestamp grouping: the whole key is one item of `groupby([key,
+  timestamp])`, levels first, an empty or all-NaN array level float64;
+- the activity split: `df[key]` and between's flattened walk (NaT kept);
+  the consecutive grouping: `df[key]`, duplicate columns refused, the
+  addition `df[key] + df[act]` declared (NotImplementedError);
+- the KeyError's `Index(...)` repr as pandas wraps and truncates it (80
+  columns, right-justified non-str items, `...` and `length=N` past 100
+  items; fuzzed on 12,000 random Indexes);
+- a set item no longer breaks the plain-key rule (unhashable 'set').
+- Polars: a list literal holding a dict whose key is no str fails as
+  Polars converts the list (`'int' object is not an instance of 'str'`),
+  before any type is built (`check_struct_keys` in polars_lit_model.hpp).
+- The Polars filter bank test reads list cells as the capture writes them
+  (other columns first, then List columns of scalar items).
+- Probes s1 6,029 of 7,230 -> 70 (declared), s2 80 of 5,472 and s3 8 of
+  1,488 (declared), p1 (Polars sequence) 132 of 3,295 -> 0, p2 (Polars
+  table) 996 of 15,462 -> 205 (found, not taken).
+- Fresh seeds 2026121700-11: one Polars call, the inner join order race
+  of `attributes.apply` (24 direct reruns: 9 and 15).
+
+In the suite: new `minera_review_dx1_tests`,
+`docs/pandas-sequence-filter-dx-bank.json.gz` (13,986 calls) with
+`minera_pandas_sequence_filter_dx_bank_parity_tests` and
+`docs/polars-sequence-filter-dx-bank.json.gz` (3,456 calls) with
+`minera_polars_sequence_filter_dx_bank_parity_tests`. The probes and the
+fresh banks are in the project files under `review-harness/round-dx/`.
+
+Full suite 617 of 617 passed on the first run; after the bank test's
+list-cell change the 52 Polars filter bank tests passed again. Every
+earlier pandas filter and sequence bank replays unchanged and the workbench
+fixture replay gave 2,673 responses unchanged. Python script and frontend
+tests not rerun (scripts and frontend unchanged). The device check on the
+Mac was skipped (the Mac was not linked).
+
+Next round (DY) should start by re-reviewing round DX:
+
+- DX's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- list case keys in the Polars table filters (probe
+  `review-harness/round-dx/pp/mk_p2.py`, 205 of 15,462 calls differ): the
+  LTL filters' "outside the observed domain" answers for list items
+  (Polars fails on duplicate `literal` names, repeated join keys, sort
+  lengths, comparisons), the attribute filters' selector with several
+  listed columns, dict and set items failing as literals in pm4py;
+- the consecutive grouping's `df[key] + df[act]` with a list key
+  (declared in DX1: the DataFrame plus Series alignment and its per-dtype
+  errors), the declared row-mask keys, dicts mapping str index labels,
+  and list stakes of str items;
+- the declared items (DQ1-5, DQ1-2, DO1-2, DN1-6), the rest of the CU
+  list, the Duration, Time, Decimal and Int128 Polars dtypes, the CSV
+  timestamp shapes outside the ISO family (DV), and the open choices on
+  CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (still declared unless Philipp answers).
+
+Round DW's targets, taken in DX (findings DX1-1 to DX1-10): DW's CI, the
+fresh seeds, list case keys in the pandas sequence filters, then the
+Polars sequence filters' list keys. Not taken (carried to DY): the Polars
+table filters' list keys, the declared items, the CU list, the new dtypes
+and the open choices.
+
+Previous list for round DX (kept for its older items):
 
 Next round (DX) should start by re-reviewing round DW:
 

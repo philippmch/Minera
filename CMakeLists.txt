@@ -1484,6 +1484,13 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_review_dw1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_dw1_tests COMMAND minera_review_dw1_tests)
 
+  add_executable(minera_review_dx1_tests src/backend/tests/test_review_dx1.cpp)
+  target_link_libraries(minera_review_dx1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_dx1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_dx1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_dx1_tests COMMAND minera_review_dx1_tests)
+  set_tests_properties(minera_review_dx1_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+
   add_executable(minera_review_ds1_tests src/backend/tests/test_review_ds1.cpp)
   target_link_libraries(minera_review_ds1_tests PRIVATE minera::core)
   target_compile_features(minera_review_ds1_tests PRIVATE cxx_std_20)
@@ -3157,6 +3164,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_sequence_filter_dc_set_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-dc-set-bank.json.gz")
   set_tests_properties(minera_pandas_sequence_filter_dc_set_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DX: list case keys (columns, arrays, mappings, callables, nested
+  # lists, empty keys) in every pandas sequence filter.
+  add_test(NAME minera_pandas_sequence_filter_dx_bank_parity_tests COMMAND minera_pandas_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-sequence-filter-dx-bank.json.gz")
+  set_tests_properties(minera_pandas_sequence_filter_dx_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_sequence_filter_bank_parity_tests
     src/backend/tests/test_polars_sequence_filter_bank_parity.cpp
@@ -3325,6 +3337,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_sequence_filter_dq_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dq-bank.json.gz")
   set_tests_properties(minera_polars_sequence_filter_dq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DX: list case keys holding dicts whose keys are no str (Polars
+  # converts the whole list first; probe p1).
+  add_test(NAME minera_polars_sequence_filter_dx_bank_parity_tests COMMAND minera_polars_sequence_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-sequence-filter-dx-bank.json.gz")
+  set_tests_properties(minera_polars_sequence_filter_dx_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_polars_filter_bank_parity_tests
     src/backend/tests/test_polars_filter_bank_parity.cpp

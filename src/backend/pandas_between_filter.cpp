@@ -490,56 +490,7 @@ std::string separator(const EventAttribute& value) {
   std::vector<std::size_t> columns(listed.begin(), listed.end());
   if (activity) columns.push_back(*activity);
   const auto view = detail::numpy_view_of(source, columns);
-  // The common NumPy dtype of the listed columns.
-  std::string dtype;
-  if (!view.dtypes.empty()) {
-    bool same = true, numbers = true, floats = false, naive_dates = true;
-    char finest = 's';
-    for (const auto c : listed) {
-      const auto& d = view.dtypes[c];
-      same &= d == view.dtypes[listed.front()];
-      const bool integer = d.starts_with("int") || d.starts_with("uint");
-      const bool real = d.starts_with("float");
-      numbers &= integer || real;
-      floats |= real;
-      const bool naive = d.starts_with("datetime64[") && d.find(',') == std::string::npos;
-      naive_dates &= naive;
-      if (naive) {
-        const auto unit = d.substr(11, d.find(']') - 11);
-        const char rank = unit == "ns" ? 'n' : unit == "us" ? 'u' : unit == "ms" ? 'm' : 's';
-        const auto order = std::string("smun");
-        if (order.find(rank) > order.find(finest)) finest = rank;
-      }
-    }
-    if (same) dtype = view.dtypes[listed.front()];
-    else if (numbers) dtype = floats ? "float64" : "int64";
-    else if (naive_dates)
-      dtype = std::string("datetime64[") + (finest == 'n' ? "ns" : finest == 'u' ? "us" : finest == 'm' ? "ms" : "s") + "]";
-    else dtype = "object";
-  }
-  EventTable flat;
-  flat.columns = {"case"};
-  if (!view.dtypes.empty()) flat.dtypes = {dtype};
-  // An object array built from a datetime64 column holds Timestamps (NaT
-  // for a missing cell).
-  const auto timestamps = [&](std::size_t c) {
-    return !view.dtypes.empty() && !dtype.starts_with("datetime64[") && view.dtypes[c].starts_with("datetime64[");
-  };
-  for (std::size_t row = 0; row < n; ++row)
-    for (const auto c : listed) {
-      auto value = view.rows[row][c];
-      if (timestamps(c)) {
-        if (!value || value->is_null) {
-          EventAttribute nat{"", ""}; nat.is_null = true; nat.kind = AttributeKind::kDate; value = nat;
-        } else if (date_value(*value)) {
-          const auto* native = std::get_if<NativeDate>(&value->typed_value);
-          NativeDate stamp = native ? *native : NativeDate{value->value};
-          stamp.resolution = NativeDateResolution::kNanosecond;
-          value->typed_value = stamp;
-        }
-      }
-      flat.rows.push_back({std::move(value)});
-    }
+  const auto flat = detail::pandas_list_flat_cases(view, listed);
   const auto cases = case_values(flat, 0);
   std::vector<std::size_t> sorted(flat.rows.size()), buffer(flat.rows.size());
   std::iota(sorted.begin(), sorted.end(), 0);
