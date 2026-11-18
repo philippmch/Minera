@@ -6733,6 +6733,11 @@ In the suite: new `minera_review_dt1_tests`,
 `minera_polars_filter_dt_bank_parity_tests`. The probes, the sweeps and
 the fresh banks are in the project files under `review-harness/round-dt/`.
 
+Full suite 608 of 609 passed; the object attributes module test made the
+object-frame check narrower (only a frame declared without columns), after
+which the 32 OCEL tests passed; no fixture changed (2,673 responses). The
+device check on the Mac was skipped (the Mac was not linked).
+
 Next round (DU) should start by re-reviewing round DT:
 
 - DT's CI run;
