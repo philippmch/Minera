@@ -16557,7 +16557,7 @@ values and passing controls.
 | OC3 | The ancestors/descendants split compares object first timestamps only, as the reference does: objects first seen at the same instant are a tie even across events or relation rows, and a tie is oriented lexically smaller to larger when the smaller id has the selected type, otherwise larger to smaller. Native used relation order as a tie-break. Matches on 40 random OCEL 2.0 logs (previously 30/40 differed). | `minera_ocel_transform_tests` |
 | OC4 | OCEL 2.0 JSON values that do not fit their declared type follow the reference reader (`_parse_attr_value`): types are tried as date/time, float/double, int, bool; float accepts booleans and padded text, int truncates floats (`int(3.7)` is 3) and accepts padded `+12`, bool gives `true`/`false` text its value and otherwise Python truthiness (`"0"` and `"no"` are true), and any other mismatch keeps the raw value instead of failing. pm4py's own writer declares a partly missing boolean column as `string`, which native used to reject. | `minera_ocel_tests` |
 | OC5 | `--enrich` (`enrich_ocel`, `/api/ocel/enrich`) writes O2O rows as `pm4py.ocel_o2o_enrichment` does, quirks included: the interaction graph in both orientations, descendants/cobirth/codeath once in graph orientation, and `object_inheritance_graph` carrying the descendants edges (reference code reuses the descendants graph). Computed triples are deduplicated among themselves and appended after the original O2O rows, which keep their multiplicity. Native emitted cobirth/codeath both ways and the true inheritance relation; that relation stays available as `discover_ocel_object_graph` / `--graph inheritance`. Declared difference: events without relations are skipped rather than raising. Since OC7 the JSON, XML and SQLite readers drop such events as the reference readers do, so they only reach enrichment from an OCEL CSV import (whose reference reader keeps them) or a native caller. Lifecycle E2O qualifiers are unchanged and match. | `minera_ocel_transform_tests` |
-| OC6 | Event features with `--features-name-style compatibility` reproduce two reference quirks. Endpoint columns: the reference iterates each object's first (last) event id as a string, so an event scores 1 only if its whole id is one character of some endpoint id of that type; both blocks are named `@@event_start_<type>` (start block first, types sorted). New interactions: the reference never records seen pairs, so each event counts every ordered relation pair whose first object id is lexically smaller. The native style keeps the corrected values (`@@event_end_<type>`, `@@event_new_interactions`). Declared difference: objects without relations are skipped where the reference raises KeyError. Since OC7 they only arrive from an OCEL CSV import or a native caller; the other readers drop them as the reference readers do. | `minera_ocel_features_tests` |
+| OC6 | Event features with `--features-name-style compatibility` reproduce two reference quirks. Endpoint columns: the reference iterates each object's first (last) event id as a string, so an event scores 1 only if its whole id is one character of some endpoint id of that type; both blocks are named `@@event_start_<type>` (start block first, types sorted). New interactions: the reference never records seen pairs, so each event counts every ordered relation pair whose first object id is lexically smaller. The native style keeps the corrected values (`@@event_end_<type>`, `@@event_new_interactions`). Events and objects without relations (a CSV import, a classic JSON whose frames drop their partners, a native caller) raise the reference's KeyError (round EF, EF1-4). | `minera_ocel_features_tests` |
 | OC7 | The OCEL 1.0 JSON, OCEL 2.0 JSON, both XML and the SQLite readers keep only events and objects that take part in an event-object relation, as every reference reader does: the dropped entries take their relations, O2O links, event-to-event links and object changes with them, and a log without relations reads as empty (`drop_unrelated_ocel_entries`). The OCEL CSV reader keeps them, as the reference CSV reader does. Every OCEL route reads its document through these readers, so filters, statistics and discovery no longer see objectless events (the timestamp, event-attribute and events filters returned them; object filters kept unlinked objects). Declared: the reference OCEL 2.0 XML reader raises `AttributeError: 'NoneType' object has no attribute 'index'` on a log with no relation at all; native reads it as empty, as the reference JSON readers do. Fresh comparisons: 120 random OCELs per format (1.0 JSON, 2.0 JSON, 2.0 XML) match events, objects, relations, O2O and changes, except the 9 relation-free 2.0 XML logs where the reference raises as declared; all 15 filters match on 150 random OCELs with orphans, except one declared `filter_ocel_objects` KeyError. | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests` |
 | OC8 | OCEL file I/O follows the reference writers and readers. Writers keep the log's event, object, relation and attribute order (the reference frame order) instead of sorting by id, and print floats as Python's repr. OCEL 2.0 XML writes O2O links as the reference does (`<object>…<objects><relationship object-id qualifier/></objects>`; the former `<object-relationships>` dialect still reads), declares a column `float` only when its frame column is float64 (an int or bool column, or one with a missing cell, is `string`; an int column with a missing cell prints its integers as floats), writes `True`/`False`, the epoch time for static values and pandas timestamps (`2020-01-01T00:00:01.250000+00:00`) for events and changes; its reader reads an attribute element without text as `"None"` unless it is a float (which raises), as the reference does. OCEL 1.0 XML (`.xmlocel`) is the reference writer's document byte for byte (`<log>`, global event/object/log scopes, `omap`/`vmap`/`ovmap` lists, ints and bools as strings, float columns as `<float>`); the former dialect still reads. The OCEL 1.0 XML, CSV and SQLite writers follow the reference events frame's column order: id, activity, timestamp after either XML reader, a CSV with the activity column before the time, or a SQLite file whose first event type table by name holds `ocel:activity` before `ocel_time`; id, timestamp, activity otherwise (the classic JSON that routes pass between them carries the order as `"minera:eventActivityFirst": true`; files written for users, from the CLI and the export download, leave it out). The OCEL 1.0 XML reader reads only the `vmap`/`ovmap` lists of a reference-shaped event or object and drops other keyed children, as `read_ocel_xml` does (the former dialect, with `id` as an XML attribute, keeps them). Checked on 11 source files (all six formats, SQLite type tables in mixed orders, keys outside the lists): the three writers match the reference; the event and object global scopes, which the reference fills with `__INVALID__` defaults after an OCEL 2.0 XML, SQLite, CSV or OCEL 1.0 XML read, now match too (see "Fresh sweep: stochastic maps and playout, OCEL global scopes, OCEL statistics and filters"). SQLite type tables get the pandas `to_sql` column types of the frame (INTEGER for int and bool columns, REAL for float, TEXT otherwise), the reference column order (`ocel_id, ocel_time, ocel:activity, …`; objects `ocel_id, …, ocel_changed_field, ocel_time` with change rows after the base row), pandas timestamp text and no all-null columns. CSV writes the reference text: `ocel:eid, ocel:timestamp, ocel:activity`, attributes in first-appearance order, then `ocel:type:*` columns; `False`/`True`, float repr, `2020-01-01 00:00:00+00:00`, list cells as the list's repr (`['i0']`, `["i'2"]`); its reader keeps attribute cells as text and objects in object-table order, as the reference reader does. OCEL JSON reads up to 128 MiB (the server's payload limit, 32 Mi nodes) and a larger file is refused with `OCEL JSON file exceeds the 128 MiB OCEL limit` (XML likewise); the server refuses an import whose JSON would not fit the other OCEL routes, so every import it returns can be posted back. Performance: SQLite import reads each type table once (120k events 212.8 s → 2.8 s; 30k 12.7 s → 0.5 s), classic JSON indexes typedOmap qualifiers (30k 5.9 s → 1.1 s), both XML writers index events and objects (120k from XML 97.4 s / 103.0 s → 5.2 s / 4.2 s, read included). Fresh round trips in both directions (native write → reference read, reference write → native read → JSON → reference read) for OCEL 2.0 JSON, OCEL 1.0 JSON, OCEL 2.0 XML, OCEL 1.0 XML, SQLite and CSV: 0 diffs on the rich fixture (lists, quotes, newlines, mixed and missing types, O2O, changes, orphans) and on 8,000 generated events, against 374 before. Declared: native OCEL 2.0 XML also names each value's type (`type="…"` on the value element; the reference reader ignores it) so native round trips stay typed; OCEL 1.0 XML keeps fractional seconds, where the reference truncates them; OCEL 1.0 XML and CSV refuse to drop qualifiers, O2O/E2E links, object changes or globals unless loss is allowed (`--ocel-xml-allow-lossy`, `--ocel-csv-allow-lossy`, the frontend's loss allowance), where the reference drops them silently; SQLite type-table names are collision-free tokens (`event_t_create_…`) where the reference CamelCases the type (`event_Create`), which the map tables resolve for both readers; the CSV reader accepts unquoted list items (`[o1]`), which the reference skips; a native OCEL JSON that holds events or objects without relations carries `"minera:keepUnrelated": true`, so an OCEL from a CSV import (or a filter or playout result) keeps them on every later route, while files without the marker are read as the reference reads them (OC7). | `minera_ocel_tests`, `minera_ocel_xml_tests`, `minera_ocel_sqlite_tests`, `minera_ocel_csv_tests` |
 | R1 | Token replay reads reset and inhibitor arcs as ordinary inputs of their weight, as the reference does. PNML parallel arcs stay distinct arcs: a place needs the weight of one arc to enable, firing consumes every arc, and repair walks the arcs in order, adding each arc's weight when the place is below it. Fresh comparisons of full forward per-trace results (fitness, activated and enabled transitions, reached marking, token counters) match 0/240 random nets with reset, inhibitor, weighted and parallel arcs and no silent transitions, and 225/232 with silent transitions; the 7 left are reference set-order ties (equal-length silent paths, or parallel arcs of different kinds and weights on one place), which follow memory addresses and are not claimed. The `/api/token-replay` route gives the same results on all 495 nets (the same 7 ties differ). Backwards replay uses the same arc reading (spot-checked only). | `minera_petri_extended_arcs_tests`, `minera_token_replay_diagnostics_tests` |
@@ -32349,3 +32349,108 @@ responses unchanged; the `minera_ocel` CLI read about 860 bank files with
 six option sets without a crash. Python script tests: 397 of 406, the 9
 errors only for duckdb missing in this container (scripts unchanged);
 frontend not rerun (unchanged).
+
+## Review EF1: re-review of round EE, routes fed classic JSON (events and objects left without relations, one instant spelled two ways, NaN and infinite values) and the objects frame of OCEL CSV imports (2026-11-18)
+
+Round EF checked EE's CI (run 44383563142 on f255ebca: the verifier,
+Python, frontend, Linux and macOS jobs green; the Windows build passed and
+its ctest, with `minera_review_eb2_tests`, was still running when EF
+pushed) and fed the logs EE now reads differently through the OCEL
+routes. Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv:
+`ef/rt/rfz.py` writes classic JSON files with EE's odd shapes (frame
+overrides, int and float columns, NaN and infinities, events and objects
+the filtering leaves without relations, `Z` and `+00:00` times), and
+`ef/rt/rsw.py` sends each file to 38 routes (descriptions, statistics,
+features in both name styles, the object graphs, enrichment, the splits,
+discoveries, filters, the flattening and the six writers), reading the
+file afresh for each pm4py call (its functions change the OCEL in place);
+`ef/un/un1.py`-`un6.py` are the hand probes. Main (f255ebca) differed on
+115 of 7,800 route calls on 300 files (88 descriptions, 27 flattenings),
+and the probes showed the feature and enrichment cases below.
+
+- **EF1-1 Descriptions of events and objects without relations.** Both
+  description variants look every event up among the related objects, in
+  (time, activity, id) order, so an event without relations (a CSV row
+  naming no object, a classic JSON event whose only object the objects
+  frame drops) raises `KeyError: '<id>'` with the first such event; with
+  timestamps an object without events raises it too, the first such object
+  by id, after the events (without timestamps it is listed). Native
+  described them as related to nothing. Now `describe_ocel_tuples` raises
+  the same `KeyError`.
+- **EF1-2 One instant spelled two ways.** A classic JSON with
+  `2024-01-01T11:00:00Z` and `2024-01-01T11:00:00+00:00` holds one time
+  twice; the descriptions order such events by activity, then id. Native
+  compared the two texts first. Now only unreadable texts order as texts.
+- **EF1-3 NaN and infinities in the flattening.** `ocel_flattening` leaves
+  a NaN event or object value out of the row (pandas' missing value) and
+  keeps an infinity a float (`inf`, `-inf`). Native refused the whole
+  flattening (`OCEL flatten attributes require finite numbers`). Now it
+  drops a NaN cell as it drops a null one and writes infinities as Python
+  prints them.
+- **EF1-4 Features and enrichment on events and objects without
+  relations.** The compatibility event features raise `KeyError` on the
+  first event without relations (events-frame order) when the relation
+  counts are on, else on the first object without events (objects-frame
+  order) when the endpoint types are on; the object features raise it on
+  the first such event for the descendants, cobirth and connected-object
+  graph families and on the last for inheritance and codeath (the graphs
+  themselves raise on the same events, as the object graph routes already
+  did), and `ocel_o2o_enrichment` raises with them. Native skipped such
+  events and objects (the old OC6 declaration). Now the compatibility
+  style raises the same `KeyError`, and enrichment with any of the four
+  event-walking graphs fails as the graph routes do (their own message, see
+  the graph contracts). The native style keeps skipping them.
+- **EF1-5 Objects of an OCEL CSV without an object table.**
+  `read_ocel_csv` lists the objects type by type, in the order of the type
+  columns (`ocel:type:t` before `ocel:type:u` puts every t object first,
+  whichever row names it first); within a type the order follows set
+  iteration and changes with `PYTHONHASHSEED` (`o2,o1,u3,u2,u1` and
+  `o1,o2,u2,u3,u1` under seeds 0 and 3). Native listed them in first
+  appearance over the rows, so the compatibility features named the per-type
+  relation counts in another order (`@@event_num_rel_objs_type_u` before
+  `_t`) and the flattening's traces came in another order. Now the CSV
+  reader groups them by type column and keeps the first appearance within
+  a type. Checked with `READER=csv rsw.py` on 80 CSV files of `ef/tr/cgen.py`
+  (imported by the server, their transports sent to the routes): 7 of 760
+  calls differed on the first 20 files before; after, 8 of 3,040 calls on
+  the 80 files differ, all the flattening's trace order within a type
+  (declared below).
+
+After the fixes: 0 of 11,400 route calls on the 300 files of seed 1 and 0
+of 7,600 on 200 files of seed 2 differ (comparing as declared: pm4py's
+writers drop fractional seconds, mixed-type writer coercions).
+
+Found and kept for round EG (`ef/sq/sgen.py`: pm4py writes 37 of the seed
+1 files as OCEL 2.0 SQLite, every second one with an event time blanked to
+`''` or NULL; the server's SQLite import sends them on as transports with
+`"minera:unreadableEventTimes"`): 89 of 1,406 route calls differ, all on
+the 18 files holding a NaT time. pm4py describes such an event (`NaT`,
+sorted last) where native refuses (`OCEL description requires valid
+timestamps`); its compatibility event features and object features with
+the lifecycle families raise `ValueError: NaTType does not support
+timestamp` where native answers; its OC-DFG measures a pair with a NaT
+end (`[0]`) that native leaves out; `write_ocel_xml` writes no timestamp
+element for the event where native writes `value=""`; and
+`write_ocel2_sqlite` raises `KeyError: 'ocel_time'` (a type whose only
+event has a NaT time) where native writes the file. The OCEL 1.0 XML vmap
+`ocel:*` keys have no transport to check: the XML reader refuses them.
+
+Declared:
+- Within one type, the objects of a CSV without an object table keep their
+  first appearance (pm4py's order follows the hash seed), so the
+  flattening's traces of such a type match under some seeds only (each of
+  the 8 differences above matches under some other hash seed).
+- The object graph routes and enrichment keep their message for an event
+  without relations (`OCEL descendants event has no object relations:
+  <id>`), where pm4py raises `KeyError: '<id>'`.
+
+Tests:
+- New: `minera_review_ef1_tests` (hand cases of EF1-1 to EF1-5 from the
+  probes).
+- No other test needed a change.
+
+Runs: the full ctest passed 627 of 627 on the first run (24 min at -j3).
+The workbench fixture replay gave 2,673 responses unchanged. Python script
+and frontend tests not rerun (scripts and frontend unchanged). The device
+check on the Mac was skipped (the Mac was not linked).

@@ -993,6 +993,22 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
                      });
   }
 
+  if (object_table == nullptr) {
+    // Round EF: without an object table the reference lists the objects type
+    // by type, in the order of the type columns (`ocel:type:t` before
+    // `ocel:type:u` puts every t object first, whichever row names it
+    // first); within a type it follows set iteration, which changes with
+    // PYTHONHASHSEED, so native keeps the first appearance there (observed
+    // black-box). The order reaches the per-type feature columns, the
+    // flattening's traces and every route that walks the objects.
+    std::unordered_map<std::string, std::size_t> type_position;
+    for (const auto& column : object_columns)
+      type_position.emplace(column.first, type_position.size());
+    std::stable_sort(object_list.begin(), object_list.end(),
+                     [&type_position](const OcelObject& left, const OcelObject& right) {
+                       return type_position.at(left.type) < type_position.at(right.type);
+                     });
+  }
   log.objects = std::move(object_list);
   // Round DU: the reference parses the whole timestamp column (dropped rows
   // included) to one dtype; without any offset it is naive, datetime64[us]

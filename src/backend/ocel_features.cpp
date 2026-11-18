@@ -20,6 +20,7 @@
 
 #include "minera/timestamp.hpp"
 #include "frame_times.hpp"
+#include "ocel_frame_types.hpp"
 
 namespace minera {
 namespace {
@@ -1321,6 +1322,50 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   object_types_by_index.reserve(log.objects.size());
   for (const auto& object : log.objects) object_types_by_index.push_back(object.type);
   const auto lifecycles = make_lifecycles(log, object_events, times);
+
+  // Round EF: under the reference names, an event or object without
+  // relations (a CSV import, or a classic JSON whose objects or events frame
+  // dropped its partners) fails as the reference fails (observed black-box):
+  // the event relation counts look every event up (KeyError on the first
+  // such event in table order), the endpoint columns every object (the first
+  // such object), the object descendants, cobirth and neighbor graphs the
+  // first such event, inheritance and codeath the last, in the reference's
+  // order of feature families.
+  if (options.feature_name_style == OcelFeatureNameStyle::kCompatibility) {
+    const auto key_error = [](const std::string& id) {
+      return std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(id));
+    };
+    std::optional<std::size_t> first_event, last_event, first_object;
+    for (std::size_t event = 0; event < log.events.size(); ++event)
+      if (event_objects[event].empty()) {
+        if (!first_event) first_event = event;
+        last_event = event;
+      }
+    for (std::size_t object = 0; object < log.objects.size(); ++object)
+      if (object_events[object].empty()) {
+        first_object = object;
+        break;
+      }
+    if (variant == OcelFeatureVariant::kEvents) {
+      const bool relation_counts =
+          options.include_event_num_rel_objs_features.value_or(options.include_relation_features) ||
+          options.include_event_num_rel_objs_type_features.value_or(options.include_relation_features);
+      const bool endpoints =
+          options.include_event_start_ot_features.value_or(options.include_endpoint_features) ||
+          options.include_event_end_ot_features.value_or(options.include_endpoint_features);
+      if (relation_counts && first_event) throw key_error(log.events[*first_event].id);
+      if (endpoints && first_object) throw key_error(log.objects[*first_object].id);
+    } else if (variant == OcelFeatureVariant::kObjects && first_event) {
+      const bool all = options.include_all_object_features.value_or(false);
+      if (options.include_general_descendants_features.value_or(all))
+        throw key_error(log.events[*first_event].id);
+      if (options.include_general_inheritance_features.value_or(all))
+        throw key_error(log.events[*last_event].id);
+      if (options.include_cobirth_features.value_or(all)) throw key_error(log.events[*first_event].id);
+      if (options.include_codeath_features.value_or(all)) throw key_error(log.events[*last_event].id);
+      if (options.include_obj_con_in_graph_features) throw key_error(log.events[*first_event].id);
+    }
+  }
 
   if (variant == OcelFeatureVariant::kEvents) {
     TableBuilder builder(log.events.size(), options.max_features);

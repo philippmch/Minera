@@ -4781,7 +4781,9 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
                                     left_time->nanoseconds != right_time->nanoseconds))
       return left_time->seconds != right_time->seconds ? left_time->seconds < right_time->seconds
                                                        : left_time->nanoseconds < right_time->nanoseconds;
-    if (left->timestamp != right->timestamp)
+    // Round EF: one instant spelled two ways (a classic JSON with "Z" and
+    // "+00:00" times) is one time; only unreadable texts order as texts.
+    if (!(left_time && right_time) && left->timestamp != right->timestamp)
       return left->timestamp < right->timestamp;
     if (left->activity != right->activity)
       return left->activity < right->activity;
@@ -4793,6 +4795,23 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
     event_ids.push_back(event_id);
   }
   std::sort(event_ids.begin(), event_ids.end(), event_less);
+  // Round EF: the reference looks every event up among the related objects,
+  // in this order, so an event without relations (kept by a CSV import or a
+  // classic JSON whose objects frame dropped its objects) raises KeyError
+  // with its id; with timestamps, so does an object without events, the
+  // first by id, after the events (observed black-box).
+  for (const auto& event_id : event_ids)
+    if (!related_by_event.count(event_id))
+      throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(event_id));
+  if (options.include_timestamps) {
+    std::vector<std::string> unrelated_objects;
+    for (const auto& object : log.objects)
+      if (!events_by_object.count(object.id)) unrelated_objects.push_back(object.id);
+    if (!unrelated_objects.empty())
+      throw std::invalid_argument(
+          "KeyError: " + ocel_frame::python_str_repr(
+                             *std::min_element(unrelated_objects.begin(), unrelated_objects.end())));
+  }
   for (const auto& event_id : event_ids) {
     const auto* event = events.at(event_id);
     OcelTupleEventDescription description;

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EE (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EF (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7181,6 +7181,78 @@ classic documents in four tests and the CLI fixture `ocel_split.json` now
 hold what read_ocel_json needs. The probes, the fuzzer, the comparer, the
 bank generator and the dump driver are in the project files under
 `review-harness/round-ee/`.
+
+Round EF re-reviewed EE (Review EF1). EE's CI run 44383563142 on
+f255ebca: the verifier, Python, frontend, Linux and macOS jobs green; the
+Windows build passed and its ctest (`minera_review_eb2_tests` with EE1-8)
+was still running when EF pushed, so check it with EF's own run. EF fed
+the logs EE now reads differently through 38 OCEL routes (`ef/rt/rfz.py` classic JSON fuzzer, `ef/rt/rsw.py` route
+sweep reading the file afresh for every pm4py call, since pm4py's
+functions change the OCEL in place). Main differed on 115 of 7,800 calls
+(descriptions, flattenings) and the probes found more:
+- both descriptions raise `KeyError` on the first event without relations
+  in (time, activity, id) order and, with timestamps, on the first object
+  without events by id (EF1-1); one instant spelled `Z` and `+00:00` is
+  one time there (EF1-2);
+- the flattening leaves NaN out and keeps infinities as floats (native
+  refused the log) (EF1-3);
+- the compatibility event and object features and `ocel_o2o_enrichment`
+  raise `KeyError` on events and objects without relations (first or last
+  as each graph walks them); native skipped them (old OC6 declaration)
+  (EF1-4);
+- `read_ocel_csv` without an object table lists the objects type by type
+  in type-column order (set iteration within a type); native listed them
+  by first appearance, which reordered the per-type feature columns
+  (EF1-5).
+After: 0 of 11,400 (seed 1) and 0 of 7,600 (seed 2) calls differ; CSV
+transports 8 of 3,040 (80 files), all the flattening's trace order within
+a type, which follows the hash seed in pm4py (declared). SQLite transports
+with a blanked event time: 89 of 1,406 calls differ, all on NaT times (kept
+for EG, see the first item below).
+
+In the suite: `minera_review_ef1_tests` (hand cases); no other test
+changed. The full ctest passed 627 of 627 on the first run, the fixture
+replay gave 2,673 responses unchanged. The fuzzer, the sweep, the comparer and the probes are in the project files
+under `review-harness/round-ef/`.
+
+Next round (EG) should start by re-reviewing round EF:
+
+- EF's CI run, and the end of EE's Windows ctest (run 44383563142);
+- event times pm4py holds as NaT (OCEL 2.0 SQLite `''` or NULL times, sent
+  on as transports with `"minera:unreadableEventTimes"`) through the routes
+  (`ef/sq/sgen.py`, `READER=sqlite rsw.py`, `ef/sq/q1.out`): pm4py
+  describes them (`NaT`, sorted last) where native refuses; its
+  compatibility event features and lifecycle object features raise
+  `ValueError: NaTType does not support timestamp`; its OC-DFG measures a
+  pair with a NaT end as `[0]`; `write_ocel_xml` writes no timestamp
+  element for such an event (native `value=""`); `write_ocel2_sqlite`
+  raises `KeyError: 'ocel_time'` when a type's only event has a NaT time;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- routes on logs of the other readers with events or objects left without
+  relations (OCEL 2.0 JSON/XML/SQLite files whose relations name missing
+  entities), and the native-style features on them (they still skip);
+- the OCEL 1.0 XML vmap `ocel:eid`/`ocel:activity`/`ocel:timestamp`
+  overrides (refused; EE's three-step filtering model may now let them be
+  read as pm4py reads them) and keyless values (a NaN column);
+- the OCEL 2.0 XML/JSON day offsets that depend on the column, the SQLite
+  leftovers (texts beyond ASCII, the kept columns downstream);
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round EE's targets, taken in EF (findings EF1-1 to EF1-5): EE's CI, routes
+fed classic JSON, CSV and SQLite transports through the routes (the
+SQLite NaT findings kept for EG). Not taken (carried to EG): the fresh
+seeds, the XML vmap overrides and keyless
+values, the XML/JSON day offsets, the SQLite leftovers, the new dtypes,
+the DW1 keys, the declared items, the CU list and the open choices.
+
+Previous list for round EF (kept for its older items):
 
 Next round (EF) should start by re-reviewing round EE:
 

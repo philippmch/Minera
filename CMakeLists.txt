@@ -1547,6 +1547,12 @@ if(MINERA_BUILD_TESTS)
            COMMAND minera_review_ee1_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel-json-reference-ee-bank.tsv.gz")
 
+  add_executable(minera_review_ef1_tests src/backend/tests/test_review_ef1.cpp)
+  target_link_libraries(minera_review_ef1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_ef1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_ef1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_ef1_tests COMMAND minera_review_ef1_tests)
+
   add_executable(minera_review_dz1_tests src/backend/tests/test_review_dz1.cpp)
   target_link_libraries(minera_review_dz1_tests PRIVATE minera::core)
   target_compile_features(minera_review_dz1_tests PRIVATE cxx_std_20)

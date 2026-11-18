@@ -660,8 +660,10 @@ Ocel enrich_ocel(const Ocel& log, const OcelEnrichmentOptions& options) {
     require_ocel_relation_column(log, "ocel:eid");
   const auto index = make_enrichment_index(log);
   Ocel result = log;
-  // O2O rows follow pm4py.ocel_o2o_enrichment, including its quirks. Events
-  // without relations are skipped (the reference readers drop them).
+  // O2O rows follow pm4py.ocel_o2o_enrichment, including its quirks. An
+  // event without relations (a CSV import or a classic JSON keeps it) fails
+  // the descendants, inheritance, cobirth and codeath graphs as the object
+  // graph routes do (round EF; the reference raises KeyError on it).
   append_reference_o2o(result, index, [&](OcelEnrichmentGraph graph) {
     switch (graph) {
       case OcelEnrichmentGraph::kInteraction: return options.include_interaction;
@@ -671,7 +673,7 @@ Ocel enrich_ocel(const Ocel& log, const OcelEnrichmentOptions& options) {
       case OcelEnrichmentGraph::kCodeath: return options.include_codeath;
     }
     return false;
-  }, false);
+  }, true);
   if (options.include_lifecycle_qualifiers) {
     // Round DT: a reference read without relations has float64 relation
     // columns, and the lifecycle enrichment adds a qualifier text to them.
@@ -1068,9 +1070,12 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
       return EventAttribute{source.key, std::to_string(*value),
                             AttributeKind::kInt};
     if (const auto* value = std::get_if<double>(&source.value)) {
-      if (!std::isfinite(*value))
-        throw std::invalid_argument(
-            "OCEL flatten attributes require finite numbers");
+      // Round EF: a NaN cell is pandas' missing value, left out like a null
+      // one; an infinity stays a float, printed as Python prints it.
+      if (std::isnan(*value)) return std::nullopt;
+      if (std::isinf(*value))
+        return EventAttribute{source.key, *value < 0 ? "-inf" : "inf",
+                              AttributeKind::kFloat};
       std::ostringstream text;
       text << std::setprecision(std::numeric_limits<double>::max_digits10)
            << *value;
