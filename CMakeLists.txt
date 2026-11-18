@@ -1478,6 +1478,12 @@ if(MINERA_BUILD_TESTS)
            COMMAND minera_review_dv1_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel-csv-timestamp-dv-bank.tsv.gz")
 
+  add_executable(minera_review_dw1_tests src/backend/tests/test_review_dw1.cpp)
+  target_link_libraries(minera_review_dw1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_dw1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_dw1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_dw1_tests COMMAND minera_review_dw1_tests)
+
   add_executable(minera_review_ds1_tests src/backend/tests/test_review_ds1.cpp)
   target_link_libraries(minera_review_ds1_tests PRIVATE minera::core)
   target_compile_features(minera_review_ds1_tests PRIVATE cxx_std_20)
@@ -3920,6 +3926,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_du_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-du-bank.json.gz")
   set_tests_properties(minera_pandas_filter_du_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DW: list case keys across the pandas filters (df[key], groupby(key)
+  # and set_index(key) readings, between's flattened case walk, the relative
+  # occurrence Series stake, LTL role lists; probes l1-l3, lt1).
+  add_test(NAME minera_pandas_filter_dw_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dw-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_dw_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

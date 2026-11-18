@@ -1,5 +1,6 @@
 #include "minera/pandas_between_filter.hpp"
 #include "numpy_object_sort.hpp"
+#include "pandas_list_key.hpp"
 #include "pandas_numpy_view.hpp"
 #include "pandas_parameter_carrier.hpp"
 
@@ -470,11 +471,120 @@ std::string separator(const EventAttribute& value) {
   if (string_value(value)) return value.value;
   error("TypeError", "can only concatenate str (not \"" + qualified_type_name(value) + "\") to str");
 }
+// Round DW: a list case key (probes dw/l2, dw/bt, observed black-box) reads
+// df[key] as pandas does (detail::pandas_getitem_list), then the activity
+// column, and walks the cases of the key's frame flattened row by row (N rows
+// times k listed columns): the values sort as one NumPy array (its dtype the
+// columns' common one), each distinct value spans the rows from its first
+// flattened position on, as many as it occurs, and reading the activity of a
+// row past the frame fails ("index R is out of bounds"). The walk itself is
+// the single-column one. Writing the labels back to the k listed columns
+// then fails unless k equals N; N = k = 1 fails later on a MultiIndex.
+[[noreturn]] void list_key_between(const EventTable& source, const EventAttribute& act1,
+                                   const EventAttribute& act2, const PandasBetweenOptions& options) {
+  const auto n = source.rows.size();
+  const auto listed = detail::pandas_getitem_list(
+      source.columns, options.case_id_key, n, [](const EventAttribute& item) { return representation(item); },
+      [](const std::string& m) { return string_key_repr(m); }, error);
+  const auto activity = column(source, options.activity_key, false);
+  std::vector<std::size_t> columns(listed.begin(), listed.end());
+  if (activity) columns.push_back(*activity);
+  const auto view = detail::numpy_view_of(source, columns);
+  // The common NumPy dtype of the listed columns.
+  std::string dtype;
+  if (!view.dtypes.empty()) {
+    bool same = true, numbers = true, floats = false, naive_dates = true;
+    char finest = 's';
+    for (const auto c : listed) {
+      const auto& d = view.dtypes[c];
+      same &= d == view.dtypes[listed.front()];
+      const bool integer = d.starts_with("int") || d.starts_with("uint");
+      const bool real = d.starts_with("float");
+      numbers &= integer || real;
+      floats |= real;
+      const bool naive = d.starts_with("datetime64[") && d.find(',') == std::string::npos;
+      naive_dates &= naive;
+      if (naive) {
+        const auto unit = d.substr(11, d.find(']') - 11);
+        const char rank = unit == "ns" ? 'n' : unit == "us" ? 'u' : unit == "ms" ? 'm' : 's';
+        const auto order = std::string("smun");
+        if (order.find(rank) > order.find(finest)) finest = rank;
+      }
+    }
+    if (same) dtype = view.dtypes[listed.front()];
+    else if (numbers) dtype = floats ? "float64" : "int64";
+    else if (naive_dates)
+      dtype = std::string("datetime64[") + (finest == 'n' ? "ns" : finest == 'u' ? "us" : finest == 'm' ? "ms" : "s") + "]";
+    else dtype = "object";
+  }
+  EventTable flat;
+  flat.columns = {"case"};
+  if (!view.dtypes.empty()) flat.dtypes = {dtype};
+  // An object array built from a datetime64 column holds Timestamps (NaT
+  // for a missing cell).
+  const auto timestamps = [&](std::size_t c) {
+    return !view.dtypes.empty() && !dtype.starts_with("datetime64[") && view.dtypes[c].starts_with("datetime64[");
+  };
+  for (std::size_t row = 0; row < n; ++row)
+    for (const auto c : listed) {
+      auto value = view.rows[row][c];
+      if (timestamps(c)) {
+        if (!value || value->is_null) {
+          EventAttribute nat{"", ""}; nat.is_null = true; nat.kind = AttributeKind::kDate; value = nat;
+        } else if (date_value(*value)) {
+          const auto* native = std::get_if<NativeDate>(&value->typed_value);
+          NativeDate stamp = native ? *native : NativeDate{value->value};
+          stamp.resolution = NativeDateResolution::kNanosecond;
+          value->typed_value = stamp;
+        }
+      }
+      flat.rows.push_back({std::move(value)});
+    }
+  const auto cases = case_values(flat, 0);
+  std::vector<std::size_t> sorted(flat.rows.size()), buffer(flat.rows.size());
+  std::iota(sorted.begin(), sorted.end(), 0);
+  if (sorted.size() <= 16 || cases.unordered_nat || (!cases.numeric_array && !cases.numpy_dates)) {
+    auto order = detail::numpy_object_stable_argsort(sorted.size(), [&](std::size_t a, std::size_t b) {
+      return case_compare(cases.values[a], cases.values[b], cases.numeric_array, cases.numpy_dates);
+    });
+    if (cases.unordered_nat) sorted = std::move(order);
+  }
+  if (!cases.unordered_nat) merge_cases(sorted, buffer, cases, 0, sorted.size());
+  for (std::size_t first = 0; first < sorted.size();) {
+    std::size_t last = first + 1;
+    while (last < sorted.size() && same_case(cases.values[sorted[first]], cases.values[sorted[last]], cases)) ++last;
+    const auto begin = *std::min_element(sorted.begin() + first, sorted.begin() + last);
+    const auto end = begin + last - first;
+    std::optional<std::size_t> opening;
+    std::size_t subcase = 0;
+    for (std::size_t row = begin; row < end; ++row) {
+      if (row >= n)
+        error("IndexError", "index " + std::to_string(row) + " is out of bounds for axis 0 with size " + std::to_string(n));
+      const auto value = cell(view, row, *activity);
+      const bool closing = contains(act2, value);
+      if (!opening) {
+        if (contains(act1, value)) opening = row;
+      } else if (closing) {
+        const auto& case_value = cases.values[sorted[first]];
+        (void)((cases.numpy_dates ? date_string(case_value, true, cases.numpy_digits)
+               : cases.float32_array ? float32_string(case_value)
+               : ordinary_string(case_value)) + separator(options.subcase_concat_str) + std::to_string(subcase++));
+        opening = value_equal(act1, act2) ? std::optional<std::size_t>(row) : std::nullopt;
+      }
+    }
+    first = last;
+  }
+  if (listed.size() != n) error("ValueError", "Columns must be same length as key");
+  error("NotImplementedError", "fillna is not defined for MultiIndex");
+}
 }  // namespace
 
 EventTable filter_pandas_between(const EventTable& source, const EventAttribute& act1,
                                 const EventAttribute& act2, const PandasBetweenOptions& options) {
   source.validate();
+  if (!options.case_id_key.is_null && options.case_id_key.container == AttributeContainerKind::kList &&
+      !options.case_id_key.children.empty())
+    list_key_between(source, act1, act2, options);
   const auto key = *column(source, options.case_id_key, true);
   const auto activity = column(source, options.activity_key, false);
   // Both columns are read as to_numpy() hands them over (round BZ): an Int64

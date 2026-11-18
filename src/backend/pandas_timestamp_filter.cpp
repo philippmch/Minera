@@ -1,6 +1,7 @@
 #include "minera/pandas_timestamp_filter.hpp"
 #include "pandas_datetime_target.hpp"
 #include "pandas_parameter_carrier.hpp"
+#include "pandas_list_key.hpp"
 #include "pandas_numpy_view.hpp"
 #include <algorithm>
 #include <cctype>
@@ -156,6 +157,11 @@ std::optional<std::size_t> column(const EventTable& source,const EventAttribute&
 }
 // df[[...]]: every listed label must be a column.
 void check_list_columns(const EventTable& source,const EventAttribute& key){
+ // Round DW: as pandas reads df[list] (detail::pandas_getitem_list).
+ if(key.container==AttributeContainerKind::kList&&!key.is_null&&!key.children.empty()){
+  (void)detail::pandas_getitem_list(source.columns,key,source.size(),[](const EventAttribute& item){return repr(item);},[](const std::string& m){return string_key_repr(m);},error);
+  return;
+ }
  detail::pandas_check_getitem_key(key,error);
  std::vector<std::string> names,absent;bool strings=true,integers=true;std::size_t missing=0;
  for(const auto& item:key.children){
@@ -257,11 +263,13 @@ bool equal_value(const EventAttribute& left,const EventAttribute& right){
 }
 struct Group { std::string key;const EventAttribute* minimum=nullptr;const EventAttribute* maximum=nullptr; };
 struct Groups { std::vector<Group> values;std::vector<std::optional<std::size_t>> rows; };
-Groups aggregate(const EventTable& source,std::size_t cases,std::size_t time,Mode mode){
+// Round DW: `key_of(row)` is the row's group key (std::nullopt drops it).
+template<typename Key>
+Groups aggregate_by(const EventTable& source,Key&& key_of,std::size_t time,Mode mode){
  Groups result;result.rows.resize(source.size());std::unordered_map<std::string,std::size_t> positions;
  for(std::size_t i=0;i<source.size();++i){
-  const auto& id=cell(source,i,cases);if(missing(id))continue;
-  const auto key=group_key(id);const auto [p,added]=positions.emplace(key,result.values.size());if(added)result.values.push_back(Group{key});
+  const auto row_key=key_of(i);if(!row_key)continue;
+  const auto& key=*row_key;const auto [p,added]=positions.emplace(key,result.values.size());if(added)result.values.push_back(Group{key});
   result.rows[i]=p->second;auto& group=result.values[p->second];const auto& time_value=cell(source,i,time);if(missing(time_value))continue;
   if(!group.minimum){group.minimum=group.maximum=&time_value;continue;}
   const auto a=native_scalar_order_kind(*group.minimum),b=native_scalar_order_kind(time_value);
@@ -276,6 +284,110 @@ Groups aggregate(const EventTable& source,std::size_t cases,std::size_t time,Mod
   if(compare_time(time_value,*group.maximum)>0)group.maximum=&time_value;
  }
  return result;
+}
+Groups aggregate(const EventTable& source,std::size_t cases,std::size_t time,Mode mode){
+ return aggregate_by(source,[&](std::size_t i)->std::optional<std::string>{const auto& id=cell(source,i,cases);if(missing(id))return std::nullopt;return group_key(id);},time,mode);
+}
+// Round DR (copied from the attribute filters): df.where(mask) for a mask
+// of cells (alive[row][column]): a column with a masked cell turns int64
+// into float64 and bool into object, its masked cells null as in
+// masked_frame; a column without one keeps its cells and dtype.
+EventTable where_frame(const EventTable& source,const std::vector<std::vector<char>>& alive){
+ const auto masked=masked_frame(source);
+ EventTable result=source;
+ for(std::size_t c=0;c<source.columns.size();++c){
+  bool any=false;for(std::size_t i=0;i<source.size();++i)any|=!alive[i][c];
+  if(!any)continue;
+  if(!result.dtypes.empty())result.dtypes[c]=masked.dtypes[c];
+  const bool to_float=!source.dtypes.empty()&&(source.dtypes[c]=="int64"||source.dtypes[c]=="uint64");
+  for(std::size_t i=0;i<source.size();++i){
+   if(!alive[i][c]){result.rows[i][c]=masked.rows[i][c];continue;}
+   if(!to_float||!source.rows[i][c])continue;
+   auto value=*source.rows[i][c];
+   const double number=native_attribute_number(value);
+   value.kind=AttributeKind::kFloat;value.typed_value=number;value.value=python::float_repr(number);
+   result.rows[i][c]=std::move(value);
+  }
+ }
+ return result;
+}
+// A dict grouper maps the index labels; its keys are strs, so only a str
+// label can map.
+bool mapping_maps_a_label(const EventTable& source,const EventAttribute& mapping){
+ if(!source.index)return false;
+ for(const auto& label:source.index->labels){
+  const auto* scalar=std::get_if<EventAttribute>(&label.value);
+  if(!scalar||!text_value(*scalar))continue;
+  for(const auto& entry:mapping.children)if(entry.key==scalar->value)return true;
+ }
+ return false;
+}
+// Round DW (probes dw/l1, dw/l2): the case filters over a list case key.
+// pandas groups by the key (detail::pandas_list_groupers, in the items'
+// order), reads the timestamp column, hashes each grouper's values and
+// aggregates the groups (a row missing a part of its key forms none); then
+// df[df[key].isin(cases)] reads the listed columns as a frame
+// (detail::pandas_getitem_list), whose cells match the selected cases (a
+// scalar for one grouper, a tuple for several) and mask the rest of the
+// frame (DataFrame.where, every unlisted column masked).
+template<typename TimeColumn>
+EventTable list_key_filter(const EventTable& source,const PandasTimestampFilterOptions& options,Mode mode,const std::optional<ParsedExactTimestamp>& lower,const std::optional<ParsedExactTimestamp>& upper,bool keep_missing,bool empty_time,TimeColumn&& time_column){
+ const auto& key=options.case_id_key;const auto n=source.size();
+ const auto groupers=detail::pandas_list_groupers(key,n,[&](const EventAttribute& item){return column(source,item);},[](const EventAttribute& item){return repr(item);},error);
+ if(empty_time){
+  if(mode==Mode::kContained||mode==Mode::kIntersecting)error("ValueError","No objects to concatenate");
+  error("AttributeError","'DataFrame' object has no attribute 'to_frame'");
+ }
+ const auto time=time_column();
+ using Kind=detail::PandasListGrouper::Kind;
+ bool dropped_all=false;
+ for(const auto& g:groupers){
+  if(g.kind==Kind::kCallable)dropped_all=true;
+  if(g.kind==Kind::kMapping){
+   if(mapping_maps_a_label(source,*g.item))error("ValueError","dicts mapping index labels in list case keys are outside the captured native domain");
+   dropped_all=true;
+  }
+ }
+ const auto value=[&](const detail::PandasListGrouper& g,std::size_t row)->const EventAttribute&{return g.kind==Kind::kColumn?cell(source,row,g.column):g.values[row];};
+ for(const auto& g:groupers){
+  if(g.kind!=Kind::kColumn&&g.kind!=Kind::kArray)continue;
+  detail::pandas_list_factorize(g,n,value,error);
+ }
+ std::vector<std::optional<EventAttribute>> labels(n);
+ for(std::size_t i=0;i<n&&!dropped_all;++i){
+  std::vector<EventAttribute> parts;bool gap=false;
+  for(const auto& g:groupers){const auto& v=value(g,i);if(v.container==AttributeContainerKind::kScalar&&missing(v)){gap=true;break;}parts.push_back(v);}
+  if(gap)continue;
+  if(parts.size()==1)labels[i]=parts.front();
+  else {EventAttribute tuple{"",""};tuple.container=AttributeContainerKind::kTuple;tuple.children=std::move(parts);labels[i]=std::move(tuple);}
+ }
+ const auto grouped=aggregate_by(source,[&](std::size_t i)->std::optional<std::string>{if(!labels[i])return std::nullopt;return group_key(*labels[i]);},time,mode);
+ check_time(source,time,mode,nullptr);
+ std::unordered_set<std::string> selected;
+ for(std::size_t i=0;i<grouped.values.size();++i){const auto& group=grouped.values[i];
+  bool matched=false;
+  if(!group.minimum)matched=keep_missing;
+  else {
+   check_time(source,time,mode,mode==Mode::kCompleting?group.maximum:group.minimum);
+   const auto a=instant(*group.minimum),b=instant(*group.maximum);
+   if(mode==Mode::kStarting)matched=inside(a,lower,upper);
+   else if(mode==Mode::kCompleting)matched=inside(b,lower,upper);
+   else if(mode==Mode::kContained)matched=a&&b&&lower&&upper&&compare_instants(*a,*lower)>=0&&compare_instants(*b,*upper)<=0;
+   else matched=a&&b&&lower&&upper&&compare_instants(*a,*upper)<0&&compare_instants(*b,*lower)>0;
+  }
+  if(matched)selected.insert(group.key);
+ }
+ const auto listed=detail::pandas_getitem_list(source.columns,key,n,[](const EventAttribute& item){return repr(item);},[](const std::string& m){return string_key_repr(m);},error);
+ for(std::size_t j=0;j<listed.size();++j)for(std::size_t k=0;k<j;++k)
+  if(listed[j]==listed[k])error("ValueError","cannot reindex on an axis with duplicate labels");
+ const bool positive=mode==Mode::kStarting||mode==Mode::kCompleting?truth(options.positive):true;
+ std::vector<std::vector<char>> alive(n,std::vector<char>(source.columns.size(),0));
+ for(std::size_t i=0;i<n;++i)for(const auto c:listed){
+  const auto& v=cell(source,i,c);
+  const bool member=!missing(v)&&root_cause_key_is_hashable(v)&&selected.contains(group_key(v));
+  alive[i][c]=member==positive;
+ }
+ return where_frame(source,alive);
 }
 EventTable apply_filter(const EventTable& source,const EventAttribute& first,const EventAttribute& last,const PandasTimestampFilterOptions& options,Mode mode,const EventAttribute* attribute=nullptr,const EventAttribute* wanted=nullptr){
  const auto lower=bound(first),upper=bound(last);
@@ -340,6 +452,11 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
    const auto& value=cell(source,i,time);check_time(source,time,mode,&value);if(inside(instant(value),lower,upper)||(keep_missing&&missing(value)))candidates.push_back(i);
   }
   if(options.case_id_key.container==AttributeContainerKind::kList&&options.case_id_key.children.empty())error("AttributeError","'DataFrame' object has no attribute 'unique'");
+  // Round DW: df[list].unique() reads the listed columns as a frame first.
+  if(options.case_id_key.container==AttributeContainerKind::kList&&!options.case_id_key.is_null){
+   (void)detail::pandas_getitem_list(source.columns,options.case_id_key,source.size(),[](const EventAttribute& item){return repr(item);},[](const std::string& m){return string_key_repr(m);},error);
+   error("AttributeError","'DataFrame' object has no attribute 'unique'");
+  }
   const auto cases=direct_column(source,options.case_id_key);std::unordered_set<std::string> accepted;
   for(auto i:candidates)accepted.insert(identity(cell(source,i,cases)));
   // Series.isin on a masked numeric column (Int64, Float64, ...) never
@@ -359,6 +476,13 @@ EventTable apply_filter(const EventTable& source,const EventAttribute& first,con
   return *time;
  };
  const bool empty_time=options.timestamp_key.container==AttributeContainerKind::kList&&options.timestamp_key.children.empty();
+ {
+  const auto& key=options.case_id_key;
+  const auto dict_item=[](const EventAttribute& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;};
+  if(!key.is_null&&key.container==AttributeContainerKind::kList&&
+     !(std::any_of(key.children.begin(),key.children.end(),dict_item)&&std::all_of(key.children.begin(),key.children.end(),[&](const auto& item){return dict_item(item)||text_value(item);})))
+   return list_key_filter(source,options,mode,lower,upper,keep_missing,empty_time,time_column);
+ }
  // Round CK: a dict case key is a groupby mapping, so a missing timestamp
  // column fails before the case column is read.
  // A list case key groups by each of its items in turn: a dict maps, a

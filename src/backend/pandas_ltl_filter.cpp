@@ -1,4 +1,5 @@
 #include "minera/pandas_ltl_filter.hpp"
+#include "pandas_list_key.hpp"
 #include "pandas_parameter_carrier.hpp"
 #include <algorithm>
 #include <cmath>
@@ -258,6 +259,13 @@ void check_target(const EventAttribute& target,std::size_t rows,const std::strin
  }
 }
 std::vector<std::size_t> selected_columns(const EventTable& source,const std::vector<EventAttribute>& requested){
+ // Round DW: df[[case, attribute, ...]] as pandas reads the list: list
+ // keys of one length turn to tuples, of different lengths stay lists that
+ // do not hash (probe dw/lt1).
+ if(std::any_of(requested.begin(),requested.end(),[](const EventAttribute& k){return !k.is_null&&k.container==AttributeContainerKind::kList;})){
+  EventAttribute key{"",""};key.container=AttributeContainerKind::kList;key.children=requested;
+  return detail::pandas_getitem_list(source.columns,key,source.size(),[](const EventAttribute& item){return repr(item);},[](const std::string& m){return string_key_repr(m);},error);
+ }
  std::vector<std::size_t> result;std::vector<std::string> absent;std::vector<std::string> names;std::size_t missing_count=0;
  // Round CK: the keys hash before the columns are read.
  for(const auto& key:requested)detail::pandas_check_hashable_key(key,error);

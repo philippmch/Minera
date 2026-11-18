@@ -31260,3 +31260,117 @@ Tests:
   names). All six pass after the change. The workbench fixture replay gave
   2,673 responses unchanged. Python script and frontend tests not rerun
   (scripts and frontend unchanged).
+
+## Review DW1: re-review of round DV, list case keys across the pandas filters (df[key], groupby(key), set_index(key)), between's walk over a list key, the relative occurrence stake against a Series, fresh seeds (2026-11-18)
+
+Round DW checked DV's CI (run 44239415021 on 49e260c: green on the Linux,
+macOS, frontend, Python and verifier jobs; Windows ctest still running at
+the time of this note), took DV's found item (list items in a list case
+key) and replayed a batch of fresh seeds. The device check on the Mac was
+skipped (the Mac was not linked).
+
+pm4py hands a list case key to pandas in three ways, and each reads it
+differently (observed black-box on pandas 3 in the reference venv; probes
+`dw/pp/mk_l1.py`, `mk_l2.py`, `mk_l3.py`, `dw/bt/b.py`, shared model in
+`src/backend/pandas_list_key.hpp`):
+
+- **DW1-1 `df[key]`.** The key becomes an array first: a regular 2-D key's
+  rows turn to tuples (`None of [Index([('cid',)], dtype='object')] are
+  in the [columns]`), a deeper key is refused (`Index data must be
+  1-dimensional` when every leaf is a number or bool, `Buffer has wrong
+  number of dimensions (expected 1, got D)` otherwise), a ragged key keeps
+  its lists (`unhashable type: 'list'`), and a list of bools masks rows
+  (`Item wrong length K instead of N.`). The KeyError lists the labels
+  with the Index's dtype (`str`, `int64`, `float64` or `object`, `nan`
+  for a missing label beside str ones). `detail::pandas_getitem_list`
+  now reads every `df[list]` of the timestamp, attribute, between and LTL
+  filters (the LTL filters select `df[[case, attribute, ...]]`, so list
+  role keys of one length turn to tuples and of different lengths stay
+  lists).
+- **DW1-2 `groupby(key)`** (timestamp and variants filters). A key of
+  labels only, as long as the frame, naming some label no column has, is
+  one array of those labels; otherwise each item is a mapping (a dict), a
+  callable (None or a set: `'NoneType' object is not callable`), an array
+  (a list: `Grouper and axis must be same length` unless it matches the
+  rows; a 2-D one's rows are tuples, a deeper one fails with the buffer
+  error when the groups factorize) or a label naming a column (KeyError
+  otherwise). The timestamp filters then aggregate per group, select
+  `df[key]` of the matched groups' rows and mask the frame (`where`);
+  `variants.apply` builds the variants per group and keeps rows by
+  `set_index(key)`.
+- **DW1-3 `set_index(key)`** (attribute filters). List items are arrays
+  as long as each frame (`Length mismatch`), other items columns; one
+  array alone is an Index of its items as they are, which `Index.isin`
+  compares by equality even when they do not hash, unless every item is
+  a tuple (a MultiIndex, whose levels must hash); several items build a
+  MultiIndex that hashes every part.
+- **DW1-4 between with a list key.** After `df[key]` and the activity
+  column, the cases of the key's frame are walked flattened row by row (N
+  rows times k listed columns): one NumPy array of the columns' common
+  dtype (an object array holds Timestamps for a datetime column), sorted
+  stably, each distinct value spanning the rows from its first flattened
+  position on, as many as it occurs. Reading the activity of a row past
+  the frame fails (`index R is out of bounds for axis 0 with size N`);
+  otherwise writing the labels back fails (`Columns must be same length
+  as key`) unless k = N = 1 (`fillna is not defined for MultiIndex`).
+- **DW1-5 The relative occurrence filter.** With a list case key the
+  denominator `df[key].nunique()` is a Series, and the stake times it is
+  formed per counted value as pandas multiplies a Series: a number gives a
+  Series whose truth value the comparison asks for (as before); None, a
+  dict, a set or a datetime (a Timestamp there) fails in each item's
+  product, a str or bytes in NumPy's string multiply; a list or tuple
+  stake is an array (NumPy's broadcast error, `Length of values (L) does
+  not match length of index (k)`, pandas' item-by-item retry `((k,),
+  (L,))` or the item's TypeError, then the comparison with a sequence or
+  str product). Counted per case, the case key's array factorizes before
+  the attribute column is read (buffer error, unhashable values).
+- **DW1-6 Fresh seeds.** Batch 2026121600-11 (twelve banks): the pandas
+  CK, CN and sequence banks replay clean (2026121609 is the batch whose
+  DV twin found the list keys). Three Polars calls differ, all races: two
+  are the struct cast race, one is `rework.apply` on two cases of an Enum
+  case column, whose row order varies between runs (direct reruns under
+  three hash seeds show both orders; the capture's six runs agreed by
+  chance).
+
+Probes: `l1` (DV's probe) 217 of 1,863 calls differed, now 0; `l2`
+(labels, tuples, 2-D, 3-D and ragged lists, arrays of the frame's length,
+one call per function on nine frames) 1,775 of 10,935 -> 0; `l3`, `l3b`
+and `l3c` (38 keys on each case's own calls, so the filters reach their
+values; CK seeds 2026121509 and 2026121601) 82 of 3,876 and then 56 of
+69,958 -> 0; `lt1` (LTL role lists) 6 of 24 -> 0.
+
+Found, not taken (next round):
+- List case keys in the pandas sequence filters (start and end
+  activities, starts/ends with, prefixes, suffixes, traces, rework, both
+  case groupings, activity split): native answers every list key with
+  `KeyError: ''`, while pandas reads them as in DW1-1 and DW1-2 (a
+  one-column list such as `['cid']` filters normally; arrays raise
+  `Grouper and axis must be same length`, None `'NoneType' object is not
+  callable`, and so on). Probe `dw/pp/mk_s1.py` (30 keys on each case's
+  own calls, sequence CK seed 2026121610, 119 cases): 6,029 of 7,230
+  calls differ.
+
+Declared:
+- A list of bools as long as the frame (a row mask) as a case key.
+- A dict in a list case key that maps a str index label (timestamp and
+  variants filters).
+- A list or tuple stake of str items, dates or missing markers against a
+  list case key.
+- Still declared from earlier rounds: the equal-size join order of the
+  Polars sequence filters, the keep-once relative occurrence count with a
+  dict case key naming several columns (DQ1-5), the nanosecond window at
+  pandas' int64 range ends (DQ1-2), dateutil-only date strings (DP1-4,
+  DQ1-4), the eager paths performance race (DO1-2), the thread-count
+  quirk of DN1-6, the struct cast race and the CSV timestamp texts
+  outside the ISO family (DV1-2).
+
+Tests:
+- New: `minera_review_dw1_tests` (the `df[key]` messages, the groupers,
+  seven between calls checked against pm4py) and
+  `docs/pandas-filter-dw-bank.json.gz` (34,520 calls of l1, l2, l3, lt1
+  and 208 cases of l3b and l3c) with
+  `minera_pandas_filter_dw_bank_parity_tests`; every earlier pandas filter
+  bank replays unchanged.
+- Full suite: 614 of 614 tests passed on the first run. The workbench
+  fixture replay gave 2,673 responses unchanged. Python script and
+  frontend tests not rerun (scripts and frontend unchanged).

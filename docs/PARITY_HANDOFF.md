@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DV (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–DW (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6811,6 +6811,72 @@ workbench fixture replay gave 2,673 responses unchanged.
 Python script and frontend tests not rerun (scripts and frontend
 unchanged). The device check on the Mac was skipped (the Mac was not
 linked).
+
+Round DW re-reviewed DV (Review DW1). DV's CI run 44239415021: green on
+the Linux, macOS, frontend, Python and verifier jobs (Windows ctest still
+running at the handoff).
+DW took DV's found item, list case keys across the pandas filters, with a
+shared model of how pandas reads them (`src/backend/pandas_list_key.hpp`):
+- `df[key]` (`pandas_getitem_list`): np.asarray first, so a regular 2-D
+  key's rows are tuples, a deeper key fails (`Index data must be
+  1-dimensional` for numbers, the buffer error otherwise), a ragged key
+  keeps unhashable lists, bools mask rows; the KeyError prints the
+  Index's dtype. Used by the timestamp, attribute, between and LTL
+  filters (LTL role lists) and the relative occurrence denominator.
+- `groupby(key)` (`pandas_list_groupers`, timestamp and variants
+  filters): the whole key as one array of labels, or per item a mapping,
+  a callable, an array (length check, 2-D rows as tuples, deeper ones
+  fail when the groups factorize) or a column label.
+- `set_index(key)` in the attribute filters: one array alone compares its
+  items by equality (unhashable ones too) unless all are tuples.
+- between walks the key's frame flattened row by row: `index R is out of
+  bounds`, then `Columns must be same length as key` (`fillna is not
+  defined for MultiIndex` at k = N = 1); an object array holds
+  Timestamps.
+- The relative occurrence stake against the `nunique()` Series: per
+  stake type (numbers, None/dict/set/datetime, str, list and tuple
+  arrays); counted per case the case key's array factorizes first.
+- Probes l1 217 of 1,863 -> 0, l2 1,775 of 10,935 -> 0, l3/l3b/l3c 82 of
+  3,876 and 56 of 69,958 -> 0, lt1 6 of 24 -> 0.
+- Fresh seeds 2026121600-11: three Polars calls, all races (two struct
+  cast, one `rework.apply` row order on an Enum case column that varies
+  between runs).
+- Found, not taken: list case keys in the pandas sequence filters (native
+  `KeyError: ''` for all of them; 6,029 of 7,230 probe calls differ).
+
+In the suite: new `minera_review_dw1_tests` and
+`docs/pandas-filter-dw-bank.json.gz` (34,520 calls) with
+`minera_pandas_filter_dw_bank_parity_tests`. The probes and the fresh
+banks are in the project files under `review-harness/round-dw/`.
+
+Full suite 614 of 614 passed on the first run; every earlier pandas filter
+bank replays unchanged and the workbench fixture replay gave 2,673
+responses unchanged. Python script and frontend tests not rerun (scripts
+and frontend unchanged). The device check on the Mac was skipped (the Mac
+was not linked).
+
+Next round (DX) should start by re-reviewing round DW:
+
+- DW's CI run (and DV's Windows job);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- list case keys in the pandas sequence filters: native raises
+  `KeyError: ''` for every list key, pandas reads them as the table
+  filters do (probe `review-harness/round-dw/pp/mk_s1.py`: 6,029 of 7,230
+  calls differ); then the Polars filters' list keys, the declared row-mask
+  keys, dicts mapping str index labels, and list stakes of str items;
+- the declared items (DQ1-5, DQ1-2, DO1-2, DN1-6), the rest of the CU
+  list, the Duration, Time, Decimal and Int128 Polars dtypes, the CSV
+  timestamp shapes outside the ISO family (DV), and the open choices on
+  CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (still declared unless Philipp answers).
+
+Round DV's targets, taken in DW (findings DW1-1 to DW1-6): DV's CI, the
+fresh seeds, list case keys across the pandas filters. Not taken (carried
+to DX): the declared items, the CU list, the new dtypes and the open
+choices.
+
+Previous list for round DW (kept for its older items):
 
 Next round (DW) should start by re-reviewing round DV:
 

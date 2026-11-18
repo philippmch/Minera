@@ -1,5 +1,6 @@
 #include "minera/pandas_variants_filter.hpp"
 #include "pandas_parameter_carrier.hpp"
+#include "pandas_list_key.hpp"
 #include <algorithm>
 #include <functional>
 #include <numeric>
@@ -234,6 +235,16 @@ bool unmatched_mapping_key(const EventTable& source,const EventAttribute& key){
  return key.container==AttributeContainerKind::kList&&std::any_of(key.children.begin(),key.children.end(),mapping)&&
   std::all_of(key.children.begin(),key.children.end(),[&](const auto& item){return mapping(item)||column(source,item).has_value();});
 }
+// Round DW: list keys the dict and set readings above leave (no set item,
+// not dicts beside labels only).
+bool list_case_key(const EventAttribute& key){
+ if(key.is_null||key.container!=AttributeContainerKind::kList||key.children.empty())return false;
+ const auto set_item=[](const EventAttribute& item){return !item.is_null&&(item.container==AttributeContainerKind::kSet||item.container==AttributeContainerKind::kFrozenSet);};
+ const auto mapping=[](const EventAttribute& item){return !item.is_null&&item.container==AttributeContainerKind::kContainer;};
+ if(std::any_of(key.children.begin(),key.children.end(),set_item))return false;
+ if(std::any_of(key.children.begin(),key.children.end(),mapping)&&std::all_of(key.children.begin(),key.children.end(),[&](const auto& item){return mapping(item)||text_value(item);}))return false;
+ return true;
+}
 std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVariantsFilterOptions& options){
  if(options.variants_df){
   const auto* table=std::get_if<EventTable>(&*options.variants_df);
@@ -278,7 +289,12 @@ std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVari
    if(item.container==AttributeContainerKind::kList){if(item.children.size()!=source.size())error("ValueError","Grouper and axis must be same length");continue;}
    if(!column(source,item))error("KeyError",repr(item));
   }
- const auto cases=unmatched?0:direct_column(source,options.case_id_key);
+ // Round DW (probes dw/l1, dw/l2): any other list key groups as
+ // detail::pandas_list_groupers reads it, before the activity column.
+ std::optional<std::vector<detail::PandasListGrouper>> groupers;
+ if(!unmatched&&list_case_key(options.case_id_key))
+  groupers=detail::pandas_list_groupers(options.case_id_key,source.size(),[&](const EventAttribute& item){return column(source,item);},[](const EventAttribute& item){return repr(item);},error);
+ const auto cases=unmatched||groupers?0:direct_column(source,options.case_id_key);
  if(options.activity_key.container==AttributeContainerKind::kList&&options.activity_key.children.empty())error("AttributeError","'DataFrame' object has no attribute 'to_frame'");
  const auto activity=column(source,options.activity_key);
  // Round CY: groupby(case)[list] hashes the list's items in order, then
@@ -298,6 +314,43 @@ std::vector<CacheRow> membership_cache(const EventTable& source,const PandasVari
  if(!activity)error("KeyError",string_key_repr("Column not found: "+(text_value(options.activity_key)?options.activity_key.value:repr(options.activity_key))));
  if(unmatched)return {};
  std::vector<CacheRow> result;
+ if(groupers){
+  // Each grouper's values hash first (a dict or set grouper maps or calls
+  // the index labels, which leaves no case here); a row missing a part of
+  // its key forms no case; a key of one grouper names its cases by value,
+  // of several by tuple.
+  using Kind=detail::PandasListGrouper::Kind;
+  bool dropped_all=false;
+  for(const auto& g:*groupers){
+   if(g.kind==Kind::kCallable)dropped_all=true;
+   if(g.kind==Kind::kMapping){
+    if(source.index)for(const auto& label:source.index->labels){
+     const auto* scalar=std::get_if<EventAttribute>(&label.value);
+     if(scalar&&text_value(*scalar))for(const auto& entry:g.item->children)if(entry.key==scalar->value)error("ValueError","dicts mapping index labels in list case keys are outside the captured native domain");
+    }
+    dropped_all=true;
+   }
+  }
+  const auto value=[&](const detail::PandasListGrouper& g,std::size_t row)->const EventAttribute&{return g.kind==Kind::kColumn?cell(source,row,g.column):g.values[row];};
+  for(const auto& g:*groupers){
+   if(g.kind!=Kind::kColumn&&g.kind!=Kind::kArray)continue;
+   detail::pandas_list_factorize(g,source.size(),value,error);
+  }
+  if(dropped_all)return {};
+  std::vector<std::string> order;std::unordered_map<std::string,std::pair<EventAttribute,std::vector<EventAttribute>>> cases_by_key;
+  for(std::size_t i=0;i<source.size();++i){
+   std::vector<EventAttribute> parts;bool gap=false;
+   for(const auto& g:*groupers){const auto& v=value(g,i);if(v.container==AttributeContainerKind::kScalar&&missing(v)){gap=true;break;}parts.push_back(v);}
+   if(gap)continue;
+   EventAttribute id=parts.size()==1?parts.front():tuple(std::move(parts));
+   const auto key=group_key(id);
+   auto found=cases_by_key.find(key);
+   if(found==cases_by_key.end()){order.push_back(key);found=cases_by_key.emplace(key,std::make_pair(std::move(id),std::vector<EventAttribute>{})).first;}
+   found->second.second.push_back(cell(source,i,*activity));
+  }
+  for(const auto& key:order){auto& entry=cases_by_key.at(key);result.push_back({entry.first,tuple(std::move(entry.second))});}
+  return result;
+ }
  for(const auto& group:groups(source,cases)){
   std::vector<EventAttribute> values;for(auto i:group.rows)values.push_back(cell(source,i,*activity));
   result.push_back({group.id,tuple(std::move(values))});
@@ -336,6 +389,32 @@ EventTable membership(const EventTable& source,const PandasVariantsFilterOptions
   return (fresh&&holds_missing(variant))||(split_hash&&std::any_of(variant.children.begin(),variant.children.end(),nanosecond_date));
  };
  std::unordered_set<std::string> selected;for(const auto& row:cache)if(!unmatched(row.variant)&&variants.contains(identity(row.variant)))selected.insert(identity(row.id));
+ // Round DW: a list key's cases are the labels set_index(key) gives each
+ // row: a list item is an array kept as it is (its rows stay lists), any
+ // other item a label naming a column; one item labels by value, several by
+ // tuple.
+ if(list_case_key(options.case_id_key)){
+  const auto& key=options.case_id_key;
+  detail::pandas_check_set_index_key(key,error);
+  std::string absent;
+  for(const auto& item:key.children)
+   if(!(item.container==AttributeContainerKind::kList&&!item.is_null)&&!column(source,item))absent+=(absent.empty()?"":", ")+repr(item);
+  if(!absent.empty())error("KeyError",string_key_repr("None of ["+absent+"] are in the columns"));
+  for(const auto& item:key.children)
+   if(item.container==AttributeContainerKind::kList&&!item.is_null&&item.children.size()!=source.size())
+    error("ValueError","Length mismatch: Expected "+std::to_string(source.size())+" rows, received array of length "+std::to_string(item.children.size()));
+  const bool positive=truth(options.positive);
+  for(std::size_t i=0;i<source.size();++i){
+   std::vector<EventAttribute> parts;
+   for(const auto& item:key.children){
+    if(item.container==AttributeContainerKind::kList&&!item.is_null){auto part=item.children[i];part.key.clear();parts.push_back(std::move(part));}
+    else parts.push_back(cell(source,i,*column(source,item)));
+   }
+   const auto label=parts.size()==1?parts.front():tuple(std::move(parts));
+   keep[i]=(root_cause_key_is_hashable(label)&&selected.contains(identity(label)))==positive;
+  }
+  return subset(source,keep);
+ }
  const auto cases=column(source,options.case_id_key);
  if(!cases)detail::pandas_check_set_index_key(options.case_id_key,error);
  if(!cases)error("KeyError",string_key_repr("None of ["+repr(options.case_id_key)+"] are in the columns"));

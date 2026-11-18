@@ -64,7 +64,8 @@ inline EventAttribute categorical_missing(const EventTable& source, std::size_t 
 // numeric categories turning to float64 with NaN when a cell is missing and
 // other categories holding NaN (NaT for datetimes) as objects. The view's
 // dtypes name the NumPy array ("object" for Python objects).
-inline EventTable numpy_view(const EventTable& source, std::initializer_list<std::size_t> cols) {
+template <typename Columns>
+inline EventTable numpy_view_of(const EventTable& source, const Columns& cols) {
   EventTable view = source;
   if (source.dtypes.empty()) return view;
   for (const auto col : cols) {
@@ -113,6 +114,10 @@ inline EventTable numpy_view(const EventTable& source, std::initializer_list<std
     }
   }
   return view;
+}
+
+inline EventTable numpy_view(const EventTable& source, std::initializer_list<std::size_t> cols) {
+  return numpy_view_of(source, cols);
 }
 
 }  // namespace minera::detail
