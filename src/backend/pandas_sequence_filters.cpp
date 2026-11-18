@@ -2556,29 +2556,482 @@ std::optional<bool> datetime_run_key(const EventTable& df, std::size_t left, std
   return std::nullopt;
 }
 
+namespace {
+
+// Round DZ (Review DZ1-1): the run key of a list case key. pm4py adds
+// df[key] (a DataFrame of the listed columns) and df[act] (a Series), which
+// pandas aligns on the frame's columns: the result's columns are the union of
+// the listed names and the row labels, the frame gains an all-NaN float64
+// column per row label and the Series is reindexed to the union (a listed
+// name gets the Series' missing value). Each column of that union then adds
+// its value of the Series, column by column in union order, and the first
+// one that raises is the error; a result of several columns cannot be
+// assigned to the single run key column. Observed black-box on pandas 3 in
+// the reference venv (Python model dz/ca/model.py, 0 differences on 23,400
+// fuzzed keys of the sequence domains' frames).
+namespace consecutive_list_key {
+
+using SK = python::Scalar::Kind;
+
+const std::string kConcatenation =
+    "Concatenation operation is not implemented for NumPy arrays, use np.concatenate() instead. Please do not rely "
+    "on this error; it may not be given on all Python implementations.";
+const std::string kAddInt = " is no longer supported.  Instead of adding/subtracting `n`, use `n * obj.freq`";
+
+// A Python object of a column or of the reindexed Series: a value (numpy
+// marks a numpy scalar of a masked array, whose categorical and datetime
+// arithmetic differ from Python's), NaN (a Python float, or numpy's), pd.NA,
+// NaT or None.
+struct Operand {
+  enum class Kind { kValue, kNaN, kNA, kNaT, kNone } kind = Kind::kValue;
+  python::Scalar value;
+  bool numpy = false;
+};
+Operand of_kind(Operand::Kind kind, bool numpy = false) {
+  Operand o;
+  o.kind = kind;
+  o.numpy = numpy;
+  return o;
+}
+Operand of_value(python::Scalar value, bool numpy = false) {
+  Operand o;
+  o.value = std::move(value);
+  o.numpy = numpy;
+  if (o.value.kind == SK::kNone) o.kind = Operand::Kind::kNone;
+  else if (o.value.kind == SK::kNA) o.kind = Operand::Kind::kNA;
+  else if (o.value.kind == SK::kFloat && std::isnan(o.value.real)) o.kind = Operand::Kind::kNaN;
+  return o;
+}
+bool missing(const Operand& o) { return o.kind != Operand::Kind::kValue; }
+bool is_date(const Operand& o) { return o.kind == Operand::Kind::kValue && o.value.kind == SK::kDate; }
+bool is_int(const Operand& o) { return o.kind == Operand::Kind::kValue && o.value.kind == SK::kInt; }
+bool is_text_operand(const Operand& o) { return o.kind == Operand::Kind::kValue && o.value.kind == SK::kText; }
+std::string type_of(const Operand& o) {
+  switch (o.kind) {
+    case Operand::Kind::kNaN: return "float";
+    case Operand::Kind::kNA: return "NAType";
+    case Operand::Kind::kNaT: return "NaTType";
+    case Operand::Kind::kNone: return "NoneType";
+    case Operand::Kind::kValue: break;
+  }
+  return python::type_name(o.value);
+}
+python::Scalar as_python(const Operand& o) {
+  switch (o.kind) {
+    case Operand::Kind::kNaN: return python::real(std::numeric_limits<double>::quiet_NaN());
+    case Operand::Kind::kNone: return python::none();
+    case Operand::Kind::kNA: {
+      python::Scalar s;
+      s.kind = SK::kNA;
+      return s;
+    }
+    default: return o.value;
+  }
+}
+[[noreturn]] void unsupported(const std::string& left, const std::string& right) {
+  fail("TypeError", "unsupported operand type(s) for +: '" + left + "' and '" + right + "'");
+}
+
+// Python's a + b of two present objects (a Timestamp next to an int raises
+// pandas' message, str + anything else names the other type).
+void value_add(const Operand& a, const Operand& b) { (void)python_add(as_python(a), as_python(b)); }
+// NaT + b: NaT absorbs an int (not a bool), a Timestamp and NaT.
+void nat_add(const Operand& b) {
+  if (b.kind == Operand::Kind::kNaT || is_date(b) || is_int(b)) return;
+  unsupported("NaTType", type_of(b));
+}
+// a + b for a Timestamp or NaT `a` of a datetime array.
+void date_add(const Operand& a, const Operand& b) {
+  if (a.kind == Operand::Kind::kNaT) return nat_add(b);
+  if (b.kind == Operand::Kind::kNaT) return;
+  if (is_int(b)) fail("TypeError", "Addition/subtraction of integers and integer-arrays with Timestamp" + kAddInt);
+  unsupported("Timestamp", type_of(b));
+}
+
+// The number of code points of a UTF-8 text (numpy's <U width).
+std::size_t utf8_code_points(const std::string& text) {
+  std::size_t count = 0;
+  for (const unsigned char c : text)
+    if ((c & 0xC0) != 0x80) ++count;
+  return count;
+}
+
+// What a column dtype is to the addition.
+struct ColumnKind {
+  enum class Family { kCategory, kDatetime, kNumeric, kString, kObject, kOther } family = Family::kOther;
+  bool aware = false;       // kDatetime
+  std::string unit;         // kDatetime
+  std::string numpy_name;   // kNumeric: the numpy dtype of the values (Int64 -> int64)
+  bool masked = false;      // kNumeric
+  NumericDtype::Kind numeric_kind = NumericDtype::Kind::kFloat;
+  bool pd_na = false;       // kString: "string" holds pd.NA
+};
+ColumnKind column_kind(const std::string& dtype) {
+  using F = ColumnKind::Family;
+  ColumnKind out;
+  if (dtype == "category") out.family = F::kCategory;
+  else if (dtype.starts_with("datetime64[")) {
+    out.family = F::kDatetime;
+    const auto comma = dtype.find(", ");
+    out.aware = comma != std::string::npos;
+    out.unit = dtype.substr(11, (out.aware ? comma : dtype.find(']')) - 11);
+  } else if (const auto numeric = numeric_dtype(dtype)) {
+    out.family = F::kNumeric;
+    out.masked = numeric->masked;
+    out.numeric_kind = numeric->kind;
+    using K = NumericDtype::Kind;
+    out.numpy_name = numeric->kind == K::kBool       ? std::string("bool")
+                     : numeric->kind == K::kSigned   ? "int" + std::to_string(numeric->bits)
+                     : numeric->kind == K::kUnsigned ? "uint" + std::to_string(numeric->bits)
+                                                     : "float" + std::to_string(numeric->bits);
+  } else if (dtype == "str" || dtype == "string") {
+    out.family = F::kString;
+    out.pd_na = dtype == "string";
+  } else if (dtype == "object") out.family = F::kObject;
+  return out;
+}
+bool integer_kind(const ColumnKind& c) {
+  return c.family == ColumnKind::Family::kNumeric &&
+         (c.numeric_kind == NumericDtype::Kind::kSigned || c.numeric_kind == NumericDtype::Kind::kUnsigned);
+}
+
+bool nat_cell(const Cell& cell) {
+  return cell && !cell->is_null && cell->kind == AttributeKind::kDate && cell->value == "NaT";
+}
+// The object a cell holds in a column of this kind.
+Operand element(const Cell& cell, const ColumnKind& column) {
+  using F = ColumnKind::Family;
+  if (column.family == F::kObject) {
+    if (!cell || cell->is_null) return of_kind(Operand::Kind::kNone);
+    if (nat_cell(cell)) return of_kind(Operand::Kind::kNaT);
+    return of_value(scalar_of(cell));
+  }
+  if (null_cell(cell)) {
+    if (column.family == F::kDatetime) return of_kind(Operand::Kind::kNaT);
+    if (column.family == F::kNumeric) return of_kind(column.masked ? Operand::Kind::kNA : Operand::Kind::kNaN, true);
+    if (column.family == F::kString && column.pd_na) return of_kind(Operand::Kind::kNA);
+    return of_kind(Operand::Kind::kNaN);
+  }
+  return of_value(scalar_of(cell), column.family == F::kNumeric && column.masked);
+}
+
+// The left column plus one Series value (a Series backed by an extension
+// array: str, string, category, a masked dtype or an aware datetime).
+void column_add(const ColumnKind& left, const std::vector<Operand>& values, const Operand& y) {
+  using F = ColumnKind::Family;
+  switch (left.family) {
+    case F::kCategory:
+      if (y.numpy) fail("TypeError", "Object with dtype category cannot perform the numpy op add");
+      unsupported("Categorical", type_of(y));
+    case F::kDatetime:
+      if (y.kind == Operand::Kind::kNaT) return;
+      if (is_date(y)) fail("TypeError", "cannot add DatetimeArray and Timestamp");
+      if (is_int(y)) fail("TypeError", "Addition/subtraction of integers and integer-arrays with DatetimeArray" + kAddInt);
+      if (y.numpy && (y.kind == Operand::Kind::kValue || y.kind == Operand::Kind::kNaN)) {
+        const bool boolean = y.kind == Operand::Kind::kValue && y.value.kind == SK::kBool;
+        if (!left.aware) {
+          if (boolean) return;
+          fail("UFuncTypeError", "ufunc 'add' cannot use operands with types dtype('<M8[" + left.unit +
+                                     "]') and dtype('float64')");
+        }
+        if (values.empty()) return;
+        unsupported(values.front().kind == Operand::Kind::kNaT ? "NaTType" : "Timestamp", type_of(y));
+      }
+      unsupported("DatetimeArray", type_of(y));
+    case F::kNumeric: {
+      if (is_text_operand(y))
+        fail("UFuncTypeError", "ufunc 'add' did not contain a loop with signature matching types (dtype('" +
+                                   left.numpy_name + "'), dtype('<U" +
+                                   std::to_string(std::max<std::size_t>(1, utf8_code_points(y.value.text))) +
+                                   "')) -> None");
+      if (y.kind == Operand::Kind::kNaT) fail("TypeError", "Cannot add NaT to ndarray with dtype " + left.numpy_name);
+      if (is_date(y)) {
+        if (integer_kind(left))
+          fail("TypeError", "Addition/subtraction of integers and integer-arrays with Timestamp" + kAddInt);
+        fail("TypeError", kConcatenation);
+      }
+      if (y.kind == Operand::Kind::kNone)
+        unsupported(left.numeric_kind == NumericDtype::Kind::kFloat ? "float"
+                    : left.numeric_kind == NumericDtype::Kind::kBool ? "bool" : "int",
+                    "NoneType");
+      return;
+    }
+    case F::kString:
+    case F::kObject:
+      if (y.kind == Operand::Kind::kNaT) fail("TypeError", "Cannot add NaT to ndarray with dtype object");
+      if (is_date(y)) fail("TypeError", kConcatenation);
+      if (y.kind == Operand::Kind::kNA) return;
+      if (left.family == F::kString && (missing(y) || is_text_operand(y))) return;
+      for (const auto& v : values)
+        if (!missing(v)) value_add(v, y);
+      return;
+    case F::kOther: break;
+  }
+  fail("NotImplementedError", "adding this column to a list case key's run key is outside the captured native domain");
+}
+
+// The left column plus a Series backed by a numpy array (numbers, objects or
+// naive datetimes), broadcast to a block of the frame's shape: the block
+// operation adds every element, without the one-row shortcuts of a Series.
+void block_add(const ColumnKind& left, const std::vector<Operand>& values, const ColumnKind& right, const Operand& y) {
+  using F = ColumnKind::Family;
+  const bool right_dates = right.family == F::kDatetime;
+  const bool right_numbers = right.family == F::kNumeric;
+  switch (left.family) {
+    case F::kCategory:
+      if (right_dates) unsupported("Categorical", "DatetimeArray");
+      fail("TypeError", "Object with dtype category cannot perform the numpy op add");
+    case F::kDatetime:
+      if (right_dates) fail("TypeError", "cannot add DatetimeArray and DatetimeArray");
+      if (integer_kind(right))
+        fail("TypeError", "Addition/subtraction of integers and integer-arrays with DatetimeArray" + kAddInt);
+      if (right_numbers && right.numeric_kind == NumericDtype::Kind::kFloat && !left.aware)
+        fail("UFuncTypeError", "ufunc 'add' cannot use operands with types dtype('<M8[" + left.unit +
+                                   "]') and dtype('" + right.numpy_name + "')");
+      if (right_numbers && right.numeric_kind == NumericDtype::Kind::kBool && !left.aware) return;
+      if (right.family == F::kObject && y.kind == Operand::Kind::kNaT) return;
+      for (const auto& v : values) date_add(v, y);
+      return;
+    case F::kNumeric:
+      if (right_dates) {
+        if (left.numeric_kind == NumericDtype::Kind::kFloat)
+          fail("UFuncTypeError", "ufunc 'add' cannot use operands with types dtype('" + left.numpy_name +
+                                     "') and dtype('<M8[" + right.unit + "]')");
+        if (left.numeric_kind == NumericDtype::Kind::kBool) {
+          if (left.masked) fail("ValueError", "Could not convert object to NumPy datetime");
+          break;
+        }
+        fail("TypeError", "Addition/subtraction of integers and integer-arrays with DatetimeArray" + kAddInt);
+      }
+      if (right_numbers || missing(y)) return;
+      for (const auto& v : values)
+        if (!missing(v)) value_add(v, y);
+      return;
+    case F::kString:
+      if (right_dates) {
+        if (y.kind == Operand::Kind::kNaT ||
+            std::none_of(values.begin(), values.end(), [](const Operand& v) { return !missing(v); }))
+          return;
+        unsupported("DatetimeArray", "str");
+      }
+      if (missing(y) || is_text_operand(y)) return;
+      for (const auto& v : values)
+        if (!missing(v)) value_add(v, y);
+      return;
+    case F::kObject:
+      if (right_dates) {
+        for (const auto& v : values) date_add(y, v);
+        return;
+      }
+      if (missing(y)) return;
+      for (const auto& v : values)
+        if (!missing(v)) value_add(v, y);
+      return;
+    case F::kOther: break;
+  }
+  fail("NotImplementedError", "adding this column to a list case key's run key is outside the captured native domain");
+}
+
+// The run key's addition and assignment; returns normally when the run key
+// is one column (an empty frame with one listed column, or one row and an
+// empty key), whose single run needs no values.
+void check(const EventTable& df, const std::vector<std::size_t>& listed, std::size_t act) {
+  const auto n = df.size();
+  const auto k = listed.size();
+  // The row labels: the RangeIndex, or int64 labels.
+  std::vector<std::int64_t> labels;
+  labels.reserve(n);
+  if (!df.index) {
+    for (std::size_t i = 0; i < n; ++i) labels.push_back(static_cast<std::int64_t>(i));
+  } else {
+    if (df.index->names.size() != 1 || df.index->dtype != "int64" || df.index->labels.size() != n)
+      fail("NotImplementedError", "a list case key's run key over this index is outside the captured native domain");
+    for (const auto& label : df.index->labels) {
+      const auto* v = std::get_if<EventAttribute>(&label.value);
+      const auto* i = v ? std::get_if<std::int64_t>(&v->typed_value) : nullptr;
+      if (!i) fail("NotImplementedError", "a list case key's run key over this index is outside the captured native domain");
+      labels.push_back(*i);
+    }
+  }
+  std::vector<std::string> names;
+  for (const auto c : listed) names.push_back(df.columns[c]);
+  const auto non_decreasing = [&] {
+    for (std::size_t i = 1; i < n; ++i)
+      if (labels[i] < labels[i - 1]) return false;
+    return true;
+  }();
+  const auto increasing_names = [&] {
+    for (std::size_t i = 1; i < k; ++i)
+      if (!(names[i - 1] < names[i])) return false;
+    return true;
+  }();
+  // The union: listed names (column positions into `listed`) and row
+  // labels (row positions), in pandas' order.
+  struct Slot {
+    bool column = false;
+    std::size_t at = 0;
+  };
+  std::vector<Slot> slots;
+  std::vector<std::size_t> name_order(k);
+  std::iota(name_order.begin(), name_order.end(), std::size_t{0});
+  const auto sort_names = [&] {
+    std::stable_sort(name_order.begin(), name_order.end(),
+                     [&](std::size_t a, std::size_t b) { return names[a] < names[b]; });
+  };
+  std::vector<std::size_t> row_order(n);
+  std::iota(row_order.begin(), row_order.end(), std::size_t{0});
+  bool columns_first = true;
+  if (n == 0) {
+    if (!increasing_names) sort_names();
+  } else if (k == 0) {
+    // numpy's quicksort argsort of the labels (its non-SIMD introsort; the
+    // SIMD sort of AVX-512 hosts breaks ties of equal labels otherwise).
+    if (!non_decreasing)
+      row_order = detail::numpy_object_quick_argsort(
+          n, [&](std::size_t a, std::size_t b) { return labels[a] < labels[b] ? -1 : labels[b] < labels[a] ? 1 : 0; });
+  } else if (increasing_names && non_decreasing) {
+    std::map<std::int64_t, std::size_t> counts;
+    for (const auto label : labels) ++counts[label];
+    if (counts.size() != n) {
+      std::size_t values = k;
+      for (const auto& [label, count] : counts) values += count * count;
+      fail("ValueError", "Length of values (" + std::to_string(values) + ") does not match length of index (" +
+                             std::to_string(k + n) + ")");
+    }
+  } else {
+    sort_names();
+    std::stable_sort(row_order.begin(), row_order.end(),
+                     [&](std::size_t a, std::size_t b) { return labels[a] < labels[b]; });
+    columns_first = false;
+  }
+  if (columns_first)
+    for (const auto c : name_order) slots.push_back({true, c});
+  for (const auto r : row_order) slots.push_back({false, r});
+  if (!columns_first)
+    for (const auto c : name_order) slots.push_back({true, c});
+
+  // The reindexed Series: its dtype, and which object each slot gets.
+  const auto act_dtype = column_dtype(df, act);
+  const auto act_kind = column_kind(act_dtype);
+  const bool identity = k == 0 && non_decreasing;
+  std::string right_dtype = act_dtype;
+  bool from_object = false, from_integers = false;
+  if (!identity) {
+    if (integer_kind(act_kind) && !act_kind.masked) {
+      if (k) right_dtype = "float64", from_integers = true;
+    } else if (act_kind.family == ColumnKind::Family::kNumeric && act_kind.numeric_kind == NumericDtype::Kind::kBool &&
+               !act_kind.masked) {
+      if (k) right_dtype = "object";
+    } else if (act_dtype == "object") {
+      // A reindex infers a column of str (or of Timestamps of one zone).
+      bool texts = true, dates = true, any = false;
+      std::vector<Cell> date_cells;
+      for (const auto& row : df.rows) {
+        const auto value = element(row[act], act_kind);
+        if (missing(value)) continue;
+        any = true;
+        if (!is_text_operand(value)) texts = false;
+        if (row[act] && date_key(*row[act])) date_cells.push_back(row[act]);
+        else dates = false;
+      }
+      if (any && texts) right_dtype = "str", from_object = true;
+      else if (any && dates)
+        if (auto inferred = datetime_dtype(date_cells)) right_dtype = std::move(*inferred), from_object = true;
+    }
+  }
+  const auto right = column_kind(right_dtype);
+  using F = ColumnKind::Family;
+  const bool blockwise = right.family == F::kObject || (right.family == F::kNumeric && !right.masked) ||
+                         (right.family == F::kDatetime && !right.aware);
+  if (right.family == F::kOther)
+    fail("NotImplementedError", "a list case key's run key with this activity dtype is outside the captured native domain");
+  Operand right_missing;
+  if (right.family == F::kDatetime) right_missing = of_kind(Operand::Kind::kNaT);
+  else if ((right.family == F::kNumeric && right.masked) || (right.family == F::kString && right.pd_na))
+    right_missing = of_kind(Operand::Kind::kNA);
+  else right_missing = of_kind(Operand::Kind::kNaN, right.family == F::kNumeric);
+  const auto right_value = [&](std::size_t row) -> Operand {
+    const auto& cell = df.rows[row][act];
+    if (from_object) {
+      const auto value = element(cell, act_kind);
+      return missing(value) ? right_missing : value;
+    }
+    if (from_integers) {
+      if (null_cell(cell)) return right_missing;
+      const auto s = scalar_of(cell);
+      return of_value(python::real(std::strtod(python::str(s).c_str(), nullptr)), true);
+    }
+    if (right.family == F::kObject) return element(cell, act_kind);
+    if (null_cell(cell)) return right_missing;
+    const bool numpy = right.family == F::kNumeric;
+    return of_value(scalar_of(cell), numpy);
+  };
+  const ColumnKind nan_column = column_kind("float64");
+  const std::vector<Operand> nan_values(n, of_kind(Operand::Kind::kNaN, true));
+  for (const auto& slot : slots) {
+    std::vector<Operand> values;
+    ColumnKind left = nan_column;
+    Operand y = right_missing;
+    if (slot.column) {
+      const auto c = listed[slot.at];
+      left = column_kind(column_dtype(df, c));
+      values.reserve(n);
+      for (const auto& row : df.rows) values.push_back(element(row[c], left));
+    } else {
+      values = nan_values;
+      y = right_value(slot.at);
+    }
+    if (blockwise) block_add(left, values, right, y);
+    else column_add(left, values, y);
+  }
+  if (slots.size() > 1)
+    fail("ValueError", "Cannot set a DataFrame with multiple columns to the single column @@extra1");
+  if (slots.empty()) fail("ValueError", "Cannot set a DataFrame without columns to the column @@extra1");
+}
+
+}  // namespace consecutive_list_key
+
+}  // namespace
+
 EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, const PandasFilterParameters& parameters) {
+  const auto filter_type_of = [&] { return parameter_or(parameters, "FILTER_TYPE", "filter_type", Value::of("first")); };
+  const auto finish = [&](const std::vector<bool>& continues, const Value& filter_type) {
+    const bool first = filter_type.kind == Kind::kString && filter_type.text == "first";
+    const bool last = filter_type.kind == Kind::kString && filter_type.text == "last";
+    if (!first && !last) {
+      EventTable out = df;
+      reset_index(out);
+      return out;
+    }
+    std::vector<std::vector<std::size_t>> runs;
+    for (std::size_t i = 0; i < df.size(); ++i) {
+      if (continues[i]) runs.back().push_back(i);
+      else runs.push_back({i});
+    }
+    return merge_groups(df, runs, first, identity_order(df.columns.size()));
+  };
   // Round DX (probe dw/s1): a list case key is read as df[key]
   // (pandas_list_key.hpp), then the activity column. The run key then adds
   // that frame and the activity series, aligned on the frame's columns,
-  // which a column named twice refuses to reindex. The addition itself (its
-  // column alignment and per-block NumPy and extension-array operations) is
-  // outside the captured native domain (declared, Review DX1).
+  // which a column named twice refuses to reindex; round DZ models the
+  // addition and the assignment (consecutive_list_key above). A run key that
+  // is one column has at most one row, so one run.
   if (ListCaseKey::applies(case_key(parameters))) {
     const auto listed = case_key(parameters).items.empty()
                             ? std::vector<std::size_t>{}
                             : detail::pandas_getitem_list(df.columns, key_attribute(case_key(parameters)), df.size(),
                                                           attribute_repr, [](const std::string& m) { return py_repr(m); }, fail);
-    (void)getitem_key(df, activity_key(parameters));
+    const auto act = getitem_key(df, activity_key(parameters));
     std::set<std::size_t> seen;
     for (const auto c : listed)
       if (!seen.insert(c).second) fail("ValueError", "cannot reindex on an axis with duplicate labels");
-    fail("NotImplementedError",
-         "adding a list case key's frame and the activity column is outside the captured native domain");
+    consecutive_list_key::check(df, listed, act);
+    return finish(std::vector<bool>(df.size(), false), filter_type_of());
   }
   // Round CL: df[case] then df[act] (a dict key is refused as an indexer).
   const auto case_column = getitem_key(df, case_key(parameters));
   const auto act = getitem_key(df, activity_key(parameters));
-  const auto filter_type = parameter_or(parameters, "FILTER_TYPE", "filter_type", Value::of("first"));
+  const auto filter_type = filter_type_of();
   // The run key is case id + activity. Two numeric columns add as numpy or
   // pandas' masked arrays do; otherwise the cells add as Python objects (two
   // str concatenate, two numbers add) over the rows where both are present,
@@ -2666,19 +3119,7 @@ EventTable pandas_consecutive_act_case_grouping_apply(const EventTable& df, cons
                          ? true
                          : run_keys[i] && run_keys[i - 1] && py_equal(*run_keys[i], *run_keys[i - 1]);
   }
-  const bool first = filter_type.kind == Kind::kString && filter_type.text == "first";
-  const bool last = filter_type.kind == Kind::kString && filter_type.text == "last";
-  if (!first && !last) {
-    EventTable out = df;
-    reset_index(out);
-    return out;
-  }
-  std::vector<std::vector<std::size_t>> runs;
-  for (std::size_t i = 0; i < df.size(); ++i) {
-    if (continues[i]) runs.back().push_back(i);
-    else runs.push_back({i});
-  }
-  return merge_groups(df, runs, first, identity_order(df.columns.size()));
+  return finish(continues, filter_type);
 }
 
 // The dtype pandas infers for a key column's distinct values: all bool

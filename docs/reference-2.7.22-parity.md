@@ -31593,3 +31593,118 @@ Tests:
 - Full suite: 618 of 618 tests passed on the first run. The workbench
   fixture replay gave 2,673 responses unchanged. Python script and
   frontend tests not rerun (scripts and frontend unchanged).
+
+## Review DZ1: re-review of round DY, the consecutive grouping's `df[key] + df[activity]` with a list key, the OCEL CSV reader's timestamp shapes outside the ISO family, fresh seeds (2026-11-18)
+
+Round DZ checked DY's CI (run 44276414877 on 9c3a8cc2: green on all six
+jobs, Windows included), took two declared items (the consecutive
+grouping with a list case key, DX1, and the CSV timestamp shapes, DV1-2)
+and replayed a batch of fresh seeds. The device check on the Mac was
+skipped (the Mac was not linked).
+
+Observed black-box on pandas 3.0.5 and numpy 2.4.6 in the reference venv:
+
+- **DZ1-1 The consecutive grouping with a list case key.** pm4py adds the
+  frame `df[key]` to the Series `df[activity]`. pandas aligns the Series'
+  index against the frame's columns: their union holds the listed names
+  (sorted unless strictly increasing) when the index is empty, the index
+  (sorted unless non-decreasing) when no name is listed, the names then
+  the labels when both are monotonic (a repeated label then fails with
+  `ValueError: Length of values (k+Σcount²) does not match length of
+  index (k+n)`), else the sorted labels then the sorted names. The
+  activity Series is reindexed onto the union (unchanged only when no name
+  is listed and the index is non-decreasing): numpy integers turn float64
+  and numpy booleans object once a name is listed, and an object column
+  is inferred again ("str" when every present value is a str, a datetime
+  dtype for Timestamps of one zone). A reindexed extension array (str,
+  string, category, masked, an aware datetime) adds column by column
+  (array plus scalar); object, numpy numbers and naive datetime64 of any
+  unit add block-wise (array plus a broadcast array, no one-row shortcut),
+  each with its own errors (Python's `can only concatenate str (not
+  "int") to str` family, `unsupported operand type(s) for +`, the masked
+  fallback that adds only present elements, NaT and Timestamp sums, the
+  categorical and datetime refusals). With an empty index and an
+  unsorted one, the right values follow numpy's quicksort argsort of the
+  labels (native models the non-SIMD introsort; the reference must run
+  with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`,
+  as for the earlier argsort ties). After the sum, more than one column
+  raises `Cannot set a DataFrame with multiple columns to the single
+  column @@extra1`, none raises `Cannot set a DataFrame without columns to
+  the column @@extra1`, and one column (a single listed name or none)
+  succeeds with every row a run of its own. Native refused every list key
+  here as outside its domain. Python model (`dz/ca/model.py`): 0
+  differences over 23,400 fuzzed keys on the CK, CN, typed and base
+  domains; C++ (`consecutive_list_key` in `pandas_sequence_filters.cpp`):
+  0 of 10,752 calls of the probes c1 to c3 and 0 of DX's 158 declared
+  calls (probes s1 to s3). This comes off the declared list.
+- **DZ1-2 The CSV reader's timestamp shapes outside the ISO family.**
+  `pd.to_datetime` guesses one format from the first text through dateutil
+  (`%m/%d/%Y` for 01/02/2024, `%d/%m/%Y` when the first field passes 12,
+  the separators `-`, `/` and `.`, one-digit fields, a literal `t`, `z` or
+  `GMT`, `%Z` for `UTC`, `%z` for `Z`, `+HH`, `+HHMM` and `+HH:MM`, ` %z`
+  after a space), and guesses none (dateutil element by element, outside
+  the model) when dateutil fails (a lone one-digit hour, a field out of
+  range) or the first text does not parse with the format (`+HH` outside
+  an ISO format, ten fraction digits after a non-ISO date). An ISO format
+  (a prefix of `%Y<sep>%m<sep>%d( |T)%H:%M:%S[.%f][%z]`, the date
+  separator one of ` /\-.` or none) goes to an ISO parser first (one- or
+  two-digit fields in range, any number of fraction digits, `+HH`
+  offsets); whatever it refuses, and every text of another format, goes
+  to the strptime rules (Python's field patterns, pandas' `%f` of up to
+  nine digits, matched case-insensitively from the start, seconds 60 and
+  61 rolling over into the next minute), whose `doesn't match format` and
+  `unconverted data remains` errors are the ones raised (a day past the
+  month gives `day is out of range for month`); one zone for the column
+  as in DV1-2, and nanoseconds once a text has more than six fraction
+  digits. Native refused these texts (`event CSV timestamp is not
+  ISO-8601`) or read some of them differently (a lowercase `z` as UTC, a
+  day 32 or seconds 60 of the ISO family as malformed). The reader now
+  keeps each event time of such a column as the ISO text of the instant
+  pandas reads (a text of the ISO family that native already reads as
+  that instant keeps its spelling), and the model takes precedence over
+  DV1-2's check, which it agrees with on DV's 29,781 fuzzed columns.
+  Python model (`dz/ts/tsmodel.py`): 0 differences over 83,647 fuzzed
+  columns (the format guess matches pandas on every covered first text);
+  native through the server (`dz/ts/natfz.py`, each event time compared
+  as an instant): 51,487 of 51,796 covered columns match, the other 309
+  hold offsets past 14 hours, which a native time cannot hold (declared).
+- **DZ1-3 Fresh seeds.** Batch 2026121900-11 (twelve banks): the pandas
+  CK, CN and sequence banks and the Polars table and sequence banks replay
+  clean apart from two calls, both declared races: the equal-size join
+  order of the Polars sequence filters (CK 2026121906, case 962) and the
+  struct cast race (Polars table CJ 2026121903, case 731, which the bank
+  test accepts).
+
+Found, not taken: nothing new.
+
+Declared:
+- Still declared from earlier rounds: the row mask, dict and list stake
+  keys of DW1, the equal-size join order of the Polars sequence filters
+  and the Polars inner join order (DX1-9), the nanosecond window at
+  pandas' int64 range ends (DQ1-2), dateutil-only date strings (DP1-4,
+  DQ1-4), the eager paths performance race (DO1-2), the thread-count quirk
+  of DN1-6 and the struct cast race.
+- New: CSV timestamp columns pandas guesses no format for (dateutil
+  element by element), columns with a year outside 1000-9999, an offset
+  of 24 hours or more, or a year outside the nanosecond range next to a
+  nanosecond text (DZ1-2), and offsets past 14 hours, which a native time
+  cannot hold.
+- The consecutive grouping's argsort of an unsorted empty-label index
+  depends on numpy's CPU features of the reference host (DZ1-1).
+
+Tests:
+- New: `docs/pandas-sequence-filter-dz-bank.json.gz` (697 cases, 10,910
+  calls of the probes c1 to c3 and the 158 calls of s1 to s3; the DY
+  driver differs on 8,558 of them) with
+  `minera_pandas_sequence_filter_dz_bank_parity_tests`, and
+  `minera_review_dz1_tests` (the CSV shapes, with
+  `docs/ocel-csv-timestamp-dz-bank.tsv.gz`: 5,000 fuzzed columns, each
+  event time compared as an instant). `minera_review_dv1_tests` now
+  expects pandas' error for a lowercase `t` separator followed by a space,
+  and `minera_review_dx1_tests` pandas' `UFuncTypeError` for its frame's
+  list keys in the consecutive grouping (a NaN float64 column meets a str
+  activity).
+- Full suite: 620 tests, 619 passed on the first run (the DX1 expectation
+  above, updated and passing); the workbench fixture replay gave 2,673
+  responses unchanged. Python script and frontend tests not rerun
+  (scripts and frontend unchanged).

@@ -343,8 +343,11 @@ void timestamp_formats() {
                  .find("passing `format='mixed'`, and the format will be inferred for each element individually. "
                        "You might want to use `dayfirst` alongside this.") != std::string::npos,
          "the suggestions");
-  // Another shape keeps the native reading (declared).
-  expect(outcome({"2024-01-01t00:00:00", "2024-01-02 00:00:00"}) == "ok", "a lowercase separator reads natively");
+  // Round DZ: a lowercase separator is a literal of the guessed format
+  // (strptime rules), which the next text does not match.
+  expect(outcome({"2024-01-01t00:00:00", "2024-01-02 00:00:00"}) ==
+             value_error("time data \"2024-01-02 00:00:00\" doesn't match format \"%Y-%m-%dt%H:%M:%S\""),
+         "a lowercase separator");
 }
 
 int replay_bank(const char* path) {

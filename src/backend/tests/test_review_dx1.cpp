@@ -154,11 +154,15 @@ void column_keys() {
              "       'nope21', 'nope22', 'nope23', 'nope24', 'nope25', 'nope26', 'nope27',\\n"
              "       'nope28', 'nope29'],\\n      dtype='str')] are in the [columns]\"",
          "a long Index wraps in the KeyError");
-  // Declared (Review DX1): adding the key's frame and the activity column
-  // aligns a Series on the columns; its errors are outside the native domain.
-  expect(error_of([&] { (void)pandas_consecutive_act_case_grouping_apply(frame(), keyed(labels({"cid"}))); })
-                 .rfind("NotImplementedError: ", 0) == 0,
-         "the consecutive grouping's addition is declared");
+  // Round DZ (Review DZ1-1): adding the key's frame and the activity column
+  // aligns the Series on the columns ("cid" then the labels 0 to 4), so a
+  // NaN float64 column meets a str activity (pm4py 2.7.22, pandas 3.0.5).
+  for (const auto& key : {std::vector<std::string>{"cid"}, std::vector<std::string>{"cid", "act"},
+                          std::vector<std::string>{}})
+    expect(error_of([&] { (void)pandas_consecutive_act_case_grouping_apply(frame(), keyed(labels(key))); }) ==
+               "UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types "
+               "(dtype('float64'), dtype('<U1')) -> None",
+           "the consecutive grouping's addition with " + std::to_string(key.size()) + " listed names");
 }
 
 void index_repr() {

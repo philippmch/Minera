@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DY (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–DZ (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6932,6 +6932,76 @@ bank replays unchanged and the workbench fixture replay gave 2,673
 responses unchanged. Python script and frontend tests not rerun (scripts
 and frontend unchanged). The device check on the Mac was skipped (the Mac
 was not linked).
+
+Round DZ re-reviewed DY (Review DZ1). DY's CI run 44276414877: green on
+all six jobs.
+DZ took two declared items:
+- the consecutive grouping's `df[key] + df[activity]` with a list key
+  (DX1): the union of the frame's columns and the Series' index (names
+  sorted unless strictly increasing, the index sorted unless
+  non-decreasing, both monotonic: names then labels, else sorted labels
+  then sorted names; a repeated label under both monotonic raises the
+  Length of values error), the reindexed activity dtype (int to float64
+  and bool to object once a name is listed, object inferred again), the
+  column-wise (extension arrays) or block-wise (object, numpy, naive
+  datetime64) add with their own errors, numpy's quicksort argsort for an
+  unsorted empty-label index (reference run with NPY_DISABLE_CPU_FEATURES),
+  then the multiple/no columns errors or one run per row; Python model
+  0 of 23,400 fuzzed keys, C++ probes c1-c3 0 of 10,752 and DX's 158
+  declared calls 0 (`consecutive_list_key` in
+  `pandas_sequence_filters.cpp`);
+- the OCEL CSV timestamp shapes outside the ISO family (DV1-2): pandas'
+  format guess (dateutil: m/d/Y, d/m/Y past 12, `-` `/` `.`, one-digit
+  fields, literal t, z and GMT, `%Z` for UTC, `+HH`, ` %z`), the ISO parser
+  first for an ISO format and the strptime rules for the rest (whose errors
+  are raised; seconds 60 and 61 roll over; day past the month), one zone,
+  nanoseconds past six digits; the reader keeps such times as ISO texts of
+  pandas' instants (`pandas_guess` in `ocel_csv.cpp`, ahead of DV's
+  `pandas_iso` check). Python model 0 of 83,647 fuzzed columns; server
+  imports 51,487 of 51,796 covered columns, the rest offsets past 14 hours
+  (declared).
+- Fresh seeds 2026121900-11: two calls, both declared races (the Polars
+  sequence equal-size join order, CK 2026121906; the struct cast race,
+  Polars table CJ 2026121903).
+
+In the suite: `docs/pandas-sequence-filter-dz-bank.json.gz` (697 cases,
+10,910 calls) with `minera_pandas_sequence_filter_dz_bank_parity_tests`,
+and `minera_review_dz1_tests` with `docs/ocel-csv-timestamp-dz-bank.tsv.gz`
+(5,000 columns). The probes, models and fresh banks are in the project
+files under `review-harness/round-dz/`.
+
+Full suite 619 of 620 passed on the first run; the one failure was
+`minera_review_dx1_tests`, whose declared NotImplementedError for the
+consecutive addition is now pandas' UFuncTypeError (test updated, then the
+45 OCEL, CSV and review tests passed again after the last rebuild). The
+workbench fixture replay gave 2,673 responses unchanged. Python script and
+frontend tests not rerun (scripts and frontend unchanged). The device
+check on the Mac was skipped (the Mac was not linked).
+
+Next round (EA) should start by re-reviewing round DZ:
+
+- DZ's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the CSV timestamp columns pandas guesses no format for (dateutil element
+  by element: a lone one-digit hour, a comma or ten-digit fraction after a
+  non-ISO date, month names, AM/PM, out-of-range first texts) and the
+  other DZ1-2 leftovers (offsets of 24 hours or more, years outside
+  1000-9999, leading or trailing spaces);
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round DY's targets, taken in DZ (findings DZ1-1 to DZ1-3): DY's CI, the
+fresh seeds, the consecutive addition, the CSV timestamp shapes. Not taken
+(carried to EA): the new dtypes, the DW1 keys, the declared items, the CU
+list and the open choices.
+
+Previous list for round DZ (kept for its older items):
 
 Next round (DZ) should start by re-reviewing round DY:
 

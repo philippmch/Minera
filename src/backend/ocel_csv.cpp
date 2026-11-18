@@ -16,6 +16,8 @@
 #include <iomanip>
 #include <limits>
 #include <map>
+#include <optional>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -24,6 +26,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace minera {
@@ -604,6 +607,17 @@ constexpr const char* kSuggestions =
     "format;\n    - passing `format='mixed'`, and the format will be inferred for each element "
     "individually. You might want to use `dayfirst` alongside this.";
 
+// Whether every text (missing cells skipped) has the ISO shape above.
+bool covers(const std::vector<std::string_view>& texts) {
+  bool any = false;
+  for (const auto text : texts) {
+    if (text.empty()) continue;
+    if (!inferred_format(text)) return false;
+    any = true;
+  }
+  return any;
+}
+
 // Throws the ValueError pd.to_datetime raises for these texts (missing cells
 // skipped), if any.
 void check_column(const std::vector<std::string_view>& texts) {
@@ -640,19 +654,520 @@ void check_column(const std::vector<std::string_view>& texts) {
 
 }  // namespace pandas_iso
 
+// Round DZ: the timestamp shapes outside the ISO family above. pd.to_datetime
+// guesses one format from the first text (through dateutil), checks that the
+// first text parses with it, and parses every text with it: a format that is
+// a prefix of "%Y<sep>%m<sep>%d( |T)%H:%M:%S[.%f][%z]" goes to an ISO parser
+// first, and any text that parser refuses (or any text, for another format)
+// to the strptime rules, whose errors are the ones raised (observed
+// black-box; a Python model matched pandas on 83,647 fuzzed columns). The
+// model covers columns whose texts all have the shape A<sep>B<sep>C (sep one
+// of - / ., a four-digit year 1000-9999 first or last), optionally followed
+// by a space, T or t and H[:M[:S[.digits]]], optionally followed by an
+// optional space and Z, z, +HH, +HHMM, +HH:MM (under 24 hours), UTC or GMT;
+// the reader then keeps every event time as the ISO text of the instant
+// pandas reads. Other columns keep the native reading (declared).
+namespace pandas_guess {
+
+constexpr const char* kSuggestions =
+    ". You might want to try:\n    - passing `format` if your strings have a consistent format;\n    - "
+    "passing `format='ISO8601'` if your strings are all ISO8601 but not necessarily in exactly the same "
+    "format;\n    - passing `format='mixed'`, and the format will be inferred for each element "
+    "individually. You might want to use `dayfirst` alongside this.";
+
+bool digit(char c) { return std::isdigit(static_cast<unsigned char>(c)) != 0; }
+
+std::size_t run(std::string_view text, std::size_t at) {
+  std::size_t count = 0;
+  while (at + count < text.size() && digit(text[at + count])) ++count;
+  return count;
+}
+
+int number(std::string_view text) {
+  int value = 0;
+  for (const char c : text) value = value * 10 + (c - '0');
+  return value;
+}
+
+bool leap(int year) { return (year % 4 == 0 && year % 100 != 0) || year % 400 == 0; }
+
+int month_days(int year, int month) {
+  static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  return month == 2 && leap(year) ? 29 : kDays[month - 1];
+}
+
+std::int64_t days_from_civil(std::int64_t y, unsigned m, unsigned d) {
+  y -= m <= 2;
+  const std::int64_t era = (y >= 0 ? y : y - 399) / 400;
+  const auto yoe = static_cast<unsigned>(y - era * 400);
+  const unsigned doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+  const unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + static_cast<std::int64_t>(doe) - 719468;
+}
+
+void civil_from_days(std::int64_t z, std::int64_t& y, unsigned& m, unsigned& d) {
+  z += 719468;
+  const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+  const auto doe = static_cast<unsigned>(z - era * 146097);
+  const unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+  y = static_cast<std::int64_t>(yoe) + era * 400;
+  const unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+  const unsigned mp = (5 * doy + 2) / 153;
+  d = doy - (153 * mp + 2) / 5 + 1;
+  m = mp < 10 ? mp + 3 : mp - 9;
+  y += m <= 2;
+}
+
+// A text of the covered shape, split into its parts.
+struct Parts {
+  std::string_view a, b, c;
+  char date_separator = '-';
+  bool has_time = false;
+  char time_separator = ' ';
+  std::string_view hour, minute, second, fraction;
+  bool has_zone = false;
+  bool zone_space = false;
+  std::string_view zone;
+};
+
+std::optional<Parts> split(std::string_view text) {
+  Parts parts;
+  std::size_t at = 0;
+  const auto field = [&](std::string_view& out) {
+    const auto count = run(text, at);
+    if (count == 0) return false;
+    out = text.substr(at, count);
+    at += count;
+    return true;
+  };
+  if (!field(parts.a) || at >= text.size()) return std::nullopt;
+  parts.date_separator = text[at];
+  if (parts.date_separator != '-' && parts.date_separator != '/' && parts.date_separator != '.')
+    return std::nullopt;
+  ++at;
+  if (!field(parts.b) || at >= text.size() || text[at] != parts.date_separator) return std::nullopt;
+  ++at;
+  if (!field(parts.c)) return std::nullopt;
+  if (at == text.size()) return parts;
+  parts.time_separator = text[at];
+  if (parts.time_separator != ' ' && parts.time_separator != 'T' && parts.time_separator != 't')
+    return std::nullopt;
+  ++at;
+  parts.has_time = true;
+  if (!field(parts.hour)) return std::nullopt;
+  if (at + 1 < text.size() && text[at] == ':' && digit(text[at + 1])) {
+    ++at;
+    field(parts.minute);
+    if (at + 1 < text.size() && text[at] == ':' && digit(text[at + 1])) {
+      ++at;
+      field(parts.second);
+      if (at + 1 < text.size() && text[at] == '.' && digit(text[at + 1])) {
+        ++at;
+        field(parts.fraction);
+      }
+    }
+  }
+  if (at == text.size()) return parts;
+  parts.has_zone = true;
+  if (text[at] == ' ') {
+    parts.zone_space = true;
+    ++at;
+  }
+  parts.zone = text.substr(at);
+  const auto zone = parts.zone;
+  if (zone == "Z" || zone == "z" || zone == "UTC" || zone == "GMT") return parts;
+  if (zone.size() < 3 || (zone[0] != '+' && zone[0] != '-') || run(zone, 1) < 2) return std::nullopt;
+  if (zone.size() == 3) return parts;
+  if (zone.size() == 5 && run(zone, 1) == 4) return parts;
+  if (zone.size() == 6 && zone[3] == ':' && run(zone, 1) == 2 && run(zone, 4) == 2) return parts;
+  return std::nullopt;
+}
+
+bool year_first(const Parts& parts) { return parts.a.size() == 4; }
+
+bool year_last(const Parts& parts) {
+  return parts.a.size() != 4 && parts.c.size() == 4 && parts.a.size() <= 2 && parts.b.size() <= 2;
+}
+
+bool in_domain(std::string_view text) {
+  const auto parts = split(text);
+  if (!parts || (!year_first(*parts) && !year_last(*parts))) return false;
+  const int year = number(year_first(*parts) ? parts->a : parts->c);
+  if (year < 1000 || year > 9999) return false;
+  if (parts->has_zone && (parts->zone[0] == '+' || parts->zone[0] == '-')) {
+    std::string offset;
+    for (const char c : parts->zone.substr(1))
+      if (c != ':') offset += c;
+    if (number(std::string_view(offset).substr(0, 2)) >= 24) return false;
+    if (offset.size() > 2 && number(std::string_view(offset).substr(2)) >= 60) return false;
+  }
+  return true;
+}
+
+// The format pandas guesses for a covered text before it checks it, or
+// nullopt when it guesses none or the model does not know.
+std::optional<std::string> structural_guess(std::string_view text) {
+  const auto parts = split(text);
+  if (!parts) return std::nullopt;
+  std::string_view year, month, day;
+  const char* fields[3];
+  if (year_first(*parts)) {
+    year = parts->a, month = parts->b, day = parts->c;
+    fields[0] = "%Y", fields[1] = "%m", fields[2] = "%d";
+  } else if (year_last(*parts)) {
+    year = parts->c;
+    if (number(parts->a) > 12) {
+      day = parts->a, month = parts->b;
+      fields[0] = "%d", fields[1] = "%m", fields[2] = "%Y";
+    } else {
+      month = parts->a, day = parts->b;
+      fields[0] = "%m", fields[1] = "%d", fields[2] = "%Y";
+    }
+  } else {
+    return std::nullopt;
+  }
+  if (month.size() > 2 || day.size() > 2) return std::nullopt;
+  const int y = number(year), m = number(month), d = number(day);
+  if (y < 1000 || y > 9999 || m < 1 || m > 12) return std::nullopt;
+  if (d < 1 || d > month_days(y, m)) return std::nullopt;
+  const std::string separator(1, parts->date_separator);
+  std::string format = std::string(fields[0]) + separator + fields[1] + separator + fields[2];
+  if (parts->has_time) {
+    if (parts->hour.size() > 2 || parts->minute.size() > 2 || parts->second.size() > 2)
+      return std::nullopt;
+    if (number(parts->hour) > 23 || (!parts->minute.empty() && number(parts->minute) > 59) ||
+        (!parts->second.empty() && number(parts->second) > 59))
+      return std::nullopt;
+    // dateutil reads no lone one-digit hour.
+    if (parts->minute.empty() && parts->hour.size() == 1) return std::nullopt;
+    format += parts->time_separator;
+    format += "%H";
+    if (!parts->minute.empty()) format += ":%M";
+    if (!parts->second.empty()) format += ":%S";
+    if (!parts->fraction.empty()) format += ".%f";
+  }
+  if (parts->has_zone) {
+    if (parts->zone_space) format += ' ';
+    if (parts->zone == "z" || parts->zone == "GMT") format += parts->zone;
+    else if (parts->zone == "UTC") format += "%Z";
+    else format += "%z";
+  }
+  return format;
+}
+
+bool format_is_iso(std::string_view format) {
+  static const char* kDateSeparators[] = {" ", "/", "\\", "-", ".", ""};
+  static const char* kTimeSeparators[] = {" ", "T"};
+  static const char* kTails[] = {"", "%z", ".%f", ".%f%z"};
+  if (format == "%Y%m") return false;
+  for (const auto* date : kDateSeparators)
+    for (const auto* time : kTimeSeparators)
+      for (const auto* tail : kTails) {
+        const std::string iso = std::string("%Y") + date + "%m" + date + "%d" + time + "%H:%M:%S" + tail;
+        if (iso.compare(0, format.size(), format) == 0 && format.size() <= iso.size()) return true;
+      }
+  return false;
+}
+
+std::vector<std::string> tokens(std::string_view format) {
+  std::vector<std::string> out;
+  for (std::size_t i = 0; i < format.size(); ++i) {
+    if (format[i] == '%' && i + 1 < format.size()) {
+      out.emplace_back(format.substr(i, 2));
+      ++i;
+    } else {
+      out.emplace_back(1, format[i]);
+    }
+  }
+  return out;
+}
+
+struct Fields {
+  int year = 1900, month = 1, day = 1, hour = 0, minute = 0, second = 0;
+  std::string fraction;
+  std::optional<int> offset_minutes;
+  bool utc_name = false;
+};
+
+struct Failure {
+  bool remains = false;
+  std::string rest;
+};
+
+using Parsed = std::variant<Fields, Failure>;
+
+// pandas' ISO parser held to an ISO format: one- or two-digit fields, up
+// to nine fraction digits (further ones skipped at the end or before the
+// offset), offsets Z, +HH, +HHMM and +HH:MM, values in range.
+std::optional<Fields> iso_parse(std::string_view text, const std::vector<std::string>& format) {
+  Fields fields;
+  std::size_t at = 0;
+  for (std::size_t i = 0; i < format.size(); ++i) {
+    const auto& token = format[i];
+    if (token == "%Y") {
+      if (run(text, at) < 4) return std::nullopt;
+      fields.year = number(text.substr(at, 4));
+      at += 4;
+    } else if (token == "%m" || token == "%d" || token == "%H" || token == "%M" || token == "%S") {
+      const auto count = std::min<std::size_t>(run(text, at), 2);
+      if (count == 0) return std::nullopt;
+      const int value = number(text.substr(at, count));
+      at += count;
+      (token == "%m" ? fields.month : token == "%d" ? fields.day : token == "%H" ? fields.hour
+                                    : token == "%M" ? fields.minute : fields.second) = value;
+    } else if (token == "%f") {
+      const auto count = std::min<std::size_t>(run(text, at), 9);
+      if (count == 0) return std::nullopt;
+      fields.fraction = std::string(text.substr(at, count));
+      at += count;
+      const auto skipped = at + run(text, at);
+      if (skipped == text.size() || (i + 1 < format.size() && format[i + 1] == "%z")) at = skipped;
+    } else if (token == "%z") {
+      if (at < text.size() && text[at] == 'Z') {
+        fields.offset_minutes = 0;
+        ++at;
+      } else if (at < text.size() && (text[at] == '+' || text[at] == '-') && run(text, at + 1) >= 2) {
+        const int sign = text[at] == '+' ? 1 : -1;
+        int minutes = number(text.substr(at + 1, 2)) * 60;
+        at += 3;
+        const auto next = at < text.size() && text[at] == ':' ? at + 1 : at;
+        if (run(text, next) >= 2) {
+          minutes += number(text.substr(next, 2));
+          at = next + 2;
+        }
+        fields.offset_minutes = sign * minutes;
+      } else {
+        return std::nullopt;
+      }
+    } else {
+      if (at >= text.size() || text[at] != token[0]) return std::nullopt;
+      ++at;
+    }
+  }
+  if (at != text.size()) return std::nullopt;
+  if (fields.month < 1 || fields.month > 12 || fields.hour > 23 || fields.minute > 59 || fields.second > 59)
+    return std::nullopt;
+  if (fields.day < 1 || fields.day > month_days(fields.year, fields.month)) return std::nullopt;
+  return fields;
+}
+
+// The strptime rules: Python's regular expressions for the fields (pandas'
+// %f takes up to nine digits), matched case-insensitively from the start,
+// a run of format whitespace matching any run of whitespace.
+std::string letter_class(char c) {
+  if (!std::isalpha(static_cast<unsigned char>(c))) {
+    // Escape only the ECMAScript syntax characters ("[:" would open a
+    // character class name in some libraries).
+    static const std::string kSyntax = "\\^$.|?*+()[]{}";
+    return kSyntax.find(c) == std::string::npos ? std::string(1, c) : std::string("\\") + c;
+  }
+  return std::string("[") + static_cast<char>(std::tolower(static_cast<unsigned char>(c))) +
+         static_cast<char>(std::toupper(static_cast<unsigned char>(c))) + "]";
+}
+
+const std::regex& strptime_regex(const std::vector<std::string>& format) {
+  static thread_local std::map<std::vector<std::string>, std::regex> cache;
+  const auto found = cache.find(format);
+  if (found != cache.end()) return found->second;
+  std::string pattern;
+  bool space = false;
+  for (const auto& token : format) {
+    if (token.size() == 1 && std::isspace(static_cast<unsigned char>(token[0]))) {
+      if (!space) pattern += "\\s+";
+      space = true;
+      continue;
+    }
+    space = false;
+    if (token == "%d") pattern += "(3[0-1]|[1-2]\\d|0[1-9]|[1-9]| [1-9])";
+    else if (token == "%f") pattern += "([0-9]{1,9})";
+    else if (token == "%H") pattern += "(2[0-3]|[0-1]\\d|\\d)";
+    else if (token == "%m") pattern += "(1[0-2]|0[1-9]|[1-9])";
+    else if (token == "%M") pattern += "([0-5]\\d|\\d)";
+    else if (token == "%S") pattern += "(6[0-1]|[0-5]\\d|\\d)";
+    else if (token == "%Y") pattern += "(\\d\\d\\d\\d)";
+    else if (token == "%z") pattern += "([+-]\\d\\d:?[0-5]\\d(?::?[0-5]\\d(?:\\.\\d{1,6})?)?|Z)";
+    else if (token == "%Z") pattern += "([uU][tT][cC]|[gG][mM][tT])";
+    else pattern += letter_class(token[0]);
+  }
+  return cache.emplace(format, std::regex(pattern, std::regex::ECMAScript)).first->second;
+}
+
+Parsed strptime_parse(std::string_view text, const std::vector<std::string>& format) {
+  const auto& regex = strptime_regex(format);
+  std::match_results<std::string_view::const_iterator> match;
+  if (!std::regex_search(text.begin(), text.end(), match, regex, std::regex_constants::match_continuous))
+    return Failure{};
+  const auto end = static_cast<std::size_t>(match.length(0));
+  if (end != text.size()) return Failure{true, std::string(text.substr(end))};
+  Fields fields;
+  std::size_t group = 1;
+  for (const auto& token : format) {
+    if (token.size() != 2 || token[0] != '%') continue;
+    const std::string value = match[group++].str();
+    if (token == "%z") {
+      if (value == "Z") {
+        fields.offset_minutes = 0;
+      } else {
+        std::string offset;
+        for (const char c : value.substr(1))
+          if (c != ':') offset += c;
+        fields.offset_minutes = (value[0] == '+' ? 1 : -1) *
+                                (number(std::string_view(offset).substr(0, 2)) * 60 +
+                                 number(std::string_view(offset).substr(2, 2)));
+      }
+    } else if (token == "%Z") {
+      fields.utc_name = true;
+    } else if (token == "%f") {
+      fields.fraction = value;
+    } else {
+      const int number_value = number(value[0] == ' ' ? std::string_view(value).substr(1) : value);
+      if (token == "%Y") fields.year = number_value;
+      else if (token == "%m") fields.month = number_value;
+      else if (token == "%d") fields.day = number_value;
+      else if (token == "%H") fields.hour = number_value;
+      else if (token == "%M") fields.minute = number_value;
+      else fields.second = number_value;
+    }
+  }
+  return fields;
+}
+
+Parsed parse(std::string_view text, const std::string& format) {
+  const auto split_format = tokens(format);
+  if (format_is_iso(format))
+    if (auto fields = iso_parse(text, split_format)) return *fields;
+  return strptime_parse(text, split_format);
+}
+
+struct Column {
+  std::vector<std::string> texts;  // one per cell, "" for a missing one
+};
+
+std::string two(int value) {
+  std::string out = std::to_string(value);
+  return out.size() < 2 ? "0" + out : out;
+}
+
+// The event times of a covered column as ISO texts, nullopt for any other
+// column; throws the ValueError pd.to_datetime raises.
+std::optional<Column> convert(const std::vector<std::string_view>& texts) {
+  std::optional<std::string_view> first;
+  for (const auto text : texts) {
+    if (text.empty()) continue;
+    if (!in_domain(text)) return std::nullopt;
+    if (!first) first = text;
+  }
+  if (!first) return std::nullopt;
+  const auto format = structural_guess(*first);
+  if (!format || !std::holds_alternative<Fields>(parse(*first, *format))) return std::nullopt;
+  const auto fail = [&](const std::string& message) {
+    throw std::invalid_argument("ValueError: " + message + kSuggestions);
+  };
+  std::vector<std::optional<Fields>> values;
+  std::set<std::optional<int>> offsets;
+  bool nanoseconds = false, years_out = false;
+  for (const auto text : texts) {
+    if (text.empty()) {
+      values.emplace_back();
+      continue;
+    }
+    auto parsed = parse(text, *format);
+    if (const auto* failure = std::get_if<Failure>(&parsed)) {
+      // A year outside the nanosecond range may have raised
+      // OutOfBoundsDatetime first (outside the model).
+      if (years_out) return std::nullopt;
+      if (failure->remains)
+        fail("unconverted data remains when parsing with format \"" + *format + "\": \"" +
+             failure->rest + "\"");
+      fail("time data \"" + std::string(text) + "\" doesn't match format \"" + *format + "\"");
+    }
+    auto& fields = std::get<Fields>(parsed);
+    if (fields.day > month_days(fields.year, fields.month)) {
+      if (years_out) return std::nullopt;
+      fail("day is out of range for month");
+    }
+    if (fields.fraction.size() > 6) nanoseconds = true;
+    if (fields.year < 1678 || fields.year > 2261) years_out = true;
+    offsets.insert(fields.utc_name ? std::optional<int>(0) : fields.offset_minutes);
+    values.emplace_back(std::move(fields));
+  }
+  if (nanoseconds && years_out) return std::nullopt;
+  if (offsets.size() > 1)
+    throw std::invalid_argument(
+        "ValueError: Mixed timezones detected. Pass utc=True in to_datetime or tz='UTC' in "
+        "DatetimeIndex to convert to a common timezone.");
+  Column column;
+  for (const auto& value : values) {
+    if (!value) {
+      column.texts.emplace_back();
+      continue;
+    }
+    // Seconds 60 and 61 roll over into the next minute.
+    const std::int64_t seconds = days_from_civil(value->year, static_cast<unsigned>(value->month),
+                                                 static_cast<unsigned>(value->day)) * 86400 +
+                                 value->hour * 3600 + value->minute * 60 + value->second;
+    std::int64_t day = seconds >= 0 ? seconds / 86400 : (seconds - 86399) / 86400;
+    const auto in_day = seconds - day * 86400;
+    std::int64_t year;
+    unsigned month, day_of_month;
+    civil_from_days(day, year, month, day_of_month);
+    if (year > 9999) return std::nullopt;
+    std::string text = std::to_string(year) + "-" + two(static_cast<int>(month)) + "-" +
+                       two(static_cast<int>(day_of_month)) + "T" + two(static_cast<int>(in_day / 3600)) +
+                       ":" + two(static_cast<int>(in_day / 60 % 60)) + ":" + two(static_cast<int>(in_day % 60));
+    std::string fraction = value->fraction;
+    fraction.resize(9, '0');
+    if (nanoseconds) text += "." + fraction;
+    else if (fraction != "000000000") text += "." + fraction.substr(0, 6);
+    const auto offset = *offsets.begin();
+    if (offset) {
+      text += *offset < 0 ? "-" : "+";
+      text += two(std::abs(*offset) / 60) + ":" + two(std::abs(*offset) % 60);
+    }
+    // The instant native reads back; a cell of the ISO family that native
+    // already reads as that instant keeps its text.
+    const auto same = [&](std::string_view cell) {
+      const auto parsed = parse_timestamp_exact(cell);
+      return parsed && parsed->seconds == seconds - offset.value_or(0) * 60 &&
+             parsed->nanoseconds == static_cast<std::uint32_t>(std::stoul(fraction)) &&
+             parsed->timezone_aware == offset.has_value() &&
+             (!offset || parsed->offset_minutes == *offset);
+    };
+    const auto cell = texts[column.texts.size()];
+    if (pandas_iso::inferred_format(cell) && same(cell)) {
+      column.texts.emplace_back(cell);
+      continue;
+    }
+    // An instant native cannot hold (an offset past 14 hours) keeps the
+    // native reading.
+    if (!same(text)) return std::nullopt;
+    column.texts.push_back(std::move(text));
+  }
+  return column;
+}
+
+}  // namespace pandas_guess
+
 Ocel parse_tables(const Table& event_table, const Table* object_table,
                   const OcelCsvImportOptions& options) {
   const auto event_header = read_header(event_table, options, "event");
   const auto event_id = required_column(event_header, options.event_id_column, "event");
   const auto activity = required_column(event_header, options.activity_column, "event");
   const auto timestamp = required_column(event_header, options.timestamp_column, "event");
+  // Each data row's event time: the cell, or the ISO text of the instant
+  // pandas reads from a column of the round DZ shapes.
+  std::optional<pandas_guess::Column> guessed;
   if (options.sort_events_by_timestamp) {
     std::vector<std::string_view> texts;
     texts.reserve(event_table.size());
     for (std::size_t row_index = 1; row_index < event_table.size(); ++row_index)
       texts.emplace_back(event_table[row_index][timestamp]);
-    pandas_iso::check_column(texts);
+    guessed = pandas_guess::convert(texts);
+    if (!guessed && pandas_iso::covers(texts)) pandas_iso::check_column(texts);
   }
+  const auto time_text = [&](std::size_t row_index) -> const std::string& {
+    return guessed ? guessed->texts[row_index - 1] : event_table[row_index][timestamp];
+  };
 
   std::vector<std::pair<std::string, std::size_t>> object_columns;
   // Columns as pm4py.read_ocel_csv selects them (observed black-box): every
@@ -725,13 +1240,13 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     // dropped row's unreadable timestamp still refuses the file.
     if (row[event_id].empty() || row[activity].empty()) {
       if (options.sort_events_by_timestamp && !row[timestamp].empty() &&
-          !parse_timestamp(row[timestamp])) {
+          !parse_timestamp(time_text(row_index))) {
         throw std::invalid_argument("event CSV timestamp is not ISO-8601: " + row[timestamp]);
       }
       event_rows.emplace_back(&row, false);
       continue;
     }
-    OcelEvent event{row[event_id], row[activity], row[timestamp], {}};
+    OcelEvent event{row[event_id], row[activity], time_text(row_index), {}};
     if (event.timestamp.empty()) {
       throw std::invalid_argument("event CSV event " + event.id +
                                   " has no timestamp (the reference reads NaT)");
@@ -865,9 +1380,8 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   // filters, splits and enrichment (black-box: filter_ocel_events_timestamp
   // then raises TypeError). See Ocel::naive_event_time_unit.
   bool any_aware = false, nanoseconds = false;
-  for (const auto& [row, kept] : event_rows) {
-    (void)kept;
-    const auto& text = (*row)[timestamp];
+  for (std::size_t row_index = 1; row_index < event_table.size(); ++row_index) {
+    const auto& text = time_text(row_index);
     if (text.empty()) continue;
     const auto parsed = parse_timestamp_exact(text);
     if (parsed && parsed->timezone_aware) any_aware = true;
