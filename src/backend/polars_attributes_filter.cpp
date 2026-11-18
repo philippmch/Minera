@@ -297,6 +297,11 @@ void case_key_arguments(const EventAttribute& key) {
   // Round CM: unique(case) refuses a dict while the plan is built.
   dict_argument(key);
   if(!text(key)&&!collection(key)&&!integer(key))col_selector(key);
+  // Round DY: select(case) builds each list item that is no str as pl.lit,
+  // which refuses a set or a dict it cannot convert, before the plan below
+  // it resolves (probe dx/p2).
+  if(detail::polars_group_keys::sequence_key(key))
+    try{(void)detail::polars_group_keys::build(key);}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
 }
 PolarsAttributesFilterCall prepare(PolarsAttributesFilterCall call,const std::vector<std::string>& columns,bool eager=false) {
   const auto op=call.operation;
@@ -1502,8 +1507,9 @@ CountColumn counts_schema(const EventTable& source,const EventAttribute& attr,co
       if(eager){result.literal_case=true;return std::optional<std::size_t>{};}
       // Round DN: lazily the group_by counts each value once beside the List
       // literal, and the denominator's pl.col reads a one-name list as that
-      // column (probe dn/a1).
-      if(one_name_list(source,options.case_id_key)){result.literal_case=true;return std::optional<std::size_t>{};}
+      // column (probe dn/a1). Round DY: any list of names, which the
+      // denominator reads in order (distinct_case_count; probe dx/p2).
+      if(name_list(options.case_id_key)){result.literal_case=true;return std::optional<std::size_t>{};}
     }
     // Round DN: a None case key is pl.lit(None) in the eager group_by too.
     if(eager&&null(options.case_id_key)){result.literal_case=true;return std::optional<std::size_t>{};}
@@ -1681,7 +1687,15 @@ PolarsAttributeCounts counts_from(const EventTable& source,const CountColumn& co
   return out;
 }
 std::size_t distinct_case_count(const EventTable& source,const EventAttribute& raw) {
-  const auto key=one_name_list(source,raw)?keys::col_key(raw,source.columns):col_key(raw,source.columns);if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
+  // Round DY: select(pl.col(names).n_unique())[0, 0] over a list or tuple of
+  // str names, or a dict of str keys (its names), reads each distinct name in
+  // order (the first missing one fails by name) and counts the first one's
+  // values (probe dx/p2).
+  const bool names=((raw.container==AttributeContainerKind::kList||raw.container==AttributeContainerKind::kTuple)&&name_list(raw))||
+                   (mapping(raw)&&!raw.children.empty()&&!keys::typed_dict(raw));
+  auto key=names||one_name_list(source,raw)?keys::col_key(raw,source.columns):col_key(raw,source.columns);
+  if(names&&collection(key)&&!key.children.empty())key=EventAttribute{"",distinct_names(key).children.front().value};
+  if(collection(key))fail("IndexError","apply","index 0 is out of bounds for sequence of length 0");
   const auto column=index_of(source,key.value);if(!column)fail("ColumnNotFoundError","apply",column_prefix(source,key.value)+resolved("'select'",frame_plan(source),{"'select'"}));
   std::unordered_set<std::string> keys;for(std::size_t i=0;i<source.size();++i)keys.insert(group_key(cell(source,i,*column),source_dtype(source,*column)));return keys.size();
 }

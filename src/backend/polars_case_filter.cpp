@@ -175,6 +175,15 @@ void validate_apply(Operation op, const EventAttribute& bound, const PolarsCaseF
   // Round CO: group_by refuses a dict case key before anything else reads
   // the bounds or the timestamp key (probe p15).
   if (keys::dict_key(options.case_id_key)) fail("TypeError", "apply", keys::dict_argument_message());
+  // Round DY: and builds each list item that is no str as pl.lit, which
+  // refuses a set or a dict it cannot convert (probe dx/p2).
+  if (detail::polars_group_keys::sequence_key(options.case_id_key)) {
+    try {
+      (void)detail::polars_group_keys::build(options.case_id_key);
+    } catch (const PolarsSequenceFilterError& error) {
+      fail(error.type, "apply", error.message);
+    }
+  }
   if (op == Operation::kPerformance && !text(options.timestamp_key) && !collection(options.timestamp_key))
     fail("TypeError", "apply", "invalid input for `col`\n\nExpected `str` or `DataType`, got '" + python_type(options.timestamp_key) + "'.");
   // Round CO: pl.col of a list timestamp key fails before the bounds build

@@ -627,13 +627,18 @@ std::optional<EventTable> literal_collect(const EventTable& source,const Labels&
          contexts({"sort","group_by","filter","select","join right","join"}));
   }
   // Round CT: then the group_by keys' str items (probe ct/l2).
+  const auto shape=[&]{fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");};
   for(const auto& item:items)if(text(item)&&!present(item.value)){
-    if(eager)throw std::invalid_argument("Native Polars variants case selector outside observed empty-list domain");
+    // Round DY: on an eager frame the sort ran (one row) and the group_by
+    // reads the frame (probe dy/p3e).
+    if(eager){
+      if(source.rows.size()!=1)shape();
+      fail("ColumnNotFoundError",phase,missing_prefix(item.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n"+frame_plan(source)+contexts({"group_by"}));
+    }
     fail("ColumnNotFoundError",phase,missing_prefix(item.value,source.columns)+"\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'join' <---\n"+literal_sort_plan(source,options,"col(\"time:timestamp\")")+
          contexts({"group_by","filter","select","join right","join"}));
   }
   for(const auto& item:items)if(!text(item)&&!item.is_null&&real(item)&&std::isnan(number(item)))literal_outside("a NaN key");
-  const auto shape=[&]{fail("ShapeError",phase,"sort expressions must have same length as DataFrame, got DataFrame height: "+std::to_string(source.rows.size())+" and Series length: 1");};
   if(eager&&source.rows.size()!=1)shape();
   duplicate_keys(source,options,false,phase,"col(\"time:timestamp\")");
   const auto act=keyed(options,source.columns).activity_key;

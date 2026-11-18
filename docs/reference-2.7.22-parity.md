@@ -31503,3 +31503,93 @@ Tests:
   again. The workbench fixture replay gave 2,673 responses unchanged.
   Python script and frontend tests not rerun (scripts and frontend
   unchanged).
+
+## Review DY1: re-review of round DX, list and dict case keys in the Polars table filters (set and dict items as literals, several listed names in the relative occurrence filter, list items in the LTL filters, missing names of eager variants), fresh seeds (2026-11-18)
+
+Round DY checked DX's CI (run 44261093997 on a8fd6d8: green on all six
+jobs, Windows included), took DX's found item (list case keys in the
+Polars table filters) and replayed a batch of fresh seeds. The device
+check on the Mac was skipped (the Mac was not linked).
+
+DX's probe `dx/pp/mk_p2.py` (48 keys on each case's own calls, Polars
+table CK seed 2026121782) left 205 of 15,462 calls differing. Five more
+probes widened it (`dy/pp/mk_p3.py`: p3 lazy and p3e eager on CK seed
+2026121801, p4 dict keys and explicit relative occurrence calls on seed
+2026121802, p5 the base table domain on seed 2026121803, p6e DX's keys on
+CK eager on seed 2026121804). Observed black-box on Polars 1.44.1 in the
+reference venv:
+
+- **DY1-1 Set and dict items fail as literals first.** pm4py hands a list
+  case key to `select(case)` (the attribute filters), `group_by(case)` (the
+  case performance filter, the contained and intersecting timestamp
+  filters) and `unique(case)` (the timeframe filter). Polars parses the
+  list item by item: a str is a column, any other item `pl.lit`, which
+  refuses a set (`cannot create expression literal for value of type
+  set`), a dict it cannot convert (`... of type dict`), a list holding a
+  dict whose key is no str (`'int' object is not an instance of 'str'`,
+  DX1-8) and an int past int64 (`integer too large for Polars`) while the
+  call is built, before any plan resolves. Native reported the plan's later
+  failure (a missing timestamp column, `is_in` on `List(Struct({}))`, a
+  datetime compared with a string). The four entry points now build the
+  key's literals with the shared group-key model first (p2 and p3: 134
+  calls).
+- **DY1-2 Several listed names in the relative occurrence filter.** The
+  lazy `group_by` counts each value once beside the List literal (DN1),
+  and the denominator `select(pl.col(names).n_unique())[0, 0]` reads a list
+  or tuple of str names, or the str keys of a dict, as the distinct names
+  in order: the first name that is no column fails by name (`"nope" not
+  found`, also `"literal"`, which only the group_by adds), else the first
+  name's distinct values count. Native refused every key of more than one
+  name with its selector error. This models the declared keep-once count
+  with a dict case key naming several columns (DQ1-5), which comes off the
+  declared list (p2: 32 calls, p3: 18, p4: 3,864 of 14,885).
+- **DY1-3 List items in the LTL filters.** A list item of scalars (or an
+  empty one, a `List(Null)` literal) is a list literal named `literal`
+  like a scalar item, so two of them repeat the name (`projections
+  contained duplicate output name 'literal'`, `group_by keys contained
+  duplicate output name`, `joining with repeated key names; already joined
+  on literal and literal`, `column with name 'literal_right' already
+  exists`). Native answered them with its "outside the observed domain"
+  error. A list key of names windows over its items and sorts as one List
+  literal in the rendered plans, and the sort's length check (`sort
+  expressions must have same length as DataFrame`), the first pair's join
+  over the missing key and the `_right` collision of `four_eyes_principle`
+  come after the activity filters of the first pair resolved (p2: 79
+  calls, p3: 54, p3e: 6).
+- **DY1-4 Missing names in an eager variants key.** On an eager frame the
+  sort runs first (`ShapeError` unless the frame has one row), then the
+  group_by reads the frame and fails on the first missing name
+  (`unable to find column "nope"` with a `DF [...]` plan at `group_by`).
+  Native refused it as outside its domain (p3e: 4 calls).
+- **DY1-5 Fresh seeds.** Batch 2026121800-11 (twelve banks): the pandas
+  CK, CN and sequence banks, the Polars CN, CJ, CI and CH table banks and
+  the four Polars sequence banks replay clean. Two calls of the Polars CK
+  bank differ, both the struct cast race (a `<=` on a struct cast: the
+  cast failure and the comparison failure of the same comparison, which
+  the bank test accepts for each other).
+
+Probes after the fixes: p2 0 of 15,462 (was 205), p3 0 of 4,840 (was 112),
+p3e 0 of 4,840 (was 10), p4 0 of 14,885 (was 3,864), p5 0 of 1,628 and
+p6e 0 of 2,544 (32 together before). Every earlier Polars table bank (54
+banks) replays clean.
+
+Found, not taken: nothing new; the probes reach 0.
+
+Declared:
+- Still declared from earlier rounds: the consecutive grouping's
+  `df[key] + df[activity]` with a list key (DX1), the row mask, dict and
+  list stake keys of DW1, the equal-size join order of the Polars sequence
+  filters and the Polars inner join order (DX1-9), the nanosecond window
+  at pandas' int64 range ends (DQ1-2), dateutil-only date strings (DP1-4,
+  DQ1-4), the eager paths performance race (DO1-2), the thread-count quirk
+  of DN1-6, the struct cast race and the CSV timestamp texts outside the
+  ISO family (DV1-2).
+
+Tests:
+- New: `docs/polars-filter-dy-bank.json.gz` (probes p2 to p6e, 150 cases,
+  44,577 calls; the DX driver differs on 4,223 of them) with
+  `minera_polars_filter_dy_bank_parity_tests`; every earlier Polars filter
+  bank replays unchanged.
+- Full suite: 618 of 618 tests passed on the first run. The workbench
+  fixture replay gave 2,673 responses unchanged. Python script and
+  frontend tests not rerun (scripts and frontend unchanged).

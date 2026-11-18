@@ -288,7 +288,9 @@ std::optional<LiteralKey> literal_key(const EventAttribute& key) {
   // Round CQ: several items are no one literal (list_key_failure).
   if (key.children.size() != 1) return std::nullopt;
   const auto& item = key.children.front();
-  if (item.container != AttributeContainerKind::kContainer && !item.is_null && !is_native_na_attribute(item) && !groups::modelled(item))
+  // Round DY: an empty list item is a List(Null) literal (probe dx/p2).
+  const bool empty_list = (item.container == AttributeContainerKind::kList || item.container == AttributeContainerKind::kTuple) && item.children.empty();
+  if (item.container != AttributeContainerKind::kContainer && !item.is_null && !is_native_na_attribute(item) && !groups::modelled(item) && !empty_list)
     throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: the item type");
   return LiteralKey{groups::literal_item(item), true};
 }
@@ -387,6 +389,8 @@ std::string render(std::string_view pattern, const EventTable& source, const Pre
   };
   std::optional<LiteralKey> literal;
   try { literal = literal_key(o.case_id_key); } catch (const std::invalid_argument&) {}
+  const bool names_key = !literal && !o.case_id_key.is_null && !o.case_id_key.children.empty() &&
+                         (o.case_id_key.container == AttributeContainerKind::kList || o.case_id_key.container == AttributeContainerKind::kTuple);
   // Round CO: each placeholder is rendered only when the pattern names it
   // (a value the template leaves out may not build: case 111 of the fresh
   // CI bank).
@@ -407,8 +411,10 @@ std::string render(std::string_view pattern, const EventTable& source, const Pre
     {"LIST_KEY", [&] { return list_key_display(o.case_id_key); }},
     {"OVER_KEYS", [&] { return over_keys_display(o.case_id_key); }},
     {"TIME_Q", [&] { return quote(o.timestamp_key.value); }},
-    {"CASE_OVER", [&] { return literal ? literal_alias(*literal) : "col(" + quote(o.case_id_key.value) + ")"; }},
-    {"CASE_SORT", [&] { return literal ? literal_sort_key(*literal) : "col(" + quote(o.case_id_key.value) + ")"; }},
+    // Round DY: a list key of names windows over its items and sorts as one
+    // List literal (probe dx/p2).
+    {"CASE_OVER", [&] { return literal ? literal_alias(*literal) : names_key ? over_keys_display(o.case_id_key) : "col(" + quote(o.case_id_key.value) + ")"; }},
+    {"CASE_SORT", [&] { return literal ? literal_sort_key(*literal) : names_key ? list_key_display(o.case_id_key) : "col(" + quote(o.case_id_key.value) + ")"; }},
     {"FIRST", item_at(0)}, {"SECOND", item_at(1)}, {"THIRD", item_at(2)}, {"LAST", item_at(p.values.empty() ? none : p.values.size() - 1)},
     {"PAIR_A", item_at(p.values.size() < 3 ? none : third_pair(p.values.size()).first)},
     {"PAIR_B", item_at(p.values.size() < 3 ? none : third_pair(p.values.size()).second)}, {"EXPR", [&] { return expression; }},
@@ -1027,8 +1033,13 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
   const auto& o = p.options;
   const auto& items = o.case_id_key.children;
   const bool strs = str_items(o.case_id_key);
-  const bool literals = std::all_of(items.begin(), items.end(), [](const EventAttribute& v) {
-    return v.container == AttributeContainerKind::kScalar && (null(v) || groups::modelled(v));
+  // Round DY: a list item of scalars (or an empty one) is a list literal,
+  // named `literal` like a scalar one (probe dx/p2).
+  const auto scalar_literal = [](const EventAttribute& v) { return v.container == AttributeContainerKind::kScalar && (null(v) || groups::modelled(v)); };
+  const bool literals = std::all_of(items.begin(), items.end(), [&](const EventAttribute& v) {
+    if (v.container == AttributeContainerKind::kList || v.container == AttributeContainerKind::kTuple)
+      return std::all_of(v.children.begin(), v.children.end(), [&](const EventAttribute& c) { return scalar_literal(c) || groups::text_key(c); });
+    return scalar_literal(v);
   });
   // Round DD: None beside str items: four_eyes and attr_value_different_persons
   // select the list as one literal and join or group on its str items
@@ -1094,6 +1105,9 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
     nodes.insert(nodes.end(), {"select", "unique"});
     repeat(nodes, static_cast<std::ptrdiff_t>(n) - 1, {"join left", "join"});
     nodes.insert(nodes.end(), {"join right", "join", "select"});
+    // Round DY: after the first pair's activity filters resolved (probe
+    // dx/p2).
+    validate_queries(source, p, eager, true, false, false, 2);
     fail("DuplicateError", phase,
          "column with name '" + first + "_right' already exists\n\nYou may want to try:\n- renaming the column prior to joining\n- using the `suffix` parameter to specify a suffix different to the default one ('_right')" +
              restack(untimed(render(kEventListNoneJoin, source, p), p), nodes));
@@ -1325,6 +1339,9 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
     fail("SchemaError", phase, literal_join_mismatch(source) + event_pair_plan(source, p));
   }
   if (!name) {
+    // Round DY: the sort's length check runs on the resolved plan, after
+    // every activity filter resolved (probe dx/p2).
+    if (names.size() == 1 && names.front() == o.timestamp_key.value && source.rows.size() >= 2) validate_queries(source, p, eager, true);
     if (names.size() == 1 && names.front() == o.timestamp_key.value && source.rows.size() >= 2)
       fail("ShapeError", phase, "sort expressions must have same length as DataFrame, got DataFrame height: " + std::to_string(source.rows.size()) + " and Series length: 1");
     throw std::invalid_argument("Native Polars LTL list case keys outside the observed domain: a selected column as a case item");
@@ -1332,6 +1349,9 @@ void list_key_failure(const EventTable& source, const Prepared& p, const std::st
   std::vector<std::string> nodes{"join", "filter", "select", "unique", "join right", "join"};
   repeat(nodes, static_cast<std::ptrdiff_t>(n) - 2, {"join left", "join"});
   nodes.insert(nodes.end(), {"join right", "join", "select"});
+  // Round DY: the first pair's join reads its keys after both activity
+  // filters resolved (probe dx/p2).
+  validate_queries(source, p, eager, true, false, false, 2);
   fail("ColumnNotFoundError", phase, missing(*name, {"literal", "_index", o.timestamp_key.value}) + restack(render(kEventListSelect, source, p), nodes));
 }
 // Round CQ: four_eyes fails at its first pair join when a list case key

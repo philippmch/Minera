@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DX (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–DY (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6898,6 +6898,64 @@ earlier pandas filter and sequence bank replays unchanged and the workbench
 fixture replay gave 2,673 responses unchanged. Python script and frontend
 tests not rerun (scripts and frontend unchanged). The device check on the
 Mac was skipped (the Mac was not linked).
+
+Round DY re-reviewed DX (Review DY1). DX's CI run 44261093997: green on
+all six jobs.
+DY took DX's found item, list and dict case keys in the Polars table
+filters:
+- set and dict items fail as `pl.lit` while pm4py builds `select(case)`,
+  `group_by(case)` or `unique(case)` (attribute, case performance and
+  timestamp filters), before any plan resolves; the shared group-key
+  model builds the literals first;
+- the relative occurrence denominator `select(pl.col(names).n_unique())[0,
+  0]` over a list of names or a dict of str keys: distinct names in order,
+  the first missing one fails by name, else the first name counts (models
+  the declared DQ1-5);
+- the LTL filters: a list item of scalars (or an empty one) is a list
+  literal named `literal`, so two items repeat the name; a key of names
+  windows over its items and sorts as one List literal; the sort length,
+  the first pair's join and the `_right` collision come after the first
+  pair's activity filters;
+- eager variants: a missing listed name fails at the frame's `group_by`
+  (after the sort's `ShapeError` unless one row).
+- Probes p2 205 of 15,462 -> 0, p3 112 of 4,840 -> 0, p3e 10 of 4,840 ->
+  0, p4 3,864 of 14,885 -> 0, p5 and p6e 32 of 4,172 -> 0.
+- Fresh seeds 2026121800-11: two Polars calls, both the struct cast race
+  (cast failure against comparison failure of the same `<=`).
+
+In the suite: `docs/polars-filter-dy-bank.json.gz` (150 cases, 44,577
+calls) with `minera_polars_filter_dy_bank_parity_tests`. The probes and the
+fresh banks are in the project files under `review-harness/round-dy/`.
+
+Full suite 618 of 618 passed on the first run; every earlier Polars table
+bank replays unchanged and the workbench fixture replay gave 2,673
+responses unchanged. Python script and frontend tests not rerun (scripts
+and frontend unchanged). The device check on the Mac was skipped (the Mac
+was not linked).
+
+Next round (DZ) should start by re-reviewing round DY:
+
+- DY's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the consecutive grouping's `df[key] + df[act]` with a list key
+  (declared in DX1: the DataFrame plus Series alignment and its per-dtype
+  errors), the declared row-mask keys, dicts mapping str index labels,
+  and list stakes of str items;
+- the CSV timestamp shapes outside the ISO family (DV1-2: the OCEL CSV
+  reader against pandas' format guess and dateutil);
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared items (DQ1-2, DO1-2, DN1-6), the rest of the CU list, and
+  the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DX's targets, taken in DY (findings DY1-1 to DY1-5): DX's CI, the
+fresh seeds, the Polars table filters' list keys (and DQ1-5). Not taken
+(carried to DZ): the consecutive addition, the CU list, the new dtypes,
+the CSV timestamp shapes and the open choices.
+
+Previous list for round DY (kept for its older items):
 
 Next round (DY) should start by re-reviewing round DX:
 

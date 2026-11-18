@@ -3623,6 +3623,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dt_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dt-bank.json.gz")
   set_tests_properties(minera_polars_filter_dt_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DY: list and dict case keys in the table filters (set and dict
+  # items as literals, list literal items in the LTL filters, several listed
+  # names in the relative occurrence denominator; eager and lazy probes).
+  add_test(NAME minera_polars_filter_dy_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dy-bank.json.gz")
+  set_tests_properties(minera_polars_filter_dy_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp

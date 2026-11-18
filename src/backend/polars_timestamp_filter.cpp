@@ -236,7 +236,13 @@ lit::ScalarCheck attribute_check(const Query& q){
 // Round CM: group_by(case) of the contained and intersecting filters fails on
 // a dict before the timestamp selector is built; the timeframe filter's
 // unique(case) after it.
-void case_dict(const PolarsTimestampFilterOptions& options){if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());}
+// Round DY: both build each list item that is no str as pl.lit, which
+// refuses a set or a dict it cannot convert (probe dx/p2).
+void case_dict(const PolarsTimestampFilterOptions& options){
+  if(keys::dict_key(options.case_id_key))fail("TypeError","apply",keys::dict_argument_message());
+  if(groups::sequence_key(options.case_id_key))
+    try{(void)groups::build(options.case_id_key);}catch(const PolarsSequenceFilterError& error){fail(error.type,"apply",error.message);}
+}
 Query prepare(const std::vector<std::string>& columns,Operation op,const EventAttribute& low,const EventAttribute& high,const PolarsTimestampFilterOptions& options,const EventAttribute& attribute={},const EventAttribute& value={},bool eager=false) {
   Query q{op,bound(low),bound(high),options,attribute,value,{},{}};
   if(op==Operation::kContained||op==Operation::kIntersecting)case_dict(options);
