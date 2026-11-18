@@ -1,4 +1,5 @@
 #include "minera/ocel_filter.hpp"
+#include "ocel_frame_types.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -436,6 +437,13 @@ IdSet expand_object_ids(const Ocel& log, IdSet selected, std::size_t level) {
       neighbours.erase(left);
     }
   }
+  // Round DT: the reference looks every requested id up in its interaction
+  // graph, whose nodes are the related objects, so another id raises
+  // KeyError (several such ids: the first in its set order, which varies
+  // with the hash seed; native names the smallest).
+  for (const auto& object_id : selected)
+    if (!adjacency.contains(object_id))
+      throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(object_id));
   for (std::size_t depth = 1; depth < level; ++depth) {
     const IdSet frontier = selected;
     bool changed = false;
@@ -548,6 +556,9 @@ bool event_filter_instant_equal(const ParsedExactTimestamp& left,
 }
 
 bool object_filter_column_exists(const Ocel& log, std::string_view key) {
+  // A frame without columns (round DT: a file that lists no object) has no
+  // id or type either; declared frames with other names keep them.
+  if (log.table_columns.objects && log.table_columns.objects->empty()) return false;
   if (key == "ocel:oid" || key == "ocel:type") return true;
   if (log.table_columns.objects)
     return std::find(log.table_columns.objects->begin(),
@@ -711,6 +722,8 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
   if (attribute_key.empty()) {
     throw std::invalid_argument("OCEL object attribute key must not be empty");
   }
+  if (attribute_key == "ocel:oid" || attribute_key == "ocel:type")
+    require_ocel_object_column(log, attribute_key);
   Ocel filtered = log;
   const auto column = ocel_numeric_column(log.objects, attribute_key);
   const auto column_values = isin_values(values, column);
@@ -748,6 +761,7 @@ Ocel filter_ocel_object_attribute_exact(
 Ocel filter_ocel_object_types(const Ocel& log,
                               const std::vector<std::string>& types,
                               bool positive, std::size_t level) {
+  require_ocel_object_column(log, "ocel:type");
   const auto selected = string_set(types);
   if (level > 1) {
     IdSet object_ids;
@@ -769,6 +783,7 @@ Ocel filter_ocel_object_types(const Ocel& log,
 Ocel filter_ocel_objects(const Ocel& log,
                          const std::vector<std::string>& object_ids,
                          bool positive, std::size_t level) {
+  require_ocel_object_column(log, "ocel:oid");
   auto selected = expand_object_ids(log, string_set(object_ids), level);
   Ocel filtered = log;
   filter_records(filtered.objects, [&](const OcelObject& object) {
@@ -997,6 +1012,7 @@ Ocel filter_ocel_activities_connected_object_type(
 }
 
 Ocel filter_ocel_cc_object(const Ocel& log, std::string_view object_id) {
+  require_ocel_object_column(log, "ocel:oid");
   IdSet selected{std::string(object_id)};
   for (const auto& component : object_interaction_components(log)) {
     if (component.count(std::string(object_id)) != 0) {
@@ -1009,6 +1025,7 @@ Ocel filter_ocel_cc_object(const Ocel& log, std::string_view object_id) {
 
 Ocel filter_ocel_cc_length(const Ocel& log, std::size_t minimum_size,
                            std::size_t maximum_size) {
+  require_ocel_object_column(log, "ocel:oid");
   if (minimum_size > maximum_size) {
     throw std::invalid_argument(
         "OCEL connected-component size bounds are reversed");
@@ -1024,6 +1041,7 @@ Ocel filter_ocel_cc_length(const Ocel& log, std::size_t minimum_size,
 
 Ocel filter_ocel_cc_object_type(const Ocel& log, std::string_view object_type,
                                 bool positive) {
+  require_ocel_object_column(log, "ocel:type");
   const auto object_types = object_types_by_id(log);
   IdSet seeds;
   for (const auto& [object_id, type] : object_types) {
@@ -1046,6 +1064,7 @@ Ocel filter_ocel_cc_object_type(const Ocel& log, std::string_view object_type,
 }
 
 Ocel filter_ocel_cc_activity(const Ocel& log, std::string_view activity) {
+  require_ocel_object_column(log, "ocel:oid");
   std::unordered_map<std::string, std::string> event_activities;
   event_activities.reserve(log.events.size());
   for (const auto& event : log.events) {

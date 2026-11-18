@@ -1253,6 +1253,23 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
       throw std::invalid_argument("minera:keepUnrelated must be boolean");
     keep_unrelated = std::get<bool>(marker->value);
   }
+  // Round DT: both reference JSON readers fail on a file that lists no event
+  // (its events frame has no timestamp column to sort by), and read a file
+  // that lists no object as an objects frame without columns, where every
+  // later lookup of ocel:oid or ocel:type fails (observed black-box through
+  // read_ocel_json and read_ocel2_json; see require_ocel_object_column).
+  // Documents Minera wrote for a log whose reference reader keeps unrelated
+  // entries (an OCEL CSV import) and literal names keep the native reading.
+  // A document Minera wrote for a log without relations says whether its
+  // relations frame is float64 ("minera:untypedRelations", see
+  // Ocel::untyped_relations) and reads as that log, empty or not.
+  const auto* untyped_marker = optional(r, "minera:untypedRelations");
+  if (untyped_marker && !untyped_marker->is_bool())
+    throw std::invalid_argument("minera:untypedRelations must be boolean");
+  const bool reference_read = !literal_names && !keep_unrelated && !untyped_marker;
+  if (reference_read && result.events.empty())
+    throw std::invalid_argument("KeyError: 'ocel:timestamp'");
+  const bool no_object_listed = reference_read && result.objects.empty();
   // Both reference JSON readers drop events with an empty id or activity and
   // objects with an empty id or type (observed black-box); literal names
   // (exact filter inputs) keep them.
@@ -1276,6 +1293,10 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     read("objects", result.table_columns.objects);
     read("relations", result.table_columns.relations);
   }
+  if (no_object_listed && !result.table_columns.objects)
+    result.table_columns.objects.emplace();
+  result.untyped_relations = untyped_marker ? std::get<bool>(untyped_marker->value)
+                                            : reference_read && result.relations.empty();
   return result;
 }
 
@@ -2131,6 +2152,21 @@ std::optional<std::string> ocel_json_limit_violation(
 Ocel parse_ocel_json(std::string_view json, const OcelJsonLimits& limits) {
   return parse_ocel_json_names(json,limits,false);
 }
+// Only a frame declared without any column counts: frames declared with
+// other names for the id and type (exact call models) keep both.
+void require_ocel_object_column(const Ocel& log, std::string_view column) {
+  const auto& declared = log.table_columns.objects;
+  if (declared && declared->empty())
+    throw std::invalid_argument("KeyError: '" + std::string(column) + "'");
+}
+
+void require_ocel_object_columns(const Ocel& log) {
+  const auto& declared = log.table_columns.objects;
+  if (declared && declared->empty())
+    throw std::invalid_argument(
+        "KeyError: \"None of [Index(['ocel:oid', 'ocel:type'], dtype='str')] are in the [columns]\"");
+}
+
 Ocel parse_ocel_json_literal_names(std::string_view json, const OcelJsonLimits& limits) {
   return parse_ocel_json_names(json,limits,true);
 }
@@ -2141,6 +2177,13 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   // Marks a log that holds events or objects without an event-object
   // relation, so parse_ocel_json keeps them instead of dropping them as the
   // reference file readers do.
+  // Round DT: a log without relations travels with its frame type, so a
+  // route reads an empty filter result as the in-memory log it was rather
+  // than as a file without events (see Ocel::untyped_relations).
+  const auto write_untyped_relations = [&] {
+    if (log.relations.empty())
+      out << ",\"minera:untypedRelations\":" << (log.untyped_relations ? "true" : "false");
+  };
   const auto write_keep_unrelated = [&] {
     std::unordered_set<std::string_view> related_events, related_objects;
     for (const auto& relation : log.relations) {
@@ -2491,6 +2534,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     // The OCEL 2.0 transport (the frontend's opened OCEL SQLite, split and
     // enriched logs) keeps times past the microsecond too (round BB).
     if (transport_markers) {
+      write_untyped_relations();
       write_nanoseconds();
       write_order_markers(true);
     }
@@ -2568,6 +2612,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   write_table_columns();
   write_keep_unrelated();
   if (transport_markers) {
+    write_untyped_relations();
     write_event_time_offset();
     write_nanoseconds();
     write_order_markers(false);
@@ -2582,6 +2627,7 @@ EtotGraph discover_etot_classic(const Ocel& log) {
 }
 
 OtgGraph discover_otg_classic(const Ocel& log) {
+  require_ocel_object_column(log, "ocel:type");
   OtgGraph result; std::set<std::string> types; std::unordered_map<std::string, std::string> type; for (const auto& o : log.objects) { type[o.id] = o.type; types.insert(o.type); } result.object_types.assign(types.begin(), types.end());
   std::unordered_map<std::string, std::vector<std::string>> by_event;
   for (const auto& r : log.relations)
@@ -3180,6 +3226,8 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
   if (!std::isfinite(options.noise_threshold) || options.noise_threshold < 0.0 ||
       options.noise_threshold > 1.0)
     throw std::invalid_argument("OCPN noise_threshold must be in [0,1]");
+  if (options.object_type_attribute.empty() || options.object_type_attribute == "ocel:type")
+    require_ocel_object_column(log, "ocel:type");
 
   const Ocel projected = project_ocpn_labels(log, options);
   OcpnGraph result;
@@ -3668,6 +3716,8 @@ std::string description_time(const std::string& text) {
 
 OcelTupleDescription describe_ocel_tuples(const Ocel& log,
                                            const OcelDescriptionOptions& options) {
+  // Round DT: the reference selects the objects frame's id and type.
+  require_ocel_object_columns(log);
   OcelTupleDescription result;
   result.includes_timestamps = options.include_timestamps;
   std::map<std::string, const OcelEvent*> events;

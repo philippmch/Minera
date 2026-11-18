@@ -534,14 +534,32 @@ void flatten_contract() {
     }
     return std::string();
   };
+  // Round DT: the frame types are the read's (Ocel::untyped_relations): a
+  // log built in code, or an in-memory filter result, has typed frames and
+  // flattens to no trace.
+  auto typed = log;
+  typed.relations.clear();
+  assert(flatten_error(typed).empty());
   auto unrelated = log;
   unrelated.relations.clear();
+  unrelated.untyped_relations = true;
   assert(flatten_error(unrelated).starts_with(
       "ValueError: You are trying to merge on str and float64 columns for key 'case:concept:name'."));
   unrelated.objects.clear();
   assert(flatten_error(unrelated) == "KeyError: 'ocel:type'");
+  // A relation-free file reads as a log without any event, object or
+  // relation (an event-free file fails at read), so it merges as above; one
+  // that lists no object has a frame without columns.
   unrelated.events.clear();
-  assert(flatten_error(unrelated) == "KeyError: 'ocel:timestamp'");
+  assert(flatten_error(unrelated).starts_with("ValueError: You are trying to merge on str and float64"));
+  auto no_objects = unrelated;
+  no_objects.table_columns.objects.emplace();
+  assert(flatten_error(no_objects) == "KeyError: 'ocel:type'");
+  auto no_events = log;
+  no_events.relations.clear();
+  no_events.events.clear();
+  no_events.untyped_relations = true;
+  assert(flatten_error(no_events) == "KeyError: 'ocel:timestamp'");
 }
 
 }  // namespace

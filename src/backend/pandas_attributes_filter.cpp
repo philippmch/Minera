@@ -21,6 +21,7 @@
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
 #include "zone_database.hpp"
+#include "pandas_numpy_operand.hpp"
 namespace minera { namespace {
 [[noreturn]] void error(std::string kind,std::string message){throw PandasAttributesFilterError(std::move(kind),std::move(message));}
 std::string string_key_repr(std::string_view value) {
@@ -555,13 +556,29 @@ bool unlikely_datetime_text(std::string_view s){
  if(p!=s.size())return false;
  return std::strtod(std::string(s.substr(begin,end-begin)).c_str(),nullptr)<1000;
 }
+// Round DT (probes dt t3, dt/nb/dtp3.py): a text without a digit names no
+// date unless one of its words is a month (pandas reads "now" and "today"
+// itself); "b", "x y", "Mon" or "\u00e9" are invalid comparisons.
+bool dateless_text(std::string_view s){
+ if(s=="now"||s=="today")return false;
+ if(std::any_of(s.begin(),s.end(),[](char c){return c>='0'&&c<='9';}))return false;
+ static const std::unordered_set<std::string> months={"jan","feb","mar","apr","may","jun","jul","aug","sep","sept","oct","nov","dec",
+  "january","february","march","april","june","july","august","september","october","november","december"};
+ std::string word;
+ const auto month=[&]{const bool hit=months.contains(word);word.clear();return hit;};
+ for(const char c:s){
+  if((c>='a'&&c<='z')||(c>='A'&&c<='Z'))word+=static_cast<char>(c|0x20);
+  else if(!word.empty()&&month())return false;
+ }
+ return !(!word.empty()&&month());
+}
 EventAttribute datetime_text_bound(const EventAttribute& bound,const std::string& dtype){
  const std::string_view text=bound.value;
  if(text.empty()||text=="NaT"||text=="nat"||text=="NAT"||text=="NaN"||text=="nan"||text=="NAN"){
   EventAttribute nat{bound.key,"NaT",AttributeKind::kDate,true};return nat;
  }
  const auto refuse=[&]{error("TypeError","Invalid comparison between dtype="+dtype+" and str");};
- if(unlikely_datetime_text(text))refuse();
+ if(unlikely_datetime_text(text)||dateless_text(text))refuse();
  auto trimmed=text;
  while(!trimmed.empty()&&(trimmed.front()==' '||trimmed.front()=='\t'))trimmed.remove_prefix(1);
  while(!trimmed.empty()&&(trimmed.back()==' '||trimmed.back()=='\t'))trimmed.remove_suffix(1);
@@ -612,6 +629,71 @@ EventAttribute datetime_text_bound(const EventAttribute& bound,const std::string
  if(!aware&&parsed->timezone_aware)refuse();
  return EventAttribute{bound.key,exact_instant_text(*parsed),AttributeKind::kDate};
 }
+// Round DT (probe dt t1; black-box fuzz dt/nb/strfz.py, 19,000 calls): a
+// "str" column checks a tuple's length first, then makes it a numpy array
+// (whose leaves turn into str when one is a str and none is another
+// object), keeps the rows that are not missing, broadcasts them with the
+// array's rows and compares each pair as Python does; a result of more than
+// one dimension cannot be assigned to the rows.
+std::vector<bool> string_tuple_mask(const EventTable& source,std::size_t attribute,const EventAttribute& bound,const std::string& op){
+ const auto n=source.size(),k=bound.children.size();
+ if(k!=n)error("ValueError","Lengths of operands do not match: "+std::to_string(n)+" != "+std::to_string(k));
+ const auto array=detail::numpy_tuple_array(bound,error);
+ enum class Leaves{kObject,kStr,kFloat,kInt,kBool};
+ const auto number=[](const EventAttribute* e){return !e->is_null&&e->container==AttributeContainerKind::kScalar&&!is_native_na_attribute(*e)&&!date_value(*e)&&numeric(*e);};
+ const auto boolean=[](const EventAttribute* e){return e->kind==AttributeKind::kBoolean||std::holds_alternative<bool>(e->typed_value);};
+ const auto integer=[&](const EventAttribute* e){return !boolean(e)&&(e->kind==AttributeKind::kInt||std::holds_alternative<std::int64_t>(e->typed_value)||std::holds_alternative<std::uint64_t>(e->typed_value));};
+ Leaves leaves=Leaves::kFloat;
+ const auto& all=array.leaves;
+ if(std::any_of(all.begin(),all.end(),[&](const EventAttribute* e){return !number(e)&&!text_value(*e);}))leaves=Leaves::kObject;
+ else if(std::any_of(all.begin(),all.end(),[](const EventAttribute* e){return text_value(*e);}))leaves=Leaves::kStr;
+ else if(std::any_of(all.begin(),all.end(),[&](const EventAttribute* e){return !integer(e)&&!boolean(e);}))leaves=Leaves::kFloat;
+ else if(std::any_of(all.begin(),all.end(),integer))leaves=Leaves::kInt;
+ else if(!all.empty())leaves=Leaves::kBool;
+ const auto as_text=[&](const EventAttribute& e)->std::string{
+  if(text_value(e))return e.value;
+  if(boolean(&e))return native_attribute_number(e)!=0?"True":"False";
+  if(integer(&e))return e.value;
+  return python::float_repr(native_attribute_number(e));
+ };
+ const auto compare=[&](const EventAttribute& value,const EventAttribute& item)->bool{
+  std::string other;
+  if(leaves==Leaves::kStr)other=as_text(item);
+  else if(leaves==Leaves::kObject&&text_value(item))other=item.value;
+  else{
+   const std::string name=leaves==Leaves::kFloat?"float":leaves==Leaves::kInt?"int":leaves==Leaves::kBool?"bool":item.is_null?std::string("NoneType"):qualified_type_name(item);
+   error("TypeError","'"+op+"' not supported between instances of 'str' and '"+name+"'");
+  }
+  const int order=value.value<other?-1:other<value.value?1:0;
+  return op==">="?order>=0:op=="<="?order<=0:op=="<"?order<0:order>0;
+ };
+ std::vector<std::size_t> valid;
+ for(std::size_t i=0;i<n;++i)if(!missing(cell(source,i,attribute)))valid.push_back(i);
+ const auto v=valid.size();
+ auto shape=array.shape;shape.front()=v;
+ const auto last=shape.back();
+ if(last!=v&&last!=1&&v!=1)
+  error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(v)+",) "+detail::numpy_broadcast_shape(shape)+" ");
+ const auto per_row=n?all.size()/n:0;
+ std::vector<const EventAttribute*> flat;
+ for(const auto i:valid)for(std::size_t j=0;j<per_row;++j)flat.push_back(all[i*per_row+j]);
+ const auto width=last==1?v:last;
+ const auto outer=last?flat.size()/last:0;
+ std::vector<bool> result;
+ for(std::size_t o=0;o<outer;++o)
+  for(std::size_t j=0;j<width;++j)result.push_back(compare(cell(source,valid[v==1?0:j],attribute),*flat[o*last+(last==1?0:j)]));
+ if(shape.size()>1)error("TypeError","NumPy boolean array indexing assignment requires a 0 or 1-dimensional input, input has "+std::to_string(shape.size())+" dimensions");
+ std::vector<bool> out(n);
+ for(std::size_t j=0;j<v;++j)out[valid[j]]=result[j];
+ return out;
+}
+bool numpy_number_dtype(const std::string& dtype){return dtype=="bool"||dtype.starts_with("int")||dtype.starts_with("uint")||dtype.starts_with("float");}
+// numpy's dtype class name: int64 -> Int64DType, uint8 -> UInt8DType.
+std::string numpy_dtype_class(const std::string& dtype){
+ if(dtype=="bool")return "BoolDType";
+ if(dtype.starts_with("uint"))return "UInt"+dtype.substr(4)+"DType";
+ std::string out=dtype;out[0]=static_cast<char>(out[0]-'a'+'A');return out+"DType";
+}
 std::vector<EventAttribute> row_bounds(const EventAttribute& bound,std::size_t rows,const std::string& dtype){
  if(text_value(bound)&&bound.container==AttributeContainerKind::kScalar&&!bound.is_null&&dtype.starts_with("datetime64"))
   return std::vector<EventAttribute>(rows,datetime_text_bound(bound,dtype));
@@ -658,6 +740,68 @@ bool comparison(const EventAttribute& value,const EventAttribute& bound,const st
  }else if(numeric(value)&&numeric(bound))order=native_scalar_key_compare(value,dtype=="float32"?float32_bound(bound):bound);
  else error("TypeError","'"+op+"' not supported between instances of '"+qualified_type_name(value)+"' and '"+qualified_type_name(bound)+"'");
  return op==">="?order>=0:op=="<="?order<=0:op=="<"?order<0:order>0;
+}
+// Round DT (probe dt t1; black-box probes dt/nb/dtp.py, dtp2.py): a
+// datetime64 column checks a tuple's length, refuses an array of more than
+// one dimension, and then reads its items as pandas infers them (None, NaN
+// and NaT skipped): aware datetimes, or date strings, compare as instants;
+// numbers, booleans, naive datetimes or only NaN/NaT are an invalid
+// comparison; any other mix (and only None) compares row by row as Python
+// objects, where a NaT row or a missing item is False.
+std::vector<bool> datetime_tuple_mask(const EventTable& source,std::size_t attribute,const EventAttribute& bound,const std::string& op,const std::string& dtype){
+ const auto n=source.size(),k=bound.children.size();
+ if(k!=n)error("ValueError","Lengths must match");
+ const auto depth=detail::numpy_object_depth(bound);
+ if(depth>1)error("ValueError","Buffer has wrong number of dimensions (expected 1, got "+std::to_string(depth)+")");
+ const auto invalid=[&]{error("TypeError","Invalid comparison between dtype="+dtype+" and tuple");};
+ const auto nan=[](const EventAttribute& e){return !e.is_null&&e.container==AttributeContainerKind::kScalar&&!date_value(e)&&numeric(e)&&!(e.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(e.typed_value))&&std::isnan(native_attribute_number(e));};
+ const auto boolean=[](const EventAttribute& e){return e.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(e.typed_value);};
+ const auto integer=[&](const EventAttribute& e){return !boolean(e)&&(e.kind==AttributeKind::kInt||std::holds_alternative<std::int64_t>(e.typed_value)||std::holds_alternative<std::uint64_t>(e.typed_value));};
+ bool none_only=!bound.children.empty(),structured=false,has_int=false,has_float=false,has_bool=false,has_str=false,has_aware=false,has_naive=false,has_other=false;
+ for(const auto& e:bound.children){
+  if(e.is_null)continue;
+  none_only=false;
+  if(e.container!=AttributeContainerKind::kScalar){structured=true;continue;}
+  if(nan(e)||(date_value(e)&&missing(e)))continue;
+  if(is_native_na_attribute(e)){has_other=true;continue;}
+  if(date_value(e)){const auto at=instant(e);if(at&&at->timezone_aware)has_aware=true;else has_naive=true;continue;}
+  if(text_value(e)){has_str=true;continue;}
+  if(boolean(e)){has_bool=true;continue;}
+  if(integer(e)){has_int=true;continue;}
+  if(numeric(e)){has_float=true;continue;}
+  has_other=true;
+ }
+ std::vector<bool> out(n);
+ const int kinds=int(has_int||has_float)+int(has_bool)+int(has_str)+int(has_aware||has_naive)+int(has_other);
+ const bool elementwise=none_only||structured||kinds>1||has_other||(has_int&&has_bool)||(has_aware&&has_naive);
+ if(elementwise){
+  for(std::size_t i=0;i<n;++i){
+   const auto& value=cell(source,i,attribute);const auto& item=bound.children[i];
+   if(missing(value)||item.is_null||nan(item)||(date_value(item)&&missing(item)))continue;
+   if(date_value(item)){
+    const auto at=instant(item);
+    if(!at||!at->timezone_aware)error("TypeError","can't compare offset-naive and offset-aware datetimes");
+    out[i]=comparison(value,item,op,dtype);continue;
+   }
+   const std::string name=item.container==AttributeContainerKind::kContainer?"dict":item.container==AttributeContainerKind::kList?"list":item.container==AttributeContainerKind::kTuple?"tuple":item.container==AttributeContainerKind::kSet?"set":item.container==AttributeContainerKind::kFrozenSet?"frozenset":qualified_type_name(item);
+   error("TypeError","'"+op+"' not supported between instances of 'Timestamp' and '"+name+"'");
+  }
+  return out;
+ }
+ if(has_aware&&!has_naive){
+  for(std::size_t i=0;i<n;++i)out[i]=comparison(cell(source,i,attribute),bound.children[i],op,dtype);
+  return out;
+ }
+ if(has_str){
+  std::vector<EventAttribute> items;
+  for(const auto& e:bound.children){
+   if(!text_value(e)){items.push_back(EventAttribute{"","NaT",AttributeKind::kDate,true});continue;}
+   try{items.push_back(datetime_text_bound(e,dtype));}catch(const PandasAttributesFilterError&){invalid();}
+  }
+  for(std::size_t i=0;i<n;++i)out[i]=comparison(cell(source,i,attribute),items[i],op,dtype);
+  return out;
+ }
+ invalid();
 }
 // The stream filters of apply_numeric: each compares the rows that remain
 // (`alive` holds the cells a list key's DataFrame.where left visible).
@@ -749,10 +893,27 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
  // Pandas evaluates complete vector comparisons before combining the masks;
  // negative event filtering keeps (value < lower) | (value > upper).
  const bool outside=events&&!positive;
- const auto lows=row_bounds(lower,source.size(),dtype);
- for(std::size_t i=0;i<source.size();++i)low[i]=comparison(cell(source,i,attribute),lows[i],outside?"<":">=",dtype);
- const auto highs=row_bounds(upper,source.size(),dtype);
- for(std::size_t i=0;i<source.size();++i)high[i]=comparison(cell(source,i,attribute),highs[i],outside?">":"<=",dtype);
+ const auto compare_all=[&](const EventAttribute& bound,const std::string& op,std::vector<bool>& out){
+  // Round DT (probe dt t1): a numpy column hands a tuple to numpy, which
+  // makes it an array first (pandas_numpy_operand.hpp); a None, dict or
+  // other leaf that is no number is an object whose comparison Python
+  // refuses, NaN rows included.
+  if(bound.container==AttributeContainerKind::kTuple&&numpy_number_dtype(dtype)){
+   const std::string python=dtype.starts_with("float")?"float":dtype=="bool"?"bool":"int";
+   out=detail::numpy_tuple_mask(source.size(),bound,op,numpy_dtype_class(dtype),[&](std::size_t i,const EventAttribute& item){
+    if(item.is_null||item.container!=AttributeContainerKind::kScalar||!numeric(item)||date_value(item)||is_native_na_attribute(item))
+     error("TypeError","'"+op+"' not supported between instances of '"+python+"' and '"+(item.is_null?std::string("NoneType"):qualified_type_name(item))+"'");
+    return comparison(cell(source,i,attribute),item,op,dtype);
+   },error);
+   return;
+  }
+  if(bound.container==AttributeContainerKind::kTuple&&dtype=="str"){out=string_tuple_mask(source,attribute,bound,op);return;}
+  if(bound.container==AttributeContainerKind::kTuple&&dtype.starts_with("datetime64")){out=datetime_tuple_mask(source,attribute,bound,op,dtype);return;}
+  const auto bounds=row_bounds(bound,source.size(),dtype);
+  for(std::size_t i=0;i<source.size();++i)out[i]=comparison(cell(source,i,attribute),bounds[i],op,dtype);
+ };
+ compare_all(lower,outside?"<":">=",low);
+ compare_all(upper,outside?">":"<=",high);
  for(std::size_t i=0;i<source.size();++i){const auto& value=cell(source,i,attribute);const bool within=low[i]&&high[i];selected[i]=events?((outside?(low[i]||high[i]):within)||(keep_nan&&missing(value))):(within||(keep_nan&&missing(value)));}
  if(!events){
   // Round CT: df[list] == value is a frame, so df[mask] masks the rows

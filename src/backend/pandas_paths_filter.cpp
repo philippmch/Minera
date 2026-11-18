@@ -10,6 +10,7 @@
 #include "minera/timestamp.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
+#include "pandas_numpy_operand.hpp"
 namespace minera { namespace {
 [[noreturn]] void error(std::string kind,std::string message){throw PandasPathsFilterError(std::move(kind),std::move(message));}
 std::string string_key_repr(std::string_view value) {
@@ -255,19 +256,22 @@ std::vector<bool> duration_mask(const std::vector<std::pair<std::size_t,double>>
  if(text_value(bound))error("TypeError","Invalid comparison between dtype=float64 and str");
  if(date_value(bound)&&std::holds_alternative<NativeDate>(bound.typed_value))error("TypeError",op+" not supported between instances of 'numpy.ndarray' and '"+type_name(bound)+"'");
  const auto compare=[&](double value,const EventAttribute& item)->bool{
-  if(item.is_null)return false;
+  // A None leaf of a tuple is an object of numpy's array, so Python's own
+  // comparison refuses it.
+  if(item.is_null&&bound.container!=AttributeContainerKind::kTuple)return false;
+  if(item.is_null)error("TypeError",op+" not supported between instances of 'float' and 'NoneType'");
   if(item.container!=AttributeContainerKind::kScalar||!numeric(item)||is_native_na_attribute(item))error("TypeError",op+" not supported between instances of 'float' and '"+type_name(item)+"'");
   const auto number=native_attribute_number(item);return lower?value>=number:value<=number;
  };
  std::vector<bool> result(n);
- if(bound.container==AttributeContainerKind::kList||bound.container==AttributeContainerKind::kTuple){
+ // Round DT (probe dt t2): a tuple is made a numpy array first, as in the
+ // case performance filter (pandas_numpy_operand.hpp).
+ if(bound.container==AttributeContainerKind::kTuple)
+  return detail::numpy_tuple_mask(n,bound,lower?">=":"<=","Float64DType",[&](std::size_t i,const EventAttribute& item){return compare(occurrences[i].second,item);},error);
+ if(bound.container==AttributeContainerKind::kList){
   const auto k=bound.children.size();
-  if(bound.container==AttributeContainerKind::kList&&k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");
-  if(bound.container==AttributeContainerKind::kTuple){
-   if(k!=n&&k!=1&&n!=1)error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) ("+std::to_string(k)+",) ");
-   if(n==1&&k!=1)error("ValueError","Length of values ("+std::to_string(k)+") does not match length of index (1)");
-  }
-  for(std::size_t i=0;i<n;++i)result[i]=compare(occurrences[i].second,bound.children[k==n?i:0]);
+  if(k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");
+  for(std::size_t i=0;i<n;++i)result[i]=compare(occurrences[i].second,bound.children[i]);
   return result;
  }
  for(std::size_t i=0;i<n;++i)result[i]=compare(occurrences[i].second,bound);

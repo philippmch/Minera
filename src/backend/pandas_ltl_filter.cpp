@@ -11,6 +11,7 @@
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
 #include "pandas_merge_order.hpp"
+#include "pandas_numpy_operand.hpp"
 #include "python_scalar.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
@@ -332,7 +333,8 @@ bool listed_bounds(const EventAttribute& boundaries,std::size_t steps){
  for(std::size_t i=0;i+1<steps&&i<boundaries.children.size();++i){
   const auto& bound=boundaries.children[i];
   if(!sequence(bound))continue;
-  for(std::size_t j=0;j<2&&j<bound.children.size();++j)if(listed_bound(bound.children[j]))return true;
+  // Round DT: a tuple compares with the chains as numpy's array does.
+  for(std::size_t j=0;j<2&&j<bound.children.size();++j)if(listed_bound(bound.children[j])||(!bound.children[j].is_null&&bound.children[j].container==AttributeContainerKind::kTuple))return true;
  }
  return false;
 }
@@ -363,6 +365,17 @@ std::vector<bool> compare_step(const std::vector<double>& differences,const Even
    error("TypeError",op+" not supported between instances of 'float' and '"+type_name(item)+"'");
   }
   return result;
+ }
+ // Round DT (probe dt t4): a tuple bound is numpy's array, compared with
+ // the float differences under pandas_numpy_operand.hpp's rules.
+ if(!bound.is_null&&bound.container==AttributeContainerKind::kTuple){
+  const std::string op=lower?">=":"<=";
+  return detail::numpy_tuple_mask(differences.size(),bound,op,"Float64DType",[&](std::size_t j,const EventAttribute& item){
+   if(item.is_null||item.container!=AttributeContainerKind::kScalar||!numeric(item)||date_value(item)||is_native_na_attribute(item))
+    error("TypeError","'"+op+"' not supported between instances of 'float' and '"+type_name(item)+"'");
+   const auto value=native_attribute_number(item);
+   return lower?differences[j]>=value:differences[j]<=value;
+  },[](const std::string& type,const std::string& message){error(type,message);});
  }
  if(missing(bound))return result;
  if(((bound.container==AttributeContainerKind::kContainer&&!bound.is_null)||row_wise_bound(bound))&&differences.empty())return result;

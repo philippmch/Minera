@@ -99,6 +99,14 @@ struct Ocel {
   // order); its OCEL 1.0 XML, CSV and SQLite writers follow the frame order.
   // Classic JSON carries it as "minera:eventActivityFirst".
   bool event_activity_first = false;
+  // The reference relations frame is float64 (round DT): a JSON file whose
+  // relations frame is empty (a relation-free file, which keeps no event and
+  // no object either) reads so, and filters keep it. Its flattening and its
+  // lifecycle enrichment then fail. An in-memory empty log (a filter result,
+  // a relation-free SQLite read) keeps typed frames, so a log built in code
+  // leaves this false; the OCEL transport carries it as
+  // "minera:untypedRelations".
+  bool untyped_relations = false;
 };
 
 using OCEL = Ocel;
@@ -206,6 +214,15 @@ void drop_unrelated_ocel_entries(Ocel& log);
 // 1.0/2.0 JSON, both XML and the SQLite readers drop such rows (observed
 // black-box), then drop_unrelated_ocel_entries applies as usual.
 void drop_empty_ocel_names(Ocel& log);
+// The reference objects frame of a log declared without any object column
+// (see OcelTableColumns; an OCEL JSON file that lists no object is read so,
+// round DT) has no `column`: a reference function that reads it raises
+// KeyError. Throws std::invalid_argument "KeyError: '<column>'".
+void require_ocel_object_column(const Ocel& log, std::string_view column);
+// Both columns at once, as a frame selection: "KeyError: \"None of
+// [Index(['ocel:oid', 'ocel:type'], dtype='str')] are in the [columns]\""
+// (the description and the SQLite writer).
+void require_ocel_object_columns(const Ocel& log);
 
 // True for a global the reference OCEL 1.0 writers produce by themselves: the
 // "__INVALID__" defaults of the event and object scopes and the computed log

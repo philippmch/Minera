@@ -1458,6 +1458,11 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_review_dr2_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_dr2_tests COMMAND minera_review_dr2_tests)
 
+  add_executable(minera_review_dt1_tests src/backend/tests/test_review_dt1.cpp)
+  target_link_libraries(minera_review_dt1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_dt1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_dt1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_dt1_tests COMMAND minera_review_dt1_tests)
   add_executable(minera_review_ds1_tests src/backend/tests/test_review_ds1.cpp)
   target_link_libraries(minera_review_ds1_tests PRIVATE minera::core)
   target_compile_features(minera_review_ds1_tests PRIVATE cxx_std_20)
@@ -3575,6 +3580,11 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_polars_filter_dq_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dq-bank.json.gz")
   set_tests_properties(minera_polars_filter_dq_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DT: the between filter's separator diagnostic with an empty anchor
+  # list (FILTER folded to false; probe u1, eager and lazy).
+  add_test(NAME minera_polars_filter_dt_bank_parity_tests COMMAND minera_polars_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/polars-filter-dt-bank.json.gz")
+  set_tests_properties(minera_polars_filter_dt_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_interleavings_merge_parity_tests
     src/backend/tests/test_interleavings_merge_parity.cpp
@@ -3883,6 +3893,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_ds_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-ds-bank.json.gz")
   set_tests_properties(minera_pandas_filter_ds_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DT: tuple bounds made numpy arrays in the paths performance filter,
+  # the numeric attribute filters (every numpy dtype, the str model and the
+  # datetime64 columns) and the LTL time-difference bounds (probes t1-t4).
+  add_test(NAME minera_pandas_filter_dt_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dt-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_dt_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp

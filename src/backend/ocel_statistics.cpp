@@ -458,6 +458,7 @@ OcelAssociationAggregates aggregate_associations(
 
 OcelEdgeAssociations edge_associations(
     const Ocel& log, const OcelEdgeAssociationOptions& options) {
+  require_ocel_object_column(log, "ocel:oid");
   const auto lookups = validate_and_index(log);
   const auto business_slots =
       options.use_business_hours || !options.business_hour_slots.empty()

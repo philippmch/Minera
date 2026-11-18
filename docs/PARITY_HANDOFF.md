@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DS (2026-11-05 to 2026-11-17, cloud container)
+## Review-fix loop, rounds T–DT (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6703,6 +6703,67 @@ Full suite 605 passed before the flattening and tuple-bound fixes; after
 them the 90 OCEL and pandas tests (606 tests in all with the new bank)
 passed again; no fixture changed (2,673 responses). The device check on
 the Mac was skipped (the Mac was not linked).
+
+Round DT re-reviewed DS (Review DT1). DS's commit 225ebc7 ran CI run
+44201772589: all six jobs green; DR's Windows job finished green, so all
+six DR jobs passed. DT took DS's carried tuple bounds and degenerate OCELs:
+- Tuple bounds: numpy's array rules moved to `pandas_numpy_operand.hpp`
+  and now serve paths performance, the numeric attribute filters (numpy
+  dtypes, the str StringArray model, datetime64 columns) and LTL
+  time-difference bounds. Probes t1 1,648 -> 0, t2 393 -> 0, t3 7 -> 0,
+  t4 504 -> 0.
+- Polars between filter: the separator diagnostic's plan folds a FILTER on
+  an empty anchor list to `false.alias(...)` (fresh CK 2026121301 case
+  311; u1 180 -> 0).
+- Degenerate OCELs: an event-free JSON file fails at read
+  (`KeyError: 'ocel:timestamp'`); an object-free one reads as an objects
+  frame without columns and raises pm4py's KeyErrors in 20 route variants;
+  a relation-free one has float64 relations (flattening and lifecycle
+  enrichment fail), carried by the transport as
+  `"minera:untypedRelations"` so empty filter results still chain like
+  in-memory logs; the SQLite reader fails on tables without rows; the
+  objects filter's level expansion raises KeyError on an unknown id.
+- Fresh seeds 2026121300-11: three calls, the between plan above and two
+  struct cast races (declared).
+
+In the suite: new `minera_review_dt1_tests`,
+`docs/pandas-filter-dt-bank.json.gz` (12,854 calls) with
+`minera_pandas_filter_dt_bank_parity_tests` and
+`docs/polars-filter-dt-bank.json.gz` (504 calls) with
+`minera_polars_filter_dt_bank_parity_tests`. The probes, the sweeps and
+the fresh banks are in the project files under `review-harness/round-dt/`.
+
+Next round (DU) should start by re-reviewing round DT:
+
+- DT's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the OCEL transport flag `minera:untypedRelations` across every route
+  that builds a new log (split sublogs, playout, enrichment, the SQLite and
+  CSV imports): pm4py's in-memory frame types after each;
+- other pandas Series comparisons with a tuple operand (the timestamp
+  filters' bounds, the variants filters), and numpy's tuple rules for
+  masked (Int64, Float64, boolean) columns in the numeric attribute
+  filters;
+- link analysis under PROPAGATE without look-forward and first
+  occurrences (three declared calls; a key-level pass where sources
+  sharing an in key share their result fits some of them; not taken in
+  DT);
+- the keep-once relative occurrence count with a dict case key naming
+  several existing columns, the nanosecond window at pandas' int64 range
+  ends, the eager paths performance race (DO1-2), the thread-count quirk
+  of DN1-6 (all declared);
+- the rest of the CU list (equal-size joins, CJ/CF/CD items); Duration,
+  Time, Decimal and Int128 column dtypes are not in any Polars domain yet;
+- the open choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DS's targets, taken in DT (findings DT1-1 to DT1-4): DS's CI run and
+DR's Windows job, the fresh seeds, the tuple bounds of the other pandas
+filters, the degenerate OCELs. Not taken (carried to DU): PROPAGATE, the
+declared items, the CU list, the new dtypes and the open choices.
+
+Previous list for round DT (kept for its older items):
 
 Next round (DT) should start by re-reviewing round DS:
 

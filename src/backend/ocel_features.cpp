@@ -1206,6 +1206,9 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       throw std::invalid_argument(
           "OCEL filter_per_type applies only to the objects variant");
   }
+  // Round DT: the reference reads the objects frame's type (events) or id
+  // (objects) first.
+  require_ocel_object_column(log, variant == OcelFeatureVariant::kObjects ? "ocel:oid" : "ocel:type");
   const bool related_object_event_context =
       options.include_related_objects_features &&
       variant == OcelFeatureVariant::kEvents;

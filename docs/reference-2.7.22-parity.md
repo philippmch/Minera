@@ -30912,3 +30912,134 @@ Tests:
   fixes; after them the 90 OCEL and pandas tests (606 in all) passed
   again. Python script and frontend tests not rerun (scripts and frontend
   unchanged); the workbench fixture replay gave 2,673 responses unchanged.
+
+## Review DT1: re-review of round DS, numpy tuple bounds in the other pandas filters, the between separator plan on an empty anchor list, degenerate OCELs in every OCEL route and reader, fresh seeds (2026-11-18)
+
+Round DT checked DS's CI (run 44201772589 on 225ebc7: all six jobs green,
+the Windows job too) and DR's Windows job (run 44186475483, job
+134404247522: green, so all six DR jobs passed), took DS's carried tuple
+bounds and degenerate OCELs, and replayed a batch of fresh seeds. The
+device check on the Mac was skipped (the Mac was not linked).
+
+- **DT1-1 Tuple bounds of the other pandas filters.** DS modelled numpy's
+  array rules for the case performance and case size filters; the shared
+  model now lives in `pandas_numpy_operand.hpp` (`numpy_tuple_array`,
+  `numpy_tuple_mask`) and serves those two filters,
+  `paths.apply_performance` (float64 durations; a None leaf raises
+  `'>=' not supported between instances of 'float' and 'NoneType'`),
+  the numeric attribute filters `apply_numeric` and `apply_numeric_events`
+  and LTL `eventually_follows`' `timestamp_diff_boundaries` (a tuple bound
+  compares with the chains as numpy's array: broadcasting, the
+  `Length of values (a) does not match length of index (n)` and
+  `Data must be 1-dimensional` checks, str leaves without a loop). The
+  numeric attribute filters follow the column dtype: every numpy integer,
+  float and bool dtype takes the numpy rules with its dtype class
+  (`Int64DType`, `UInt8DType`, `BoolDType`, ...); a pandas `str` column
+  compares the tuple as pandas' StringArray does (`Lengths of operands do
+  not match: n != k`, the leaves made a numpy str array with `str()` of
+  numbers and Python's float repr, the valid rows broadcast, a 2-D result
+  refused by boolean indexing); a datetime64 column checks the length
+  (`Lengths must match`), refuses nested tuples (`Buffer has wrong number
+  of dimensions (expected 1, got D)`), then classifies the leaves: aware
+  datetimes and date texts compare, numbers, bools, naive datetimes, NaT,
+  all-missing and empty tuples are an `Invalid comparison between
+  dtype=datetime64[...] and tuple`, and mixes compare item by item as
+  Python objects (NaT rows and missing leaves False; `'>=' not supported
+  between instances of 'Timestamp' and 'int'`, `can't compare
+  offset-naive and offset-aware datetimes`). A text leaf without a digit
+  or month word (but "now" and "today") is an invalid comparison too.
+  Probes `dt/specs/t1.py` (numeric attribute filters over every dtype,
+  3,500 calls) 1,648 -> 0, `t2.py` (paths performance, 450) 393 -> 0,
+  `t3.py` (random nested tuples, 8,400) 7 -> 0, `t4.py` (LTL, 504)
+  504 -> 0; a fuzz of the str model (`nb/strfz.py`, 19,000) 0.
+- **DT1-2 Polars between filter, empty anchor list** (fresh Polars CK
+  2026121301 case 311). The separator diagnostic prints the query plan,
+  where Polars folds a `FILTER` on an empty anchor list to
+  `false.alias("_first_act")` / `false.alias("_last_act")`; native printed
+  the `is_in` of an empty literal. Probe `u1.py` (empty anchor lists and
+  list separators, eager and lazy, 504 calls): 180 -> 0.
+- **DT1-3 Degenerate OCELs.** pm4py's `read_ocel_json` and
+  `read_ocel2_json` fail on a file that lists no event (`KeyError:
+  'ocel:timestamp'`), read a file that lists no object as an objects
+  frame without columns, and read a relation-free file as a log without
+  events and objects whose relations frame is float64. Native read all
+  three as empty logs. Now:
+  - an event-free JSON file fails at read in every route;
+  - an object-free file declares an objects frame without columns
+    (`OcelTableColumns::objects` empty, kept by the transport), and
+    `require_ocel_object_column` raises pm4py's KeyError where the
+    reference reads the frame: the description (both variants: `KeyError:
+    "None of [Index(['ocel:oid', 'ocel:type'], dtype='str')] are in the
+    [columns]"`), event and object features (`'ocel:type'`,
+    `'ocel:oid'`), OTG, OCPN and SAW discovery (`'ocel:type'`; OCDFG
+    already raised), edge associations (`'ocel:oid'`), the object types,
+    objects, object attribute (id and type keys) and the four
+    connected-component filters, the flattening (`'ocel:type'`), the JSON
+    and XML exports (`'ocel:type'`) and the SQLite writer (the "None of"
+    error); the event filters, statistics other than edge associations,
+    ETOT, the object graphs, the split and the CSV export work as before;
+  - a relation-free file sets `Ocel::untyped_relations`: the flattening
+    raises DS's merge error and the lifecycle enrichment `UFuncTypeError:
+    ufunc 'add' did not contain a loop with signature matching types
+    (dtype('float64'), dtype('<U2')) -> None`. In-memory empty logs (a
+    filter result, a relation-free SQLite read) keep typed frames and work
+    in pm4py, so the OCEL transport carries the flag as
+    `"minera:untypedRelations"` for every log without relations, and a
+    document with it reads as that log (an empty filter result chains to
+    any route, as in memory); a download leaves it out and reads as the
+    reference reads the file. DS's flattening errors are now conditioned
+    on the flag (a log built in code flattens to no trace);
+  - pm4py's OCEL 2.0 SQLite reader fails on an event or object table
+    without rows (`ValueError: No objects to concatenate`); native read an
+    empty log. A database with rows but no event-object rows still reads
+    as an empty log, as in pm4py. The XML readers already refuse a
+    relation-free file (AO1-7; pm4py raises `AttributeError: 'NoneType'
+    object has no attribute 'index'`, native keeps its message);
+  - `filter_ocel_objects` with a level above 1 looks every requested id up
+    in its interaction graph (the related objects): another id raises
+    `KeyError: '<id>'` (native ignored it).
+  Probes `dt/nb/ocdeg.py`, `ocdeg2.py`, `ocdeg3.py` (pm4py functions on
+  relation-free and object-free logs), `dt/oc/rd.py` and `sq.py` (every
+  reader on degenerate files), `typed.py` (in-memory empty logs) and
+  `lv.py`; the server sweep `dt/oc/nat.sh` (39 route variants on eight
+  degenerate files) agrees with the reference on every variant.
+- **DT1-4 Fresh seeds.** Batch 2026121300-11 (twelve banks): three calls.
+  Polars CK 2026121301 case 311 is DT1-2; CK 2026121301 case 305 and CJ
+  2026121303 case 231 (`paths.apply_performance` with a dict bound) are
+  the declared struct cast race (24 reruns of case 305 in the reference
+  gave the comparison error every time; the bank test accepts). Every
+  other call replays clean.
+
+Declared:
+- The XML readers' message on a relation-free file (AO1-7, unchanged).
+- With several requested ids missing from the interaction graph,
+  `filter_ocel_objects` names the first in its set order (hash seeded);
+  native names the smallest.
+- Still declared from earlier rounds: link analysis under PROPAGATE
+  without look-forward and first occurrences (three calls), the
+  equal-size join order of the Polars sequence filters, the keep-once
+  relative occurrence count with a dict case key naming several columns
+  (DQ1-5), the nanosecond window at pandas' int64 range ends (DQ1-2),
+  dateutil-only date strings (DP1-4, DQ1-4; in tuples too), the eager
+  paths performance race (DO1-2), the thread-count quirk of DN1-6 and the
+  struct cast race.
+
+Tests:
+- New: `minera_review_dt1_tests` (degenerate OCELs: reads, the object-free
+  KeyErrors of every function above, the float relations and their
+  transport, typed empty logs, the SQLite reader without rows, the level
+  expansion); `docs/pandas-filter-dt-bank.json.gz` (12,854 calls of t1-t4)
+  with `minera_pandas_filter_dt_bank_parity_tests`;
+  `docs/polars-filter-dt-bank.json.gz` (504 calls of u1) with
+  `minera_polars_filter_dt_bank_parity_tests`.
+- `minera_ocel_transform_tests`: DS's flattening cases now set
+  `untyped_relations`, and a typed log without relations flattens to no
+  trace.
+- Full suite: 608 of 609 tests passed on the first run; the object
+  attributes module test showed the frame check too wide (exact call
+  models declare the id and type columns under other names), so only a
+  frame declared without any column counts; after that the 32 OCEL tests
+  passed again. The workbench fixture replay gave 2,673 responses
+  unchanged; the server sweep of 39 OCEL route variants on eight
+  degenerate files agrees with the reference. Python script and frontend
+  tests not rerun (scripts and frontend unchanged).

@@ -13,6 +13,7 @@
 #include "business_hours.hpp"
 #include "root_cause_trace_key.hpp"
 #include "pandas_range_index.hpp"
+#include "pandas_numpy_operand.hpp"
 #include "python_scalar.hpp"
 #include "root_cause_unicode.hpp"
 namespace minera {
@@ -286,42 +287,8 @@ std::vector<bool> duration_mask(const std::vector<double>& durations,const std::
  // every leaf compares with its cases in C order (a non-number raises), and
  // the result is assigned to the cases: its first dimension must be n and
  // it must be one-dimensional.
- if(bound.container==AttributeContainerKind::kTuple){
-  const auto is_sequence=[](const EventAttribute* e){return !e->is_null&&(e->container==AttributeContainerKind::kList||e->container==AttributeContainerKind::kTuple);};
-  const auto python_shape=[](const std::vector<std::size_t>& shape){
-   std::string out="(";for(std::size_t i=0;i<shape.size();++i)out+=(i?", ":"")+std::to_string(shape[i]);
-   return out+(shape.size()==1?",)":")");
-  };
-  std::vector<std::size_t> shape{bound.children.size()};std::vector<const EventAttribute*> level;
-  for(const auto& c:bound.children)level.push_back(&c);
-  while(!level.empty()){
-   const bool any=std::any_of(level.begin(),level.end(),is_sequence);
-   if(!any)break;
-   const bool all=std::all_of(level.begin(),level.end(),is_sequence);
-   const auto width=level.front()->children.size();
-   if(!all||std::any_of(level.begin(),level.end(),[&](const EventAttribute* e){return e->children.size()!=width;}))
-    error("ValueError","setting an array element with a sequence. The requested array has an inhomogeneous shape after "+std::to_string(shape.size())+" dimensions. The detected shape was "+python_shape(shape)+" + inhomogeneous part.");
-   shape.push_back(width);std::vector<const EventAttribute*> next;
-   for(const auto* e:level)for(const auto& c:e->children)next.push_back(&c);
-   level=std::move(next);
-  }
-  const auto plain=[](const EventAttribute* e){return !e->is_null&&e->container==AttributeContainerKind::kScalar&&!is_native_na_attribute(*e)&&(numeric(*e)||text_value(*e));};
-  if(std::all_of(level.begin(),level.end(),plain)&&std::any_of(level.begin(),level.end(),[](const EventAttribute* e){return text_value(*e);}))
-   error("UFuncTypeError",std::string("ufunc '")+(lower?"greater_equal":"less_equal")+"' did not contain a loop with signature matching types (<class 'numpy.dtypes."+(sizes?"Int64DType":"Float64DType")+"'>, <class 'numpy.dtypes.StrDType'>) -> None");
-  const auto last=shape.back();
-  if(last!=n&&last!=1&&n!=1){
-   std::string dims="(";for(std::size_t i=0;i<shape.size();++i)dims+=(i?",":"")+std::to_string(shape[i]);
-   error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(n)+",) "+dims+(shape.size()==1?",) ":") "));
-  }
-  auto broadcast=shape;broadcast.back()=last==1?n:last;
-  const std::size_t outer=level.empty()?0:level.size()/last;
-  for(std::size_t o=0;o<outer;++o)
-   for(std::size_t j=0;j<broadcast.back();++j)(void)compare(durations[cases[n==1?0:j]],*level[o*last+(last==1?0:j)]);
-  if(broadcast.front()!=n)error("ValueError","Length of values ("+std::to_string(broadcast.front())+") does not match length of index ("+std::to_string(n)+")");
-  if(broadcast.size()>1)error("ValueError","Data must be 1-dimensional, got ndarray of shape "+python_shape(broadcast)+" instead");
-  for(std::size_t i=0;i<n;++i)result[i]=compare(durations[cases[i]],*level[last==1?0:i]);
-  return result;
- }
+ if(bound.container==AttributeContainerKind::kTuple)
+  return detail::numpy_tuple_mask(n,bound,lower?">=":"<=",sizes?"Int64DType":"Float64DType",[&](std::size_t i,const EventAttribute& item){return compare(durations[cases[i]],item);},error);
  if(bound.container==AttributeContainerKind::kList){
   const auto k=bound.children.size();
   if(k!=n)error("ValueError","('Lengths must match to compare', ("+std::to_string(n)+",), ("+std::to_string(k)+",))");

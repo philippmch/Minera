@@ -478,6 +478,7 @@ std::string interpolate(const std::string& pattern,
   }
   return output;
 }
+bool empty_anchor(const Anchor& a) { return !a.scalar && a.literal.values.empty(); }
 void validate_separator(const EventTable& source, const std::string& key, const std::string& activity,
                         const Anchor& act1, const Anchor& act2, const std::string& activity_dtype,
                         const EventAttribute& separator, const std::string& phase) {
@@ -497,8 +498,10 @@ void validate_separator(const EventTable& source, const std::string& key, const 
   auto message = interpolate(pattern, {
       {"%RESOLVED1%", resolved_text(act1, activity, activity_dtype)},
       {"%RESOLVED2%", resolved_text(act2, activity, activity_dtype)},
-      {"%FIRST1%", resolved_text(act1, "_first_act", activity_dtype)},
-      {"%LAST2%", resolved_text(act2, "_last_act", activity_dtype)},
+      // Round DT (fresh Polars CK 2026121301 case 311, probe dt u1): the
+      // optimizer folds a FILTER on an empty anchor to false.
+      {"%FIRST1%", empty_anchor(act1) ? std::string("false.alias(\"_first_act\")") : resolved_text(act1, "_first_act", activity_dtype)},
+      {"%LAST2%", empty_anchor(act2) ? std::string("false.alias(\"_last_act\")") : resolved_text(act2, "_last_act", activity_dtype)},
       {"(inner: 'String',", "(inner: '" + detail::polars_lit::debug_name(detail::polars_lit::argument_literal(separator).type) + "',"},
       {"%CASE%", quote(key)}, {"%ACTIVITY%", quote(activity)},
       {"%SEPARATOR%", expression.substr(1, expression.size() - 2)}, {"%FRAME%", frame_plan(source)}});

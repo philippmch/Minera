@@ -821,6 +821,11 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       object_type_names.insert(type);
     }
   }
+  // Round DT: the reference reader concatenates the type tables of the
+  // listed types, so an event or object table without rows fails there
+  // (observed black-box, probe dt/oc sq.py).
+  if ((activities.empty() || object_type_names.empty()) && !options.validate_references.value_or(false))
+    throw std::invalid_argument("ValueError: No objects to concatenate");
   const auto event_map = read_type_map(db, "event_map_type");
   const auto object_map = read_type_map(db, "object_map_type");
   read_type_catalog(db, event_map, "event_", log.event_type_attributes);
@@ -1073,6 +1078,8 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
 
 void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
                         const OcelSqliteOptions& options) {
+  // Round DT: the reference writer selects the objects frame's id and type.
+  require_ocel_object_columns(log);
 #if !defined(MINERA_HAS_SQLITE)
   (void)log;
   (void)path;

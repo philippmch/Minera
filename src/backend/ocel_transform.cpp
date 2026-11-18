@@ -658,8 +658,15 @@ Ocel enrich_ocel(const Ocel& log, const OcelEnrichmentOptions& options) {
     }
     return false;
   }, false);
-  if (options.include_lifecycle_qualifiers)
+  if (options.include_lifecycle_qualifiers) {
+    // Round DT: a reference read without relations has float64 relation
+    // columns, and the lifecycle enrichment adds a qualifier text to them.
+    if (result.relations.empty() && result.untyped_relations)
+      throw std::invalid_argument(
+          "UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('float64'), "
+          "dtype('<U2')) -> None");
     apply_lifecycle_qualifiers(result, index);
+  }
   return result;
 }
 
@@ -983,9 +990,16 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
   // column with a float64 one (round DS, observed black-box through the OCEL
   // 1.0 and 2.0 JSON readers; a log whose relations miss the type flattens to
   // no trace).
-  if (log.events.empty()) throw std::invalid_argument("KeyError: 'ocel:timestamp'");
-  if (log.objects.empty()) throw std::invalid_argument("KeyError: 'ocel:type'");
-  if (log.relations.empty())
+  // Round DT: a file that lists no event fails at read (parse_ocel_json), one
+  // that lists no object reads as an objects frame without columns, and a
+  // relation-free one as a log without events and objects, which merges like
+  // any log without relations.
+  require_ocel_object_column(log, "ocel:type");
+  if (log.untyped_relations && log.events.empty() && !log.objects.empty())
+    throw std::invalid_argument("KeyError: 'ocel:timestamp'");
+  if (log.untyped_relations && log.objects.empty() && !log.events.empty())
+    throw std::invalid_argument("KeyError: 'ocel:type'");
+  if (log.untyped_relations && log.relations.empty())
     throw std::invalid_argument(
         "ValueError: You are trying to merge on str and float64 columns for key 'case:concept:name'. If you "
         "wish to proceed you should use pd.concat");

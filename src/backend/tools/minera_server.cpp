@@ -2820,6 +2820,9 @@ void handle_ocel_exchange(const httplib::Request& request,
 
     if (mode == "export") {
       const auto log = minera::parse_ocel_json(body);
+      // Round DT: the reference JSON and XML writers read the objects
+      // frame's type (a log read from a file that lists no object has none).
+      if (format != "csv" && format != "csv_objects") minera::require_ocel_object_column(log, "ocel:type");
       std::string payload;
       std::string content_type;
       std::string filename;
