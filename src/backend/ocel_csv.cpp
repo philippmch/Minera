@@ -733,8 +733,8 @@ std::optional<Column> convert(const std::vector<std::string_view>& cells) {
     std::int64_t year;
     unsigned month, day_of_month;
     civil_from_days(day, year, month, day_of_month);
-    if (year > 9999) return std::nullopt;
-    std::string text = std::to_string(year) + "-" + two(static_cast<int>(month)) + "-" +
+    if (year < 1 || year > 9999) return std::nullopt;
+    std::string text = padded(static_cast<std::uint32_t>(year), 4) + "-" + two(static_cast<int>(month)) + "-" +
                        two(static_cast<int>(day_of_month)) + "T" + two(static_cast<int>(in_day / 3600)) +
                        ":" + two(static_cast<int>(in_day / 60 % 60)) + ":" + two(static_cast<int>(in_day % 60));
     const std::uint32_t nanoseconds =

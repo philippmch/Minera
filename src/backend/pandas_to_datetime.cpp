@@ -20,6 +20,9 @@ namespace {
 
 // Thrown inside the model: the column is outside it.
 struct Outside {};
+// An integer past 18 digits inside dateutil's reading: outside the model for
+// the error pandas raises, but pandas raises (round EC).
+struct LongInteger : Outside {};
 // datetime.replace overflowed (a field past a C int).
 struct Overflow {};
 // pandas' error for the column.
@@ -59,7 +62,7 @@ std::optional<std::int64_t> py_int(std::string_view text) {
   if (!all_digits(text)) return std::nullopt;
   std::size_t start = 0;
   while (start + 1 < text.size() && text[start] == '0') ++start;
-  if (text.size() - start > 18) throw Outside{};
+  if (text.size() - start > 18) throw LongInteger{};
   std::int64_t value = 0;
   for (std::size_t i = start; i < text.size(); ++i) value = value * 10 + (text[i] - '0');
   return value;
@@ -374,9 +377,8 @@ std::int64_t sixty_times_fraction(const std::string& fraction) {
 }
 
 thread_local std::int64_t current_year_value = 2026;
-// pd.to_datetime(utc=True, format="mixed") (to_datetime_utc_mixed): an
-// offset of a day or more raises.
-thread_local bool utc_mixed = false;
+// Today's date for texts that start with a time (pandas reads them on it).
+thread_local Date today_value{2026, 1, 1};
 
 std::int64_t convert_year(std::int64_t year, bool century) {
   if (year < 100 && !century) {
@@ -748,14 +750,15 @@ std::optional<Res> dateutil_parse(std::string_view s, bool fuzzy = false) {
   return res;
 }
 
-// pandas' dateutil_parse on datetime(1, 1, 1).
+// pandas' dateutil_parse on datetime(1, 1, 1), or on today's date at
+// midnight for a text that starts with a time.
 struct Reading {
   std::int64_t year = 1, month = 1, day = 1, hour = 0, minute = 0, second = 0, microsecond = 0;
   std::optional<int> offset_minutes;
   std::string tzname;
 };
 
-Reading pandas_dateutil(std::string_view text) {
+Reading pandas_dateutil(std::string_view text, const Date* on = nullptr) {
   const auto res = dateutil_parse(text);
   if (!res)
     throw Error{"DateParseError: Unknown datetime string format, unable to parse: " + std::string(text)};
@@ -771,9 +774,9 @@ Reading pandas_dateutil(std::string_view text) {
   }
   if (!any) throw Error{"DateParseError: Unable to parse datetime string: " + std::string(text)};
   Reading reading;
-  reading.year = res->year.value_or(1);
-  reading.month = res->month.value_or(1);
-  reading.day = res->day.value_or(1);
+  reading.year = res->year.value_or(on ? on->year : 1);
+  reading.month = res->month.value_or(on ? on->month : 1);
+  reading.day = res->day.value_or(on ? on->day : 1);
   reading.hour = res->hour.value_or(0);
   reading.minute = res->minute.value_or(0);
   reading.second = res->second.value_or(0);
@@ -792,9 +795,11 @@ Reading pandas_dateutil(std::string_view text) {
   if ((res->tzname && *res->tzname == "UTC") || (res->tzoffset && *res->tzoffset == 0)) {
     reading.offset_minutes = 0;
   } else if (res->tzoffset && *res->tzoffset != 0) {
-    if (std::llabs(*res->tzoffset) >= 86400 && utc_mixed)
-      throw Error{"ValueError: offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24)."};
-    if (std::llabs(*res->tzoffset) >= 86400 || *res->tzoffset % 60 != 0) throw Outside{};
+    if (std::llabs(*res->tzoffset) >= 86400)
+      throw Error{"ValueError: Parsed string \"" + std::string(text) +
+                  "\" gives an invalid tzoffset, which must be between -timedelta(hours=24) and "
+                  "timedelta(hours=24)"};
+    if (*res->tzoffset % 60 != 0) throw Outside{};
     reading.offset_minutes = static_cast<int>(*res->tzoffset / 60);
     reading.tzname = res->tzname.value_or("");
   } else if (res->tzname) {
@@ -965,8 +970,26 @@ struct Offset {
   bool had_minutes = false;
 };
 
+// repr() of datetime.timedelta(minutes=minutes), |minutes| >= 1440.
+std::string timedelta_repr(std::int64_t minutes) {
+  const std::int64_t seconds = minutes * 60;
+  const std::int64_t days = seconds >= 0 ? seconds / 86400 : -((-seconds + 86399) / 86400);
+  const std::int64_t rest = seconds - days * 86400;
+  std::string out = "datetime.timedelta(days=" + std::to_string(days);
+  if (rest != 0) out += ", seconds=" + std::to_string(rest);
+  return out + ")";
+}
+
+Error offset_error(std::int64_t minutes) {
+  return Error{"ValueError: offset must be a timedelta strictly between -timedelta(hours=24) and "
+               "timedelta(hours=24), not " +
+               timedelta_repr(minutes) + "." + kSuggestions};
+}
+
 // pandas' ISO offset: Z, or a sign, one or two hour digits, then an
-// optional colon and one or two minute digits.
+// optional colon and one or two minute digits. Minutes past 59 and offsets
+// of a day or more do not match (the strptime rules raise the latter with a
+// format, dateutil without one).
 std::optional<Offset> iso_offset(std::string_view text, std::size_t pos) {
   const auto n = text.size();
   if (pos < n && text[pos] == 'Z') return Offset{0, pos + 1, true};
@@ -992,8 +1015,7 @@ std::optional<Offset> iso_offset(std::string_view text, std::size_t pos) {
     pos += count;
     had = true;
   }
-  if (hours >= 24 && utc_mixed) throw Error{"ValueError: offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24)."};
-  if (hours >= 24 || minutes >= 60) throw Outside{};
+  if (minutes >= 60 || hours * 60 + minutes >= 1440) return std::nullopt;
   return Offset{sign * (hours * 60 + minutes), pos, had};
 }
 
@@ -1155,6 +1177,7 @@ Parsed strptime_parse(std::string_view text, const std::vector<std::string>& for
         fields.offset_minutes = (value[0] == '+' ? 1 : -1) *
                                 (number(std::string_view(offset).substr(0, 2)) * 60 +
                                  number(std::string_view(offset).substr(2, 2)));
+        if (std::abs(*fields.offset_minutes) >= 1440) throw offset_error(*fields.offset_minutes);
       }
     } else if (token == "%Z") {
       fields.utc_name = true;
@@ -1277,10 +1300,26 @@ std::optional<Fields> iso_any(std::string_view t) {
   while (i < n && is_space(t[i])) ++i;
   Fields v;
   v.year = 0;
-  if (i < n && t[i] == '-') throw Outside{};
-  if (run(t, i) < 4) return std::nullopt;
-  if (i + 4 < n && is_digit(t[i + 4]) && !(i + 8 <= n && run(t, i) >= 8)) throw Outside{};
+  // A sign before an ISO text is a negative year (outside the model);
+  // before anything else it is no ISO text ("-198013445166" goes on to
+  // the not-likely check).
+  const std::size_t j = i < n && t[i] == '-' ? i + 1 : i;
+  if (j > i && run(t, j) >= 4) {
+    if (iso_any(t.substr(j))) throw Outside{};
+    return std::nullopt;
+  }
+  if (run(t, j) < 4) {
+    // Fewer than four digits read as year 0 when a separator follows
+    // (outside the model); otherwise the text is no ISO one.
+    if (j < n && (t[j] == '-' || t[j] == '.' || t[j] == '/' || t[j] == '\\' || t[j] == ' ') &&
+        iso_any("2000" + std::string(t.substr(j))))
+      throw Outside{};
+    return std::nullopt;
+  }
+  // Five to seven digits are no year here (dateutil reads them).
+  if (i + 4 < n && is_digit(t[i + 4]) && !(i + 8 <= n && run(t, i) >= 8)) return std::nullopt;
   v.year = number(t.substr(i, 4));
+  if (v.year == 0) throw Outside{};
   i += 4;
   if (i == n) return v;
   char separator = 0;
@@ -1343,41 +1382,46 @@ std::optional<Fields> iso_any(std::string_view t) {
   return v;
 }
 
-// Python float() syntax, a little widened; such texts are outside the model.
-bool float_like(std::string_view t) {
+bool c_space(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r'; }
+
+// pandas' check before its own readers and dateutil: a text that starts
+// with 0 goes on; the single letters a, A, m, M, p, P, t and T do not, nor
+// a text that reads as a number (pandas' xstrtod: spaces, a sign, digits
+// with one point, an exponent) below 1000.
+void check_looks_like_datetime(std::string_view t) {
+  if (!t.empty() && t[0] == '0') return;
+  const auto refuse = [&]() {
+    throw Error{"ValueError: Given date string \"" + std::string(t) + "\" not likely a datetime"};
+  };
+  if (t.size() == 1 && std::string_view("aAmMpPtT").find(t[0]) != std::string_view::npos) refuse();
   std::size_t i = 0;
   const auto n = t.size();
-  while (i < n && is_space(t[i])) ++i;
-  auto end = n;
-  while (end > i && is_space(t[end - 1])) --end;
-  if (i < end && (t[i] == '+' || t[i] == '-')) ++i;
-  const auto body = lower(t.substr(i, end - i));
-  if (body == "inf" || body == "infinity" || body == "nan") return true;
-  std::size_t k = 0;
-  const auto digits_or_underscores = [&]() {
-    const auto start = k;
-    if (k < body.size() && is_digit(body[k])) {
-      ++k;
-      while (k < body.size() && (is_digit(body[k]) || body[k] == '_')) ++k;
-    }
-    return k > start;
-  };
-  bool mantissa = digits_or_underscores();
-  if (k < body.size() && body[k] == '.') {
-    ++k;
-    if (mantissa) {
-      while (k < body.size() && (is_digit(body[k]) || body[k] == '_')) ++k;
-    } else {
-      mantissa = digits_or_underscores();
-    }
+  while (i < n && c_space(t[i])) ++i;
+  const auto start = i;
+  if (i < n && (t[i] == '+' || t[i] == '-')) ++i;
+  std::size_t digits = 0;
+  while (i < n && is_digit(t[i])) ++i, ++digits;
+  if (i < n && t[i] == '.') {
+    ++i;
+    while (i < n && is_digit(t[i])) ++i, ++digits;
   }
-  if (!mantissa) return false;
-  if (k < body.size() && body[k] == 'e') {
-    ++k;
-    if (k < body.size() && (body[k] == '+' || body[k] == '-')) ++k;
-    if (!digits_or_underscores()) return false;
+  if (digits == 0) return;
+  std::size_t end_number = i;
+  if (i < n && (t[i] == 'e' || t[i] == 'E')) {
+    std::size_t k = i + 1;
+    if (k < n && (t[k] == '+' || t[k] == '-')) ++k;
+    const auto exponent_digits = run(t, k);
+    if (exponent_digits == 0) return;  // xstrtod stops before the 'e': not a number
+    end_number = k + exponent_digits;
   }
-  return k == body.size();
+  i = end_number;
+  while (i < n && c_space(t[i])) ++i;
+  if (i != n) return;
+  const std::string number_text(t.substr(start, end_number - start));
+  char* end = nullptr;
+  const double value = std::strtod(number_text.c_str(), &end);
+  if (!std::isfinite(value)) return;  // xstrtod's range error: goes on
+  if (value < 1000) refuse();
 }
 
 // pandas' check for a text that starts with a time:
@@ -1401,6 +1445,7 @@ struct Element {
   Value value;
   std::optional<int> offset_minutes;
   bool nanoseconds = false;
+  bool iso = false;  // read by the ISO parser (its range error shows the fields)
 };
 
 Element from_reading(std::string_view text, const Reading& reading) {
@@ -1468,12 +1513,73 @@ std::optional<std::array<int, 3>> delimited(std::string_view t) {
               std::to_string(day_value) + ")"};
 }
 
-std::optional<std::array<int, 3>> year_or_month(std::string_view t) {
-  if (t.size() == 4 && all_digits(t)) {
-    const int year = number(t);
-    if (year >= 1) return std::array<int, 3>{year, 1, 1};
+// Python int() of a short text: spaces around, a sign, digits with single
+// underscores between them; nullopt where int() raises.
+std::optional<int> python_int(std::string_view t) {
+  std::size_t i = 0, n = t.size();
+  while (i < n && c_space(t[i])) ++i;
+  while (n > i && c_space(t[n - 1])) --n;
+  bool negative = false;
+  if (i < n && (t[i] == '+' || t[i] == '-')) negative = t[i++] == '-';
+  if (i == n || !is_digit(t[i]) || !is_digit(t[n - 1])) return std::nullopt;
+  int value = 0;
+  for (; i < n; ++i) {
+    if (t[i] == '_') {
+      if (!is_digit(t[i + 1])) return std::nullopt;
+      continue;
+    }
+    if (!is_digit(t[i])) return std::nullopt;
+    value = value * 10 + (t[i] - '0');
   }
-  if (t.size() >= 4 && t.size() <= 7 && lower(t).find('q') != std::string::npos) throw Outside{};
+  return negative ? -value : value;
+}
+
+// pandas' quarter reader on a text of four to seven characters with a Q
+// (any case) at index 1 to 5: nullopt to go on, or the quarter's first day.
+// The quarter digit is read as a character code minus '0'.
+std::optional<std::array<int, 3>> quarter(std::string_view t) {
+  std::string u(t);
+  for (auto& c : u) c = c >= 'a' && c <= 'z' ? static_cast<char>(c - 'a' + 'A') : c;
+  const auto n = u.size();
+  const auto i = u.find('Q', 1);
+  if (i == std::string::npos || i >= 6) return std::nullopt;
+  int q = 0;
+  std::optional<int> year;
+  const std::string_view s(u);
+  if (i == 1) {
+    q = static_cast<unsigned char>(u[0]) - '0';
+    if (n == 4 || (n == 5 && u[i + 1] == '-')) {
+      year = python_int(s.substr(n - 2));
+      if (year) *year += 2000;
+    } else if (n == 6 || (n == 7 && u[i + 1] == '-')) {
+      year = python_int(s.substr(n - 4));
+    } else {
+      return std::nullopt;
+    }
+  } else if (i == 2 || i == 3) {
+    if (!(n == 4 || (n == 5 && u[i - 1] == '-'))) return std::nullopt;
+    q = static_cast<unsigned char>(u[n - 1]) - '0';
+    year = python_int(s.substr(0, 2));
+    if (year) *year += 2000;
+  } else {
+    if (!(n == 6 || (n == 7 && u[i - 1] == '-'))) return std::nullopt;
+    q = static_cast<unsigned char>(u[n - 1]) - '0';
+    year = python_int(s.substr(0, 4));
+  }
+  if (!year) return std::nullopt;
+  if (q < 1 || q > 4)
+    throw Error{"DateParseError: Incorrect quarterly string is given, quarter must be between 1 and 4: " + u};
+  if (*year < 1 || *year > 9999) return std::nullopt;
+  return std::array<int, 3>{*year, (q - 1) * 3 + 1, 1};
+}
+
+std::optional<std::array<int, 3>> year_or_month(std::string_view t) {
+  if (t.size() == 4) {
+    const auto year = python_int(t);
+    if (year && *year >= 1 && *year <= 9999) return std::array<int, 3>{*year, 1, 1};
+  }
+  if (t.size() >= 4 && t.size() <= 7 && lower(t).find('q') != std::string::npos)
+    if (const auto q = quarter(t)) return q;
   // "%Y-%m": four digits, "-", then 1[0-2]|0[1-9]|[1-9] to the end.
   if (t.size() >= 6 && t.size() <= 7 && all_digits(t.substr(0, 4)) && t[4] == '-') {
     const auto m = t.substr(5);
@@ -1504,20 +1610,10 @@ std::optional<std::array<int, 3>> year_or_month(std::string_view t) {
   return std::nullopt;
 }
 
-// `today` (pd.to_datetime(utc=True, format="mixed"), read_ocel2_sqlite):
-// a float-like text is an error and a text that starts with a time and has
-// no date takes today's date through dateutil.parser.parse.
-Element element(std::string_view t, const Date* today = nullptr) {
-  std::optional<Fields> v;
-  try {
-    v = iso_any(t);
-  } catch (const Outside&) {
-    // A digit run of five to seven, or a sign: a number, which raises here.
-    if (today && !t.empty() && t[0] != '0' && float_like(t))
-      throw Error{"ValueError: Given date string \"" + std::string(t) + "\" not likely a datetime"};
-    throw;
-  }
-  if (v) {
+// One text without a format (pandas' ISO parser, its checks and readers,
+// then dateutil); a text that starts with a time reads on today's date.
+Element element(std::string_view t) {
+  if (const auto v = iso_any(t)) {
     Element out;
     out.value.year = v->year;
     out.value.month = v->month;
@@ -1530,28 +1626,11 @@ Element element(std::string_view t, const Date* today = nullptr) {
     out.value.nanoseconds = static_cast<std::uint32_t>(number(fraction));
     out.offset_minutes = v->offset_minutes;
     out.nanoseconds = v->fraction.size() > 6;
+    out.iso = true;
     return out;
   }
-  if (!t.empty() && t[0] != '0' && float_like(t)) {
-    if (today) throw Error{"ValueError: Given date string \"" + std::string(t) + "\" not likely a datetime"};
-    throw Outside{};
-  }
-  if (time_first(t)) {
-    const auto res = dateutil_parse(t);
-    if (res && (!res->year || !res->month || !res->day)) {
-      if (!today) throw Outside{};
-      const auto reading = dateutil_parser_parse(t, false, *today);
-      if (!reading) throw Outside{};
-      if (reading->offset_seconds && std::llabs(*reading->offset_seconds) >= 86400)
-        throw Error{"ValueError: offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24)."};
-      if (reading->offset_seconds && *reading->offset_seconds % 60 != 0) throw Outside{};
-      Element out;
-      out.value = reading->value;
-      if (reading->offset_seconds) out.offset_minutes = static_cast<int>(*reading->offset_seconds / 60);
-      return out;
-    }
-    return from_reading(t, pandas_dateutil(t));
-  }
+  check_looks_like_datetime(t);
+  if (time_first(t)) return from_reading(t, pandas_dateutil(t, &today_value));
   if (const auto d = delimited(t)) {
     Element out;
     out.value = Value{(*d)[0], (*d)[1], (*d)[2], 0, 0, 0, 0};
@@ -1571,12 +1650,69 @@ bool in_domain(std::string_view text) {
   return true;
 }
 
-bool year_ok(int year) { return year >= 1000 && year <= 9999; }
+bool year_ok(int year) { return year >= 1 && year <= 9999; }
+
+// The nanosecond range of datetime64[ns] (NaT's value excluded), on the
+// fields as written.
+using Key = std::array<std::int64_t, 7>;
+Key key_of(const Value& v) {
+  return {v.year, v.month, v.day, v.hour, v.minute, v.second, static_cast<std::int64_t>(v.nanoseconds)};
+}
+bool in_ns_range(const Value& v) {
+  static constexpr Key kMin{1677, 9, 21, 0, 12, 43, 145224193};
+  static constexpr Key kMax{2262, 4, 11, 23, 47, 16, 854775807};
+  const auto k = key_of(v);
+  return !(k < kMin) && !(kMax < k);
+}
+
+std::string out_of_bounds(const std::string& what) {
+  return "OutOfBoundsDatetime: Out of bounds nanosecond timestamp" + (what.empty() ? "" : ": " + what);
+}
+
+// The UTC instant of an aware value: outside the model when it leaves years
+// 1-9999, or the nanosecond range in a nanosecond column.
+void check_utc(const Value& v, std::optional<int> offset, bool nanoseconds) {
+  if (!offset || *offset == 0) return;
+  const std::int64_t seconds =
+      days_from_civil(v.year, static_cast<unsigned>(v.month), static_cast<unsigned>(v.day)) * 86400 +
+      v.hour * 3600 + v.minute * 60 + v.second - static_cast<std::int64_t>(*offset) * 60;
+  const std::int64_t first = days_from_civil(1, 1, 1) * 86400, end = days_from_civil(10000, 1, 1) * 86400;
+  if (seconds < first || seconds >= end) throw Outside{};
+  if (nanoseconds) {
+    // datetime64[ns]: -9223372036854775807 to 9223372036854775807 ns.
+    const std::int64_t low = -9223372037, high = 9223372036;
+    if (seconds < low || seconds > high) throw Outside{};
+    if (seconds == low && v.nanoseconds < 145224193) throw Outside{};
+    if (seconds == high && v.nanoseconds > 854775807) throw Outside{};
+  }
+}
+
+// pandas parses the column once with the finest unit seen so far (values
+// after the first nanosecond one must fit nanoseconds then), and again in
+// nanoseconds when that unit changed after the first value; mixed zones
+// raise in between.
+struct Pass {
+  bool nanoseconds = false, changed = false, seen = false;
+  std::set<std::optional<int>> offsets;
+  std::vector<std::pair<Value, std::string_view>> held;
+  std::vector<std::optional<int>> held_offsets;
+};
+
+Result finish(Pass& pass, Result result, const char* suffix) {
+  if (pass.offsets.size() > 1) throw Error{kMixed};
+  if (pass.changed)
+    for (const auto& [value, text] : pass.held)
+      if (!in_ns_range(value)) throw Error{out_of_bounds(std::string(text)) + suffix};
+  for (std::size_t k = 0; k < pass.held.size(); ++k)
+    check_utc(pass.held[k].first, pass.held_offsets[k], pass.nanoseconds);
+  result.nanoseconds = pass.nanoseconds;
+  result.offset_minutes = pass.offsets.empty() ? std::nullopt : *pass.offsets.begin();
+  return result;
+}
 
 Result with_format(const std::vector<std::string_view>& texts, const std::string& format) {
   Result result;
-  std::set<std::optional<int>> offsets;
-  bool years_out = false;
+  Pass pass;
   const auto fail = [&](const std::string& message) { throw Error{"ValueError: " + message + kSuggestions}; };
   for (const auto text : texts) {
     if (text.empty()) {
@@ -1585,55 +1721,78 @@ Result with_format(const std::vector<std::string_view>& texts, const std::string
     }
     auto parsed = parse(text, format);
     if (const auto* failure = std::get_if<Failure>(&parsed)) {
-      // A year outside the nanosecond range may have raised
-      // OutOfBoundsDatetime first (outside the model).
-      if (years_out) throw Outside{};
       if (failure->remains)
         fail("unconverted data remains when parsing with format \"" + format + "\": \"" + failure->rest + "\"");
       fail("time data \"" + std::string(text) + "\" doesn't match format \"" + format + "\"");
     }
     const auto& fields = std::get<Fields>(parsed);
     if (!year_ok(fields.year)) throw Outside{};
-    if (fields.day > month_days(fields.year, fields.month)) {
-      if (years_out) throw Outside{};
-      fail("day is out of range for month");
-    }
-    if (fields.fraction.size() > 6) result.nanoseconds = true;
-    if (fields.year < 1678 || fields.year > 2261) years_out = true;
-    const std::optional<int> offset = fields.utc_name ? std::optional<int>(0) : fields.offset_minutes;
-    if (offset && std::abs(*offset) >= 24 * 60) throw Outside{};
-    offsets.insert(offset);
+    if (fields.day > month_days(fields.year, fields.month)) fail("day is out of range for month");
     std::string fraction = fields.fraction;
     fraction.resize(9, '0');
-    result.values.emplace_back(Value{fields.year, fields.month, fields.day, fields.hour, fields.minute,
-                                     fields.second, static_cast<std::uint32_t>(number(fraction))});
+    const Value value{fields.year, fields.month, fields.day, fields.hour, fields.minute, fields.second,
+                      static_cast<std::uint32_t>(number(fraction))};
+    if (fields.fraction.size() > 6 && !pass.nanoseconds) {
+      pass.nanoseconds = true;
+      pass.changed = pass.seen;
+    }
+    if (pass.nanoseconds && !in_ns_range(value)) throw Error{out_of_bounds(std::string(text)) + kSuggestions};
+    pass.seen = true;
+    const std::optional<int> offset = fields.utc_name ? std::optional<int>(0) : fields.offset_minutes;
+    if (pass.nanoseconds) check_utc(value, offset, true);
+    pass.offsets.insert(offset);
+    pass.held.emplace_back(value, text);
+    pass.held_offsets.push_back(offset);
+    result.values.emplace_back(value);
   }
-  if (result.nanoseconds && years_out) throw Outside{};
-  if (offsets.size() > 1) throw Error{kMixed};
-  result.offset_minutes = *offsets.begin();
-  return result;
+  return finish(pass, std::move(result), kSuggestions);
 }
 
 Result element_by_element(const std::vector<std::string_view>& texts) {
   Result result;
-  std::set<std::optional<int>> offsets;
-  bool years_out = false;
+  Pass pass;
   for (const auto text : texts) {
     if (text.empty()) {
       result.values.emplace_back();
       continue;
     }
     const auto parsed = element(text);
-    if (!year_ok(parsed.value.year)) throw Outside{};
-    if (parsed.value.year < 1678 || parsed.value.year > 2261) years_out = true;
-    if (parsed.nanoseconds) result.nanoseconds = true;
-    offsets.insert(parsed.offset_minutes);
-    result.values.emplace_back(parsed.value);
+    const auto& value = parsed.value;
+    if (!year_ok(value.year)) throw Outside{};
+    if (parsed.nanoseconds) {
+      if (!in_ns_range(value)) {
+        // The ISO parser's range error shows the fields, dateutil's none.
+        std::string fields;
+        if (parsed.iso)
+          fields = std::to_string(value.year) + "-" + two(value.month) + "-" + two(value.day) + " " +
+                   two(value.hour) + ":" + two(value.minute) + ":" + two(value.second);
+        throw Error{out_of_bounds(fields)};
+      }
+      if (!pass.nanoseconds) {
+        pass.nanoseconds = true;
+        pass.changed = pass.seen;
+      }
+    }
+    if (pass.nanoseconds && !in_ns_range(value)) throw Error{out_of_bounds(std::string(text))};
+    pass.seen = true;
+    if (pass.nanoseconds) check_utc(value, parsed.offset_minutes, true);
+    pass.offsets.insert(parsed.offset_minutes);
+    pass.held.emplace_back(value, text);
+    pass.held_offsets.push_back(parsed.offset_minutes);
+    result.values.emplace_back(value);
   }
-  if (result.nanoseconds && years_out) throw Outside{};
-  if (offsets.size() > 1) throw Error{kMixed};
-  result.offset_minutes = *offsets.begin();
-  return result;
+  return finish(pass, std::move(result), "");
+}
+
+Date local_today() {
+  const std::time_t now = std::time(nullptr);
+  std::tm local{};
+#if defined(_WIN32)
+  localtime_s(&local, &now);
+#else
+  localtime_r(&now, &local);
+#endif
+  return Date{local.tm_year + 1900, local.tm_mon + 1, local.tm_mday};
 }
 
 int local_year() {
@@ -1649,7 +1808,9 @@ int local_year() {
 
 }  // namespace
 
-std::optional<Result> to_datetime(const std::vector<std::string_view>& cells, int current_year) {
+namespace {
+
+std::optional<Result> to_datetime_on(const std::vector<std::string_view>& cells, int current_year, Date today) {
   // pandas' NaT spellings are missing values, for the guess too.
   std::vector<std::string_view> texts;
   texts.reserve(cells.size());
@@ -1666,6 +1827,7 @@ std::optional<Result> to_datetime(const std::vector<std::string_view>& cells, in
   }
   if (!first) return std::nullopt;
   current_year_value = current_year;
+  today_value = today;
   try {
     const auto format = guess_format(*first);
     return format ? with_format(texts, *format) : element_by_element(texts);
@@ -1676,8 +1838,18 @@ std::optional<Result> to_datetime(const std::vector<std::string_view>& cells, in
   }
 }
 
+}  // namespace
+
+std::optional<Result> to_datetime(const std::vector<std::string_view>& texts, int current_year) {
+  return to_datetime_on(texts, current_year, local_today());
+}
+
+std::optional<Result> to_datetime(const std::vector<std::string_view>& texts, Date today) {
+  return to_datetime_on(texts, today.year, today);
+}
+
 std::optional<Result> to_datetime(const std::vector<std::string_view>& texts) {
-  return to_datetime(texts, local_year());
+  return to_datetime_on(texts, local_year(), local_today());
 }
 
 namespace {
@@ -1806,16 +1978,6 @@ UtcInstant epoch_nanoseconds(std::int64_t value) {
   return UtcInstant{seconds, static_cast<std::uint32_t>(rest), false};
 }
 
-Date local_today() {
-  const std::time_t now = std::time(nullptr);
-  std::tm local{};
-#if defined(_WIN32)
-  localtime_s(&local, &now);
-#else
-  localtime_r(&now, &local);
-#endif
-  return Date{local.tm_year + 1900, local.tm_mon + 1, local.tm_mday};
-}
 
 }  // namespace
 
@@ -1826,10 +1988,7 @@ std::optional<std::vector<std::optional<UtcInstant>>> to_datetime_utc_mixed(cons
   bool numbers = false, years_out = false, nanoseconds = false, outside = false;
   std::optional<std::string> raised;  // an error raises whatever the other values are
   current_year_value = today.year;
-  struct Mode {
-    Mode() { utc_mixed = true; }
-    ~Mode() { utc_mixed = false; }
-  } mode;
+  today_value = today;
   for (const auto& cell : cells) {
     out.emplace_back();
     switch (cell.kind) {
@@ -1864,7 +2023,7 @@ std::optional<std::vector<std::optional<UtcInstant>>> to_datetime_utc_mixed(cons
           break;
         }
         try {
-          const auto parsed = element(t, &today);
+          const auto parsed = element(t);
           const auto& v = parsed.value;
           // Microseconds hold any year from 1 (pandas' dateutil default).
           if (v.year < 1 || v.year > 9999) {
@@ -1878,6 +2037,10 @@ std::optional<std::vector<std::optional<UtcInstant>>> to_datetime_utc_mixed(cons
               v.hour * 3600 + v.minute * 60 + v.second;
           if (parsed.offset_minutes) seconds -= static_cast<std::int64_t>(*parsed.offset_minutes) * 60;
           out.back() = UtcInstant{seconds, v.nanoseconds, parsed.offset_minutes.has_value()};
+        } catch (const LongInteger&) {
+          // dateutil puts such a number in no field: pandas raises (which
+          // error does not matter here, the column is kept either way).
+          if (!raised) raised = "OutOfBoundsDatetime: Parsing \"" + std::string(t) + "\" to datetime overflows";
         } catch (const Outside&) {
           outside = true;
         } catch (const Error& error) {

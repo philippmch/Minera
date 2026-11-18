@@ -298,6 +298,33 @@ void append_classic_relations(const Node& omap, std::string_view event_id,
   }
 }
 
+// read_ocel_xml reads a reference-shaped event's relations from every child
+// keyed "omap" (whatever its tag): each element in it names an object by its
+// value attribute, whatever its tag or key; one without a value, or naming no
+// listed object, raises. An event relates to an object once, where it is
+// first listed, with the qualifier attribute of its last listing ("" when
+// that one has none).
+// Observed black-box, round EC.
+void append_reference_omap(const Node& event, std::string_view event_id,
+                           const std::unordered_map<std::string, std::string>& types, Ocel& log) {
+  std::unordered_map<std::string, std::size_t> listed;
+  for (const auto& omap : event.children) {
+    if (attr_or(omap, "key") != "omap") continue;
+    for (const auto& rel : omap.children) {
+      const auto* oid = attr(rel, "value");
+      if (oid == nullptr || !types.count(*oid))
+        throw std::invalid_argument("OCEL XML relation references unknown object");
+      const auto* qualifier = attr(rel, "qualifier");
+      std::string text = qualifier ? *qualifier : std::string{};
+      const auto [at, fresh] = listed.emplace(*oid, log.relations.size());
+      if (fresh)
+        log.relations.push_back({std::string(event_id), *oid, std::move(text)});
+      else
+        log.relations[at->second].qualifier = std::move(text);
+    }
+  }
+}
+
 using StandardXmlAttributeTypes =
     std::map<std::string, std::map<std::string, std::string>>;
 
@@ -414,11 +441,15 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
       log.events.push_back(std::move(e));
       collect_date_keys(*en, log.event_type_attributes[log.events.back().activity],
                         {"id", "event-id", "activity", "type", "timestamp", "time"}, lists_only);
-      for (const auto& child_node : en->children) {
-        const auto name = local(child_node.name);
-        const auto key = attr_or(child_node, "key", attr_or(child_node, "name"));
-        if (name == "omap" || (name == "list" && key == "omap"))
-          append_classic_relations(child_node, log.events.back().id, types, log);
+      if (lists_only) {
+        append_reference_omap(*en, log.events.back().id, types, log);
+      } else {
+        for (const auto& child_node : en->children) {
+          const auto name = local(child_node.name);
+          const auto key = attr_or(child_node, "key", attr_or(child_node, "name"));
+          if (name == "omap" || (name == "list" && key == "omap"))
+            append_classic_relations(child_node, log.events.back().id, types, log);
+        }
       }
     }
   }

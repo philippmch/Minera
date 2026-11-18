@@ -17,7 +17,10 @@
 // s<hex of the text>), then pandas' dtype and each event in order with its
 // time (I<seconds>.<nanoseconds>, N for NaT or a missing text, S<hex> for a
 // text the column keeps, U for a number or NaN in a column of numbers). Only
-// columns whose reading does not move with the date.
+// columns whose reading does not move with the date. Round EC adds
+// docs/ocel2-sqlite-time-ec-bank.tsv.gz (the texts of Review EC1: numbers of
+// 1000 or more, quarters, years before 1000, offsets of a day, nanosecond
+// bounds), in the same format.
 #include "minera/ocel.hpp"
 #include "minera/ocel_sqlite.hpp"
 #include "minera/timestamp.hpp"
@@ -371,7 +374,8 @@ int main(int argc, char** argv) {
   readings();
 #if defined(MINERA_HAS_SQLITE)
   files();
-  if (argc > 1 && replay_bank(argv[1]) != 0) return 1;
+  for (int i = 1; i < argc; ++i)
+    if (replay_bank(argv[i]) != 0) return 1;
   std::filesystem::remove(file_path());
 #else
   (void)argc;

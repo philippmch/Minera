@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EB (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EC (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7054,6 +7054,76 @@ OCEL, OCDFG and review tests passed. The workbench fixture replay (run
 before that fix) gave 2,673 responses unchanged. Python script and
 frontend tests not rerun (scripts and frontend unchanged). The device
 check on the Mac was skipped (the Mac was not linked).
+
+Round EC re-reviewed EB (Review EC1). EB's CI run 44325631910: green on
+five jobs; the Windows build took 30 min (EA's 62 min did not recur) and
+its ctest failed `minera_review_eb2_tests` on 9 bank files whose kept
+column holds a REAL: winsqlite3 spells it with 17 digits where SQLite 3.45
+spells 15. The reader now formats REAL cells itself (EC1-5).
+EC took the CSV leftovers and the classic OCEL readers from EB's list:
+- CSV timestamps: time-first texts on today's date, "not likely a
+  datetime" numbers below 1000 and lone letters, quarters, years 1 to 9999
+  in microseconds with the nanosecond passes, offsets of a day or more
+  (EC1-1). Model 0 of 21,000 fresh and 149,000 corpus columns, C++ 0;
+- SQLite: EB's own branch for `format="mixed"` raised on `2024.5` and read
+  time-first texts with unknown zones, weekdays or invalid days that
+  pandas refuses (6 of 132 files); it now shares the CSV element reader
+  (EC1-2); EB's bank then caught signed numbers that are no ISO text and
+  integers past 18 digits, which the first port had put outside the model
+  (both raise in pandas); now 907 plus 554 fuzzed files read alike besides
+  negative years (declared) and the harness's ISO spelling of kept
+  nanosecond texts;
+- fresh seeds 2026122200-11: two calls, the declared struct cast race
+  (Polars table CK 2026122201 case 267, CJ 2026122203 case 424) (EC1-3);
+- OCEL 1.0 XML: every child keyed `omap`, whatever its tag, read by its
+  elements' value attributes, one relation per object with its last
+  listing's qualifier (EC1-4); EB's binary differed on 17 of 40 fuzzed
+  files, now 0 of 1,000. Classic JSON date values matched on the probes.
+
+In the suite: `minera_review_ec1_tests` with
+`docs/ocel-csv-timestamp-ec-bank.tsv.gz` (6,000 columns), and
+`minera_review_eb2_tests` now also replays
+`docs/ocel2-sqlite-time-ec-bank.tsv.gz` (1,181 files). The model, the
+C++ driver, the SQLite fuzzer and bank generator, the omap fuzzer and the
+classic XML probes are in the project files under `review-harness/round-ec/`.
+
+Full suite 624 of 624 passed on the first run (before EC1-5 and the
+signed-text cases; after them the EB2 and EC1 tests and the OCEL, SQLite
+and review E tests passed again). The workbench fixture replay gave 2,673
+responses unchanged. Python script and frontend tests not rerun (scripts
+and frontend unchanged). The device check on the Mac was skipped (the Mac
+was not linked).
+
+Next round (ED) should start by re-reviewing round EC:
+
+- EC's CI run (Windows in particular: EC1-5 changed the SQLite REAL
+  texts there);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the OCEL 1.0 XML reader's other reference-shaped events and objects
+  (`ec/cl2/p11.py`): every keyed child read whatever its tag, a repeated
+  key winning last (timestamp, activity, vmap lists), a `<string
+  key="timestamp">` kept as text, `<int>` and `<boolean>` values kept as
+  strings, a value without `value` as `"None"`, one without a key under
+  NaN; then the classic JSON reader beyond date values;
+- the OCEL 2.0 XML/JSON day offsets that depend on the column, the SQLite
+  leftovers (texts beyond ASCII, the kept columns downstream);
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round EB's targets, taken in EC (findings EC1-1 to EC1-5): EB's CI, the
+fresh seeds, the CSV leftovers, the SQLite re-review, the classic readers'
+date values (and the XML omap lists found on the way). Not taken (carried
+to ED): the XML/JSON day offsets, the SQLite leftovers beyond ASCII, the
+new dtypes, the DW1 keys, the declared items, the CU list and the open
+choices.
+
+Previous list for round EC (kept for its older items):
 
 Next round (EC) should start by re-reviewing round EB:
 

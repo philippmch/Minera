@@ -31929,3 +31929,131 @@ Tests:
   before that fix) gave 2,673 responses unchanged. Python script and
   frontend tests not rerun (scripts and frontend unchanged). The device
   check on the Mac was skipped (the Mac was not linked).
+
+## Review EC1: re-review of round EB, the OCEL CSV reader's remaining pd.to_datetime readings, EB's SQLite reading, the classic XML omap lists, SQLite REAL texts on Windows, fresh seeds (2026-11-18)
+
+Round EC checked EB's CI (run 44325631910 on e5b3520: the Python,
+frontend, verifier, Linux and macOS jobs green; the Windows build took 30
+min, EA's 62 min did not recur, and its ctest failed one test,
+`minera_review_eb2_tests`, on 9 bank files: EC1-5), took the CSV
+leftovers and the classic OCEL readers from EB's list, re-reviewed EB's
+SQLite reading and replayed a batch of fresh seeds. The device check on
+the Mac was skipped (the Mac was not linked).
+
+Observed black-box on pandas 3.0.5 and dateutil 2.9.0.post0 in the
+reference venv:
+
+- **EC1-1 CSV timestamp leftovers.** read_ocel_csv's `pd.to_datetime` of
+  the timestamp column, in the shapes EA and EB left outside the model:
+  - a text that starts with a time (`10:00`, `10:00 May 2024`) reads on
+    today's date at midnight through pandas' dateutil checks (an unknown
+    zone name, a weekday without a day and a day past the month raise);
+  - a text pandas reads as a number below 1000 (`999`, `1e2`, ` 5`), or a
+    lone `a A m M p P t T`, raises `Given date string "X" not likely a
+    datetime`; a larger one goes on to dateutil (`2024.5` is May 2024,
+    `12345` raises);
+  - quarters (`2024Q2`, `1Q24`, `4Q-2024`, any case) read as the quarter's
+    first day; the quarter digit is taken as a character code, so `2024Q5`
+    and `12345Q` raise `Incorrect quarterly string is given, quarter must
+    be between 1 and 4: X` (X upper-cased);
+  - years 1 to 9999 read in microseconds (`0999-05-01`, `999-05-01`); a
+    column turns nanoseconds at its first nanosecond text: later values
+    must fit nanoseconds at once (`Out of bounds nanosecond timestamp:
+    ...`, the fields for an ISO text, bare for a dateutil one), earlier
+    ones in a second pass after the zone check;
+  - an offset of a day or more raises: without a format dateutil's
+    `Parsed string "X" gives an invalid tzoffset, which must be between
+    -timedelta(hours=24) and timedelta(hours=24)`, with one the strptime
+    error `offset must be a timedelta strictly between ..., not
+    datetime.timedelta(days=1).` and the format suggestions; without a
+    format, offsets with 60 minutes or more (`+05:75` is 6:15) and digit
+    runs of five to seven go to dateutil.
+  Native kept its own reading for all of them (declared in EA and EB).
+  The model (`ec/csv/ecmodel.py`) matched pandas on 21,000 fresh fuzzed
+  columns and the 149,000 columns of rounds DZ and EA; the C++ port
+  (`pandas_to_datetime.cpp`, one element reader for both modes) matches
+  the model on all of them (`ec/drv/natcmp.py`).
+- **EC1-2 SQLite event times, re-review of EB2-1.** EB read a text in
+  `format="mixed"` through its own branch: a float-like text of 1000 or
+  more (`2024.5`) raised natively, where pandas reads it, and a time-first
+  text went to plain dateutil, so `10:00 EST`, `10:00 Mon` and `10:00 Feb
+  30` read natively where pandas raises. EB's binary differed on 6 of 132
+  fuzzed files. The SQLite mode now shares the CSV mode's element reader
+  (quarters, years from 1, offsets of a day or more, the not-likely check
+  included): `ec/sq/p6.py` (seeds 2-5) reads 907 fuzzed files as pm4py does
+  besides one with a negative year (declared below) and three where the
+  harness cannot read a kept nanosecond text past 2262 that the native
+  JSON writer spells as ISO (same order, same text). EB's bank then
+  caught two shapes the first port had put outside the model, which EB
+  read right: a sign before digits that are no ISO text
+  (`-198013445166`) is no ISO year, so pandas' not-likely check raises;
+  an integer past 18 digits inside dateutil's reading
+  (`1000000000000000004`, `May 1000000000000000004`) always raises
+  (`Parsing "X" to datetime overflows`), which is all the SQLite mode
+  needs. With both fixed, EB's bank replays clean, and `ec/sq/p6n.py`
+  (seeds 21-23: 554 files of signed numbers and digit runs of 17 to 24)
+  differs only on one more negative year and one more harness spelling.
+  The CSV mode's model and port take the signed rule too (0 of 1,236
+  signed columns against pandas, `ec/csv/neg.py`; the 170,000 corpus
+  columns still 0).
+- **EC1-3 Fresh seeds.** Batch 2026122200-11 (twelve banks): ten replay
+  clean; the Polars table CK bank (2026122201, case 267) and CJ bank
+  (2026122203, case 424) differ on one call each, the declared struct
+  cast race.
+- **EC1-4 OCEL 1.0 XML omap lists.** read_ocel_xml reads a
+  reference-shaped event's relations (id as a keyed child) from every
+  child keyed `omap`, whatever its tag (`<foo key="omap">` too; `name=` or
+  an `<omap>` element without a key is no omap), and each element in it by
+  its `value` attribute, whatever its tag or key (`<string key="id">`,
+  `<object>`, a nested `<list value=...>`): one without a value attribute
+  raises (KeyError None), one naming no listed object raises (KeyError,
+  ` o1` is not `o1`). An event relates to an object once, at its first
+  listing across its omap lists, with the last `qualifier` attribute given
+  (an element without one keeps the earlier qualifier, `""` by default).
+  Native read only `<string key="object-id">` children, so a file keyed
+  any other way lost its relations ("no event-object relation"): EB's
+  binary differed on 17 of 40 fuzzed files (`ec/cl2/fz.py`); now 0 of 1,000.
+  The former native dialect (id as an XML attribute) reads as before.
+- **EC1-5 SQLite REAL texts across platforms.** A kept SQLite time column
+  holding a REAL keeps native's text of it (declared in EB2-1), which came
+  from `sqlite3_column_text`: SQLite 3.45 (Linux, macOS) spells it with
+  `%!.15g` (`210234042488.696`), Windows' winsqlite3 (3.47 or later) with
+  17 digits when 15 do not round-trip (`210234042488.69626`), so EB's
+  Windows CI failed `minera_review_eb2_tests` on 9 bank files. The OCEL
+  SQLite reader now spells REAL cells with `sqlite3_snprintf("%!.15g")` on
+  every platform (SQLite 3.53 gives the same text through its printf).
+
+Declared:
+- Outside the CSV and SQLite model (native's reading kept): characters
+  other than printable ASCII and tab, `%`, negative years (a sign before
+  an ISO text: `-1500`, `-20070126`) and year 0 (`/04/19`, which pandas'
+  ISO parser reads as year 0), integers past 18 digits (in the CSV mode,
+  for the error pandas raises), offsets with seconds, aware values whose UTC instant
+  leaves years 1-9999 or the nanosecond range of a nanosecond column, and
+  the format guess's own exceptions (nanosecond texts in years 1677 and
+  2262, `%I` without `%p`).
+- A processing instruction inside an OCEL 1.0 XML omap list raises in the
+  reference (lxml keeps it, its value is None); the native parser skips
+  processing instructions.
+- The other shapes of reference-shaped OCEL 1.0 XML events and objects
+  (round ED): the reference reads every keyed child whatever its tag
+  (`<foo key="id">`, `<foo key="type">`, `<foo key="vmap">`), lets a
+  repeated key win last (two timestamps, two activities, two vmap lists),
+  keeps a `<string key="timestamp">` as text, keeps `<int>` and
+  `<boolean>` values as strings (only `<float>` and `<date>` convert), a
+  value without a `value` attribute as `"None"`, and a value without a key
+  under the key NaN.
+
+Tests:
+- New: `minera_review_ec1_tests` (the EC1-1 readings with a fixed today,
+  the SQLite mode's EC1-2 cases, the CSV reader, the EC1-4 omap cases, and
+  `docs/ocel-csv-timestamp-ec-bank.tsv.gz`: 6,000 fuzzed columns read on
+  2026-11-18); `minera_review_eb2_tests` also replays
+  `docs/ocel2-sqlite-time-ec-bank.tsv.gz` (1,181 fuzzed files with
+  float-like, quarter, time-first and out-of-range texts).
+- Full suite 624 of 624 passed on the first run (before EC1-5 and the
+  signed-text cases; after them the 9 EB2 and EC1 tests, then the OCEL,
+  SQLite and review E tests passed again). The workbench fixture replay
+  gave 2,673 responses unchanged. Python script and frontend tests not
+  rerun (scripts and frontend unchanged). The device check on the Mac was
+  skipped (the Mac was not linked).

@@ -142,6 +142,15 @@ void step_done(sqlite3* db, sqlite3_stmt* statement) {
 }
 
 std::string column_string(sqlite3_stmt* statement, int column) {
+  // A REAL as the "%!.15g" text that SQLite gave it before 3.47: newer
+  // libraries (Windows' winsqlite3) spell a value that does not round-trip
+  // in 15 digits with 17, so a kept time's text moved with the platform
+  // (round EC, the Windows CI run of round EB).
+  if (sqlite3_column_type(statement, column) == SQLITE_FLOAT) {
+    char text[64];
+    sqlite3_snprintf(static_cast<int>(sizeof text), text, "%!.15g", sqlite3_column_double(statement, column));
+    return text;
+  }
   const auto* value = sqlite3_column_text(statement, column);
   return value == nullptr
              ? std::string{}

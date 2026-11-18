@@ -18,12 +18,25 @@
 // H:MM:SS.fffffffff part when the microseconds end in 000). One zone for the
 // column, microseconds unless a text gives nanoseconds.
 //
+// Round EC: a text that starts with a time ("10:00", "10:00 May 2024")
+// reads on today's date at midnight through the same dateutil checks; a
+// text pandas reads as a number below 1000, or a lone a, A, m, M, p, P, t
+// or T, is "not likely a datetime"; quarters ("2024Q1", "1Q24", "4Q-2024")
+// read as the quarter's first day, a quarter digit outside 1-4 raising;
+// years 1 to 9999 read in microseconds; an offset of a day or more raises
+// (dateutil's tzoffset error without a format, the timedelta error with
+// one); without a format the ISO parser leaves offsets past 59 minutes and
+// five-to-seven-digit runs to dateutil. A column turns nanoseconds at the
+// first nanosecond text: later values must fit nanoseconds at once, earlier
+// ones in a second pass after the zone check (OutOfBoundsDatetime).
+//
 // Outside the model (to_datetime returns nullopt; the CSV reader keeps its
 // native reading, declared): characters other than printable ASCII and
-// tab, "%", years outside 1000-9999, offsets of 24 hours or more, texts
-// pandas reads as numbers, texts that start with a time and leave the date
-// to today's, quarters, integers past 18 digits, and a nanosecond text next
-// to a year outside the nanosecond range.
+// tab, "%", negative years (a sign before an ISO text) and year 0,
+// integers past 18 digits, offsets with seconds, aware values whose UTC
+// instant leaves years 1-9999 or the nanosecond range of a nanosecond
+// column, and the guess's own exceptions (nanosecond texts in years 1677
+// and 2262, %I without %p).
 
 #include <cstdint>
 #include <optional>
@@ -31,6 +44,10 @@
 #include <vector>
 
 namespace minera::pandas_to_datetime {
+
+struct Date {
+  int year = 1970, month = 1, day = 1;
+};
 
 struct Value {
   int year = 1900, month = 1, day = 1, hour = 0, minute = 0;
@@ -48,8 +65,12 @@ struct Result {
 // missing values. Throws std::invalid_argument with
 // pandas' error ("ValueError: ...", "DateParseError: ...",
 // "OutOfBoundsDatetime: ..."); nullopt when the column is outside the model.
-// Two-digit years follow dateutil's window around current_year.
+// Two-digit years follow dateutil's window around current_year; today
+// (for texts that start with a time) is the host's local date.
 std::optional<Result> to_datetime(const std::vector<std::string_view>& texts, int current_year);
+// Two-digit years and texts that start with a time on `today`.
+std::optional<Result> to_datetime(const std::vector<std::string_view>& texts, Date today);
+// The host's local year and date.
 std::optional<Result> to_datetime(const std::vector<std::string_view>& texts);
 
 // dateutil.parser.parse(text, fuzzy=fuzzy) without a default or tzinfos, as
@@ -65,10 +86,6 @@ std::optional<Result> to_datetime(const std::vector<std::string_view>& texts);
 // range"). nullopt outside the model: characters other than printable ASCII
 // and ASCII whitespace, integers past 18 digits, a zone name of the host's
 // own zone other than UTC, GMT and Z.
-struct Date {
-  int year = 1970, month = 1, day = 1;
-};
-
 struct DateutilReading {
   Value value;
   // nullopt for a naive reading; dateutil keeps any offset, even a day or
@@ -86,14 +103,14 @@ std::optional<DateutilReading> dateutil_parser_parse(std::string_view text, bool
 // to_datetime reads as missing (empty, NaT, nat, NAT, nan, NaN, NAN) are
 // NaT; an integer counts nanoseconds since the epoch, a float too
 // (truncated); a text reads as to_datetime reads it without a format
-// (above), except that each value converts to UTC on its own, a text that
-// starts with a time and has no date takes today's date through
-// dateutil.parser.parse, and a float-like text is an error. Throws
-// std::invalid_argument when pandas raises (the reader then keeps the
-// column as it is); nullopt outside the model: blobs, characters other than
-// printable ASCII and tab, "%", years outside 1000-9999, a year outside the
-// nanosecond range next to a number or a nanosecond text, and the other
-// shapes to_datetime leaves out.
+// (above, a text that starts with a time on today's date), except that each
+// value converts to UTC on its own. Throws std::invalid_argument when
+// pandas raises (the reader then keeps the column as it is): a blob, a
+// float past int64, any text to_datetime refuses, and a year outside the
+// nanosecond range next to a number or a nanosecond text, and a text
+// whose dateutil reading meets an integer past 18 digits. nullopt outside
+// the model: an integer equal to NaT's value, and the other texts
+// to_datetime leaves out.
 struct Cell {
   enum class Kind { kNull, kInteger, kReal, kText, kBlob };
   Kind kind = Kind::kNull;
