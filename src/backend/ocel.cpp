@@ -7,6 +7,7 @@
 #include "ocel_frame_types.hpp"
 #include "ocpn_projection.hpp"
 #include "python_isoformat.hpp"
+#include "pandas_to_datetime.hpp"
 #include "frame_times.hpp"
 #include "python_scalar.hpp"
 #include "reference_tree_net.hpp"
@@ -20,6 +21,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <iomanip>
 #include <limits>
 #include <locale>
@@ -1108,7 +1110,8 @@ Ocel project_ocpn_labels(const Ocel& log,
                              options.object_type_attribute, "OCPN");
 }
 
-static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_nanoseconds);
+static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_nanoseconds,
+                             const std::vector<std::optional<std::int64_t>>* given_keys = nullptr);
 
 static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& limits,
                                  bool literal_names) {
@@ -1334,7 +1337,7 @@ std::int64_t iso_wall_microseconds(std::string_view original) {
   if (!spelled.empty() && spelled.back() == 'Z') spelled.replace(spelled.size() - 1, 1, "+00:00");
   const auto invalid = [&](const std::string& reason = {}) {
     throw std::invalid_argument(reason.empty()
-        ? "Invalid isoformat string: '" + spelled + "'" : reason);
+        ? "Invalid isoformat string: " + ocel_frame::python_str_repr(spelled) : reason);
   };
   const std::string_view text = spelled;
   if (text.size() < 7) invalid();
@@ -1437,7 +1440,7 @@ std::int64_t iso_wall_microseconds(std::string_view original) {
 // reading), so pandas compares an offset value by its instant, and a value
 // without one is naive, which the reference cannot sort next to aware ones.
 struct LenientTimestamp {
-  std::int64_t microseconds;
+  std::int64_t microseconds;  // the UTC instant when aware, else the wall clock
   bool aware;
 };
 
@@ -1463,160 +1466,26 @@ int month_from_word(std::string_view word) {
   return lowered == "sept" ? 9 : 0;
 }
 
-// A subset of dateutil.parser.parse (default dayfirst/yearfirst) observed
-// black-box against the pinned reference: YYYY/MM/DD and MM/DD/YYYY with
-// '/', '.' or '-' (a first field above 12 reads day-first), "Jan 2 2020",
-// "2 Jan 2020" and "January 2, 2020" (month names in any case), the basic
-// YYYYMMDD, then a clock H:MM[:SS[.f]] (HHMM[SS[.f]] after YYYYMMDD) after
-// 'T' or spaces, then an optional Z or z, UTC, GMT, +HH, +HHMM or +HH:MM
-// offset; an all-numeric date directly followed by "-HHMM" is a naive
-// clock. Anything else is nullopt (unknown to native).
-std::optional<LenientTimestamp> dateutil_subset(std::string_view text) {
-  std::size_t p = 0, n = text.size();
-  const auto space = [](char ch) { return std::isspace(static_cast<unsigned char>(ch)) != 0; };
-  const auto digit = [](char ch) { return std::isdigit(static_cast<unsigned char>(ch)) != 0; };
-  const auto alpha = [](char ch) { return std::isalpha(static_cast<unsigned char>(ch)) != 0; };
-  while (p < n && space(text[p])) ++p;
-  while (n > p && space(text[n - 1])) --n;
-  const auto number = [&](std::size_t low, std::size_t high, int& value) {
-    const std::size_t begin = p;
-    value = 0;
-    while (p < n && digit(text[p])) {
-      if (p - begin == high) return false;
-      value = value * 10 + (text[p++] - '0');
-    }
-    return p - begin >= low;
-  };
-  const auto word = [&]() {
-    const std::size_t begin = p;
-    while (p < n && alpha(text[p])) ++p;
-    return text.substr(begin, p - begin);
-  };
-  const auto skip_spaces = [&]() { while (p < n && space(text[p])) ++p; };
-  int year = 0, month = 0, day = 0;
-  bool compact = false, numeric = false;
-  if (p < n && alpha(text[p])) {  // Jan 2[,] 2020
-    month = month_from_word(word());
-    skip_spaces();
-    if (!month || !number(1, 2, day)) return std::nullopt;
-    if (p < n && text[p] == ',') ++p;
-    skip_spaces();
-    if (!number(4, 4, year)) return std::nullopt;
-  } else {
-    const std::size_t begin = p;
-    int first = 0;
-    if (!number(1, 8, first)) return std::nullopt;
-    const std::size_t length = p - begin;
-    if (length == 8) {  // YYYYMMDD
-      compact = numeric = true;
-      year = first / 10000;
-      month = first / 100 % 100;
-      day = first % 100;
-    } else if (length == 4) {  // YYYY/MM/DD
-      if (p >= n || (text[p] != '/' && text[p] != '.' && text[p] != '-')) return std::nullopt;
-      const char separator = text[p++];
-      numeric = true;
-      year = first;
-      if (!number(1, 2, month) || p >= n || text[p++] != separator || !number(1, 2, day))
-        return std::nullopt;
-    } else if (length <= 2 && p < n && space(text[p])) {  // 2 Jan[,] 2020
-      skip_spaces();
-      day = first;
-      month = month_from_word(word());
-      if (!month) return std::nullopt;
-      if (p < n && text[p] == ',') ++p;
-      skip_spaces();
-      if (!number(4, 4, year)) return std::nullopt;
-    } else if (length <= 2 && p < n && (text[p] == '/' || text[p] == '.' || text[p] == '-')) {
-      numeric = true;
-      const char separator = text[p++];  // MM/DD/YYYY
-      int second = 0;
-      if (!number(1, 2, second) || p >= n || text[p++] != separator || !number(4, 4, year))
-        return std::nullopt;
-      month = first;
-      day = second;
-      if (month > 12 && day <= 12) std::swap(month, day);
-    } else {
-      return std::nullopt;
-    }
-  }
-  int hour = 0, minute = 0, second = 0;
-  std::int64_t micro = 0;
-  if (numeric && p + 5 == n && text[p] == '-' && std::all_of(text.begin() + p + 1, text.begin() + n, digit)) {
-    // An all-numeric date then "-HHMM" reads that as a naive clock HH:MM
-    // ("2024-06-25-0530" is 05:30), observed black-box.
-    hour = (text[p + 1] - '0') * 10 + (text[p + 2] - '0');
-    minute = (text[p + 3] - '0') * 10 + (text[p + 4] - '0');
-    p = n;
-  }
-  if (p < n) {
-    if (text[p] == 'T') ++p;
-    else if (space(text[p])) skip_spaces();
-    else return std::nullopt;
-    bool seconds = false;
-    if (compact) {  // HHMM[SS[.f]]
-      int clock = 0;
-      const std::size_t begin = p;
-      if (!number(4, 6, clock) || p - begin == 5) return std::nullopt;
-      seconds = p - begin == 6;
-      if (seconds) { hour = clock / 10000; minute = clock / 100 % 100; second = clock % 100; }
-      else { hour = clock / 100; minute = clock % 100; }
-    } else {
-      if (!number(1, 2, hour) || p >= n || text[p++] != ':' || !number(2, 2, minute)) return std::nullopt;
-      if (p < n && text[p] == ':') {
-        ++p;
-        if (!number(2, 2, second)) return std::nullopt;
-        seconds = true;
-      }
-    }
-    if (seconds) {
-      if (p < n && (text[p] == '.' || text[p] == ',')) {
-        ++p;
-        std::size_t count = 0;
-        while (p < n && digit(text[p])) {
-          if (count < 6) micro = micro * 10 + (text[p] - '0');
-          ++count;
-          ++p;
-        }
-        if (!count) return std::nullopt;
-        for (std::size_t index = count; index < 6; ++index) micro *= 10;
-      }
-    }
-  }
-  skip_spaces();
-  bool aware = false;
-  std::int64_t offset_seconds = 0;
-  if (p < n) {
-    aware = true;
-    if (text[p] == 'Z' || text[p] == 'z') {
-      ++p;
-    } else if (text[p] == '+' || text[p] == '-') {
-      const std::int64_t sign = text[p++] == '-' ? -1 : 1;
-      const auto pair = [&](int& value) {  // exactly two digits, more may follow
-        if (p + 2 > n || !digit(text[p]) || !digit(text[p + 1])) return false;
-        value = (text[p] - '0') * 10 + (text[p + 1] - '0');
-        p += 2;
-        return true;
-      };
-      int hours = 0, minutes = 0;
-      if (!pair(hours)) return std::nullopt;
-      if (p < n && text[p] == ':') ++p;
-      if (p < n && digit(text[p]) && !pair(minutes)) return std::nullopt;
-      if (hours > 23 || minutes > 59) return std::nullopt;
-      offset_seconds = sign * (hours * 3600 + minutes * 60);
-    } else {
-      const auto zone = lower_ascii(word());
-      if (zone != "utc" && zone != "gmt") return std::nullopt;
-    }
-    if (p != n) return std::nullopt;
-  }
-  if (year < 1 || month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59)
-    return std::nullopt;
-  static constexpr int kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-  if (day < 1 || day > (month == 2 && leap(year) ? 29 : kDays[month - 1])) return std::nullopt;
+// pm4py's dateutil fallback for a text fromisoformat refuses (round EB,
+// observed black-box on dateutil 2.9): dateutil.parser.parse with today's
+// date for missing fields, fuzzy for read_ocel2_xml (unknown words and
+// numbers that fit no field are skipped), not for read_ocel2_json. Throws
+// dateutil's error; nullopt for a text outside the port's model (characters
+// beyond printable ASCII, integers past 18 digits, a zone named like the
+// host's own) and for an offset of a day or more: dateutil keeps it, and
+// whether pandas then raises depends on the other values of the column
+// (declared).
+std::optional<LenientTimestamp> dateutil_reading(std::string_view text, bool fuzzy) {
+  const auto reading = pandas_to_datetime::dateutil_parser_parse(text, fuzzy);
+  if (!reading) return std::nullopt;
+  const auto& v = reading->value;
   const std::int64_t wall =
-      (detail::python_iso::days_from_civil(year, month, day) * 86400 + hour * 3600 + minute * 60 + second) * 1000000 + micro;
-  return LenientTimestamp{wall - offset_seconds * 1000000, aware};
+      (detail::python_iso::days_from_civil(v.year, v.month, v.day) * 86400 + v.hour * 3600LL +
+       v.minute * 60LL + v.second) * 1000000 + v.nanoseconds / 1000;
+  if (!reading->offset_seconds) return LenientTimestamp{wall, false};
+  const auto offset = *reading->offset_seconds;
+  if (offset >= 86400 || offset <= -86400) return std::nullopt;
+  return LenientTimestamp{wall - offset * 1000000, true};
 }
 
 // Whether dateutil's fuzzy reading certainly finds no date: no digit and no
@@ -1830,9 +1699,14 @@ void drop_empty_ocel_names(Ocel& log) {
   });
 }
 
-void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool change) {
+namespace {
+
+// convert_ocel_date_value; with `stamp_naive_change` false a naive dateutil
+// change value of read_ocel2_json stays naive. Returns whether the value is
+// a naive dateutil reading.
+bool convert_date_value(OcelValue& value, OcelTimestampReader reader, bool change, bool stamp_naive_change) {
   auto* text = std::get_if<std::string>(&value);
-  if (text == nullptr) return;
+  if (text == nullptr) return false;
   std::optional<std::int64_t> microseconds;
   bool aware = true, lenient_route = false;
   try {
@@ -1841,22 +1715,33 @@ void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool 
     if (reader == OcelTimestampReader::kIsoFormat) throw;
     if (reader != OcelTimestampReader::kDateutil &&
         reader != OcelTimestampReader::kIsoFormatOrFileOrder)
-      return;
-    if (const auto lenient = dateutil_subset(*text)) {
-      microseconds = lenient->microseconds;
-      aware = lenient->aware;
-      lenient_route = true;
-    } else if (reader == OcelTimestampReader::kDateutil && certainly_not_a_date(*text)) {
-      throw std::invalid_argument("String does not contain a date: " + *text);
+      return false;
+    std::optional<LenientTimestamp> lenient;
+    if (reader == OcelTimestampReader::kDateutil) {
+      // read_ocel2_xml reads fuzzy and raises dateutil's error.
+      lenient = dateutil_reading(*text, true);
+      if (!lenient) {
+        if (certainly_not_a_date(*text))
+          throw std::invalid_argument("String does not contain a date: " + *text);
+        return false;  // outside the native model: kept as written
+      }
     } else {
-      // A shape native does not read: kept as written. read_ocel2_json keeps
-      // any text dateutil does not read (observed black-box).
-      return;
+      // read_ocel2_json keeps any text dateutil does not read (observed
+      // black-box), and one outside the native model.
+      try {
+        lenient = dateutil_reading(*text, false);
+      } catch (const std::invalid_argument&) {
+        return false;
+      }
+      if (!lenient) return false;
     }
-    // read_ocel2_json stores object-change values in a UTC column, so a
-    // naive dateutil value there is stamped UTC (its event and object values
-    // stay naive), observed black-box; read_ocel2_xml keeps it naive.
-    if (change && reader == OcelTimestampReader::kIsoFormatOrFileOrder) aware = true;
+    // read_ocel2_json makes a change column of naive values UTC, so a naive
+    // dateutil value there is stamped UTC (its event and object values stay
+    // naive), observed black-box; read_ocel2_xml keeps it naive.
+    microseconds = lenient->microseconds;
+    aware = lenient->aware ||
+            (stamp_naive_change && change && reader == OcelTimestampReader::kIsoFormatOrFileOrder);
+    lenient_route = true;
   }
   // A text with surrounding white space, or any text fromisoformat refuses
   // ("... 20:40z"), is not kept as written: the reference reads it through
@@ -1870,8 +1755,25 @@ void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool 
   // a datetime ("1999-09-08 13:37Z" is written "1999-09-08T13:37:00Z").
   const bool spaced = text->size() > 10 && (*text)[10] == ' ';
   if (!padded && !lenient_route && !spaced && natively_stored(*text, *microseconds, aware) && !(change && text->ends_with('Z')))
-    return;
+    return false;
   *text = utc_timestamp_text(*microseconds, !aware ? "" : change ? "+00:00" : "Z");
+  return !aware;
+}
+
+}  // namespace
+
+void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool change) {
+  convert_date_value(value, reader, change, true);
+}
+
+void check_ocel2_xml_date_text(std::string_view text) {
+  try {
+    iso_wall_microseconds(text);
+    return;
+  } catch (const std::invalid_argument&) {
+  }
+  if (!dateutil_reading(text, true) && certainly_not_a_date(text))
+    throw std::invalid_argument("String does not contain a date: " + std::string(text));
 }
 
 void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
@@ -1903,12 +1805,29 @@ void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
       if (declared(log.object_type_attributes, object.type, attribute.key))
         convert(attribute.value, false);
   }
-  for (auto& change : log.object_changes) {
+  // read_ocel2_json stamps a field's naive change values UTC only when the
+  // field's column of the changes frame holds nothing but naive datetimes
+  // (and missing values): next to a text, a number or an aware value the
+  // column stays object and a naive dateutil value stays naive (round EB,
+  // observed black-box).
+  const bool json = reader == OcelTimestampReader::kIsoFormatOrFileOrder;
+  std::vector<std::size_t> naive_changes;
+  std::set<std::string> mixed_fields;
+  for (std::size_t index = 0; index < log.object_changes.size(); ++index) {
+    auto& change = log.object_changes[index];
     std::string type = change.object_type;
     if (type.empty())
       if (const auto found = object_types.find(change.object_id); found != object_types.end())
         type = std::string(found->second);
-    if (declared(log.object_type_attributes, type, change.field)) convert(change.value, true);
+    bool naive = false;
+    if (declared(log.object_type_attributes, type, change.field))
+      naive = json ? convert_date_value(change.value, reader, true, false) : (convert(change.value, true), false);
+    if (naive) naive_changes.push_back(index);
+    else if (json && !std::holds_alternative<std::nullptr_t>(change.value)) mixed_fields.insert(change.field);
+  }
+  for (const auto index : naive_changes) {
+    auto& change = log.object_changes[index];
+    if (!mixed_fields.count(change.field)) std::get<std::string>(change.value) += "+00:00";
   }
 }
 
@@ -1921,9 +1840,152 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader) {
   sort_ocel_events(log, reader, false);
 }
 
+// pm4py.read_ocel2_sqlite reads the event time column with pandas: the
+// type tables' columns concatenate (read_sql's dtype per table: int64 when
+// every value is an integer, float64 for numbers with NULLs or reals, else
+// object), a numeric column stays numbers, and an object column goes
+// through pd.to_datetime(utc=True, format="mixed"), which leaves it as it is
+// when it raises (round EB, observed black-box).
+void sort_ocel2_sqlite_events(Ocel& log, const std::vector<OcelSqliteTime>& times, OcelSqliteTimeColumn column) {
+  namespace ptd = pandas_to_datetime;
+  if (times.size() != log.events.size()) throw std::logic_error("sort_ocel2_sqlite_events: one time per event");
+  std::vector<std::optional<std::int64_t>> keys(times.size());
+  if (column != OcelSqliteTimeColumn::kObject) {
+    // Numbers sort as numbers (declared: native keeps their texts), NaN last.
+    for (std::size_t i = 0; i < times.size(); ++i) {
+      const auto& time = times[i];
+      if (time.kind == OcelSqliteTime::Kind::kInteger && column == OcelSqliteTimeColumn::kInteger) {
+        keys[i] = time.integer;
+      } else if (time.kind == OcelSqliteTime::Kind::kInteger || time.kind == OcelSqliteTime::Kind::kReal) {
+        double value = time.kind == OcelSqliteTime::Kind::kInteger ? static_cast<double>(time.integer) : time.real;
+        if (std::isnan(value)) continue;
+        if (value == 0) value = 0;  // -0.0 ties with 0.0
+        std::int64_t bits;
+        std::memcpy(&bits, &value, sizeof bits);
+        keys[i] = bits >= 0 ? bits : bits ^ std::numeric_limits<std::int64_t>::max();
+      }
+    }
+    sort_ocel_events(log, OcelTimestampReader::kInstantNanoseconds, false, &keys);
+    return;
+  }
+  std::vector<ptd::Cell> cells(times.size());
+  for (std::size_t i = 0; i < times.size(); ++i) {
+    auto& cell = cells[i];
+    switch (times[i].kind) {
+      case OcelSqliteTime::Kind::kNull: break;
+      case OcelSqliteTime::Kind::kInteger:
+        cell.kind = ptd::Cell::Kind::kInteger;
+        cell.integer = times[i].integer;
+        break;
+      case OcelSqliteTime::Kind::kReal:
+        cell.kind = ptd::Cell::Kind::kReal;
+        cell.real = times[i].real;
+        break;
+      case OcelSqliteTime::Kind::kText:
+        cell.kind = ptd::Cell::Kind::kText;
+        cell.text = log.events[i].timestamp;
+        break;
+      case OcelSqliteTime::Kind::kBlob:
+        cell.kind = ptd::Cell::Kind::kBlob;
+        break;
+    }
+  }
+  std::optional<std::vector<std::optional<ptd::UtcInstant>>> instants;
+  bool raised = false;
+  try {
+    instants = ptd::to_datetime_utc_mixed(cells);
+  } catch (const std::invalid_argument&) {
+    raised = true;
+  }
+  if (instants) {
+    // Each event keeps its text when native reads it as pandas' instant;
+    // otherwise it becomes that instant's UTC text, NaT an empty text.
+    std::vector<std::string> texts(times.size());
+    for (std::size_t i = 0; i < times.size(); ++i) {
+      const auto& instant = (*instants)[i];
+      auto& text = log.events[i].timestamp;
+      if (!instant) {
+        texts[i].clear();
+        continue;
+      }
+      const auto native = parse_timestamp_exact(text);
+      if (native && native->seconds == instant->seconds && native->nanoseconds == instant->nanoseconds &&
+          (native->timezone_aware || !instant->aware) && times[i].kind == OcelSqliteTime::Kind::kText)
+        texts[i] = text;
+      else
+        texts[i] = utc_timestamp_text(instant->seconds, instant->nanoseconds, instant->aware ? "+00:00" : "Z");
+    }
+    for (std::size_t i = 0; i < times.size(); ++i) log.events[i].timestamp = std::move(texts[i]);
+    sort_ocel_events(log, OcelTimestampReader::kInstantNanoseconds, false);
+    return;
+  }
+  // A column pandas leaves as it is sorts its numbers first (by value), then
+  // its texts as Python sorts them (code points, which is UTF-8 byte order),
+  // NULL and NaN last, each group stably (observed black-box). Blobs among
+  // them are outside the model (native's reading of the texts).
+  const auto is_number = [&](std::size_t i) {
+    return times[i].kind == OcelSqliteTime::Kind::kInteger ||
+           (times[i].kind == OcelSqliteTime::Kind::kReal && !std::isnan(times[i].real));
+  };
+  bool blobs = false;
+  for (const auto& time : times) blobs = blobs || time.kind == OcelSqliteTime::Kind::kBlob;
+  if (!raised || blobs) {
+    sort_ocel_events(log, OcelTimestampReader::kInstantNanoseconds, false);
+    return;
+  }
+  // -1, 0, 1 as Python compares an int or float with another, exactly.
+  const auto compare = [&](std::size_t left, std::size_t right) -> int {
+    const auto& a = times[left];
+    const auto& b = times[right];
+    if (a.kind == OcelSqliteTime::Kind::kInteger && b.kind == OcelSqliteTime::Kind::kInteger)
+      return a.integer < b.integer ? -1 : a.integer > b.integer ? 1 : 0;
+    if (a.kind == OcelSqliteTime::Kind::kReal && b.kind == OcelSqliteTime::Kind::kReal)
+      return a.real < b.real ? -1 : a.real > b.real ? 1 : 0;
+    const bool flip = a.kind == OcelSqliteTime::Kind::kReal;
+    const std::int64_t integer = flip ? b.integer : a.integer;
+    const double real = flip ? a.real : b.real;
+    int result = 0;  // integer against real
+    if (real >= 9223372036854775808.0) {
+      result = -1;
+    } else if (real < -9223372036854775808.0) {
+      result = 1;
+    } else {
+      const auto whole = static_cast<std::int64_t>(std::trunc(real));
+      const double fraction = real - std::trunc(real);
+      if (integer != whole) result = integer < whole ? -1 : 1;
+      else if (fraction != 0) result = fraction > 0 ? -1 : 1;
+    }
+    return flip ? -result : result;
+  };
+  std::vector<std::size_t> numbers, texts;
+  for (std::size_t i = 0; i < times.size(); ++i) {
+    if (is_number(i)) numbers.push_back(i);
+    else if (times[i].kind == OcelSqliteTime::Kind::kText) texts.push_back(i);
+  }
+  std::stable_sort(numbers.begin(), numbers.end(),
+                   [&](std::size_t left, std::size_t right) { return compare(left, right) < 0; });
+  std::stable_sort(texts.begin(), texts.end(), [&](std::size_t left, std::size_t right) {
+    return log.events[left].timestamp < log.events[right].timestamp;
+  });
+  std::int64_t rank = 0;
+  for (std::size_t k = 0; k < numbers.size(); ++k) {
+    if (k > 0 && compare(numbers[k - 1], numbers[k]) != 0) ++rank;
+    keys[numbers[k]] = rank;
+  }
+  ++rank;
+  for (std::size_t k = 0; k < texts.size(); ++k) {
+    if (k > 0 && log.events[texts[k]].timestamp != log.events[texts[k - 1]].timestamp) ++rank;
+    keys[texts[k]] = rank;
+  }
+  sort_ocel_events(log, OcelTimestampReader::kInstantNanoseconds, false, &keys);
+}
+
 // `keep_nanoseconds`: a classic document Minera wrote with the
 // "minera:nanoseconds" marker keeps the digits past the microsecond.
-static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_nanoseconds) {
+// `given_keys` (SQLite, a column pandas keeps as numbers or texts): the
+// event order's keys, nullopt last; event texts stay as they are.
+static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_nanoseconds,
+                             const std::vector<std::optional<std::int64_t>>* given_keys) {
   // The key is the timestamp at the importer's precision: SQLite keeps
   // nanoseconds of the instant, the JSON and XML importers microseconds of
   // the ISO wall-clock fields (an OCEL 2.0 XML dateutil fallback with an
@@ -1946,7 +2008,10 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
   std::vector<std::size_t> undated;
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& text = log.events[index].timestamp;
-    if (reader == OcelTimestampReader::kInstantNanoseconds) {
+    if (given_keys) {
+      if (const auto& key = (*given_keys)[index]) keys.emplace_back(*key, 0, index);
+      else undated.push_back(index);
+    } else if (reader == OcelTimestampReader::kInstantNanoseconds) {
       if (text.empty()) { undated.push_back(index); continue; }
       const auto instant = parse_timestamp_exact(text);
       if (!instant) { unknown = true; continue; }
@@ -1974,7 +2039,7 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
         store(index, *wall);
         keys.emplace_back(*wall, 0, index);
         aware = true;
-      } else if (const auto lenient = dateutil_subset(text)) {
+      } else if (const auto lenient = dateutil_reading(text, true)) {
         (lenient->aware ? aware : naive) = true;
         store(index, lenient->microseconds, lenient->aware);
         keys.emplace_back(lenient->microseconds, 0, index);
@@ -1996,6 +2061,8 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
   for (auto& change : log.object_changes) {
     const auto& text = change.timestamp;
     if (text.starts_with("1970-01-01T00:00:00")) continue;
+    // read_ocel2_xml keeps a change time of "0" as its text too.
+    if (reader == OcelTimestampReader::kDateutil && text == "0") continue;
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
       const auto instant = parse_timestamp_exact(text);
       if (instant && (!instant->timezone_aware || instant->offset_minutes != 0))
@@ -2015,11 +2082,14 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
             exact && exact->timezone_aware && exact->offset_minutes != 0)
           *microseconds -= static_cast<std::int64_t>(exact->offset_minutes) * 60 * 1000000;
     } catch (const std::invalid_argument&) {
-      if (reader == OcelTimestampReader::kDateutil)
-        if (const auto lenient = dateutil_subset(text)) {
+      if (reader == OcelTimestampReader::kDateutil) {
+        if (const auto lenient = dateutil_reading(text, true)) {
           microseconds = lenient->microseconds;
           aware = lenient->aware;
+        } else if (certainly_not_a_date(text)) {
+          throw std::invalid_argument("String does not contain a date: " + text);
         }
+      }
     }
     if (microseconds && !natively_stored(text, *microseconds, aware, truncates))
       change.timestamp = stored_timestamp_text(text, *microseconds, false, aware);

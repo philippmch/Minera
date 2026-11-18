@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EA (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EB (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7012,6 +7012,74 @@ Full suite 621 of 621 passed on the first run. The workbench fixture
 replay gave 2,673 responses unchanged. Python script and frontend tests
 not rerun (scripts and frontend unchanged). The device check on the Mac
 was skipped (the Mac was not linked).
+
+Round EB re-reviewed EA (Reviews EB1 and EB2). EA's CI run 44304386291:
+green on all six jobs (Windows included).
+EB took the other OCEL readers' timestamp columns from EA's list:
+- OCEL 2.0 XML: fromisoformat, then fuzzy `dateutil.parser.parse` (today's
+  date for missing fields, a weekday without a day moved on, two-digit
+  years around today's year, GMT+3 three hours west), whose errors are
+  raised in document order; an empty date element raises pandas'
+  TypeError; naive next to aware event times raise the sort's error
+  (EB1-1). EA's binary differed on 174 of 200 fuzzed files; now 0 of about
+  1,700 XML files;
+- OCEL 2.0 JSON: date attributes and change values through non-fuzzy
+  dateutil (text kept on any error), a naive change value stamped UTC only
+  when its field's change column is all naive datetimes (EB1-2); 0 of
+  about 1,900 JSON files;
+- `Invalid isoformat string` quotes the text as Python's repr (EB1-3);
+- SQLite: the event time column as read_sql types each table and
+  `pd.to_datetime(utc=True, format="mixed")` reads an object column
+  (numbers as nanoseconds, texts element by element, today's date for a
+  time without a date); a column of numbers, or one that raises, keeps its
+  values and sorts by them (numbers first, then texts as Python sorts
+  them, NULL last) (EB2-1). The first fuzz differed on 89 of 136 files;
+  now 1,093 files read alike besides texts beyond ASCII;
+- Fresh seeds 2026122100-11: one call, the declared struct cast race
+  (Polars table CJ 2026122103 case 199).
+
+In the suite: `minera_review_eb1_tests` with
+`docs/ocel-dateutil-eb-bank.tsv.gz` (11,977 texts) and
+`docs/ocel2-dateutil-eb-bank.tsv.gz` (1,400 documents), and
+`minera_review_eb2_tests` with `docs/ocel2-sqlite-time-eb-bank.tsv.gz`
+(1,179 files). The dateutil model, the file fuzzers, the SQLite probes and
+bank generator and the fresh banks are in the project files under
+`review-harness/round-eb/`.
+
+Full suite 622 of 623 passed on the first run; the one failure was
+`minera_ocel_xml_tests`, which held an object attribute time of "0" (pm4py
+keeps it as text) and a date value with newlines (pm4py reads it), both
+fixed in the XML reader and the dateutil model; after the rebuild the 49
+OCEL, OCDFG and review tests passed. The workbench fixture replay (run
+before that fix) gave 2,673 responses unchanged. Python script and
+frontend tests not rerun (scripts and frontend unchanged). The device
+check on the Mac was skipped (the Mac was not linked).
+
+Next round (EC) should start by re-reviewing round EB:
+
+- EB's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the SQLite leftovers (texts beyond ASCII, digit runs inside texts, the
+  kept columns' values downstream of the importer), the OCEL 2.0 XML/JSON
+  day offsets that depend on the column, the CSV leftovers (years outside
+  1000-9999, offsets of 24 hours or more, time-first texts, quarters,
+  float-like texts) now that `to_datetime_utc_mixed` reads several of them
+  for SQLite, and the classic OCEL readers' (JSON, XML) date values;
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round EA's targets, taken in EB (findings EB1-1 to EB2-1): EA's CI, the
+fresh seeds, the OCEL 2.0 XML, JSON and SQLite timestamp columns. Not taken
+(carried to EC): the CSV leftovers, the new dtypes, the DW1 keys, the
+declared items, the CU list and the open choices.
+
+Previous list for round EB (kept for its older items):
 
 Next round (EB) should start by re-reviewing round EA:
 

@@ -31809,3 +31809,123 @@ Tests:
 - Full suite: 621 tests, all passed on the first run; the workbench
   fixture replay gave 2,673 responses unchanged. Python script and
   frontend tests not rerun (scripts and frontend unchanged).
+
+## Review EB1: re-review of round EA, the OCEL 2.0 XML, JSON and SQLite readers' timestamps and date values as pandas and dateutil read them, fresh seeds (2026-11-18)
+
+Round EB checked EA's CI (run 44304386291 on 294ee7f: green on all six
+jobs, Windows included), took the other OCEL
+readers' timestamp columns from EA's list and replayed a batch of fresh
+seeds. The device check on the Mac was skipped (the Mac was not linked).
+
+Observed black-box on pandas 3.0.5 and dateutil 2.9 in the reference venv
+(python-dateutil pinned to 2.9.0.post0, the version every earlier round
+saw; pip now resolves 4.0.0):
+
+- **EB1-1 OCEL 2.0 XML times and date values.** read_ocel2_xml reads each
+  event time, object change time and declared date value with
+  `datetime.fromisoformat` and falls back to `dateutil.parser.parse(text,
+  fuzzy=True)`: missing fields come from today's date at midnight (the day
+  cut to the month's length, `bad month number N; must be 1-12` from
+  calendar), a weekday without a day moves on to that weekday (`date value
+  out of range` past 9999), two-digit years follow today's year, `GMT+3`
+  reads as three hours west, offset 0 is UTC, another offset a fixed zone,
+  an unknown zone name stays naive; fuzzy reading skips unknown words, an
+  AM/PM without a valid hour or after another one, and numbers that fit no
+  field. Its errors are raised: `Unknown string format: X`, `String does
+  not contain a date: X`, datetime's range messages followed by `: X`,
+  `signed integer is greater than maximum` past int32. They come in
+  document order (the objects and events sections as the file orders
+  them; an event's time before its attributes; an object attribute's value
+  before its time, the static attribute's time included); an empty date
+  element raises `Parser must be a string or character stream, not
+  NoneType`; naive next to aware event times raise pandas' `'values' is
+  not ordered, ...` from the sort. An object attribute's time of `0`, or
+  one starting `1970-01-01T00:00:00`, stays its text unread (`00` raises);
+  newlines and other ASCII whitespace in an element's text read as spaces.
+  Native read only an ISO subset and kept the file order for the rest:
+  EA's binary differed on 174 of 200 fuzzed files. The dateutil model (`dateutil_parser_parse` in
+  `pandas_to_datetime.cpp`, which now also has the fuzzy branches) matched
+  dateutil on about 74,000 plain and 74,000 fuzzy texts and the C++ the
+  model on 149,000; file fuzz (pm4py against `minera_ocel`, `eb/fz/fz.py`)
+  0 of 275, 704, 392, 351 and 270 XML files (the last with whitespace
+  around and inside the values, `WS=1`; error texts compared without the
+  trailing newline lxml keeps).
+- **EB1-2 OCEL 2.0 JSON date values.** read_ocel2_json keeps event times
+  on fromisoformat (unchanged) but reads declared date attributes and
+  object change values with non-fuzzy dateutil, keeping the text on any
+  error; a change value dateutil reads naive is stamped UTC only when
+  every other value of that field's change column is a naive datetime too
+  (otherwise the object column keeps it naive); a change time that is no
+  ISO text stays a text. File fuzz 0 of 531, 716, 317, 366 and 272 JSON
+  files.
+- **EB1-3 isoformat errors.** `Invalid isoformat string: ...` now quotes
+  the text as Python's repr does (a tab is `\t`).
+- **EB1-4 Fresh seeds.** Batch 2026122100-11 (twelve banks): eleven
+  replay clean; the Polars table CJ bank (2026122103, case 199,
+  `attributes.apply_numeric_events`) differs on one call, the declared
+  struct cast race.
+
+Declared:
+- Texts outside the dateutil model keep native's reading (the file order
+  of the whole log, or the text for a JSON value): characters beyond
+  printable ASCII and tab, integers past 18 digits, a zone name of the
+  host's own zone other than UTC, GMT and Z, and offsets of a day or more
+  (dateutil keeps them; whether pandas then raises depends on the rest of
+  the column).
+- Missing fields follow the host's local date, as the reference's do.
+
+## Review EB2: the OCEL 2.0 SQLite reader's event times as pandas reads them (2026-11-18)
+
+- **EB2-1 SQLite event times.** read_ocel2_sqlite reads each event type
+  table with read_sql and concatenates them, so the time column's dtype
+  comes from the stored values: int64 when every value of a table is an
+  integer, float64 for numbers with NULLs or reals, object otherwise
+  (tables without rows play no part; SQLite's NUMERIC affinity of a
+  `TIMESTAMP` column already stores `"15"` as the integer 15). A column of
+  numbers stays numbers and the events sort by them, NaN last. An object
+  column goes through `pd.to_datetime(utc=True, format="mixed")`: every
+  value on its own, integers and floats as nanoseconds since the epoch
+  (floats truncated), NULL, `""`, `NaT`, `nat`, `NAT`, `nan`, `NaN`, `NAN`
+  as NaT (last), a text as pandas reads it without a format (EA1-1) with
+  each offset converted on its own, a text that starts with a time and has
+  no date on today's date through dateutil, years from 1 in microseconds.
+  It raises on a float-like or other unreadable text, an offset of a day,
+  a blob, a float past int64, and a year outside the nanosecond range next
+  to a number or a nanosecond text; then the column stays as it is and the
+  events sort by it: numbers first by value, then texts as Python sorts
+  them, NULL and NaN last, each stably. Native read ISO texts only and
+  kept the file order otherwise: the first fuzz differed on 89 of 136
+  files. Now `sort_ocel2_sqlite_events` (with `to_datetime_utc_mixed` in
+  `pandas_to_datetime.cpp`) orders and reads 1,093 fuzzed files as pm4py
+  does (`eb/sq/p5.py`, seeds 11-16): 4 files with texts beyond ASCII
+  differ (declared below), and 8 more only where the harness could not
+  read a kept nanosecond text past 2262 that the native JSON writer spells
+  as ISO (same order, same text).
+
+Declared:
+- A column the reference keeps as numbers holds native texts of them, and
+  a kept text column holds texts natively too (native filters may read
+  them as times); the text `""` and NULL are both no time natively.
+- Outside the model (native's instant reading of the texts): texts beyond
+  printable ASCII, a blob among texts that do not raise, digit runs of
+  five to seven that are no number and integers past 18 digits inside a
+  text, an integer equal to NaT's value.
+
+Tests:
+- New: `minera_review_eb1_tests` (dateutil readings with a fixed today,
+  the XML and JSON readers' cases, `docs/ocel-dateutil-eb-bank.tsv.gz`:
+  11,977 texts with their plain and fuzzy readings on 2026-11-18, and
+  `docs/ocel2-dateutil-eb-bank.tsv.gz`: 1,400 XML and JSON documents whose
+  reading does not move with the date) and `minera_review_eb2_tests`
+  (`to_datetime_utc_mixed` cases with a fixed today, SQLite files of each
+  dtype, `docs/ocel2-sqlite-time-eb-bank.tsv.gz`: 1,179 fuzzed files
+  without texts that start with a time and whose reading is the same with
+  dateutil's today in 2071).
+- Full suite 622 of 623 passed on the first run; the one failure was
+  `minera_ocel_xml_tests`, which held an object attribute time of "0" (pm4py
+  keeps it as text) and a date value with newlines (pm4py reads it), both
+  fixed in the XML reader and the dateutil model; after the rebuild the 49
+  OCEL, OCDFG and review tests passed. The workbench fixture replay (run
+  before that fix) gave 2,673 responses unchanged. Python script and
+  frontend tests not rerun (scripts and frontend unchanged). The device
+  check on the Mac was skipped (the Mac was not linked).

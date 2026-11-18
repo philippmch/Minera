@@ -1400,6 +1400,19 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_review_bx1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_bx1_tests COMMAND minera_review_bx1_tests)
 
+  add_executable(minera_review_eb2_tests src/backend/tests/test_review_eb2.cpp)
+  target_link_libraries(minera_review_eb2_tests PRIVATE minera::core)
+  if(WIN32)
+    target_link_libraries(minera_review_eb2_tests PRIVATE winsqlite3)
+  elseif(SQLite3_FOUND)
+    target_link_libraries(minera_review_eb2_tests PRIVATE SQLite::SQLite3)
+  endif()
+  target_compile_features(minera_review_eb2_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_eb2_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_eb2_tests
+           COMMAND minera_review_eb2_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel2-sqlite-time-eb-bank.tsv.gz")
+
   add_executable(minera_review_by1_tests src/backend/tests/test_review_by1.cpp)
   target_link_libraries(minera_review_by1_tests PRIVATE minera::core)
   if(WIN32)
@@ -1499,6 +1512,15 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_review_ea1_tests
            COMMAND minera_review_ea1_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel-csv-timestamp-ea-bank.tsv.gz")
+
+  add_executable(minera_review_eb1_tests src/backend/tests/test_review_eb1.cpp)
+  target_link_libraries(minera_review_eb1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_eb1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_eb1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_eb1_tests
+           COMMAND minera_review_eb1_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel-dateutil-eb-bank.tsv.gz"
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel2-dateutil-eb-bank.tsv.gz")
 
   add_executable(minera_review_dz1_tests src/backend/tests/test_review_dz1.cpp)
   target_link_libraries(minera_review_dz1_tests PRIVATE minera::core)

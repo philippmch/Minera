@@ -452,6 +452,62 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
   // writers then fill the event and object scopes with their defaults.
 }
 
+// read_ocel2_xml reads every time and declared date value as it walks the
+// file (round EB, observed black-box): objects and events in document order,
+// an event's time before its attributes, an object attribute's value before
+// its time, so the first unreadable text raises its dateutil error.
+void check_standard_xml_dates(const Node& root, const StandardXmlAttributeTypes& object_attribute_types,
+                              const StandardXmlAttributeTypes& event_attribute_types, bool reject_lists) {
+  const auto date_type = [](const StandardXmlAttributeTypes& table, const std::string& owner,
+                            const std::string& key) -> const std::string* {
+    const auto found_owner = table.find(owner);
+    if (found_owner == table.end()) return nullptr;
+    const auto found = found_owner->second.find(key);
+    if (found == found_owner->second.end() || found->second.find("date") == std::string::npos) return nullptr;
+    return &found->second;
+  };
+  const auto check_value = [&](const Node& node, const std::string* declared) {
+    if (declared == nullptr) return;
+    // An empty element's text is None, which dateutil refuses.
+    if (attr(node, "type") == nullptr && attr(node, "value") == nullptr && node.text.empty() &&
+        node.children.empty())
+      throw std::invalid_argument("Parser must be a string or character stream, not NoneType");
+    const auto value = standard_xml_value(node, declared, reject_lists);
+    if (const auto* text = std::get_if<std::string>(&value)) check_ocel2_xml_date_text(*text);
+  };
+  for (const auto& section : root.children) {
+    const auto name = local(section.name);
+    if (name == "objects") {
+      for (const auto* on : children(section, "object")) {
+        const std::string type = attr_or(*on, "type");
+        if (const auto* a = child(*on, "attributes"))
+          for (const auto& av : a->children) if (local(av.name) == "attribute") {
+            const std::string key = attr_or(av, "name", attr_or(av, "key"));
+            if (key.empty()) continue;
+            check_value(av, date_type(object_attribute_types, type, key));
+            // "0" and the 1970-01-01T00:00:00 base entries stay texts (observed
+            // black-box).
+            if (const auto* when = attr(av, "time");
+                when && *when != "0" && !when->starts_with("1970-01-01T00:00:00"))
+              check_ocel2_xml_date_text(*when);
+          }
+      }
+    } else if (name == "events") {
+      for (const auto* en : children(section, "event")) {
+        if (const auto* when = attr(*en, "time") ? attr(*en, "time") : attr(*en, "timestamp"))
+          check_ocel2_xml_date_text(*when);
+        const std::string activity = attr_or(*en, "type", attr_or(*en, "activity"));
+        if (const auto* a = child(*en, "attributes"))
+          for (const auto& av : a->children) if (local(av.name) == "attribute") {
+            const auto key = attr_or(av, "name", attr_or(av, "key"));
+            if (key.empty()) continue;
+            check_value(av, date_type(event_attribute_types, activity, key));
+          }
+      }
+    }
+  }
+}
+
 void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
   std::unordered_map<std::string, std::string> types;
   StandardXmlAttributeTypes object_attribute_types;
@@ -460,6 +516,7 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
                                 object_attribute_types);
   parse_standard_xml_type_table(root, "event-types", "event-type",
                                 event_attribute_types);
+  check_standard_xml_dates(root, object_attribute_types, event_attribute_types, reject_lists);
   log.object_type_attributes = object_attribute_types;
   log.event_type_attributes = event_attribute_types;
   struct StandardAttribute {

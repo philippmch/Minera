@@ -154,12 +154,15 @@ enum class OcelTimestampReader {
   // adapters use the classic format as transport (empty or NaT timestamps).
   kIsoFormatOrFileOrder,
   // OCEL 2.0 XML: the ISO reading above (wall clock), or else the reference's
-  // dateutil fallback, which keeps its offset: a fallback value with an offset
+  // dateutil fallback (dateutil.parser.parse, fuzzy, today's date for missing
+  // fields), which keeps its offset: a fallback value with an offset
   // compares by its UTC instant, one without is naive (wall clock), and naive
-  // next to aware values raises as the reference's sort does. Shapes outside
-  // the native dateutil subset keep the file order of the whole log; a text
-  // with no digit and no month or weekday word raises "String does not
-  // contain a date".
+  // next to aware values raises as the reference's sort does. dateutil's
+  // errors are raised. Texts outside the native dateutil model (characters
+  // beyond printable ASCII, integers past 18 digits, offsets of a day or
+  // more) keep the file order of the whole log; such
+  // a text with no digit and no month or weekday word raises "String does
+  // not contain a date".
   kDateutil,
   // SQLite: the UTC instant (offsets convert), compared at nanoseconds.
   kInstantNanoseconds,
@@ -185,6 +188,26 @@ void sort_ocel_events_by_timestamp(Ocel& log, OcelTimestampReader reader);
 // `nanoseconds` selects kInstantNanoseconds, otherwise kIsoFormat.
 void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 
+// pm4py.read_ocel2_sqlite's event order, as pandas reads the time column
+// (`times[i]` is log.events[i]'s cell; a text one is the event's
+// timestamp): a column of numbers sorts as numbers, NULL last (declared: the
+// reference keeps the numbers, native their texts); an object column reads
+// through pd.to_datetime(utc=True, format="mixed") (integers and floats as
+// nanoseconds since the epoch, NULL and NaT spellings as NaT, which sorts
+// last as an empty text), then orders as kInstantNanoseconds; one that raises
+// there stays texts, which sort as Python sorts them. Outside that model
+// (blobs, numbers among texts that raise, the shapes pandas_to_datetime
+// leaves out) the order is kInstantNanoseconds' reading of the texts.
+struct OcelSqliteTime {
+  enum class Kind { kNull, kInteger, kReal, kText, kBlob };
+  Kind kind = Kind::kNull;
+  std::int64_t integer = 0;
+  double real = 0;
+};
+// pandas' dtype of the concatenated column.
+enum class OcelSqliteTimeColumn { kInteger, kReal, kObject };
+void sort_ocel2_sqlite_events(Ocel& log, const std::vector<OcelSqliteTime>& times, OcelSqliteTimeColumn column);
+
 // Converts the string values of attributes the type catalogs declare as
 // dates (a type naming "date" or "time" in any case; for kDateutil, as
 // read_ocel2_xml, one naming "date") to the UTC timestamp the reference
@@ -194,20 +217,26 @@ void sort_ocel_events_by_timestamp(Ocel& log, bool nanoseconds = false);
 // offset is dropped, a naive text is UTC). kIsoFormatOrFileOrder (OCEL 2.0
 // JSON) keeps a text it cannot read; kIsoFormat (OCEL 1.0 XML) throws the
 // reference's "Invalid isoformat string"; kDateutil (OCEL 2.0 XML) falls back
-// to the dateutil subset (an aware value is its UTC instant, a naive one
-// stays naive) and throws "String does not contain a date" for a text that
-// certainly is none. An event or object value is spelled "...[.ffffff]Z", a
+// to fuzzy dateutil (an aware value is its UTC instant, a naive one stays
+// naive) and throws its errors. An event or object value is spelled "...[.ffffff]Z", a
 // change value "...+00:00" (the reference JSON writers' spellings), unless the
 // text already is that UTC value. Non-string values are kept.
 void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader);
 
 // One date value as convert_ocel_date_attributes converts it (`change`: an
 // object-change value). kIsoFormatOrFileOrder (OCEL 2.0 JSON) falls back to
-// the dateutil subset like kDateutil but keeps a text it cannot read, and
-// stamps a naive change value UTC, as read_ocel2_json does. The OCEL 1.0 XML
+// dateutil without fuzzy reading and keeps a text it cannot read, and stamps
+// a naive change value UTC (an aware one is its UTC instant), as
+// read_ocel2_json does. The OCEL 1.0 XML
 // reader calls it for each <date>/<timestamp> element's value only, as
 // read_ocel_xml converts per element (a <string> under the same key stays).
 void convert_ocel_date_value(OcelValue& value, OcelTimestampReader reader, bool change = false);
+
+// read_ocel2_xml reads each time and declared date value as it walks the
+// file, so the first text that neither fromisoformat nor fuzzy dateutil reads
+// raises, in document order (round EB, observed black-box). Throws that
+// error for `text`.
+void check_ocel2_xml_date_text(std::string_view text);
 
 // Keeps only the events and objects that take part in at least one
 // event-object relation, as every reference OCEL JSON, XML and SQLite reader
