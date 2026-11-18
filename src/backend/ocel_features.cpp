@@ -1346,6 +1346,22 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
         first_object = object;
         break;
       }
+    // Round EG: a NaT event time (an OCEL 2.0 SQLite '' or NULL) raises in
+    // the reference's timestamp columns of the events, and in the lifecycle
+    // columns of an object whose events all have one (NaT times are left out
+    // of the others); both families come before the lookups below (observed
+    // black-box).
+    const auto nat = [&](std::size_t event) { return ocel_frame::nat_time_text(log.events[event].timestamp); };
+    const auto nat_error = [] {
+      return std::invalid_argument("ValueError: NaTType does not support timestamp");
+    };
+    if (variant == OcelFeatureVariant::kEvents && options.include_timestamp_features)
+      for (std::size_t event = 0; event < log.events.size(); ++event)
+        if (nat(event)) throw nat_error();
+    if (variant == OcelFeatureVariant::kObjects && options.include_lifecycle_features.value_or(true) &&
+        options.include_lifecycle_duration_features.value_or(true))
+      for (const auto& events : object_events)
+        if (!events.empty() && std::all_of(events.begin(), events.end(), nat)) throw nat_error();
     if (variant == OcelFeatureVariant::kEvents) {
       const bool relation_counts =
           options.include_event_num_rel_objs_features.value_or(options.include_relation_features) ||

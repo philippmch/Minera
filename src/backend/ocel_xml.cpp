@@ -548,6 +548,25 @@ void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
   log.objects.push_back({std::move(id), std::move(type), std::move(attributes)});
 }
 
+// A vmap entry keyed "ocel:eid", "ocel:activity" or "ocel:timestamp" sets
+// that events-frame cell while the relations frame keeps the event's own
+// value (observed black-box). Round EG: an entry equal to the event's own
+// value changes nothing (a date the same instant); an empty or missing id or
+// activity, or an id that is no str or that no relation names, drops the row
+// from the events frame, so its relations go too while the objects they name
+// stay, as in classic JSON's filtering (round EE). Any other such entry
+// whose row remains (an activity or time a native OCEL cannot hold beside
+// the relations frame's, an id naming another event's rows), and a time
+// that is no date even on a dropped row (it changes the frame's time column),
+// is refused after the filtering (declared).
+struct XmlFrameOverride {
+  std::string event_id;                 // the event's own id
+  std::optional<std::string> frame_id;  // a str id other than the own one
+  bool drop = false;                    // the events-frame row is dropped
+  std::string held;                     // what a native OCEL cannot hold if the row remains
+  bool column = false;                  // refused whenever an event remains
+};
+
 // read_ocel_xml's reading of an event whose id is a keyed child: "id",
 // "activity", "timestamp", every "omap" and every "vmap" by key whatever the
 // tag ("type", "time" or "event-id" are no keys), the last of a repeated key
@@ -558,7 +577,8 @@ void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
 // cannot hold: such a file is refused (declared).
 void read_reference_event(const Node& en, Ocel& log, bool reject_lists,
                           const std::unordered_map<std::string, std::string>& types,
-                          std::vector<OcelXmlTime>& times) {
+                          std::vector<OcelXmlTime>& times,
+                          std::vector<XmlFrameOverride>& overrides) {
   std::string id, activity;
   const Node* time = nullptr;
   ReferenceAttributes attributes;
@@ -570,11 +590,47 @@ void read_reference_event(const Node& en, Ocel& log, bool reject_lists,
     else if (*key == "timestamp") time = &c;
     else if (*key == "vmap") attributes.read(c, reject_lists);
   }
-  for (const auto& attribute : attributes.values)
-    if (attribute.key == "ocel:eid" || attribute.key == "ocel:activity" || attribute.key == "ocel:timestamp")
-      throw std::invalid_argument(
-          "OCEL XML event vmap entry " + attribute.key + ": pm4py puts it in the events frame and "
-          "keeps the event's own value in the relations frame, which a native OCEL cannot hold");
+  XmlFrameOverride frame;
+  bool overridden = false;
+  const auto hold = [&](const std::string& key) {
+    if (frame.held.empty())
+      frame.held = "OCEL XML event vmap entry " + key +
+                   ": pm4py puts it in the events frame and keeps the event's own value in the "
+                   "relations frame, which a native OCEL cannot hold";
+  };
+  for (const auto& attribute : attributes.values) {
+    const auto* text = std::get_if<std::string>(&attribute.value);
+    const auto* real = std::get_if<double>(&attribute.value);
+    if (attribute.key == "ocel:eid") {
+      overridden = true;
+      if (text == nullptr || text->empty()) frame.drop = true;
+      else if (*text != id) frame.frame_id = *text;
+    } else if (attribute.key == "ocel:activity") {
+      overridden = true;
+      if ((text != nullptr && text->empty()) || (real != nullptr && std::isnan(*real))) frame.drop = true;
+      else if (text == nullptr || *text != activity) hold(attribute.key);
+    } else if (attribute.key == "ocel:timestamp") {
+      overridden = true;
+      bool same = false;
+      if (attributes.dated.count(attribute.key) && text != nullptr && time != nullptr &&
+          reference_value_kind(*time) == ReferenceValueKind::kDate)
+        same = reference_value(*time) == attribute.value;
+      if (!attributes.dated.count(attribute.key)) {
+        frame.column = true;
+        hold(attribute.key);
+      } else if (!same) {
+        hold(attribute.key);
+      }
+    }
+  }
+  std::erase_if(attributes.values, [](const OcelAttribute& attribute) {
+    return attribute.key == "ocel:eid" || attribute.key == "ocel:activity" || attribute.key == "ocel:timestamp";
+  });
+  for (const auto* key : {"ocel:eid", "ocel:activity", "ocel:timestamp"}) attributes.dated.erase(key);
+  if (overridden) {
+    frame.event_id = id;
+    overrides.push_back(std::move(frame));
+  }
   OcelXmlTime typed;
   std::string text;
   if (time == nullptr) {
@@ -650,7 +706,8 @@ OcelValue standard_xml_value(const Node& node, const std::string* declared_type,
 // Returns the typed times of the events, in file order, for
 // sort_ocel_xml_events (a former-dialect event's time is a date).
 std::vector<OcelXmlTime> parse_classic(const Node& root, Ocel& log, bool reject_lists,
-                                       std::vector<HeldColumnChange>& held_changes) {
+                                       std::vector<HeldColumnChange>& held_changes,
+                                       std::vector<XmlFrameOverride>& overrides) {
   check_reference_values(root);
   std::unordered_map<std::string, std::string> types;
   for (const auto* objects : children(root, "objects")) {
@@ -698,7 +755,7 @@ std::vector<OcelXmlTime> parse_classic(const Node& root, Ocel& log, bool reject_
       const auto* en = &element;
       // read_ocel_xml reads every child of <events> as an event.
       if (reference_shaped_event(*en)) {
-        read_reference_event(*en, log, reject_lists, types, times);
+        read_reference_event(*en, log, reject_lists, types, times, overrides);
         continue;
       }
       if (local(en->name) != "event") continue;
@@ -1095,8 +1152,40 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   const bool standard = child(root, "object-types") != nullptr || child(root, "event-types") != nullptr || attr(root, "ocelVersion") != nullptr;
   std::vector<OcelXmlTime> classic_times;
   std::vector<HeldColumnChange> held_changes;
+  std::vector<XmlFrameOverride> overrides;
   if (standard) parse_standard(root, log, options.reject_unsupported);
-  else classic_times = parse_classic(root, log, options.reject_unsupported, held_changes);
+  else classic_times = parse_classic(root, log, options.reject_unsupported, held_changes, overrides);
+  // The rows a vmap ocel:* entry drops from the events frame (see
+  // XmlFrameOverride): an id other than the own one drops the row unless a
+  // relation names it (then it is held).
+  std::unordered_set<std::string> dropped_events;
+  if (!overrides.empty()) {
+    std::unordered_set<std::string> related;
+    for (const auto& relation : log.relations) related.insert(relation.event_id);
+    for (auto& frame : overrides) {
+      if (frame.frame_id) {
+        if (related.count(*frame.frame_id)) {
+          if (frame.held.empty())
+            frame.held = "OCEL XML event " + frame.event_id + " vmap entry ocel:eid " +
+                         ocel_frame::python_str_repr(*frame.frame_id) +
+                         ": pm4py puts it in the events frame next to the rows it names, which a "
+                         "native OCEL cannot hold";
+        } else {
+          frame.drop = true;
+        }
+      }
+      if (frame.drop) dropped_events.insert(frame.event_id);
+    }
+    // An id listed by another event too names rows a native OCEL cannot
+    // tell apart from the dropped one.
+    std::unordered_map<std::string, std::size_t> listed;
+    for (const auto& event : log.events) ++listed[event.id];
+    for (const auto& id : dropped_events)
+      if (listed[id] > 1)
+        throw std::invalid_argument("OCEL XML event " + id +
+                                    ": a vmap ocel:* entry drops one of the rows under this id, "
+                                    "which a native OCEL cannot tell apart");
+  }
   // Both reference XML readers build the events frame activity first.
   log.event_activity_first = true;
   // read_ocel2_xml also drops an object link to an unlisted object (the
@@ -1124,6 +1213,32 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   // without relations.
   drop_empty_ocel_names(log);
   drop_unrelated_ocel_entries(log);
+  // Round EG: the rows a vmap ocel:* entry drops go after the objects their
+  // relations name were kept; with no relation left, no event or object
+  // stays (see XmlFrameOverride).
+  if (!dropped_events.empty()) {
+    std::erase_if(log.events, [&](const OcelEvent& event) { return dropped_events.count(event.id) != 0; });
+    std::erase_if(log.relations, [&](const OcelRelation& relation) {
+      return dropped_events.count(relation.event_id) != 0;
+    });
+    std::erase_if(log.e2e, [&](const OcelE2eRelation& relation) {
+      return dropped_events.count(relation.source_id) || dropped_events.count(relation.target_id);
+    });
+    if (log.relations.empty()) {
+      log.events.clear();
+      log.objects.clear();
+      log.object_changes.clear();
+      log.o2o.clear();
+      held_changes.clear();
+    }
+  }
+  for (const auto& frame : overrides) {
+    if (frame.held.empty()) continue;
+    const bool remains = std::any_of(log.events.begin(), log.events.end(), [&](const OcelEvent& event) {
+      return frame.column ? true : event.id == frame.event_id;
+    });
+    if (remains && (frame.column || !frame.drop)) throw std::invalid_argument(frame.held);
+  }
   // An OCEL 1.0 object change of ocel:oid or ocel:type whose row survives
   // (see read_reference_object) is refused (declared).
   if (!held_changes.empty()) {
@@ -1296,11 +1411,15 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
       const auto activity_line = "      <string key=\"activity\" value=\"" + esc(event.activity) + "\"/>\n";
       out << "    <event>\n      <string key=\"id\" value=\"" << esc(event.id) << "\"/>\n";
       if (log.event_activity_first) out << activity_line;
-      out << "      <date key=\"timestamp\" value=\""
-          << esc(event_offset ? ocel_frame::offset_timestamp_text(event.timestamp, 'T',
-                                                                  event_offset, "Z")
-                              : classic_xml_timestamp_text(event.timestamp))
-          << "\"/>\n";
+      // Round EG: the reference writes no timestamp for a NaT time (an
+      // OCEL 2.0 SQLite '' or NULL), as for any missing cell (observed
+      // black-box).
+      if (!ocel_frame::nat_time_text(event.timestamp))
+        out << "      <date key=\"timestamp\" value=\""
+            << esc(event_offset ? ocel_frame::offset_timestamp_text(event.timestamp, 'T',
+                                                                    event_offset, "Z")
+                                : classic_xml_timestamp_text(event.timestamp))
+            << "\"/>\n";
       if (!log.event_activity_first) out << activity_line;
       for (const auto& attribute : event.attributes)
         if (reserved_name(attribute.key))
@@ -1419,9 +1538,13 @@ void write_ocel_xml(std::ostream& out, const Ocel& log,
   for (const auto& event : log.events) {
     out << "    <event id=\"" << esc(event.id) << "\" type=\""
         << esc(event.activity) << "\" time=\""
-        << esc(ocel_frame::offset_timestamp_text(event.timestamp, 'T', event_offset,
-                                                 event_offset ? std::nullopt
-                                                              : std::optional<std::string_view>("+00:00")))
+        // Round EG: a NaT time (an OCEL 2.0 SQLite '' or NULL) is written
+        // as pandas prints it (observed black-box).
+        << (ocel_frame::nat_time_text(event.timestamp)
+                ? std::string("NaT")
+                : esc(ocel_frame::offset_timestamp_text(event.timestamp, 'T', event_offset,
+                                                        event_offset ? std::nullopt
+                                                                     : std::optional<std::string_view>("+00:00"))))
         << "\">\n";
     std::ostringstream attributes;
     for (const auto& attribute : event.attributes)

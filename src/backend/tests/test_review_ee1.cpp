@@ -244,7 +244,7 @@ void reference_shapes() {
 // Classic JSON is Minera's transport: a log holding an event time
 // read_ocel_json cannot read (an empty time of a CSV import, say) travels
 // with "minera:unreadableEventTimes" and keeps it in file order; a download
-// leaves the marker out and reads as pm4py reads the file.
+// leaves the marker and the time out and reads as pm4py reads the file.
 void transport() {
   Ocel log;
   log.objects.push_back({"o1", "t", {{"n", std::int64_t{2}}}});
@@ -269,7 +269,10 @@ void transport() {
          "the transport reads back in file order: " + round);
   const auto download = serialize_ocel_json(log, OcelJsonFormat::kClassic, false);
   expect(download.find("minera:unreadableEventTimes") == std::string::npos, "a download leaves the marker out");
-  expect(reading(download) == R"({"error":"Invalid isoformat string: ''"})", "a download reads as pm4py reads it");
+  // Round EG: pm4py's write_ocel_json leaves a NaT time out of the event
+  // entry, so reading the download back raises on the missing key.
+  expect(reading(download) == R"({"error":"KeyError: 'ocel:timestamp'"})",
+         "a download reads as pm4py reads it: " + reading(download));
   bool refused = false;
   try {
     (void)parse_ocel_json(R"({"ocel:events":{},"ocel:objects":{},"minera:unreadableEventTimes":1})");

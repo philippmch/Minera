@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EF (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EG (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7214,6 +7214,76 @@ In the suite: `minera_review_ef1_tests` (hand cases); no other test
 changed. The full ctest passed 627 of 627 on the first run, the fixture
 replay gave 2,673 responses unchanged. The fuzzer, the sweep, the comparer and the probes are in the project files
 under `review-harness/round-ef/`.
+
+Round EG re-reviewed EF (Review EG1). EF's CI run 44395233990 on
+35655a0e: the verifier, Python, frontend and macOS jobs green, the Linux
+and Windows ctest steps still running when EG pushed (check them with EG's
+own run); EE's Windows ctest (run 44383563142) passed. EG took the event
+times pm4py holds as NaT (OCEL 2.0 SQLite `''` or NULL times, which the
+server's import sends on as transports with
+`"minera:unreadableEventTimes"`) through the 38 routes (`eg/sq/sgen2.py`
+writes 187 SQLite files in seven NaT shapes; `eg/rt/rsw.py` with
+`READER=sqlite` and `STRICT=1`, which now compares messages too):
+- both descriptions and the LLM OCEL context sort NaT last and print
+  `NaT`, leave it out of the lifecycles, and raise `ValueError: NaTType
+  does not support timestamp` on an object whose events all have one
+  (EG1-1);
+- the compatibility event features raise it on any NaT time, the object
+  features on such an object (EG1-2);
+- the OC-DFG measures a pair with a NaT end as `0` (EG1-3);
+- the ancestors/descendants split gives no direction to a pair where
+  either object starts at NaT (EG1-4);
+- the writers: classic XML and JSON leave the time out, OCEL 2.0 XML writes
+  `NaT`, OCEL 2.0 JSON raises `KeyError: 'ocel:timestamp'`, OCEL 2.0 SQLite
+  raises `KeyError: 'ocel_time'` for a type whose events all have one, else
+  stores NULL (EG1-5).
+It also read the OCEL 1.0 XML vmap `ocel:eid`/`ocel:activity`/
+`ocel:timestamp` entries as pm4py does where a native OCEL can hold the
+result (equal values; empty, missing or unrelated ids and empty
+activities drop the row before the filtering), refusing the rest (EG1-6).
+Main differed on 89 of 1,406 calls on EF's SQLite files; now 0 of 1,406,
+and 1 of 7,106 on the 187 new files (a declared writer coercion). Relations
+naming missing entities in OCEL 2.0 JSON, XML and SQLite files: 0 of 7,448
+calls differ (no change needed).
+
+In the suite: `minera_review_eg1_tests` (hand cases);
+`minera_review_ee1_tests` now expects a download to leave an empty time
+out (EG1-5) and one line of the round-ED XML bank changed (EG1-6). The
+full ctest passed 627 of 628 on the first run (the EE1 case, fixed), the
+fixture replay gave 2,673 responses unchanged. The generators, the sweep, the
+comparers and the probes are in the project files under
+`review-harness/round-eg/`.
+
+Next round (EH) should start by re-reviewing round EG:
+
+- EG's CI run, and the end of EF's Linux and Windows ctest (run
+  44395233990);
+- NaT event times from the other readers through the routes (EG swept the
+  SQLite ones only): CSV time cells pm4py cannot read, OCEL 2.0 JSON/XML
+  times, the filters and time-based routes on a log mixing NaT and times;
+- the OCEL 1.0 XML vmap entries still refused (EG1-6 declared: a row that
+  stays with another activity, id or time) and the keyless values (a NaN
+  column);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the OCEL 2.0 XML/JSON day offsets that depend on the column, the SQLite
+  leftovers (texts beyond ASCII, the kept columns downstream);
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round EF's targets, taken in EG (findings EG1-1 to EG1-6): EF's CI and
+EE's Windows ctest, the SQLite NaT times through the routes, the other
+readers' relations naming missing entities, the XML vmap overrides. Not
+taken (carried to EH): the fresh seeds, the keyless XML values, the XML/JSON
+day offsets, the SQLite leftovers, the new dtypes, the DW1 keys, the
+declared items, the CU list and the open choices.
+
+Previous list for round EG (kept for its older items):
 
 Next round (EG) should start by re-reviewing round EF:
 

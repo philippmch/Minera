@@ -43,6 +43,9 @@ namespace {
 // historic double projection.
 std::optional<double> legacy_edge_elapsed(const std::string& from_text,
                                           const std::string& to_text) {
+  // Round EG: a pair with a NaT end (an OCEL 2.0 SQLite '' or NULL time)
+  // measures 0, as the reference's OC-DFG does (observed black-box).
+  if (ocel_frame::nat_time_text(from_text) || ocel_frame::nat_time_text(to_text)) return 0.0;
   const auto from = parse_timestamp_exact(from_text);
   const auto to = parse_timestamp_exact(to_text);
   if (from && to) return ocdfg_elapsed_seconds(*from, *to);
@@ -3433,6 +3436,13 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   };
 
   if (format == OcelJsonFormat::kStandard) {
+    // Round EG: write_ocel2_json raises on a NaT event time (an OCEL 2.0
+    // SQLite '' or NULL time; observed black-box). A download does too; the
+    // open source view of a route keeps the empty time.
+    if (!transport_markers)
+      for (const auto* event : events)
+        if (ocel_frame::nat_time_text(event->timestamp))
+          throw std::invalid_argument("KeyError: 'ocel:timestamp'");
     StandardTypeTable object_types;
     StandardTypeTable event_types;
     collect_standard_types(log, object_types, event_types);
@@ -3563,8 +3573,12 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     write_string(out, event->id);
     out << ":{\"ocel:activity\":";
     write_string(out, event->activity);
-    out << ",\"ocel:timestamp\":";
-    write_string(out, event_time(event->timestamp));
+    // Round EG: write_ocel_json leaves a NaT time out of the event entry
+    // (observed black-box), so a download does; the transport keeps it.
+    if (transport_markers || !ocel_frame::nat_time_text(event->timestamp)) {
+      out << ",\"ocel:timestamp\":";
+      write_string(out, event_time(event->timestamp));
+    }
     const auto relations = event_relations(*event);
     out << ",\"ocel:omap\":[";
     bool relation_first = true;
@@ -4740,6 +4754,8 @@ namespace {
 // An event time as the reference prints its pandas Timestamp (str): UTC with
 // "+00:00", fraction digits as stored (round BX).
 std::string description_time(const std::string& text) {
+  // Round EG: a NaT time (an OCEL 2.0 SQLite '' or NULL) prints "NaT".
+  if (ocel_frame::nat_time_text(text)) return "NaT";
   const auto parsed = parse_timestamp_exact(text);
   if (!parsed) return text;
   return parsed->timezone_aware ? frame_times::utc_text(*parsed) : python::timestamp_str(*parsed);
@@ -4781,9 +4797,14 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
                                     left_time->nanoseconds != right_time->nanoseconds))
       return left_time->seconds != right_time->seconds ? left_time->seconds < right_time->seconds
                                                        : left_time->nanoseconds < right_time->nanoseconds;
+    // Round EG: a NaT time sorts after every time (pandas puts NaT last);
+    // two NaT times tie.
+    const bool left_nat = ocel_frame::nat_time_text(left->timestamp);
+    const bool right_nat = ocel_frame::nat_time_text(right->timestamp);
+    if (left_nat != right_nat) return right_nat;
     // Round EF: one instant spelled two ways (a classic JSON with "Z" and
     // "+00:00" times) is one time; only unreadable texts order as texts.
-    if (!(left_time && right_time) && left->timestamp != right->timestamp)
+    if (!left_nat && !(left_time && right_time) && left->timestamp != right->timestamp)
       return left->timestamp < right->timestamp;
     if (left->activity != right->activity)
       return left->activity < right->activity;
@@ -4795,6 +4816,15 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
     event_ids.push_back(event_id);
   }
   std::sort(event_ids.begin(), event_ids.end(), event_less);
+  // Round EG: the reference takes every object's lifecycle from its
+  // events' times first (with timestamps or without): NaT times are left
+  // out, and an object whose events all have one raises, before the lookups
+  // below (observed black-box).
+  for (const auto& [object_id, object_events] : events_by_object)
+    if (std::all_of(object_events.begin(), object_events.end(), [&](const std::string& id) {
+          return ocel_frame::nat_time_text(events.at(id)->timestamp);
+        }))
+      throw std::invalid_argument("ValueError: NaTType does not support timestamp");
   // Round EF: the reference looks every event up among the related objects,
   // in this order, so an event without relations (kept by a CSV import or a
   // classic JSON whose objects frame dropped its objects) raises KeyError
@@ -4833,8 +4863,12 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
     if (options.include_timestamps) {
       const auto it = events_by_object.find(object.id);
       if (it != events_by_object.end() && !it->second.empty()) {
+        // NaT times sort last and stay out of the lifecycle (round EG).
+        const auto timed_end = std::find_if(it->second.begin(), it->second.end(), [&](const std::string& id) {
+          return ocel_frame::nat_time_text(events.at(id)->timestamp);
+        });
         const auto* first = events.at(it->second.front());
-        const auto* last = events.at(it->second.back());
+        const auto* last = events.at(*std::prev(timed_end));
         description.lifecycle_start = description_time(first->timestamp);
         description.lifecycle_end = description_time(last->timestamp);
         const auto start = parse_timestamp_exact(first->timestamp);

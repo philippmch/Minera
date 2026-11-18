@@ -32454,3 +32454,103 @@ Runs: the full ctest passed 627 of 627 on the first run (24 min at -j3).
 The workbench fixture replay gave 2,673 responses unchanged. Python script
 and frontend tests not rerun (scripts and frontend unchanged). The device
 check on the Mac was skipped (the Mac was not linked).
+
+## Review EG1: re-review of round EF, event times pm4py holds as NaT (OCEL 2.0 SQLite `''` or NULL times through the routes and writers), relations naming missing entities in the other readers, and the OCEL 1.0 XML vmap `ocel:*` entries (2026-11-18)
+
+Round EG checked EF's CI (run 44395233990 on 35655a0e: the verifier,
+Python, frontend and macOS jobs green; the Linux and Windows ctest steps
+were still running when EG pushed) and the end of EE's Windows job (run
+44383563142: its ctest, with `minera_review_eb2_tests` and EE1-8, passed).
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the
+reference venv: `eg/sq/sgen2.py` writes OCEL 2.0 SQLite files with event
+times blanked to `''` or NULL in seven shapes (no event, one, all, all but
+one, a subset, every event of one object, every event of one type; 187
+files), the server's SQLite import sends them on as transports with
+`"minera:unreadableEventTimes"`, and `eg/rt/rsw.py` (EF's 38-route sweep;
+`STRICT=1` now also compares the messages when both sides raise, and the
+writers by content) sends each to the routes; `eg/nat/` holds the hand
+probes, `eg/o2/g2.py` and `g3.py` write OCEL 2.0 JSON, XML and SQLite files
+whose relations name missing events or objects, `eg/xv/` the XML vmap
+probes. Main (35655a0e) differed on 89 of 1,406 route calls on EF's 37
+SQLite files; the new files showed EG1-4 on top.
+
+- **EG1-1 Descriptions of NaT times.** Both description variants sort an
+  event with a NaT time after every time (such events by activity, then
+  id) and print its time `NaT`; an object's lifecycle start, end and
+  duration leave NaT times out; an object whose events all have a NaT time
+  raises `ValueError: NaTType does not support timestamp`, with timestamps
+  or without, before EF1-1's `KeyError` lookups. The LLM OCEL context
+  (`ocel` variant) does the same. Native refused (`OCEL description
+  requires valid timestamps`). Now native describes them so.
+- **EG1-2 Compatibility features on NaT times.** The event features raise
+  `ValueError: NaTType does not support timestamp` on any NaT time when the
+  timestamp features are on (they come first); the object features raise
+  it on an object whose events all have one when the lifecycle features
+  (with durations) are on, and measure the other objects over their known
+  times. Native answered. Now the compatibility style raises the same
+  error; the native style is unchanged.
+- **EG1-3 OC-DFG performance with a NaT end.** pm4py measures a pair of
+  events with a NaT time on either end as `0`. Native left the pair out of
+  the performance list. Now it measures `0`.
+- **EG1-4 Ancestors/descendants split with NaT starts.** An object whose
+  events all have a NaT time starts at NaT, which compares false both
+  ways, so an interacting pair where either starts at NaT gets no
+  direction and neither joins the other's projection. Native put the known
+  start first. Found on the 187 files after EG1-1 to EG1-3
+  (53 of 7,106 calls differed, 52 of them this split).
+- **EG1-5 Writers.** `write_ocel_xml` leaves the timestamp element of such
+  an event out, `write_ocel2_xml` writes `time="NaT"`, `write_ocel_json`
+  leaves `ocel:timestamp` out of the event entry, `write_ocel2_json` raises
+  `KeyError: 'ocel:timestamp'`, and `write_ocel2_sqlite` raises
+  `KeyError: 'ocel_time'` when every event of an event type has a NaT time
+  (otherwise it stores NULL). Native wrote an empty time in each. Now the
+  exports do as pm4py does; the classic JSON transport between routes keeps
+  the empty time with its marker.
+- **EG1-6 OCEL 1.0 XML vmap `ocel:eid`, `ocel:activity` and
+  `ocel:timestamp` entries.** `read_ocel_xml` puts such an entry into the
+  events frame while the relations frame keeps the event's own value, then
+  filters as EE1-4 does. An entry equal to the own value (a date equal to
+  the time) changes nothing; an empty id or activity, a missing one, or an
+  id that no relation names leaves a row the filtering drops, with its
+  relations (the objects they name stay, the objects frame was filtered
+  first); when no relation is left nothing is. Native refused every such
+  entry. Now it reads these as pm4py does; entries whose row stays and
+  differs are still refused (declared below). One round-ED bank file (an id
+  entry `zz` on an event whose relation names a missing object) now gets
+  the unknown-object refusal pm4py's `KeyError: 'o9'` matches.
+
+After the fixes: 0 of 1,406 calls on EF's SQLite files and 1 of 7,106 on
+the 187 new files differ (declared below). Relations naming missing events
+or objects, with events and objects left without relations: 0 of 2,128
+calls on 56 OCEL 2.0 JSON files, 0 of 2,660 on 70 OCEL 2.0 XML files and 0
+of 2,660 on 70 OCEL 2.0 SQLite files differ (nothing to fix). The XML vmap
+probes: 8 of 13 differences fixed, 5 declared; the round-ED XML fuzz files
+(seeds 1-15, 4,500 files) read alike.
+
+Declared:
+- An OCEL 1.0 XML vmap entry whose row stays and differs from the event's
+  own value (another activity, an id naming another event, another date,
+  a time that is no date) is refused (`OCEL XML event vmap entry ...:
+  pm4py puts it in the events frame ...`): pm4py keeps two values for one
+  event (events and relations frames) or two rows with one id, which a
+  native OCEL cannot hold. A time that is no date on a row the filtering
+  drops is refused too: it leaves pm4py an object time column.
+- The XML export of a log whose event times are all NaT (one file):
+  re-read, pm4py's file gives NaN for every event time, native's None for
+  one event, a mixed-type coercion of the empty column (with the declared
+  writer coercions).
+- OCEL 1.0 XML keyless values (a NaN column) stay refused.
+
+Tests:
+- New: `minera_review_eg1_tests` (hand cases of EG1-1 to EG1-6).
+- Changed: `minera_review_ee1_tests` (a download of a log with an empty
+  time now leaves the time out, so reading it back raises `KeyError:
+  'ocel:timestamp'` as reading pm4py's own file does, EG1-5); one line of
+  `docs/ocel-xml-reference-ed-bank.tsv.gz` (EG1-6).
+
+Runs: the full ctest passed 627 of 628 on the first run (16 min at -j3);
+the one failure was `minera_review_ee1_tests` (above), which passed after
+its change. The workbench fixture replay gave 2,673 responses unchanged.
+Python script and frontend tests not rerun (scripts and frontend
+unchanged). The device check on the Mac was skipped (the Mac was not
+linked).

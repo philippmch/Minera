@@ -294,6 +294,11 @@ inline std::string civil_timestamp_text(const CivilTimestamp& time, char separat
   return out;
 }
 
+// An event time pandas holds as NaT: the empty text native keeps for an
+// OCEL 2.0 SQLite '' or NULL time, sent on in transports (round EG). pandas
+// sorts it after every time and prints it "NaT".
+inline bool nat_time_text(std::string_view text) { return text.empty(); }
+
 // The text pandas prints for a timestamp the reference holds as UTC:
 // "YYYY-MM-DD HH:MM:SS[.ffffff]+00:00" (separator ' ', suffix "+00:00"), or
 // with separator 'T' and suffix "Z" for the OCEL 1.0 XML date. A naive text

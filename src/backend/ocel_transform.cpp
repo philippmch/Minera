@@ -350,10 +350,13 @@ std::vector<std::pair<std::string, ObjectIds>> ancestors_descendants(
     // below: lexically smaller -> larger when the smaller endpoint has the
     // selected type, otherwise larger -> smaller when that one has it.
     auto before = [&](const StartOrder& first, const StartOrder& second) {
-      if (first.known && second.known) return first.timestamp < second.timestamp;
-      if (first.known != second.known) return first.known;
-      return false;
+      return first.known && second.known && first.timestamp < second.timestamp;
     };
+    // Round EG: an object whose events all have a NaT time (an OCEL 2.0
+    // SQLite '' or NULL) starts at NaT, which compares neither before, after
+    // nor equal to any start: such a pair gets no direction (observed
+    // black-box).
+    if (!a.known || !b.known) continue;
     if (before(a, b)) {
       directed[left].insert(right);
     } else if (before(b, a)) {

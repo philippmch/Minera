@@ -1158,6 +1158,19 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
   throw std::runtime_error("SQLite support is not available in this build");
 #else
   validate_log(log, options.validate_references.value_or(true));
+  // Round EG: the reference drops a type table's columns without a value,
+  // so an event type whose times are all NaT (an OCEL 2.0 SQLite '' or NULL
+  // time) loses its time column and raises (observed black-box; it has
+  // written other tables by then, native writes no file).
+  {
+    std::map<std::string_view, bool> all_nat;
+    for (const auto& event : log.events) {
+      const auto [entry, added] = all_nat.try_emplace(event.activity, true);
+      entry->second = entry->second && ocel_frame::nat_time_text(event.timestamp);
+    }
+    for (const auto& [activity, nat] : all_nat)
+      if (nat) throw std::invalid_argument("KeyError: 'ocel_time'");
+  }
   std::error_code error;
   std::filesystem::remove(path, error);
   if (error) throw std::runtime_error("cannot replace SQLite output: " + error.message());
@@ -1331,10 +1344,14 @@ void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
                                            columns, {}));
       for (const auto* event : rows) {
         bind_text(statement.get(), 1, event->id);
-        bind_text(statement.get(), activity_first ? 3 : 2,
-                  event_offset ? ocel_frame::offset_timestamp_text(event->timestamp, ' ',
-                                                                   event_offset, std::nullopt, true)
-                               : pandas_time(event->timestamp));
+        // A NaT time is NULL there, as pandas writes a missing cell.
+        if (ocel_frame::nat_time_text(event->timestamp))
+          bind_null(statement.get(), activity_first ? 3 : 2);
+        else
+          bind_text(statement.get(), activity_first ? 3 : 2,
+                    event_offset ? ocel_frame::offset_timestamp_text(event->timestamp, ' ',
+                                                                     event_offset, std::nullopt, true)
+                                 : pandas_time(event->timestamp));
         bind_text(statement.get(), activity_first ? 2 : 3, event->activity);
         bind_type_attributes(statement.get(), 4, columns, event->attributes);
         step_done(db, statement.get());
