@@ -1,6 +1,8 @@
 #include "minera/ocel_xml.hpp"
 
 #include "ocel_frame_types.hpp"
+#include "ocel_xml_times.hpp"
+#include "python_float_text.hpp"
 #include "xml_pull_parser.hpp"
 
 #include <algorithm>
@@ -17,6 +19,7 @@
 #include <tuple>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace minera {
 namespace {
@@ -298,6 +301,13 @@ void append_classic_relations(const Node& omap, std::string_view event_id,
   }
 }
 
+// lxml's element.get: the attribute named exactly `key` (a prefixed one is
+// another attribute).
+const std::string* exact_attr(const Node& n, std::string_view key) {
+  for (const auto& [k, v] : n.attrs) if (k == key) return &v;
+  return nullptr;
+}
+
 // read_ocel_xml reads a reference-shaped event's relations from every child
 // keyed "omap" (whatever its tag): each element in it names an object by its
 // value attribute, whatever its tag or key; one without a value, or naming no
@@ -309,12 +319,12 @@ void append_reference_omap(const Node& event, std::string_view event_id,
                            const std::unordered_map<std::string, std::string>& types, Ocel& log) {
   std::unordered_map<std::string, std::size_t> listed;
   for (const auto& omap : event.children) {
-    if (attr_or(omap, "key") != "omap") continue;
+    if (const auto* key = exact_attr(omap, "key"); key == nullptr || *key != "omap") continue;
     for (const auto& rel : omap.children) {
-      const auto* oid = attr(rel, "value");
+      const auto* oid = exact_attr(rel, "value");
       if (oid == nullptr || !types.count(*oid))
         throw std::invalid_argument("OCEL XML relation references unknown object");
-      const auto* qualifier = attr(rel, "qualifier");
+      const auto* qualifier = exact_attr(rel, "qualifier");
       std::string text = qualifier ? *qualifier : std::string{};
       const auto [at, fresh] = listed.emplace(*oid, log.relations.size());
       if (fresh)
@@ -323,6 +333,273 @@ void append_reference_omap(const Node& event, std::string_view event_id,
         log.relations[at->second].qualifier = std::move(text);
     }
   }
+}
+
+// How read_ocel_xml reads a keyed value of a reference-shaped event or object
+// (its time, a vmap or ovmap entry), by the element's tag: one naming "float"
+// in any case is float(value), else one naming "date" is fromisoformat(value)
+// stamped UTC, else the value attribute's text, "None" without one (an <int>
+// or <boolean> stays a text, so does a nested list). Observed black-box,
+// round ED.
+enum class ReferenceValueKind { kText, kFloat, kDate };
+ReferenceValueKind reference_value_kind(const Node& n) {
+  std::string tag = local(n.name);
+  for (auto& ch : tag) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  if (tag.find("float") != std::string::npos) return ReferenceValueKind::kFloat;
+  if (tag.find("date") != std::string::npos) return ReferenceValueKind::kDate;
+  return ReferenceValueKind::kText;
+}
+double reference_float(const Node& n) {
+  const auto* value = exact_attr(n, "value");
+  if (value == nullptr)
+    throw std::invalid_argument("float() argument must be a string or a real number, not 'NoneType'");
+  if (const auto parsed = detail::parse_python_float_text(*value)) return *parsed;
+  throw std::invalid_argument("could not convert string to float: " + ocel_frame::python_str_repr(*value));
+}
+const std::string& reference_date_text(const Node& n) {
+  const auto* value = exact_attr(n, "value");
+  if (value == nullptr) throw std::invalid_argument("'NoneType' object has no attribute 'endswith'");
+  return *value;
+}
+std::string reference_text(const Node& n) {
+  const auto* value = exact_attr(n, "value");
+  return value != nullptr ? *value : std::string("None");
+}
+OcelValue reference_value(const Node& n, bool change = false) {
+  switch (reference_value_kind(n)) {
+    case ReferenceValueKind::kFloat:
+      return reference_float(n);
+    case ReferenceValueKind::kDate: {
+      OcelValue value = reference_date_text(n);
+      convert_ocel_date_value(value, OcelTimestampReader::kIsoFormat, change);
+      return value;
+    }
+    case ReferenceValueKind::kText:
+      break;
+  }
+  return reference_text(n);
+}
+
+// An id, activity or type child's value as read_ocel_xml takes it: the value
+// attribute as written, whatever the tag (a <float key="id" value="7"/> is
+// "7"); none is None, which drops the event or object (native: empty).
+std::string reference_name(const Node& n) {
+  const auto* value = exact_attr(n, "value");
+  return value != nullptr ? *value : std::string{};
+}
+
+bool reference_shaped_event(const Node& n) { return attr_or(n, "id", attr_or(n, "event-id")).empty(); }
+bool reference_shaped_object(const Node& n) { return attr_or(n, "id", attr_or(n, "object-id")).empty(); }
+
+// An object's ovmap entry whose key the object already holds (ocel:oid and
+// ocel:type from the start, an earlier entry's key, a second keyless entry)
+// is an object change at its `timestamp` attribute, which read_ocel_xml reads
+// as it reads a date (none raises AttributeError). Observed black-box,
+// round ED.
+std::string reference_change_time(const Node& entry) {
+  const auto* time = exact_attr(entry, "timestamp");
+  if (time == nullptr) throw std::invalid_argument("'NoneType' object has no attribute 'endswith'");
+  OcelValue checked = *time;
+  convert_ocel_date_value(checked, OcelTimestampReader::kIsoFormat, true);
+  return *time;
+}
+
+// read_ocel_xml reads each keyed value as it walks the file, so the first one
+// float() or fromisoformat refuses raises, in document order (an event's time
+// and vmap, an object's ovmap with each change's time after its value).
+// Relations are resolved after the walk. Observed black-box, round ED.
+void check_reference_values(const Node& root) {
+  for (const auto& container : root.children) {
+    const auto name = local(container.name);
+    const bool events = name == "events";
+    if (!events && name != "objects") continue;
+    for (const auto& element : container.children) {
+      if (events ? !reference_shaped_event(element) : !reference_shaped_object(element)) continue;
+      std::vector<const Node*> entries;
+      for (const auto& c : element.children) {
+        const auto* key = exact_attr(c, "key");
+        if (key == nullptr) continue;
+        if (events && *key == "timestamp") {
+          (void)reference_value(c);
+        } else if (*key == (events ? "vmap" : "ovmap")) {
+          for (const auto& entry : c.children) {
+            (void)reference_value(entry, !events);
+            entries.push_back(&entry);
+          }
+        }
+      }
+      // An object's change times are read after all of its values.
+      if (events) continue;
+      std::unordered_set<std::string> held{"ocel:oid", "ocel:type"};
+      bool keyless = false;
+      for (const auto* entry : entries) {
+        const auto* entry_key = exact_attr(*entry, "key");
+        const bool repeated = entry_key == nullptr ? std::exchange(keyless, true)
+                                                   : !held.insert(*entry_key).second;
+        if (repeated) (void)reference_change_time(*entry);
+      }
+    }
+  }
+}
+
+// The vmap or ovmap entries of a reference-shaped event or object: every
+// child's elements, each under its key whatever its tag, the last value of a
+// repeated key at its first position. A keyless entry (a NaN column, which
+// the reference's writers and attribute listings then fail on) is dropped
+// (declared).
+struct ReferenceAttributes {
+  std::vector<OcelAttribute> values;
+  std::unordered_map<std::string, std::size_t> at;
+  std::unordered_set<std::string> dated;
+  void read(const Node& list, bool reject_lists) {
+    for (const auto& entry : list.children) {
+      const auto* key = exact_attr(entry, "key");
+      const auto entry_name = local(entry.name);
+      if (reject_lists && (entry_name == "list" || entry_name == "array"))
+        throw std::invalid_argument("OCEL XML list values are unsupported");
+      if (key == nullptr) continue;
+      auto value = reference_value(entry);
+      if (reference_value_kind(entry) == ReferenceValueKind::kDate) dated.insert(*key);
+      else dated.erase(*key);
+      const auto [found, fresh] = at.emplace(*key, values.size());
+      if (fresh) values.push_back({*key, std::move(value)});
+      else values[found->second].value = std::move(value);
+    }
+  }
+};
+
+// read_ocel_xml's reading of an object whose id is a keyed child: children
+// count by their key attribute whatever their tag ("id", "type" and every
+// "ovmap"; "object-id", "object-type" or a name= attribute are no keys), the
+// last of a repeated "id" or "type" wins. An ovmap entry keeps its first
+// value; a later one under the same key is an object change at its
+// timestamp attribute (see reference_change_time), in file order. A change
+// of "ocel:oid" or "ocel:type" goes into the change frame's own column (an
+// "ocel:oid" change's row names the object its value names), so the row
+// survives the reference's filtering only when that object does: such a
+// change is set aside in `held` (the object its row names) and refused after
+// the filtering when it survives (declared). Keyless entries are dropped
+// (declared, as for events). Observed black-box, round ED.
+struct HeldColumnChange {
+  std::string object_id, key;
+};
+
+void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
+                           std::unordered_map<std::string, std::string>& types,
+                           std::vector<HeldColumnChange>& held_changes) {
+  bool has_id = false;
+  std::string id, type;
+  std::vector<OcelAttribute> attributes;
+  std::unordered_set<std::string> held{"ocel:oid", "ocel:type"};
+  std::unordered_set<std::string> dated;
+  struct Change { std::string time, field; OcelValue value; };
+  std::vector<Change> changes;
+  std::vector<std::size_t> pending_type_changes;
+  for (const auto& c : on.children) {
+    const auto* key = exact_attr(c, "key");
+    if (key == nullptr) continue;
+    if (*key == "id") {
+      id = reference_name(c);
+      has_id = exact_attr(c, "value") != nullptr;
+    } else if (*key == "type") {
+      type = reference_name(c);
+    } else if (*key == "ovmap") {
+      for (const auto& entry : c.children) {
+        const auto entry_name = local(entry.name);
+        if (reject_lists && (entry_name == "list" || entry_name == "array"))
+          throw std::invalid_argument("OCEL XML list values are unsupported");
+        const auto* entry_key = exact_attr(entry, "key");
+        if (entry_key == nullptr) continue;
+        if (held.insert(*entry_key).second) {
+          if (reference_value_kind(entry) == ReferenceValueKind::kDate) dated.insert(*entry_key);
+          attributes.push_back({*entry_key, reference_value(entry)});
+          continue;
+        }
+        if (*entry_key == "ocel:oid" || *entry_key == "ocel:type") {
+          (void)reference_change_time(entry);
+          auto value = reference_value(entry, true);
+          // The row names the object it changes, or for "ocel:oid" the
+          // object its value names (none for a float or a date).
+          if (*entry_key == "ocel:type") {
+            held_changes.push_back({std::string{}, *entry_key});
+            pending_type_changes.push_back(held_changes.size() - 1);
+          } else if (const auto* text = std::get_if<std::string>(&value)) {
+            held_changes.push_back({*text, *entry_key});
+          }
+          continue;
+        }
+        changes.push_back({reference_change_time(entry), *entry_key, reference_value(entry, true)});
+      }
+    }
+  }
+  // An object without an id is dropped and names no relation target (the
+  // reference's None is no "None" and no ""); an empty id or type is
+  // dropped too, after relations to it are read.
+  if (has_id) {
+    if (const auto [it, added] = types.emplace(id, type); !added && !id.empty())
+      throw_repeated_xml_object(id, it->second, type);
+  }
+  auto& schema = log.object_type_attributes[type];
+  for (const auto& key : dated) schema[key] = "date";
+  if (!has_id) id.clear();
+  for (const auto index : pending_type_changes) held_changes[index].object_id = id;
+  for (auto& change : changes)
+    log.object_changes.push_back({id, type, std::move(change.time), std::move(change.field), std::move(change.value)});
+  log.objects.push_back({std::move(id), std::move(type), std::move(attributes)});
+}
+
+// read_ocel_xml's reading of an event whose id is a keyed child: "id",
+// "activity", "timestamp", every "omap" and every "vmap" by key whatever the
+// tag ("type", "time" or "event-id" are no keys), the last of a repeated key
+// winning. The time is a typed value (see sort_ocel_xml_events); none is a
+// missing time. A vmap entry keyed "ocel:eid", "ocel:activity" or
+// "ocel:timestamp" overrides that events-frame column while the relations
+// frame keeps the event's own (observed black-box), which a native OCEL
+// cannot hold: such a file is refused (declared).
+void read_reference_event(const Node& en, Ocel& log, bool reject_lists,
+                          const std::unordered_map<std::string, std::string>& types,
+                          std::vector<OcelXmlTime>& times) {
+  std::string id, activity;
+  const Node* time = nullptr;
+  ReferenceAttributes attributes;
+  for (const auto& c : en.children) {
+    const auto* key = exact_attr(c, "key");
+    if (key == nullptr) continue;
+    if (*key == "id") id = reference_name(c);
+    else if (*key == "activity") activity = reference_name(c);
+    else if (*key == "timestamp") time = &c;
+    else if (*key == "vmap") attributes.read(c, reject_lists);
+  }
+  for (const auto& attribute : attributes.values)
+    if (attribute.key == "ocel:eid" || attribute.key == "ocel:activity" || attribute.key == "ocel:timestamp")
+      throw std::invalid_argument(
+          "OCEL XML event vmap entry " + attribute.key + ": pm4py puts it in the events frame and "
+          "keeps the event's own value in the relations frame, which a native OCEL cannot hold");
+  OcelXmlTime typed;
+  std::string text;
+  if (time == nullptr) {
+    typed.kind = OcelXmlTime::Kind::kMissing;
+  } else {
+    switch (reference_value_kind(*time)) {
+      case ReferenceValueKind::kFloat:
+        typed.kind = OcelXmlTime::Kind::kFloat;
+        typed.real = reference_float(*time);
+        break;
+      case ReferenceValueKind::kDate:
+        typed.kind = OcelXmlTime::Kind::kDate;
+        text = reference_date_text(*time);
+        break;
+      case ReferenceValueKind::kText:
+        typed.kind = OcelXmlTime::Kind::kText;
+        text = reference_text(*time);
+        break;
+    }
+  }
+  auto& schema = log.event_type_attributes[activity];
+  for (const auto& key : attributes.dated) schema[key] = "date";
+  log.events.push_back({id, activity, std::move(text), std::move(attributes.values)});
+  times.push_back(typed);
+  append_reference_omap(en, log.events.back().id, types, log);
 }
 
 using StandardXmlAttributeTypes =
@@ -370,37 +647,42 @@ OcelValue standard_xml_value(const Node& node, const std::string* declared_type,
   return value_node(typed, reject_lists);
 }
 
-void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
+// Returns the typed times of the events, in file order, for
+// sort_ocel_xml_events (a former-dialect event's time is a date).
+std::vector<OcelXmlTime> parse_classic(const Node& root, Ocel& log, bool reject_lists,
+                                       std::vector<HeldColumnChange>& held_changes) {
+  check_reference_values(root);
   std::unordered_map<std::string, std::string> types;
   for (const auto* objects : children(root, "objects")) {
-    for (const auto* on : children(*objects, "object")) {
-      const std::string id = attr_or(*on, "id", attr_or(*on, "object-id")).empty()
-                                 ? keyed_value(*on, "id")
-                                 : attr_or(*on, "id", attr_or(*on, "object-id"));
+    for (const auto& element : objects->children) {
+      const auto* on = &element;
+      // read_ocel_xml reads every child of <objects> as an object.
+      if (reference_shaped_object(*on)) {
+        read_reference_object(*on, log, reject_lists, types, held_changes);
+        continue;
+      }
+      if (local(on->name) != "object") continue;
+      const std::string id = attr_or(*on, "id", attr_or(*on, "object-id"));
       const std::string type = attr_or(*on, "type", attr_or(*on, "object-type")).empty()
                                    ? (keyed_value(*on, "type").empty()
                                           ? keyed_value(*on, "object-type")
                                           : keyed_value(*on, "type"))
                                    : attr_or(*on, "type", attr_or(*on, "object-type"));
-      // An empty id or type is no error: drop_empty_ocel_names drops the
-      // object (observed black-box), so an empty id may repeat.
+      // An empty type is no error: drop_empty_ocel_names drops the object
+      // (observed black-box).
       if (const auto [it, added] = types.emplace(id, type); !added && !id.empty())
         throw_repeated_xml_object(id, it->second, type);
       OcelObject o{id, type, {}};
-      // In the reference shape (keyed id and type children) read_ocel_xml
-      // reads only the ovmap list: other keyed children are dropped. The
-      // former native dialect (id and type as XML attributes) keeps them.
-      const bool lists_only = attr_or(*on, "id", attr_or(*on, "object-id")).empty();
+      // The former native dialect (id and type as XML attributes) keeps every
+      // keyed child as an attribute.
       std::vector<std::size_t> dated;
       append_values_filtered(*on, o.attributes, reject_lists,
-                             {"id", "object-id", "type", "object-type"}, &dated, lists_only);
-      // read_ocel_xml converts each <date> element (a <string> under the same
-      // key stays a string); the catalog entry below is for the writers.
+                             {"id", "object-id", "type", "object-type"}, &dated);
       for (const auto index : dated)
         convert_ocel_date_value(o.attributes[index].value, OcelTimestampReader::kIsoFormat);
       log.objects.push_back(std::move(o));
       collect_date_keys(*on, log.object_type_attributes[type],
-                        {"id", "object-id", "type", "object-type"}, lists_only);
+                        {"id", "object-id", "type", "object-type"});
       for (const auto* links : children(*on, "o2o"))
         for (const auto* rel : children(*links, "relation")) {
           log.o2o.push_back({id, attr_or(*rel, "target-id",
@@ -410,11 +692,17 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
         }
     }
   }
+  std::vector<OcelXmlTime> times;
   for (const auto* events : children(root, "events")) {
-    for (const auto* en : children(*events, "event")) {
-      const std::string id = attr_or(*en, "id", attr_or(*en, "event-id")).empty()
-                                 ? keyed_value(*en, "id")
-                                 : attr_or(*en, "id", attr_or(*en, "event-id"));
+    for (const auto& element : events->children) {
+      const auto* en = &element;
+      // read_ocel_xml reads every child of <events> as an event.
+      if (reference_shaped_event(*en)) {
+        read_reference_event(*en, log, reject_lists, types, times);
+        continue;
+      }
+      if (local(en->name) != "event") continue;
+      const std::string id = attr_or(*en, "id", attr_or(*en, "event-id"));
       const std::string activity =
           attr_or(*en, "activity", attr_or(*en, "type")).empty()
               ? (keyed_value(*en, "activity").empty()
@@ -428,28 +716,23 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
                      : keyed_value(*en, "timestamp"))
               : attr_or(*en, "timestamp", attr_or(*en, "time"));
       OcelEvent e{id, activity, timestamp, {}};
-      // As in the OCEL 2.0 reader: no id or activity drops the event later,
-      // no timestamp raises.
+      // As in the OCEL 2.0 reader: no activity drops the event later, no
+      // timestamp raises.
       if (e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
-      // As for objects: the reference reads only the vmap list.
-      const bool lists_only = attr_or(*en, "id", attr_or(*en, "event-id")).empty();
       std::vector<std::size_t> dated;
       append_values_filtered(*en, e.attributes, reject_lists,
-                             {"id", "event-id", "activity", "type", "timestamp", "time"}, &dated, lists_only);
+                             {"id", "event-id", "activity", "type", "timestamp", "time"}, &dated);
       for (const auto index : dated)
         convert_ocel_date_value(e.attributes[index].value, OcelTimestampReader::kIsoFormat);
       log.events.push_back(std::move(e));
+      times.push_back({});
       collect_date_keys(*en, log.event_type_attributes[log.events.back().activity],
-                        {"id", "event-id", "activity", "type", "timestamp", "time"}, lists_only);
-      if (lists_only) {
-        append_reference_omap(*en, log.events.back().id, types, log);
-      } else {
-        for (const auto& child_node : en->children) {
-          const auto name = local(child_node.name);
-          const auto key = attr_or(child_node, "key", attr_or(child_node, "name"));
-          if (name == "omap" || (name == "list" && key == "omap"))
-            append_classic_relations(child_node, log.events.back().id, types, log);
-        }
+                        {"id", "event-id", "activity", "type", "timestamp", "time"});
+      for (const auto& child_node : en->children) {
+        const auto name = local(child_node.name);
+        const auto key = attr_or(child_node, "key", attr_or(child_node, "name"));
+        if (name == "omap" || (name == "list" && key == "omap"))
+          append_classic_relations(child_node, log.events.back().id, types, log);
       }
     }
   }
@@ -481,6 +764,7 @@ void parse_classic(const Node& root, Ocel& log, bool reject_lists) {
   // read_ocel_xml reads no <global> scope (observed black-box: a custom event
   // global and the written defaults both read as no globals), so the OCEL 1.0
   // writers then fill the event and object scopes with their defaults.
+  return times;
 }
 
 // read_ocel2_xml reads every time and declared date value as it walks the
@@ -809,7 +1093,10 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   if (xml.size() > options.max_bytes) throw std::invalid_argument("OCEL XML file exceeds the " + ocel_limit_text(options.max_bytes) + " OCEL limit");
   const Node root = parse_tree(xml); Ocel log;
   const bool standard = child(root, "object-types") != nullptr || child(root, "event-types") != nullptr || attr(root, "ocelVersion") != nullptr;
-  if (standard) parse_standard(root, log, options.reject_unsupported); else parse_classic(root, log, options.reject_unsupported);
+  std::vector<OcelXmlTime> classic_times;
+  std::vector<HeldColumnChange> held_changes;
+  if (standard) parse_standard(root, log, options.reject_unsupported);
+  else classic_times = parse_classic(root, log, options.reject_unsupported, held_changes);
   // Both reference XML readers build the events frame activity first.
   log.event_activity_first = true;
   // read_ocel2_xml also drops an object link to an unlisted object (the
@@ -827,7 +1114,8 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   if (log.relations.empty())
     throw std::invalid_argument("OCEL XML file has no event-object relation");
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
-  sort_ocel_events_by_timestamp(log, standard ? OcelTimestampReader::kDateutil : OcelTimestampReader::kIsoFormat);
+  if (standard) sort_ocel_events_by_timestamp(log, OcelTimestampReader::kDateutil);
+  else sort_ocel_xml_events(log, classic_times);
   // Both XML readers convert date values: OCEL 2.0 the declared ones here,
   // OCEL 1.0 each <date> element as parse_classic reads it.
   if (standard) convert_ocel_date_attributes(log, OcelTimestampReader::kDateutil);
@@ -836,6 +1124,17 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   // without relations.
   drop_empty_ocel_names(log);
   drop_unrelated_ocel_entries(log);
+  // An OCEL 1.0 object change of ocel:oid or ocel:type whose row survives
+  // (see read_reference_object) is refused (declared).
+  if (!held_changes.empty()) {
+    std::unordered_set<std::string> object_ids;
+    for (const auto& object : log.objects) object_ids.insert(object.id);
+    for (const auto& change : held_changes)
+      if (object_ids.count(change.object_id))
+        throw std::invalid_argument(
+            "OCEL XML object change of " + change.key + ": pm4py writes it into the change "
+            "frame's own column, which a native OCEL cannot hold");
+  }
   return log;
 }
 

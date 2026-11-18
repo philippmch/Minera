@@ -5,6 +5,7 @@
 #include "minera/timestamp.hpp"
 #include "minera/filtering_common.hpp"
 #include "ocel_frame_types.hpp"
+#include "ocel_xml_times.hpp"
 #include "ocpn_projection.hpp"
 #include "python_isoformat.hpp"
 #include "pandas_to_datetime.hpp"
@@ -1978,6 +1979,80 @@ void sort_ocel2_sqlite_events(Ocel& log, const std::vector<OcelSqliteTime>& time
     keys[texts[k]] = rank;
   }
   sort_ocel_events(log, OcelTimestampReader::kInstantNanoseconds, false, &keys);
+}
+
+// read_ocel_xml builds the time column from each event's typed value, so a
+// column holding texts or floats is an object or float column, which pandas
+// sorts as described at sort_ocel_xml_events (round ED, observed black-box).
+void sort_ocel_xml_events(Ocel& log, const std::vector<OcelXmlTime>& times) {
+  using Kind = OcelXmlTime::Kind;
+  if (times.size() != log.events.size()) throw std::logic_error("sort_ocel_xml_events: one time per event");
+  const auto is_float = [&](std::size_t i) {
+    return times[i].kind == Kind::kFloat && !std::isnan(times[i].real);
+  };
+  bool dates = false, floats = false, texts = false, missing = false;
+  for (std::size_t i = 0; i < times.size(); ++i) {
+    dates = dates || times[i].kind == Kind::kDate;
+    floats = floats || is_float(i);
+    texts = texts || times[i].kind == Kind::kText;
+    missing = missing || times[i].kind == Kind::kMissing ||
+              (times[i].kind == Kind::kFloat && std::isnan(times[i].real));
+  }
+  if (!floats && !texts && !missing) {
+    sort_ocel_events(log, OcelTimestampReader::kIsoFormat, false);
+    return;
+  }
+  if (dates && floats)
+    throw std::invalid_argument("'values' is not ordered, please explicitly specify the categories "
+                                "order by passing in a categories argument.");
+  // Dates (or floats) first by value, then texts by code points (UTF-8 byte
+  // order), each group stably; missing times last.
+  std::vector<std::int64_t> wall(times.size(), 0);
+  std::vector<std::size_t> numbers, words;
+  for (std::size_t i = 0; i < times.size(); ++i) {
+    auto& text = log.events[i].timestamp;
+    switch (times[i].kind) {
+      case Kind::kDate:
+        wall[i] = iso_wall_microseconds(text);
+        if (!natively_stored(text, wall[i])) text = stored_timestamp_text(text, wall[i], true);
+        numbers.push_back(i);
+        break;
+      case Kind::kFloat:
+        if (std::isnan(times[i].real)) {
+          text.clear();  // NaN sorts and reads as a missing time
+        } else {
+          text = ocel_frame::float_repr(times[i].real);
+          numbers.push_back(i);
+        }
+        break;
+      case Kind::kText:
+        words.push_back(i);
+        break;
+      case Kind::kMissing:
+        text.clear();
+        break;
+    }
+  }
+  const auto less = [&](std::size_t left, std::size_t right) {
+    if (times[left].kind == Kind::kDate) return wall[left] < wall[right];
+    return times[left].real < times[right].real;
+  };
+  std::stable_sort(numbers.begin(), numbers.end(), less);
+  std::stable_sort(words.begin(), words.end(), [&](std::size_t left, std::size_t right) {
+    return log.events[left].timestamp < log.events[right].timestamp;
+  });
+  std::vector<std::optional<std::int64_t>> keys(times.size());
+  std::int64_t rank = 0;
+  for (std::size_t k = 0; k < numbers.size(); ++k) {
+    if (k > 0 && less(numbers[k - 1], numbers[k])) ++rank;
+    keys[numbers[k]] = rank;
+  }
+  ++rank;
+  for (std::size_t k = 0; k < words.size(); ++k) {
+    if (k > 0 && log.events[words[k]].timestamp != log.events[words[k - 1]].timestamp) ++rank;
+    keys[words[k]] = rank;
+  }
+  sort_ocel_events(log, OcelTimestampReader::kIsoFormat, false, &keys);
 }
 
 // `keep_nanoseconds`: a classic document Minera wrote with the

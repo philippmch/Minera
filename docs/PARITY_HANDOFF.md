@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EC (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–ED (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7093,6 +7093,87 @@ and review E tests passed again). The workbench fixture replay gave 2,673
 responses unchanged. Python script and frontend tests not rerun (scripts
 and frontend unchanged). The device check on the Mac was skipped (the Mac
 was not linked).
+
+Round ED re-reviewed EC (Review ED1). EC's CI run 44345934164: green on
+five jobs; the Windows build took 58 min and its ctest failed
+`minera_review_eb2_tests` again on 13 bank files: winsqlite3 spells a REAL
+with 17 digits through `sqlite3_snprintf("%!.15g")` too, so EC1-5 did not
+hold there. The SQLite reader now formats REAL cells itself
+(`sqlite_real_text.hpp`, 15 digits rounded half up from the exact value,
+SQLite 3.45's shape; ED1-7). ED took the OCEL 1.0 XML shapes EC declared and probed the classic JSON
+reader:
+- OCEL 1.0 XML, events and objects whose id is a keyed child: every child
+  of `<events>`/`<objects>` is an event/object whatever its tag, children
+  count by their exact key whatever theirs, the last of a repeated key
+  wins (ED1-1); values read by tag (`float` in the lowercase tag is
+  `float()`, else `date` is `fromisoformat`, else the text or `"None"`;
+  `<int>`, `<boolean>` and `<string>` times stay texts) (ED1-2); the time
+  column sorts as pandas sorts an object column, dates or floats first,
+  texts by code point, missing last, dates next to floats raise (ED1-3,
+  `sort_ocel_xml_events`); vmap lists merge last-wins, an object keeps an
+  ovmap key's first value and a repeat is an object change at its
+  `timestamp` attribute (ED1-4); values raise in document order (ED1-5).
+  EC's binary differed on 79 of 153 probes and 151 of 600 fuzzed files;
+  now 12 probes (declared: keyless values, vmap `ocel:*` overrides, a
+  processing instruction in a vmap) and 0 of 4,500 fuzzed files. The fuzz
+  caught the first port refusing an `ocel:type` change of an object the
+  filtering drops; the refusal now waits for the filtering;
+- fresh seeds 2026122300-11: two calls, the declared struct cast race
+  (Polars table CJ 2026122303 case 380, CK 2026122301 case 219) (ED1-6);
+- classic JSON (kept for EE; native's transport format, so a change there
+  needs care): `str()` of non-string activities, null activities dropping
+  the event, non-string or string omaps, `KeyError` on a missing
+  `ocel:vmap`/`ocel:ovmap`, ovmap `ocel:type` and vmap `ocel:activity`
+  overrides, list/dict/big-int/NaN values, a time `"x"` raising.
+
+In the suite: `minera_review_ed1_tests` with
+`docs/ocel-xml-reference-ed-bank.tsv.gz` (1,336 files) and the ED1-7
+REAL texts. The probes, the fuzzer and comparer, the bank generator, the
+JSON probes, the REAL text check against SQLite and the fresh banks are in
+the project files under `review-harness/round-ed/`.
+
+Full suite 624 of 625 passed on the first run; the one failure was
+`minera_ocel_xml_tests`, which held an `<int>` value as an integer (pm4py
+keeps the text); after the fix the 40 OCEL, OCDFG, OCPN and review E tests
+and 17 recheck, server and import tests passed, and after ED1-7 the 66
+OCEL, SQLite, review E, recheck, server, import, connector and history
+tests. The workbench fixture
+replay gave 2,673 responses unchanged. Python script and frontend tests
+not rerun (scripts and frontend unchanged). The device check on the Mac
+was skipped (the Mac was not linked).
+
+Next round (EE) should start by re-reviewing round ED:
+
+- ED's CI run (Windows in particular: ED1-7 changes the SQLite REAL
+  texts there again; `minera_review_eb2_tests` must pass);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the classic JSON reader beyond date values (ED1, `ed/js/jp1.py`):
+  non-string and null activities, non-string and string omaps, a missing
+  `ocel:vmap`/`ocel:ovmap` key, ovmap `ocel:type` and vmap `ocel:*`
+  overrides, list/dict/big-int/NaN values, unreadable times. Native reads
+  classic JSON as its own transport too, so keep the transport's reading
+  where the two must differ and declare it;
+- the OCEL 1.0 XML vmap `ocel:eid`/`ocel:activity`/`ocel:timestamp`
+  overrides (the reference's result depends on which events survive its
+  filtering; refused for now) and keyless values (a NaN column);
+- the OCEL 2.0 XML/JSON day offsets that depend on the column, the SQLite
+  leftovers (texts beyond ASCII, the kept columns downstream);
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round EC's targets, taken in ED (findings ED1-1 to ED1-7): EC's CI, the
+fresh seeds, the OCEL 1.0 XML reference shapes, the classic JSON reader
+(probed, findings kept for EE). Not taken (carried to EE): the XML/JSON
+day offsets, the SQLite leftovers beyond ASCII, the new dtypes, the DW1
+keys, the declared items, the CU list and the open choices.
+
+Previous list for round ED (kept for its older items):
 
 Next round (ED) should start by re-reviewing round EC:
 

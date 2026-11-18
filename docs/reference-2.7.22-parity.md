@@ -32057,3 +32057,148 @@ Tests:
   gave 2,673 responses unchanged. Python script and frontend tests not
   rerun (scripts and frontend unchanged). The device check on the Mac was
   skipped (the Mac was not linked).
+
+## Review ED1: re-review of round EC, the OCEL 1.0 XML reader's reference-shaped events and objects, SQLite REAL texts on Windows, the classic JSON reader probed, fresh seeds (2026-11-18)
+
+Round ED checked EC's CI (run 44345934164 on 13ba29b2: the Python,
+frontend, verifier, Linux and macOS jobs green; the Windows build took 58
+min and its ctest failed `minera_review_eb2_tests` again, on 13 bank
+files: ED1-7), took
+the OCEL 1.0 XML shapes EC declared, probed the classic JSON reader and
+replayed a batch of fresh seeds. The device check on the Mac was skipped
+(the Mac was not linked).
+
+Observed black-box on pm4py 2.7.22 (lxml, pandas 3.0.5) in the reference
+venv, on OCEL 1.0 XML events and objects whose id is a keyed child (the
+shape pm4py writes; the former native dialect, id as an XML attribute,
+reads as before):
+
+- **ED1-1 Keys, tags and repeats.** read_ocel_xml takes every child of
+  `<events>` and `<objects>` as an event or an object whatever its tag,
+  and every child of one by its exact `key` attribute whatever the child's
+  tag: an event reads `id`, `activity`, `timestamp`, every `omap` and
+  every `vmap`; an object `id`, `type` and every `ovmap`. `type`, `time`,
+  `event-id`, `object-id`, `object-type`, a `name=` attribute and a
+  namespaced key are no keys. The last of a repeated `id`, `activity`,
+  `timestamp` or `type` wins. `id`, `activity` and `type` take the value
+  attribute as written whatever the tag (`<float key="id" value="7"/>` is
+  `"7"`); none drops the event or object (an object without one names no
+  relation target).
+- **ED1-2 Typed values.** A time, a vmap value and an ovmap value read by
+  their tag: a tag whose lowercase holds `float` (`Float`, `FLOAT`,
+  `ocel:float`) is Python's `float()` of the value (spaces, `1_0`,
+  `1e400`, `nan`, `inf`; `could not convert string to float: 'x'`, or
+  `float() argument must be a string or a real number, not 'NoneType'`
+  without a value); else one whose lowercase holds `date` (`Date`,
+  `datetime`, `x:date`) is `datetime.fromisoformat` of the value as
+  written (no strip), stamped UTC when naive (`Invalid isoformat string`,
+  or `'NoneType' object has no attribute 'endswith'` without a value);
+  every other tag (`string`, `int`, `boolean`, `list`, `foo`) keeps the
+  value text, or `"None"` without a value attribute (element text is no
+  value). A `<string key="timestamp">` is a text time.
+- **ED1-3 The time column.** The events frame sorts its time column as
+  pandas sorts an object column: dates (or floats) first by value, then
+  texts by code point, a missing time or NaN last, each stably; dates
+  next to non-NaN floats raise `'values' is not ordered, please explicitly
+  specify the categories order by passing in a categories argument.`.
+  Native keeps a text time as its text, a float time as Python's repr of
+  it (`3.0`, `-inf`) and NaN or a missing time as an empty text.
+- **ED1-4 vmap and ovmap lists.** An event's vmap lists merge, a repeated
+  key's last value winning at its first position. An object keeps an
+  ovmap key's first value; a later entry under a key the object holds
+  (`ocel:oid` and `ocel:type` from the start) is an object change at its
+  `timestamp` attribute, read as a date, in file order (none raises
+  `'NoneType' object has no attribute 'endswith'`, after the object's
+  values). An `ocel:oid` or `ocel:type` change goes into the change
+  frame's own column (an `ocel:oid` change's row names the object its
+  value names), so its row survives only when that object does.
+- **ED1-5 Document order.** Values convert as the file is walked (an
+  event's time and vmap values, an object's ovmap values and then its
+  change times, containers in file order), so the first unreadable value
+  raises its message; a relation to an unknown object raises after the
+  walk.
+
+Native read only `<event>` and `<object>` elements, their keys through the
+former dialect's rules and every value through its own typed reader
+(`<int>` as an integer, `<boolean>` as a boolean, a `<string>` time as a
+date), with no object changes: EC's binary differed
+on 79 of 153 probes (`ed/cl/pr1.py`-`pr14.py`) and on 151 of 600 fuzzed
+files (`ed/cl/fz2.py`, seeds 1-2). The XML reader now reads
+reference-shaped elements as above (`parse_classic` hands the typed times
+to `sort_ocel_xml_events`): 12 of the 153 probes differ, all declared
+below, and 0 of 4,500 fuzzed files (seeds 1-15) besides two the fuzz
+found in the first port, which refused an `ocel:type` change of an object
+the filtering then drops (pm4py drops the change with it); the refusal
+now waits for the filtering (`ed/cl/pr15.py`: ten change shapes, the five
+that differ are the declared refusals). EC's omap fuzz (`ec/cl2/fz.py`)
+still reads 600 of 600 files alike.
+
+- **ED1-6 Fresh seeds.** Batch 2026122300-11 (twelve banks): ten replay
+  clean; the Polars table CJ bank (2026122303, case 380) and CK bank
+  (2026122301, case 219) differ on one call each, the declared struct
+  cast race.
+
+- **ED1-7 SQLite REAL texts on Windows, re-review of EC1-5.** EC spelled
+  REAL cells with `sqlite3_snprintf("%!.15g")`, but winsqlite3 spells a
+  value that does not round-trip in 15 digits with 17 through its printf
+  too (`210234042488.69626` where SQLite 3.45 gives `210234042488.696`),
+  so EC's Windows ctest failed `minera_review_eb2_tests` on 13 bank files
+  (9 of the EB bank, 4 of the EC bank). The OCEL SQLite reader now
+  formats REAL cells itself (`sqlite_real_text.hpp`): 15 significant
+  digits rounded half up from the exact decimal expansion, %g's fixed or
+  exponent form, trailing zeros dropped with one digit kept after the
+  point (`2.0`, `1.0e+20`, `1.5e-05`), `Inf`/`-Inf`, `0.0` for a negative
+  zero. It equals SQLite 3.45's `%!.15g` on 2,000,000 random values
+  (`ed/sqr/h.cpp`) besides 127 that lie within a hair of a half at the
+  16th digit, where SQLite's long double scaling decides (declared:
+  native's text there is the exact rounding), and every SQLite bank
+  replays unchanged.
+
+Observed in the classic JSON reader (`read_ocel_json`, native's own
+transport format; kept for round EE, `ed/js/jp1.py`): a non-string
+activity reads as `str()` of it (`5` is `"5"`) and a null activity drops
+the event, where native refuses the file; an omap of non-string ids
+relates nothing and a string omap is read character by character (native
+refuses); a missing `ocel:vmap` or `ocel:ovmap` key raises `KeyError`
+(native reads the event or object); an ovmap `ocel:type` overrides the
+object's type and a vmap `ocel:activity` its activity (native ignores
+both and drops `ocel:*` keys); lists, dicts, integers past 64 bits and
+`NaN`/`Infinity` values read as Python objects (native refuses them); a
+time `"x"` raises `Invalid isoformat string` where native keeps file
+order.
+
+Declared:
+- A value without a key reads under a NaN column in the reference (which
+  the reference's own writers and attribute listings then fail on);
+  native drops it.
+- A vmap entry keyed `ocel:eid`, `ocel:activity` or `ocel:timestamp`
+  overrides that events-frame column while the relations frame keeps the
+  event's own value; native refuses the file. An object change of
+  `ocel:oid` or `ocel:type` whose row survives the filtering is refused
+  too.
+- A processing instruction inside a vmap raises in the reference
+  (`'_cython_3_2_9.cython_function_or_method' object has no attribute
+  'lower'`, lxml's PI tag); the native parser skips processing
+  instructions.
+- Texts and floats kept as event times (ED1-3) read as times downstream
+  where native can read them; an empty text is a missing time.
+- A kept SQLite REAL within a rounding hair of a half at its 16th digit
+  (ED1-7) is spelled by the exact rounding, which can differ from SQLite
+  3.45's last digit.
+
+Tests:
+- New: `minera_review_ed1_tests` (the ED1-1 to ED1-5 shapes, the change
+  refusals and the declared cases, the ED1-7 REAL texts, and
+  `docs/ocel-xml-reference-ed-bank.tsv.gz`: 1,336 files, the probes and
+  fuzz seeds 8-11, each with native's reading checked against pm4py on
+  2026-11-18).
+- Full suite 624 of 625 passed on the first run; the one failure was
+  `minera_ocel_xml_tests`, which held an `<int>` vmap value of a
+  reference-shaped event as an integer (pm4py keeps the text). After that
+  fix and the change refusal's wait for the filtering, the 40 OCEL, OCDFG,
+  OCPN and review E tests and 17 recheck, server and import tests passed
+  again; after ED1-7 the 66 OCEL, SQLite, review E, recheck, server,
+  import, connector and history tests passed. The workbench fixture
+  replay gave 2,673 responses unchanged. Python script and frontend tests
+  not rerun (scripts and frontend unchanged). The device check on the Mac
+  was skipped (the Mac was not linked).

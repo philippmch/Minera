@@ -603,7 +603,9 @@ int main() {
   assert(keyed.objects.front().attributes.front().key == "state");
   assert(keyed.events.size() == 1 && keyed.events.front().activity == "create");
   assert(keyed.relations.size() == 1 && keyed.relations.front().qualifier == "owner");
-  assert(std::get<std::int64_t>(keyed.events.front().attributes.front().value) == 7);
+  // read_ocel_xml keeps an <int> value as its text (only <float> and <date>
+  // convert; observed black-box, round ED).
+  assert(std::get<std::string>(keyed.events.front().attributes.front().value) == "7");
   // read_ocel_xml ignores the <global> scopes.
   assert(keyed.globals.empty());
 
