@@ -126,9 +126,10 @@ void follows_reference_csv_row_shapes() {
   // A missing timestamp is NaT in the reference, which a native event cannot hold.
   assert(refused(header + "e1,,A,['o1'],5\n", "has no timestamp"));
   // The reference parses timestamps before it drops rows, so a dropped row's
-  // unreadable timestamp refuses the file.
-  assert(refused(header + row1 + "e2,extra,,['o1'],5\n", "not ISO-8601: extra"));
-  assert(refused(header + row1 + ",extra,B,['o1'],5\n", "not ISO-8601: extra"));
+  // unreadable timestamp refuses the file (with pandas' error, round EA).
+  assert(refused(header + row1 + "e2,extra,,['o1'],5\n",
+                 "time data \"extra\" doesn't match format \"%Y-%m-%dT%H:%M:%S%z\""));
+  assert(refused(header + row1 + ",extra,B,['o1'],5\n", "time data \"extra\" doesn't match format"));
   // Fields past the header are dropped when the first data row is longer.
   assert(ids(minera::parse_ocel_csv(header + "e1,2024-01-01T00:00:00Z,A,['o1'],5,x,y\n"
                                              "e2,2024-01-02T00:00:00Z,B,['o1'],6,z\n")) ==

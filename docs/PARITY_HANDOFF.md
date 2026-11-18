@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DZ (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EA (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6977,6 +6977,67 @@ consecutive addition is now pandas' UFuncTypeError (test updated, then the
 workbench fixture replay gave 2,673 responses unchanged. Python script and
 frontend tests not rerun (scripts and frontend unchanged). The device
 check on the Mac was skipped (the Mac was not linked).
+
+Round EA re-reviewed DZ (Review EA1). DZ's CI run 44289921628: green on
+all six jobs.
+EA took the CSV timestamp columns DZ1-2 had left declared:
+- the format guess through dateutil and pandas' token matching (month and
+  weekday names, AM/PM with `%I`, a comma fraction, the compact forms) and,
+  when no format is guessed, every text on its own (pandas' ISO parser, its
+  MM/DD/YYYY and year or month-year readers, then dateutil with pandas'
+  checks and errors: DateParseError, the weekday-without-day and
+  un-recognized timezone ValueErrors, OutOfBoundsDatetime past int32;
+  two-digit years around the clock year, GMT+2 as two hours west,
+  nanoseconds from a long H:MM:SS fraction) (EA1-1). `pandas_to_datetime`
+  (`src/backend/pandas_to_datetime.cpp`) replaces DZ's `pandas_guess`
+  parser; the reader still keeps each event time as the ISO text of
+  pandas' instant. Python model 0 of 37,249 fuzzed columns plus DZ's
+  86,729; C++ 0 against the model on all 130,000 and 0 of 14,910 fresh
+  covered columns against pandas; server imports 6,002 of 6,002;
+- read_csv's NA spellings and to_datetime's NaT spellings (NaT, nat, NAT,
+  nan, NaN, NAN) are missing values, for the guess too; a dropped row with
+  such a time no longer refuses the file (EA1-2).
+- Fresh seeds 2026122000-11: four calls, all the declared struct cast race
+  (Polars table CK 2026122001 cases 35, 250, 538; CJ 2026122003 case 588).
+
+In the suite: `minera_review_ea1_tests` with
+`docs/ocel-csv-timestamp-ea-bank.tsv.gz` (5,000 columns whose reading does
+not move with the clock year until 2050); `minera_review_dz1_tests` and
+`minera_ocel_csv_tests` now expect pandas' readings and errors for the
+shapes DZ left declared. The models, the C++ comparison driver, the
+corpora and the fresh banks are in the project files under
+`review-harness/round-ea/`.
+
+Full suite 621 of 621 passed on the first run. The workbench fixture
+replay gave 2,673 responses unchanged. Python script and frontend tests
+not rerun (scripts and frontend unchanged). The device check on the Mac
+was skipped (the Mac was not linked).
+
+Next round (EB) should start by re-reviewing round EA:
+
+- EA's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the CSV timestamp leftovers (years outside 1000-9999, offsets of 24
+  hours or more, texts that start with a time and take today's date,
+  quarters, float-like texts, a nanosecond text next to a year outside the
+  nanosecond range) and the other OCEL readers' timestamp columns (XML,
+  JSON, SQLite) against pandas' reading;
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round DZ's targets, taken in EA (findings EA1-1 to EA1-3): DZ's CI, the
+fresh seeds, the CSV timestamp columns pandas guesses no format for (with
+the NA and NaT spellings found on the way). Not taken (carried to EB): the
+CSV leftovers above, the new dtypes, the DW1 keys, the declared items, the
+CU list and the open choices.
+
+Previous list for round EA (kept for its older items):
 
 Next round (EA) should start by re-reviewing round DZ:
 

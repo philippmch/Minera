@@ -149,15 +149,18 @@ void shapes() {
   check({"2024-01-02t13:45:07", "2024-01-02 13:45:08"},
         value_error("time data \"2024-01-02 13:45:08\" doesn't match format \"%Y-%m-%dt%H:%M:%S\""));
   check({"2024-02-01 10:00:00z", "2024-02-30 10:00:00z"}, value_error("day is out of range for month"));
-  check({"01/02/2024 13:45:07.1234567891"}, "event CSV timestamp is not ISO-8601: 01/02/2024 13:45:07.1234567891");
+  // Ten fraction digits after a non-ISO date: no format, dateutil reads
+  // microseconds (round EA).
+  check({"01/02/2024 13:45:07.1234567891"}, "ok us 2024-01-02T13:45:07.123456");
   check({"2024-01-02 13:45:07 +02:00", "2024-01-02 13:45:07 +03:00"},
         "ValueError: Mixed timezones detected. Pass utc=True in to_datetime or tz='UTC' in DatetimeIndex to "
         "convert to a common timezone.");
-  // Shapes pandas guesses no format for (dateutil element by element) keep
-  // the native reading (declared): ten fraction digits after a non-ISO date,
-  // a lone one-digit hour; so do lowercase zone names.
-  check({"2024-01-02 3"}, "event CSV timestamp is not ISO-8601: 2024-01-02 3");
-  check({"2024-01-02 13:45:07 utc"}, "event CSV timestamp is not ISO-8601: 2024-01-02 13:45:07 utc");
+  // Shapes pandas guesses no format for go element by element through
+  // dateutil (round EA): a lone one-digit hour and a lowercase zone name
+  // are refused there.
+  check({"2024-01-02 3"}, "DateParseError: Unknown datetime string format, unable to parse: 2024-01-02 3");
+  check({"2024-01-02 13:45:07 utc"},
+        "DateParseError: Unknown datetime string format, unable to parse: 2024-01-02 13:45:07 utc");
   // ISO family texts that native reads as pandas does keep their text.
   {
     const auto log = parse_ocel_csv(csv_of({"2024-01-02 13:45:07+0000", "2024-01-03 08:00:00Z"}));

@@ -299,6 +299,7 @@ add_library(minera_core
   src/backend/ocdfg_edge_metrics.cpp
   src/backend/ocdfg_edge_metrics_json.cpp
   src/backend/ocel_csv.cpp
+  src/backend/pandas_to_datetime.cpp
   src/backend/ocel_sqlite.cpp
   src/backend/ocel_filter.cpp
   src/backend/ocel_activity_type_matching.cpp
@@ -1490,6 +1491,14 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_review_dx1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_dx1_tests COMMAND minera_review_dx1_tests)
   set_tests_properties(minera_review_dx1_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+
+  add_executable(minera_review_ea1_tests src/backend/tests/test_review_ea1.cpp)
+  target_link_libraries(minera_review_ea1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_ea1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_ea1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_ea1_tests
+           COMMAND minera_review_ea1_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel-csv-timestamp-ea-bank.tsv.gz")
 
   add_executable(minera_review_dz1_tests src/backend/tests/test_review_dz1.cpp)
   target_link_libraries(minera_review_dz1_tests PRIVATE minera::core)

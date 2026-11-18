@@ -31708,3 +31708,104 @@ Tests:
   above, updated and passing); the workbench fixture replay gave 2,673
   responses unchanged. Python script and frontend tests not rerun
   (scripts and frontend unchanged).
+
+## Review EA1: re-review of round DZ, the OCEL CSV reader's timestamp columns pandas guesses no format for, month and weekday names, AM/PM and two-digit years, NA and NaT spellings, fresh seeds (2026-11-18)
+
+Round EA checked DZ's CI (run 44289921628 on c5fd2ec: green on all six
+jobs, Windows included), took the CSV timestamp columns DZ1-2 had left
+declared and replayed a batch of fresh seeds. The device check on the Mac
+was skipped (the Mac was not linked).
+
+Observed black-box on pandas 3.0.5 and dateutil 2.9 in the reference venv:
+
+- **EA1-1 CSV timestamp columns beyond the DZ shapes.** pandas' format
+  guess reads the first text with dateutil (its own wrapper: fields on
+  0001-01-01, a weekday without a day refused, unknown zone names refused)
+  and matches the reading's fields against its own regex tokens (the
+  compact `%Y%m%d%H%M%S` forms, `%Y`, `%H%M%S`, `%B`, `%b`, `%m`, `%d`,
+  `%H`, `%M`, `%S`, `%S.%f`, `%z`, `%Z`, `%a`, `%A`, `%p`, with `%H` turned
+  `%I` beside `%p` and "59,456" joined as a decimal); it keeps the format
+  only when every numeric token found a field, year, month and day are
+  among them, the first text parses with it and strftime gives the tokens
+  back. So month and weekday names, AM/PM and a comma before the fraction
+  now take the format path (ISO parser first for an ISO format, the
+  strptime rules otherwise, with `%b`, `%B`, `%a`, `%A`, `%p` and `%I`).
+  When no format is guessed (a lone one-digit hour, two-digit years, a
+  first text dateutil refuses or the format does not parse), every text is
+  read on its own: pandas' ISO parser without a format, its MM/DD/YYYY
+  reader (`Invalid date specified (m/d)` when both fields pass 12), its
+  year and month-year readers (`2024`, `2024-05`, `May 2024`), then
+  dateutil with pandas' checks, whose errors are raised as
+  `DateParseError: <message>: <text>` (`Unknown datetime string format,
+  unable to parse`, `day is out of range for month`, `hour must be in
+  0..23`, ...), `ValueError: Parsing datetimes with weekday but no day
+  information is not supported`, `Parsed string ... included an
+  un-recognized timezone` and `OutOfBoundsDatetime` for a field past
+  int32. dateutil's two-digit year window follows the current year (2026:
+  00-75 are 20xx, 76-99 19xx), `GMT+2` reads as two hours west, and a text
+  whose microseconds end in 000 and whose `H:MM:SS.` fraction has more
+  than six digits makes the column nanoseconds. A later text that does not
+  fit the guessed format now raises pandas' `time data "..." doesn't match
+  format` where native refused it as `event CSV timestamp is not
+  ISO-8601`. Python model (`ea/ea1/eamodel.py`): 0 differences over
+  37,249 fuzzed columns of this round (grammar and mutations, 2,751
+  outside) and DZ's 86,729; the lexers, dateutil's `_parse` and the format
+  guess 0 differences over 85,000 to 133,000 texts each. C++
+  (`pandas_to_datetime.cpp`, which replaces DZ's `pandas_guess` parser in
+  `ocel_csv.cpp`; `ea/ea2/natcmp.py`): 0 differences against the model on
+  all 130,000 corpus columns and 0 against pandas on 14,910 covered columns
+  of two fresh corpora; through the server (`ea/ea2/natfz.py`, default
+  trimming, padded texts left out, each event time compared as an
+  instant) 6,002 of 6,002 covered fresh columns match. This comes off the
+  declared list.
+- **EA1-2 NA and NaT spellings in the timestamp column.** read_ocel_csv
+  reads the column as texts with read_csv's NA spellings (`NA`, `null`,
+  `nan`, `NaN`, `None`, `#N/A`, ...) missing, and `pd.to_datetime` takes
+  `NaT`, `nat`, `NAT`, `nan`, `NaN` and `NAN` as missing too, for the
+  guess as well (the format comes from the first other text; `Nat`,
+  `none` and padded spellings stay texts). Native read them as texts: a
+  dropped row (no id or activity) with such a time refused the file, and
+  the spelling blocked the guess. Now they are missing values; an event
+  whose time is missing is still refused as NaT (declared). Fuzzed: 3,000
+  columns with NaT spellings inserted, 0 differences (2,769 covered).
+- **EA1-3 Fresh seeds.** Batch 2026122000-11 (twelve banks): the pandas
+  CK, CN and sequence banks, the Polars sequence banks and the Polars
+  table CH, CI and CN banks replay clean; the Polars table CK
+  (2026122001, cases 35, 250 and 538) and CJ (2026122003, case 588) banks
+  differ on four calls, all the declared struct cast race (`must specify
+  one field in the struct` against the comparison error).
+
+Found, not taken: nothing new.
+
+Declared:
+- Still declared from earlier rounds: the row mask, dict and list stake
+  keys of DW1, the equal-size join order of the Polars sequence filters
+  and the Polars inner join order (DX1-9), the nanosecond window at
+  pandas' int64 range ends (DQ1-2), dateutil-only date strings in the
+  filters (DP1-4, DQ1-4), the eager paths performance race (DO1-2), the
+  thread-count quirk of DN1-6, the struct cast race, the consecutive
+  grouping's argsort on the reference host's CPU features (DZ1-1) and an
+  event whose time is missing (NaT).
+- CSV timestamp columns outside the model keep the native reading: a
+  character outside printable ASCII and tab, a `%`, a year outside
+  1000-9999, an offset of 24 hours or more, texts pandas reads as numbers
+  (float-like texts not starting with 0), texts that start with a time
+  and take today's date, quarters, integers past 18 digits, and a
+  nanosecond text next to a year outside the nanosecond range; offsets
+  past 14 hours, which a native time cannot hold; and the default field
+  trimming (`trim_fields=false` matches read_csv's kept spaces).
+- Two-digit years follow the clock year of the host, as dateutil does on
+  the reference host.
+
+Tests:
+- New: `minera_review_ea1_tests` (the shapes above, with
+  `docs/ocel-csv-timestamp-ea-bank.tsv.gz`: 5,000 fuzzed columns whose
+  reading does not move with the current year until 2050, each event time
+  compared as an instant). `minera_review_dz1_tests` now expects pandas'
+  reading of the shapes DZ left declared (`DateParseError` for a lone
+  one-digit hour and a lowercase `utc`, microseconds for ten fraction
+  digits after a non-ISO date), and `minera_ocel_csv_tests` pandas' error
+  for a dropped row's unreadable time.
+- Full suite: 621 tests, all passed on the first run; the workbench
+  fixture replay gave 2,673 responses unchanged. Python script and
+  frontend tests not rerun (scripts and frontend unchanged).
