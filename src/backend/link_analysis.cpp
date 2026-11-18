@@ -553,47 +553,51 @@ LinkAnalysisResult discover_link_analysis(const EventLog& log,
   // iteration order (python::number_set_order for a set filled one by one).
   std::vector<std::pair<std::size_t, std::size_t>> relation;
   if (options.propagate) {
-    // Round DS, modelled black-box (review-harness round-ds, pr/): the
-    // sources' sets, filled in merge order, grow by `set.union` with their
-    // targets' sets, pass after pass until none grows: the sources in the
-    // order they first appear in the merge of the in column with the out
-    // column (the self-merge with its sides swapped, after the look-forward
-    // filter), each source's targets in ascending order as they stood when
-    // the source's turn began, a union kept only when it grows the set. The
-    // sets' iteration order then follows CPython's table (RowSet). It
-    // agrees with pm4py on 868 of 871 swept calls; the rest stay declared.
+    // Round DS, modelled black-box (review-harness round-ds, pr/), pass
+    // order corrected in round DV (round-dv, pr/): the sources' sets,
+    // filled in merge order, grow by `set.union` with their targets' sets,
+    // pass after pass until none grows. A pass walks the linked pairs (each
+    // source with the targets it kept: all of them, or its first under keep
+    // first occurrence) in the order of the merge of the in column with the
+    // out column (the self-merge with its sides swapped, after the
+    // look-forward filter), and keeps a union only when it grows the
+    // source's set. The sets' iteration order then follows CPython's table
+    // (RowSet). Round DS walked each source's targets together (the sources
+    // in first-appearance order of that merge); that differed on three
+    // swept calls where a later pair of an earlier source's target grew
+    // first. 872 of 872 swept calls agree now.
     std::map<std::size_t, RowSet> sets;
+    std::set<std::pair<std::size_t, std::size_t>> kept;
     for (const auto& [source, targets] : added) {
       auto& set = sets[source];
-      for (const auto target : targets) set.add(target);
+      for (const auto target : targets) {
+        set.add(target);
+        kept.emplace(source, target);
+      }
     }
-    std::vector<std::size_t> order;
-    std::set<std::size_t> placed;
+    std::vector<std::pair<std::size_t, std::size_t>> walk;
     for (const auto& [target_index, source_index] : detail::pandas_inner_merge_order(
              in_keys, out_keys, frame && merge_numeric, monotonic(false), monotonic(true))) {
       if (options.look_forward && target_index <= source_index) continue;
-      if (sets.contains(source_index) && placed.insert(source_index).second) order.push_back(source_index);
+      if (kept.erase({source_index, target_index})) walk.emplace_back(source_index, target_index);
     }
-    for (const auto& [source, set] : sets)
-      if (placed.insert(source).second) order.push_back(source);
+    // Every kept pair is a pair of the swapped merge; this keeps the walk
+    // complete should the two merge orders ever disagree on a key.
+    for (const auto& pair : kept) walk.push_back(pair);
     bool changed = true;
     while (changed) {
       changed = false;
-      for (const auto source : order) {
-        auto targets = sets[source].order();
-        std::sort(targets.begin(), targets.end());
-        for (const auto target : targets) {
-          const auto next = sets.find(target);
-          if (next == sets.end()) continue;
-          auto& current = sets[source];
-          auto grown = current.united(next->second);
-          if (grown.size() <= current.size()) continue;
-          association_count += grown.size() - current.size();
-          if (association_count > options.max_links)
-            throw std::invalid_argument("link analysis exceeded max_links");
-          current = std::move(grown);
-          changed = true;
-        }
+      for (const auto& [source, target] : walk) {
+        const auto next = sets.find(target);
+        if (next == sets.end()) continue;
+        auto& current = sets[source];
+        auto grown = current.united(next->second);
+        if (grown.size() <= current.size()) continue;
+        association_count += grown.size() - current.size();
+        if (association_count > options.max_links)
+          throw std::invalid_argument("link analysis exceeded max_links");
+        current = std::move(grown);
+        changed = true;
       }
     }
     for (const auto source : sources)

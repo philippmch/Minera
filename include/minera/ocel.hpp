@@ -233,6 +233,29 @@ void require_ocel_object_column(const Ocel& log, std::string_view column);
 // (the description and the SQLite writer).
 void require_ocel_object_columns(const Ocel& log);
 
+// Round DV: pm4py.read_ocel_csv builds the relations frame of a file whose
+// rows name no object with only ocel:qualifier (float64), and both reference
+// playouts that produce no event build events and objects frames without any
+// column next to that relations frame (observed black-box). Ocel::table_columns
+// declares such frames: relations as {"ocel:qualifier"}, events and objects
+// empty. A reference function that reads a missing column raises KeyError.
+// A declared relations frame is degenerate when it lists none of ocel:eid,
+// ocel:oid, ocel:activity, ocel:type and ocel:timestamp (exact call models
+// declare literal role names next to those).
+[[nodiscard]] bool ocel_relations_frame_degenerate(const Ocel& log);
+// Throws std::invalid_argument "KeyError: '<column>'" when the relations frame
+// is degenerate and lacks `column`.
+void require_ocel_relation_column(const Ocel& log, std::string_view column);
+// An events frame declared without any column (an empty playout).
+[[nodiscard]] bool ocel_events_frame_columnless(const Ocel& log);
+// Throws std::invalid_argument "KeyError: '<column>'" for such a frame.
+void require_ocel_event_column(const Ocel& log, std::string_view column);
+// Declares the frames above for a log without relations: the relations frame
+// always, the events and objects frames too when `columnless_entities` (a
+// playout) and the log holds no event and no object. A log with relations is
+// left as it is.
+void mark_ocel_relation_free_frames(Ocel& log, bool columnless_entities);
+
 // True for a global the reference OCEL 1.0 writers produce by themselves: the
 // "__INVALID__" defaults of the event and object scopes and the computed log
 // scope (version, ordering, attribute names, object types). Writers that have

@@ -2,8 +2,7 @@
 // (docs/ocel-links-bank.json.gz). Link analysis: seeded event tables through
 // the public link_analysis.algorithm.apply with the default columns and with
 // doc->ref links under every LOOK_FORWARD/KEEP_FIRST_OCCURRENCE/PROPAGATE
-// combination, bound by the generated index pairs in order (three propagated
-// calls sorted within sources, declared). Interleavings:
+// combination, bound by the generated index pairs in order. Interleavings:
 // seeded related left/right logs through the public interleavings
 // algorithm.apply, bound by every row's activities, timestamps, indices,
 // direction and elapsed seconds in order; naive timestamps raise.
@@ -277,21 +276,9 @@ Json interleavings_case(const BankCase& item) {
 
 // Link rows come grouped by source; within a source the reference lists the
 // targets in a CPython set's iteration order, which the native analysis gives
-// (round DR), also for the sets grown by propagation's set unions (round DS).
-// Three propagated calls without look-forward or first occurrences list a
-// grown set in an order the native pass order does not reach (declared): those
-// compare the targets sorted within each source.
-Json sorted_within_sources(const Json& pairs) {
-  auto out = pairs;
-  std::stable_sort(out.items.begin(), out.items.end(), [](const Json& a, const Json& b) {
-    return a.items[0].number < b.items[0].number ||
-           (a.items[0].number == b.items[0].number && a.items[1].number < b.items[1].number);
-  });
-  // Sources must already be ascending in the original order.
-  for (std::size_t i = 1; i < pairs.items.size(); ++i)
-    if (pairs.items[i].items[0].number < pairs.items[i - 1].items[0].number) return pairs;
-  return out;
-}
+// (round DR), also for the sets grown by propagation's set unions (round DS;
+// the three propagated calls declared in DS, links-001, -008 and -009
+// doc-ref/001, follow since round DV's pass order).
 
 // Reference timestamps print as "YYYY-MM-DD HH:MM:SS[.f]+00:00"; native keeps
 // ISO text with a Z designator. Both name the same UTC instant.
@@ -306,14 +293,13 @@ Json iso_rows(const Json& rows) {
   return out;
 }
 
-// The bound projection of a reference outcome: link pairs (in order, or
-// sorted within sources for the declared propagated calls) or interleaving
-// rows.
-Json projection(const Json& expected, bool propagate) {
+// The bound projection of a reference outcome: link pairs in order or
+// interleaving rows.
+Json projection(const Json& expected) {
   Json out;
   out.kind = Json::kObject;
   if (expected.get("error")) out.fields["error"] = text("raised");
-  else if (const auto* pairs = expected.get("pairs")) out.fields["value"] = propagate ? sorted_within_sources(*pairs) : *pairs;
+  else if (const auto* pairs = expected.get("pairs")) out.fields["value"] = *pairs;
   else out.fields["value"] = iso_rows(*expected.get("rows"));
   return out;
 }
@@ -322,18 +308,15 @@ std::string difference(const BankCase& item, const std::function<Json()>& produc
   Json actual;
   actual.kind = Json::kObject;
   std::string message;
-  const bool propagate = item.call == "doc-ref/001" &&
-                         (item.name == "links-001" || item.name == "links-008" || item.name == "links-009");
   try {
     actual.fields["value"] = produce();
-    if (propagate) actual.fields["value"] = sorted_within_sources(actual.fields["value"]);
   } catch (const std::exception& error) {
     actual.fields["error"] = text("raised");
     message = error.what();
   }
   const auto rendered = render(actual);
   std::vector<std::string> admissible;
-  for (const auto& expected : item.expected) admissible.push_back(render(projection(expected, propagate)));
+  for (const auto& expected : item.expected) admissible.push_back(render(projection(expected)));
   if (std::find(admissible.begin(), admissible.end(), rendered) != admissible.end()) return {};
   return "native " + rendered.substr(0, 900) + (message.empty() ? "" : " (" + message + ")") + " reference " +
          admissible.front().substr(0, 900);

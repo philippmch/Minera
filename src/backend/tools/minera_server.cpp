@@ -2820,9 +2820,16 @@ void handle_ocel_exchange(const httplib::Request& request,
 
     if (mode == "export") {
       const auto log = minera::parse_ocel_json(body);
+      // Round DV: with a degenerate relations frame (an OCEL CSV import
+      // naming no object, an empty playout) the OCEL 2.0 XML writer fails on
+      // its event id first, the CSV writer on its type (black-box).
+      if (format == "xml_standard") minera::require_ocel_relation_column(log, "ocel:eid");
+      if (format == "csv" || format == "csv_objects") minera::require_ocel_relation_column(log, "ocel:type");
       // Round DT: the reference JSON and XML writers read the objects
       // frame's type (a log read from a file that lists no object has none).
       if (format != "csv" && format != "csv_objects") minera::require_ocel_object_column(log, "ocel:type");
+      // Round DV: then the other writers read the relations' event id.
+      minera::require_ocel_relation_column(log, "ocel:eid");
       std::string payload;
       std::string content_type;
       std::string filename;

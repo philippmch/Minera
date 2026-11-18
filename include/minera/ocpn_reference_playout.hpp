@@ -73,10 +73,13 @@ class OcpnReferenceOcelWriter {
                           bool objects_unique_per_trace);
   void add(const OcpnReferenceTrace& trace);
   // The reference playout frame (round DU, black-box): events listed id,
-  // activity, timestamp with naive datetime64[s] times.
+  // activity, timestamp with naive datetime64[s] times. Without any event
+  // (round DV) the events and objects frames have no column and the
+  // relations frame only ocel:qualifier (mark_ocel_relation_free_frames).
   [[nodiscard]] Ocel take() {
     log_.event_activity_first = true;
     log_.naive_event_time_unit = "s";
+    mark_ocel_relation_free_frames(log_, true);
     return std::move(log_);
   }
 

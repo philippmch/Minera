@@ -292,6 +292,11 @@ SawNetDiscoveryResult discover_saw_nets(const Ocel& log) {
 
 SawNetDiscoveryResult discover_saw_nets(
     const Ocel& log, const SawNetDiscoveryOptions& options) {
+  // Round DV: the reference flattens each object type's objects, so a log
+  // read with a degenerate relations frame fails on its type once an object
+  // exists (black-box; see ocel_relations_frame_degenerate).
+  require_ocel_object_column(log, "ocel:type");
+  if (!log.objects.empty()) require_ocel_relation_column(log, "ocel:type");
   // Selected activity labels name the transitions, but each type's log is
   // flattened from the objects whose canonical type equals the type label.
   Ocel projected = project_ocel_labels(

@@ -2179,6 +2179,41 @@ void require_ocel_object_columns(const Ocel& log) {
         "KeyError: \"None of [Index(['ocel:oid', 'ocel:type'], dtype='str')] are in the [columns]\"");
 }
 
+bool ocel_relations_frame_degenerate(const Ocel& log) {
+  const auto& declared = log.table_columns.relations;
+  if (!declared) return false;
+  for (const auto& name : *declared)
+    if (name == "ocel:eid" || name == "ocel:oid" || name == "ocel:activity" ||
+        name == "ocel:type" || name == "ocel:timestamp")
+      return false;
+  return true;
+}
+
+void require_ocel_relation_column(const Ocel& log, std::string_view column) {
+  if (!ocel_relations_frame_degenerate(log)) return;
+  const auto& declared = *log.table_columns.relations;
+  if (std::find(declared.begin(), declared.end(), column) == declared.end())
+    throw std::invalid_argument("KeyError: '" + std::string(column) + "'");
+}
+
+bool ocel_events_frame_columnless(const Ocel& log) {
+  return log.table_columns.events && log.table_columns.events->empty();
+}
+
+void require_ocel_event_column(const Ocel& log, std::string_view column) {
+  if (ocel_events_frame_columnless(log))
+    throw std::invalid_argument("KeyError: '" + std::string(column) + "'");
+}
+
+void mark_ocel_relation_free_frames(Ocel& log, bool columnless_entities) {
+  if (!log.relations.empty()) return;
+  log.table_columns.relations = std::vector<std::string>{"ocel:qualifier"};
+  if (columnless_entities && log.events.empty() && log.objects.empty()) {
+    log.table_columns.events.emplace();
+    log.table_columns.objects.emplace();
+  }
+}
+
 Ocel parse_ocel_json_literal_names(std::string_view json, const OcelJsonLimits& limits) {
   return parse_ocel_json_names(json,limits,true);
 }
@@ -2658,6 +2693,7 @@ EtotGraph discover_etot_classic(const Ocel& log) {
 
 OtgGraph discover_otg_classic(const Ocel& log) {
   require_ocel_object_column(log, "ocel:type");
+  require_ocel_relation_column(log, "ocel:eid");
   OtgGraph result; std::set<std::string> types; std::unordered_map<std::string, std::string> type; for (const auto& o : log.objects) { type[o.id] = o.type; types.insert(o.type); } result.object_types.assign(types.begin(), types.end());
   std::unordered_map<std::string, std::vector<std::string>> by_event;
   for (const auto& r : log.relations)
@@ -2832,6 +2868,8 @@ OcdfgGraph discover_ocdfg_classic_with_options(
   };
   const auto activity_column = column(options.activity_attribute, true);
   const auto type_column = column(options.object_type_attribute, false);
+  // Round DV: a degenerate relations frame fails on the activity first.
+  require_ocel_relation_column(log, activity_column);
   require_column(log.table_columns.events, event_columns, activity_column);
   require_column(log.table_columns.objects, object_columns, type_column);
   require_column(log.table_columns.relations, relation_columns, activity_column);
@@ -3256,6 +3294,13 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
   if (!std::isfinite(options.noise_threshold) || options.noise_threshold < 0.0 ||
       options.noise_threshold > 1.0)
     throw std::invalid_argument("OCPN noise_threshold must be in [0,1]");
+  // Round DV: the public discovery reads the relations frame's activity
+  // before the objects frame's type (SAW-net discovery flattens per type, see
+  // discover_saw_nets).
+  if (options.require_related_object_types)
+    require_ocel_relation_column(log, options.activity_attribute.empty()
+                                          ? std::string_view("ocel:activity")
+                                          : std::string_view(options.activity_attribute));
   if (options.object_type_attribute.empty() || options.object_type_attribute == "ocel:type")
     require_ocel_object_column(log, "ocel:type");
 
@@ -3748,6 +3793,8 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
                                            const OcelDescriptionOptions& options) {
   // Round DT: the reference selects the objects frame's id and type.
   require_ocel_object_columns(log);
+  // Round DV: then it sorts the relations by their time.
+  require_ocel_relation_column(log, "ocel:timestamp");
   OcelTupleDescription result;
   result.includes_timestamps = options.include_timestamps;
   std::map<std::string, const OcelEvent*> events;

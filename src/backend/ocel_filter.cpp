@@ -163,6 +163,9 @@ Ocel propagate_event_filter(Ocel log) {
     clear_all_tables(log);
     return log;
   }
+  // Round DV: the reference selects the relations by event id once an event
+  // remains (a degenerate relations frame then raises; black-box).
+  require_ocel_relation_column(log, "ocel:eid");
 
   log.relations.erase(
       std::remove_if(log.relations.begin(), log.relations.end(),
@@ -225,6 +228,8 @@ Ocel propagate_object_filter(Ocel log) {
     clear_all_tables(log);
     return log;
   }
+  // Round DV: by object id once an object remains (see above).
+  require_ocel_relation_column(log, "ocel:oid");
 
   log.relations.erase(
       std::remove_if(log.relations.begin(), log.relations.end(),
@@ -472,6 +477,8 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
   if (attribute_key.empty()) {
     throw std::invalid_argument("OCEL event attribute key must not be empty");
   }
+  // Round DV: an events frame without columns (an empty playout).
+  require_ocel_event_column(log, attribute_key);
   Ocel filtered = log;
   const auto column = ocel_numeric_column(log.events, attribute_key);
   const auto column_values = isin_values(values, column);
@@ -788,6 +795,8 @@ Ocel filter_ocel_object_types(const Ocel& log,
 Ocel filter_ocel_objects(const Ocel& log,
                          const std::vector<std::string>& object_ids,
                          bool positive, std::size_t level) {
+  // Round DV: a deeper level walks the relations from their event ids first.
+  if (level > 1) require_ocel_relation_column(log, "ocel:eid");
   require_ocel_object_column(log, "ocel:oid");
   auto selected = expand_object_ids(log, string_set(object_ids), level);
   Ocel filtered = log;
@@ -801,6 +810,8 @@ Ocel filter_ocel_objects(const Ocel& log,
 Ocel filter_ocel_events(const Ocel& log,
                         const std::vector<std::string>& event_ids,
                         bool positive) {
+  // Round DV: an events frame without columns (an empty playout).
+  require_ocel_event_column(log, "ocel:eid");
   const auto selected = string_set(event_ids);
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
@@ -822,6 +833,8 @@ Ocel filter_ocel_events_timestamp(const Ocel& log, std::string_view from,
       parse_bound(from, -std::numeric_limits<double>::infinity());
   const double upper =
       parse_bound(to, std::numeric_limits<double>::infinity());
+  // Round DV: an empty playout's events frame has no timestamp at all.
+  require_ocel_event_column(log, "ocel:timestamp");
   // Round DU: the reference compares the events frame with aware bounds, so
   // a naive frame (an OCEL CSV import without offsets, a playout) raises,
   // empty or not (black-box).
@@ -841,6 +854,8 @@ Ocel filter_ocel_events_timestamp(const Ocel& log, std::string_view from,
 Ocel filter_ocel_activity_type_matching(
     const Ocel& log,
     const std::map<std::string, std::vector<std::string>>& allowed) {
+  // Round DV: a degenerate relations frame (see ocel_relations_frame_degenerate).
+  require_ocel_relation_column(log, "ocel:activity");
   std::unordered_map<std::string, std::string> event_activities;
   for (const auto& event : log.events) {
     event_activities.emplace(event.id, event.activity);
@@ -885,6 +900,7 @@ ocel_event_object_type_counts(const Ocel& log) {
 Ocel filter_ocel_events_object_type_counts(
     const Ocel& log,
     const std::map<std::string, std::size_t>& minimum_counts) {
+  require_ocel_relation_column(log, "ocel:eid");
   const auto counts = ocel_event_object_type_counts(log);
   IdSet selected_events;
   for (const auto& [event_id, by_type] : counts) {
@@ -925,6 +941,7 @@ bool meets_object_type_count(std::size_t count,
 Ocel filter_ocel_events_object_type_counts_exact(
     const Ocel& log,
     const std::map<std::string, OcelObjectTypeCountThreshold>& minimum_counts) {
+  require_ocel_relation_column(log, "ocel:eid");
   const auto counts = ocel_event_object_type_counts(log);
   IdSet selected_events;
   for (const auto& [event_id, by_type] : counts) {
@@ -951,6 +968,7 @@ namespace {
 Ocel filter_ocel_lifecycle_events_per_object_type(const Ocel& log,
                                                    std::string_view object_type,
                                                    bool first) {
+  require_ocel_relation_column(log, "ocel:type");
   std::unordered_map<std::string, std::string> object_types;
   object_types.reserve(log.objects.size());
   for (const auto& object : log.objects) {
@@ -996,6 +1014,7 @@ Ocel filter_ocel_end_events_per_object_type(const Ocel& log,
 
 Ocel filter_ocel_activities_connected_object_type(
     const Ocel& log, std::string_view object_type) {
+  require_ocel_relation_column(log, "ocel:type");
   const auto object_types = object_types_by_id(log);
   std::unordered_map<std::string, std::string> event_activities;
   event_activities.reserve(log.events.size());
@@ -1023,6 +1042,7 @@ Ocel filter_ocel_activities_connected_object_type(
 }
 
 Ocel filter_ocel_cc_object(const Ocel& log, std::string_view object_id) {
+  require_ocel_relation_column(log, "ocel:eid");
   require_ocel_object_column(log, "ocel:oid");
   IdSet selected{std::string(object_id)};
   for (const auto& component : object_interaction_components(log)) {
@@ -1036,6 +1056,7 @@ Ocel filter_ocel_cc_object(const Ocel& log, std::string_view object_id) {
 
 Ocel filter_ocel_cc_length(const Ocel& log, std::size_t minimum_size,
                            std::size_t maximum_size) {
+  require_ocel_relation_column(log, "ocel:eid");
   require_ocel_object_column(log, "ocel:oid");
   if (minimum_size > maximum_size) {
     throw std::invalid_argument(
@@ -1053,6 +1074,7 @@ Ocel filter_ocel_cc_length(const Ocel& log, std::size_t minimum_size,
 Ocel filter_ocel_cc_object_type(const Ocel& log, std::string_view object_type,
                                 bool positive) {
   require_ocel_object_column(log, "ocel:type");
+  require_ocel_relation_column(log, "ocel:eid");
   const auto object_types = object_types_by_id(log);
   IdSet seeds;
   for (const auto& [object_id, type] : object_types) {
@@ -1075,6 +1097,9 @@ Ocel filter_ocel_cc_object_type(const Ocel& log, std::string_view object_type,
 }
 
 Ocel filter_ocel_cc_activity(const Ocel& log, std::string_view activity) {
+  // Round DV: an empty playout fails on its events frame's activity first.
+  require_ocel_event_column(log, "ocel:activity");
+  require_ocel_relation_column(log, "ocel:eid");
   require_ocel_object_column(log, "ocel:oid");
   std::unordered_map<std::string, std::string> event_activities;
   event_activities.reserve(log.events.size());

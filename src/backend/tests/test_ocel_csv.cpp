@@ -61,7 +61,21 @@ void reference_capture_tests() {
   lossy.allow_lossy = true;
   assert(minera::serialize_ocel_csv(log, lossy) == kReferenceEvents);
   assert(minera::serialize_ocel_objects_csv(log, lossy) == kReferenceObjects);
-  const auto reread = minera::parse_ocel_csv(kReferenceEvents, kReferenceObjects);
+  // pm4py cannot read this file back (round DV): pandas infers the format
+  // of the timestamp column from its first text, which has no fraction, so
+  // e2's raises. The same rows with every time at six fraction digits read.
+  bool refused = false;
+  try {
+    (void)minera::parse_ocel_csv(kReferenceEvents, kReferenceObjects);
+  } catch (const std::invalid_argument& error) {
+    refused = std::string(error.what()).starts_with(
+        "ValueError: time data \"2020-01-01 00:00:01.250000+00:00\" doesn't match format \"%Y-%m-%d %H:%M:%S%z\"");
+  }
+  assert(refused);
+  std::string uniform = kReferenceEvents;
+  for (const std::string whole : {"00:00:00+00:00", "00:00:03+00:00"})
+    uniform.replace(uniform.find(whole), whole.size(), whole.substr(0, 8) + ".000000+00:00");
+  const auto reread = minera::parse_ocel_csv(uniform, kReferenceObjects);
   assert(reread.events.size() == 4 && reread.objects.size() == 3 && reread.relations.size() == 4);
   bool quoted_id = false;
   for (const auto& relation : reread.relations) quoted_id = quoted_id || relation.object_id == "i'2";
@@ -459,7 +473,8 @@ void writes_naive_json_and_xml_timestamps_as_utc() {
 // pm4py.read_ocel_csv keeps a "+02:00" column as datetime64[us, UTC+02:00]
 // and the XML writers print its wall clock: "+02:00" in OCEL 2.0 XML, the
 // wall clock labelled "Z" in OCEL 1.0 XML (observed black-box). Times that
-// do not share one offset stay UTC (the reference refuses to read them).
+// do not share one offset are refused as the reference refuses them (round
+// DV: pandas' "Mixed timezones detected").
 void writes_offset_csv_wall_clock_in_xml() {
   const auto log = minera::parse_ocel_csv(
       "ocel:eid,ocel:timestamp,ocel:activity,d,ocel:type:order\n"
@@ -479,12 +494,16 @@ void writes_offset_csv_wall_clock_in_xml() {
   assert(xml1.find("<date key=\"timestamp\" value=\"2024-01-01T10:00:00Z\"/>") != std::string::npos);
   assert(xml1.find("<date key=\"timestamp\" value=\"2024-01-01T11:30:00Z\"/>") != std::string::npos);
   assert(minera::serialize_ocel_csv(log).find("e1,2024-01-01 10:00:00+02:00,A") != std::string::npos);
-  const auto mixed = minera::parse_ocel_csv(
-      "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n"
-      "e1,2024-01-01 10:00:00+02:00,A,['o1']\n"
-      "e2,2024-01-01 11:30:00Z,B,['o1']\n");
-  assert(minera::serialize_ocel_xml(mixed, standard).find("time=\"2024-01-01T08:00:00+00:00\"") !=
-         std::string::npos);
+  bool mixed_refused = false;
+  try {
+    (void)minera::parse_ocel_csv(
+        "ocel:eid,ocel:timestamp,ocel:activity,ocel:type:order\n"
+        "e1,2024-01-01 10:00:00+02:00,A,['o1']\n"
+        "e2,2024-01-01 11:30:00Z,B,['o1']\n");
+  } catch (const std::invalid_argument& error) {
+    mixed_refused = std::string(error.what()).starts_with("ValueError: Mixed timezones detected.");
+  }
+  assert(mixed_refused);
 }
 
 // Date-typed attribute values: pm4py.read_ocel2_json, read_ocel2_xml and

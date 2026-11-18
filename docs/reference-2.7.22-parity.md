@@ -31150,3 +31150,113 @@ Tests:
 - Full suite: 611 of 611 tests passed on the first run. The workbench
   fixture replay gave 2,673 responses unchanged. Python script and
   frontend tests not rerun (scripts and frontend unchanged).
+
+## Review DV1: re-review of round DU, relation-free OCEL CSV imports and empty playouts, the OCEL CSV reader's timestamp formats, the pass order of propagated links, fresh seeds (2026-11-18)
+
+Round DV checked DU's CI (run 44228428180 on 21ef4b2: green on all six
+jobs, finished 04:14 UTC), took DU's two found items and the three
+declared PROPAGATE calls, and replayed a batch of fresh seeds. The
+device check on the Mac was skipped (the Mac was not linked).
+
+- **DV1-1 Relation-free OCEL CSV imports and empty playouts.** pm4py's
+  `read_ocel_csv` builds the relations frame of a file whose rows name no
+  object (no object columns, empty ones, `[]` lists) with only
+  `ocel:qualifier`; a row that names an object, even `[None]` or one the
+  reader drops later, keeps the usual columns. Both reference playouts
+  (OCPN and OC causal net) that produce no event also build events and
+  objects frames without any column. Nearly every later function then
+  raises `KeyError` on the first column it reads: the statistics, both
+  descriptions, the discoveries but ETOT, SAW nets with objects, the
+  features, the object graphs, enrichment, the splits, most filters
+  (a filter whose selection is already empty returns an empty log first),
+  the CSV, OCEL 1.0 XML and SQLite writers and the flattening; the SQLite
+  writer on columnless events raises `None of [Index(['ocel:eid',
+  'ocel:activity'] ...)] are in the [columns]`. Native answered them as
+  for an empty log. Now the reader and both playouts declare those frames
+  (`mark_ocel_relation_free_frames`, carried by the transport as before),
+  and each function checks the column it reads first
+  (`require_ocel_relation_column`, `require_ocel_event_column`, next to the
+  objects checks). Probe `dv/oc/deg.py` over 44 routes on eight logs (CSV
+  without objects, with an objects file, empty objects, `[]`, `[None]`,
+  dropped rows, both playouts): 319 of 352 calls differed, now 0; the
+  variant sweep `v2ref.py` (135 calls with other parameters) 1 -> 0.
+- **DV1-2 The CSV reader's timestamp formats.** pm4py parses the timestamp
+  column with `pd.to_datetime`, which infers one format from the first
+  text (`%Y-%m-%d`, a space or `T`, `%H:%M`, optional `:%S`, `.%f` and an
+  offset `%z`) and holds every later text to it: a text of another shape
+  raises `time data "..." doesn't match format "..."`, a longer one
+  `unconverted data remains when parsing with format "...": "<rest>"`
+  (`%f` takes at most nine digits; more are skipped at the end or before
+  the offset), and offsets next to naive texts or two different offsets
+  raise `Mixed timezones detected. Pass utc=True in to_datetime or
+  tz='UTC' in DataFrame constructor to receive a DatetimeIndex.` Native
+  read them all. Now the reader checks the column when every text is of
+  that ISO family (`pandas_iso` in `ocel_csv.cpp`); other shapes keep the
+  native reading (declared). Python model `dv/ts/model.py`: 0 differences
+  over 23,000 fuzzed columns; native through the server: 0 over 4,300
+  imports (`natfz.py`). pm4py's CSV writer prints whole seconds without a
+  fraction, so it cannot read back its own file when some event times
+  have one (`minera_ocel_csv_tests` now expects that refusal, and the
+  refusal of mixed offsets that it read as UTC before).
+- **DV1-3 Link analysis under PROPAGATE.** The three calls declared since
+  DS (and the OCEL links bank's links-001, -008 and -009 doc-ref/001) come
+  from the pass order: pm4py walks the linked pairs (each source with the
+  targets it kept) in the order of the self-merge with its sides swapped
+  and unites the source's set with the target's set pair by pair; round DS
+  walked each source's targets together, which differs when a later pair
+  of an earlier source's target grows that target first (a set then
+  merges a larger table and is presized). Found by replaying the DS
+  sweeps in Python with real sets (`dv/pr/f9.py`: 871 of 872 calls, the
+  last one only because the Python model fills the initial sets naively),
+  then ported (`link_analysis.cpp`). Server sweep `sw1.py`: 1,600 of
+  1,600 calls on the small domains (seeds 0-199) and 3,600 of 3,600 on the
+  larger ones (seeds 7000-7449; DS: 1,197 of 1,200 over 7000-7149) in
+  exact order; the Python model also holds on 868 calls of fresh seeds
+  (7150-7449, and 9000-9149 with up to 40 rows), where the DS order missed
+  16.
+- **DV1-4 Fresh seeds.** Batch 2026121500-11 (twelve banks): one call,
+  pandas CK 2026121509 case 572 (`variants.apply` with a list of two
+  dicts inside the case key list; the list items found below, not taken).
+  Every other call replays clean.
+
+Found, not taken (next round):
+- List items in a list case key (fresh pandas CK 2026121509 case 572,
+  `variants.apply` with `[[{...}, {...}]]`): pandas takes a list item as an
+  array grouper (`Grouper and axis must be same length` unless it matches
+  the rows, then groups by its values), a tuple item as a label, and the
+  `None of [Index(...)]` message prints list items as tuples; several
+  functions read their timestamp or activity column first. Probe
+  `dv/pp/mk_l1.py` (each function's first case-key call of that bank, 23
+  keys, three frames): 217 of 1,863 calls differ; native answers most of
+  them with a KeyError naming the whole key.
+
+Declared:
+- CSV timestamp texts outside the ISO family (for example lowercase `t`
+  or `z`, comma fractions, `+HH` offsets, inner spaces or dates without a
+  time): pandas infers other formats or falls back to dateutil; native
+  reads them as before.
+- Still declared from earlier rounds: the equal-size join order of the
+  Polars sequence filters, the keep-once relative occurrence count with a
+  dict case key naming several columns (DQ1-5), the nanosecond window at
+  pandas' int64 range ends (DQ1-2), dateutil-only date strings (DP1-4,
+  DQ1-4), the eager paths performance race (DO1-2), the thread-count
+  quirk of DN1-6 and the struct cast race; the JSON writers keep fractions
+  of event times.
+
+Tests:
+- New: `minera_review_dv1_tests` (the declared frames, 44 calls on four
+  degenerate logs, the timestamp cases, 32 link analysis calls on four
+  CSV uploads in pm4py's exact order) with
+  `docs/ocel-csv-timestamp-dv-bank.tsv.gz` (4,000 fuzzed columns, 547
+  that parse); `minera_ocel_links_parity_tests` now binds every
+  propagated call in exact order.
+- Full suite: 606 of 612 tests passed on the first run. The other six
+  held inputs pm4py refuses: `minera_ocel_csv_tests` re-read pm4py's own
+  CSV output with mixed fraction widths and a file with mixed offsets
+  (both raise in pm4py; the refusals are expected now), and the five object
+  graph module tests (interaction, cobirth, codeath, descendants,
+  inheritance) declared a relations frame without its core columns as
+  mere metadata (now `ocel:eid` and `ocel:oid` stand next to the extra
+  names). All six pass after the change. The workbench fixture replay gave
+  2,673 responses unchanged. Python script and frontend tests not rerun
+  (scripts and frontend unchanged).

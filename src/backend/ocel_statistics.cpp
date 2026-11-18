@@ -381,6 +381,8 @@ std::string serialize_edges(const OcelEdgeAssociations& associations) {
 
 OcelObjectTypeActivities object_type_activities(
     const Ocel& log, const OcelObjectTypeActivityOptions&) {
+  // Round DV: the reference reads the relations frame's activity first.
+  require_ocel_relation_column(log, "ocel:activity");
   const auto lookups = validate_and_index(log);
   OcelObjectTypeActivities result;
   for (const auto& relation : log.relations) {
@@ -393,6 +395,7 @@ OcelObjectTypeActivities object_type_activities(
 }
 
 OcelObjectsOtCount objects_ot_count(const Ocel& log) {
+  require_ocel_relation_column(log, "ocel:eid");
   const auto lookups = validate_and_index(log);
   OcelObjectsOtCount result;
   for (const auto& relation : log.relations) {
@@ -405,11 +408,15 @@ OcelObjectsOtCount objects_ot_count(const Ocel& log) {
 
 OcelActivityAssociations activity_associations(
     const Ocel& log, OcelAssociationPrefilter prefilter) {
+  // The start/end prefilter groups the relations by object first.
+  require_ocel_relation_column(
+      log, prefilter == OcelAssociationPrefilter::kNone ? "ocel:activity" : "ocel:oid");
   return make_activity_associations(log, prefilter);
 }
 
 OcelObjectTypeActivityAssociations object_type_activity_associations(
     const Ocel& log, OcelAssociationPrefilter prefilter) {
+  require_ocel_relation_column(log, "ocel:type");
   const auto lookups = validate_and_index(log);
   OcelObjectTypeActivityAssociations result;
   for (const auto& row : filtered_rows(log, prefilter)) {
@@ -458,6 +465,7 @@ OcelAssociationAggregates aggregate_associations(
 
 OcelEdgeAssociations edge_associations(
     const Ocel& log, const OcelEdgeAssociationOptions& options) {
+  require_ocel_relation_column(log, "ocel:eid");
   require_ocel_object_column(log, "ocel:oid");
   const auto lookups = validate_and_index(log);
   const auto business_slots =

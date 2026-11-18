@@ -481,12 +481,178 @@ void write_object_table(std::ostream& out, const Ocel& log,
   }
 }
 
+// Round DV: pm4py.read_ocel_csv parses the timestamp column (every row,
+// dropped ones included; empty cells are NaN) with pd.to_datetime, which
+// infers one format from the first text and holds every later text to it,
+// then refuses mixed offsets (observed black-box; a Python model of the rule
+// matched pandas on 28,000 fuzzed columns). The model covers columns whose
+// texts all have the ISO shape YYYY-MM-DD[( |T)HH:MM[:SS[.digits]][Z|+HH:MM|
+// +HHMM]]; any other shape keeps the native reading (declared).
+namespace pandas_iso {
+
+bool digits_at(std::string_view text, std::size_t at, std::size_t count) {
+  if (at + count > text.size()) return false;
+  for (std::size_t i = 0; i < count; ++i)
+    if (!std::isdigit(static_cast<unsigned char>(text[at + i]))) return false;
+  return true;
+}
+
+// The format pandas infers from a text of the shape above, or nullopt for
+// any other shape.
+std::optional<std::string> inferred_format(std::string_view text) {
+  if (!digits_at(text, 0, 4) || text.size() < 10 || text[4] != '-' || !digits_at(text, 5, 2) ||
+      text[7] != '-' || !digits_at(text, 8, 2))
+    return std::nullopt;
+  std::string format = "%Y-%m-%d";
+  std::size_t at = 10;
+  if (at == text.size()) return format;
+  if (text[at] != ' ' && text[at] != 'T') return std::nullopt;
+  format += text[at++];
+  if (!digits_at(text, at, 2) || at + 2 >= text.size() || text[at + 2] != ':' ||
+      !digits_at(text, at + 3, 2))
+    return std::nullopt;
+  format += "%H:%M";
+  at += 5;
+  if (at < text.size() && text[at] == ':') {
+    if (!digits_at(text, at + 1, 2)) return std::nullopt;
+    format += ":%S";
+    at += 3;
+    if (at < text.size() && text[at] == '.') {
+      if (!digits_at(text, at + 1, 1)) return std::nullopt;
+      ++at;
+      while (at < text.size() && std::isdigit(static_cast<unsigned char>(text[at]))) ++at;
+      format += ".%f";
+    }
+  }
+  if (at == text.size()) return format;
+  if (text[at] == 'Z') {
+    ++at;
+  } else if (text[at] == '+' || text[at] == '-') {
+    if (!digits_at(text, at + 1, 2)) return std::nullopt;
+    at += 3;
+    if (at < text.size() && text[at] == ':') ++at;
+    if (!digits_at(text, at, 2)) return std::nullopt;
+    at += 2;
+  } else {
+    return std::nullopt;
+  }
+  if (at != text.size()) return std::nullopt;
+  return format + "%z";
+}
+
+struct Match {
+  enum class Kind { kOk, kNoMatch, kRemains } kind = Kind::kOk;
+  std::string rest;
+  std::optional<int> offset_minutes;
+};
+
+// The text held to an inferred format by pandas' ISO parser: fixed-width
+// fields, up to nine fraction digits (further digits are skipped at the end
+// of the text or before an offset the format expects), and the unconverted
+// rest when the format ends first.
+Match match(std::string_view text, std::string_view format) {
+  Match result;
+  std::size_t at = 0;
+  for (std::size_t f = 0; f < format.size(); ++f) {
+    if (format[f] != '%') {
+      if (at >= text.size() || text[at] != format[f]) return {Match::Kind::kNoMatch, {}, {}};
+      ++at;
+      continue;
+    }
+    const char token = format[++f];
+    if (token == 'Y' || token == 'm' || token == 'd' || token == 'H' || token == 'M' || token == 'S') {
+      const std::size_t width = token == 'Y' ? 4 : 2;
+      if (!digits_at(text, at, width)) return {Match::Kind::kNoMatch, {}, {}};
+      at += width;
+    } else if (token == 'f') {
+      std::size_t count = 0;
+      while (count < 9 && at + count < text.size() &&
+             std::isdigit(static_cast<unsigned char>(text[at + count])))
+        ++count;
+      if (count == 0) return {Match::Kind::kNoMatch, {}, {}};
+      at += count;
+      std::size_t skipped = at;
+      while (skipped < text.size() && std::isdigit(static_cast<unsigned char>(text[skipped]))) ++skipped;
+      const bool zone_next = f + 2 < format.size() && format[f + 1] == '%' && format[f + 2] == 'z';
+      if (skipped == text.size() || zone_next) at = skipped;
+    } else if (token == 'z') {
+      if (at < text.size() && text[at] == 'Z') {
+        ++at;
+        result.offset_minutes = 0;
+      } else if (at < text.size() && (text[at] == '+' || text[at] == '-') && digits_at(text, at + 1, 2)) {
+        const int sign = text[at] == '+' ? 1 : -1;
+        int minutes = ((text[at + 1] - '0') * 10 + (text[at + 2] - '0')) * 60;
+        at += 3;
+        std::size_t next = at < text.size() && text[at] == ':' ? at + 1 : at;
+        if (digits_at(text, next, 2)) {
+          minutes += (text[next] - '0') * 10 + (text[next + 1] - '0');
+          at = next + 2;
+        }
+        result.offset_minutes = sign * minutes;
+      } else {
+        return {Match::Kind::kNoMatch, {}, {}};
+      }
+    }
+  }
+  if (at != text.size()) return {Match::Kind::kRemains, std::string(text.substr(at)), {}};
+  return result;
+}
+
+constexpr const char* kSuggestions =
+    ". You might want to try:\n    - passing `format` if your strings have a consistent format;\n    - "
+    "passing `format='ISO8601'` if your strings are all ISO8601 but not necessarily in exactly the same "
+    "format;\n    - passing `format='mixed'`, and the format will be inferred for each element "
+    "individually. You might want to use `dayfirst` alongside this.";
+
+// Throws the ValueError pd.to_datetime raises for these texts (missing cells
+// skipped), if any.
+void check_column(const std::vector<std::string_view>& texts) {
+  std::optional<std::string> format;
+  bool first = true;
+  for (const auto text : texts) {
+    if (text.empty()) continue;
+    if (first) {
+      first = false;
+      format = inferred_format(text);
+    }
+    if (!format || !inferred_format(text)) return;
+  }
+  if (!format) return;
+  std::set<int> offsets;
+  bool naive = false;
+  for (const auto text : texts) {
+    if (text.empty()) continue;
+    const auto matched = match(text, *format);
+    if (matched.kind == Match::Kind::kNoMatch)
+      throw std::invalid_argument("ValueError: time data \"" + std::string(text) +
+                                  "\" doesn't match format \"" + *format + "\"" + kSuggestions);
+    if (matched.kind == Match::Kind::kRemains)
+      throw std::invalid_argument("ValueError: unconverted data remains when parsing with format \"" +
+                                  *format + "\": \"" + matched.rest + "\"" + kSuggestions);
+    if (matched.offset_minutes) offsets.insert(*matched.offset_minutes);
+    else naive = true;
+  }
+  if (offsets.size() + (naive ? 1 : 0) > 1)
+    throw std::invalid_argument(
+        "ValueError: Mixed timezones detected. Pass utc=True in to_datetime or tz='UTC' in "
+        "DatetimeIndex to convert to a common timezone.");
+}
+
+}  // namespace pandas_iso
+
 Ocel parse_tables(const Table& event_table, const Table* object_table,
                   const OcelCsvImportOptions& options) {
   const auto event_header = read_header(event_table, options, "event");
   const auto event_id = required_column(event_header, options.event_id_column, "event");
   const auto activity = required_column(event_header, options.activity_column, "event");
   const auto timestamp = required_column(event_header, options.timestamp_column, "event");
+  if (options.sort_events_by_timestamp) {
+    std::vector<std::string_view> texts;
+    texts.reserve(event_table.size());
+    for (std::size_t row_index = 1; row_index < event_table.size(); ++row_index)
+      texts.emplace_back(event_table[row_index][timestamp]);
+    pandas_iso::check_column(texts);
+  }
 
   std::vector<std::pair<std::string, std::size_t>> object_columns;
   // Columns as pm4py.read_ocel_csv selects them (observed black-box): every
@@ -716,6 +882,11 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   }
   if (!any_aware)
     log.naive_event_time_unit = event_rows.empty() ? "s" : nanoseconds ? "ns" : "us";
+  // Round DV: a file whose rows (dropped ones included) name no object, not
+  // even None, gets a relations frame with only ocel:qualifier, where nearly
+  // every later function raises KeyError (black-box; see
+  // ocel_relations_frame_degenerate). An object table changes nothing.
+  if (elements.empty()) mark_ocel_relation_free_frames(log, false);
   return log;
 }
 

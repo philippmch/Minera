@@ -259,7 +259,9 @@ void metadata_and_literal_identity_invariance() {
   source.object_type_attributes[odd][odd] = odd;
   source.table_columns.events = std::vector<std::string>{odd};
   source.table_columns.objects = std::vector<std::string>{};
-  source.table_columns.relations = std::vector<std::string>{odd, odd};
+  // Extra declared columns are metadata; a relations frame without its core
+  // columns is a degenerate frame where pm4py raises KeyError (round DV).
+  source.table_columns.relations = std::vector<std::string>{"ocel:eid", "ocel:oid", odd, odd};
   check(source, expected);
   // All ordinary string bytes remain identity data, including embedded NULs.
   source.objects[0].id = odd;

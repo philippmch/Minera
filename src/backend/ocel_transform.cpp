@@ -653,6 +653,11 @@ void append_reference_o2o(Ocel& result, const EnrichmentIndex& index,
 }  // namespace
 
 Ocel enrich_ocel(const Ocel& log, const OcelEnrichmentOptions& options) {
+  // Round DV: both reference enrichments group the relations by event id
+  // first (a degenerate relations frame raises, black-box).
+  if (options.include_interaction || options.include_descendants || options.include_inheritance ||
+      options.include_cobirth || options.include_codeath || options.include_lifecycle_qualifiers)
+    require_ocel_relation_column(log, "ocel:eid");
   const auto index = make_enrichment_index(log);
   Ocel result = log;
   // O2O rows follow pm4py.ocel_o2o_enrichment, including its quirks. Events
@@ -725,6 +730,9 @@ std::string serialize_ocel_enrichment_json(const Ocel& log,
 
 OcelObjectGraph discover_ocel_object_graph(const Ocel& log,
                                            OcelEnrichmentGraph graph) {
+  // Round DV: every reference object graph reads the relations' event id
+  // first (black-box).
+  require_ocel_relation_column(log, "ocel:eid");
   // Every direct relation treats literal strings, including empty strings,
   // as identities. Enrichment keeps its previous validation policy.
   const bool literal_ids = graph == OcelEnrichmentGraph::kInteraction ||
@@ -1004,6 +1012,9 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
   // relation-free one as a log without events and objects, which merges like
   // any log without relations.
   require_ocel_object_column(log, "ocel:type");
+  // Round DV: a degenerate relations frame (an OCEL CSV import naming no
+  // object, an empty playout) has no type to merge on.
+  require_ocel_relation_column(log, "ocel:type");
   if (log.untyped_relations && log.events.empty() && !log.objects.empty())
     throw std::invalid_argument("KeyError: 'ocel:timestamp'");
   if (log.untyped_relations && log.objects.empty() && !log.events.empty())
@@ -1198,6 +1209,9 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
   OcelSplitResult result;
   result.variant = options.variant;
   if (options.variant == OcelSplitVariant::kConnectedComponents) {
+    // Round DV: a degenerate relations frame (see
+    // ocel_relations_frame_degenerate) fails on the event id.
+    require_ocel_relation_column(log, "ocel:eid");
     const auto types = object_types(log);
     // Connected components are disjoint, so all of them are filtered in a
     // single pass instead of one full log scan per component.
@@ -1215,6 +1229,7 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
     if (options.object_type.empty())
       throw std::invalid_argument(
           "OCEL ancestors/descendants split requires object_type");
+    require_ocel_relation_column(log, "ocel:eid");
     auto unbounded = options;
     unbounded.max_objects = std::numeric_limits<std::size_t>::max();
     const auto candidates = ancestors_descendants(log, unbounded);

@@ -1469,6 +1469,15 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_review_du1_tests PRIVATE cxx_std_20)
   target_compile_options(minera_review_du1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_du1_tests COMMAND minera_review_du1_tests)
+
+  add_executable(minera_review_dv1_tests src/backend/tests/test_review_dv1.cpp)
+  target_link_libraries(minera_review_dv1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_dv1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_dv1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_dv1_tests
+           COMMAND minera_review_dv1_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/ocel-csv-timestamp-dv-bank.tsv.gz")
+
   add_executable(minera_review_ds1_tests src/backend/tests/test_review_ds1.cpp)
   target_link_libraries(minera_review_ds1_tests PRIVATE minera::core)
   target_compile_features(minera_review_ds1_tests PRIVATE cxx_std_20)

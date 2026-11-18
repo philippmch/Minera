@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DU (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–DV (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6773,6 +6773,69 @@ Full suite 611 of 611 passed on the first run; no fixture changed (2,673
 responses). Python script and frontend tests not rerun (scripts and
 frontend unchanged). The device check on the Mac was skipped (the Mac was
 not linked).
+
+Round DV re-reviewed DU (Review DV1). DU's CI run 44228428180: green on
+all six jobs.
+DV took DU's two found items and the PROPAGATE calls declared since DS:
+- Relation-free OCEL CSV imports and empty playouts: pm4py's relations
+  frame holds only `ocel:qualifier` (an empty playout's events and objects
+  frames have no columns), so nearly every function raises KeyError on the
+  first column it reads. The CSV reader and both reference playouts
+  declare those frames (`mark_ocel_relation_free_frames`), and each
+  function checks its first column (`require_ocel_relation_column`,
+  `require_ocel_event_column`); a filter whose selection is already empty
+  still returns an empty log. Sweep 319 of 352 -> 0, variants 1 -> 0.
+- The CSV reader's timestamps: pandas infers one format from the first
+  text and refuses later texts of another shape (`doesn't match format`,
+  `unconverted data remains`) and mixed offsets (`Mixed timezones
+  detected`); modelled for the ISO family (`pandas_iso` in
+  `ocel_csv.cpp`), other shapes declared. Model 0 of 23,000, native 0 of
+  4,300.
+- PROPAGATE: pm4py walks the linked pairs in the order of the swapped
+  self-merge, pair by pair (DS walked each source's targets together).
+  Server sweeps 1,600 of 1,600 and 3,600 of 3,600 in exact order; the
+  three declared calls and the links bank's three are exact now.
+- Fresh seeds 2026121500-11: one call (pandas CK `variants.apply` with
+  list items in the case key list), found and carried to DW.
+
+In the suite: new `minera_review_dv1_tests` with
+`docs/ocel-csv-timestamp-dv-bank.tsv.gz` (4,000 columns);
+`minera_ocel_links_parity_tests` binds every propagated call in order.
+The probes, the sweeps and the fresh banks are in the project files under
+`review-harness/round-dv/`.
+
+Full suite 606 of 612 on the first run; the other six (OCEL CSV re-reads
+of inputs pm4py refuses, five object graph module tests declaring a
+relations frame without its core columns) were updated and pass. The
+workbench fixture replay gave 2,673 responses unchanged.
+Python script and frontend tests not rerun (scripts and frontend
+unchanged). The device check on the Mac was skipped (the Mac was not
+linked).
+
+Next round (DW) should start by re-reviewing round DV:
+
+- DV's CI run;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- list items in a list case key across the pandas filters (variants,
+  timestamp, between, attributes, cases, paths, LTL): pandas takes a list
+  item as an array grouper (`Grouper and axis must be same length`, or
+  groups by its values when it matches the rows), a tuple item as a label,
+  prints list items as tuples in `None of [Index(...)]`, and some
+  functions read their timestamp or activity column first; probe
+  `review-harness/round-dv/pp/mk_l1.py` (217 of 1,863 calls differ);
+- the declared items (DQ1-5, DQ1-2, DO1-2, DN1-6), the rest of the CU
+  list, the Duration, Time, Decimal and Int128 Polars dtypes, the CSV
+  timestamp shapes outside the ISO family (DV), and the open choices on
+  CSV timestamp columns of plain numbers and "roles to diagnostics
+  groups" (still declared unless Philipp answers).
+
+Round DU's targets, taken in DV (findings DV1-1 to DV1-4): DU's CI, the
+relation-free OCEL frames, the CSV reader's timestamp formats, the
+PROPAGATE pass order and the fresh seeds. Not taken (carried to DW): the
+declared items, the CU list, the new dtypes and the open choices.
+
+Previous list for round DV (kept for its older items):
 
 Next round (DV) should start by re-reviewing round DU:
 

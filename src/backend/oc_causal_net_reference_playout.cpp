@@ -448,6 +448,9 @@ Ocel reference_oc_causal_net_playout(const OcCausalNet& net,
   // naive datetime64[s] times.
   log.event_activity_first = true;
   log.naive_event_time_unit = "s";
+  // Round DV: without any event the frames carry no column (relations only
+  // ocel:qualifier), as the OCPN playout's (black-box).
+  mark_ocel_relation_free_frames(log, true);
   return log;
 }
 

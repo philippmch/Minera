@@ -46,6 +46,9 @@ Ocel filter_ocel_activity_type_matching_exact(
     const Ocel& log,
     const std::map<std::string, std::vector<std::string>>& correspondence,
     const OcelActivityTypeMatchingOptions& options) {
+  // Round DV: a degenerate relations frame (an OCEL CSV import without any
+  // object reference) fails on the activity key first (black-box).
+  require_ocel_relation_column(log, options.activity_key);
   require_relation_column(log, options.object_type_key);
   require_relation_column(log, options.activity_key);
   std::unordered_map<std::string, const OcelEvent*> events;
