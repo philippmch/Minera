@@ -145,4 +145,27 @@ std::vector<bool> numpy_tuple_mask(std::size_t n, const EventAttribute& bound, c
   return result;
 }
 
+// Round DU (probe du v1, black-box probes du/u/mk1.py, mk2.py): a masked
+// column (Int64, UInt8, Float64, boolean, ...) makes the tuple a numpy array
+// too, but never broadcasts it: an array of more than one dimension is
+// refused, then one of another length, then a str array has no loop; the
+// rows then compare with their items one by one (an object item that is no
+// number raises its TypeError at its row, NA rows included). A NaN item
+// gives NA, which a mask reads as False (the same in & and |), so `compare`
+// returns false for it as for an NA row.
+template <class Compare, class Error>
+std::vector<bool> masked_tuple_mask(std::size_t n, const EventAttribute& bound, const std::string& op,
+                                    const std::string& dtype_class, Compare&& compare, Error&& error) {
+  const auto array = numpy_tuple_array(bound, error);
+  if (array.shape.size() > 1) error("NotImplementedError", "can only perform ops with 1-d structures");
+  if (array.shape.front() != n) error("ValueError", "Lengths must match to compare");
+  if (numpy_str_array(array))
+    error("UFuncTypeError", "ufunc '" + numpy_ufunc_name(op) +
+                                "' did not contain a loop with signature matching types (<class 'numpy.dtypes." +
+                                dtype_class + "'>, <class 'numpy.dtypes.StrDType'>) -> None");
+  std::vector<bool> result(n);
+  for (std::size_t i = 0; i < n; ++i) result[i] = compare(i, *array.leaves[i]);
+  return result;
+}
+
 }  // namespace minera::detail

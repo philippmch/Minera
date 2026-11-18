@@ -688,6 +688,13 @@ std::vector<bool> string_tuple_mask(const EventTable& source,std::size_t attribu
  return out;
 }
 bool numpy_number_dtype(const std::string& dtype){return dtype=="bool"||dtype.starts_with("int")||dtype.starts_with("uint")||dtype.starts_with("float");}
+// pandas' masked number dtypes (Int8 .. UInt64, Float32, Float64, boolean)
+// and the numpy dtype of their data.
+bool masked_number_dtype(const std::string& dtype){return dtype=="boolean"||dtype.starts_with("Int")||dtype.starts_with("UInt")||dtype.starts_with("Float");}
+std::string masked_numpy_dtype(const std::string& dtype){
+ if(dtype=="boolean")return "bool";
+ std::string out=dtype;for(auto& c:out)c=static_cast<char>(std::tolower(static_cast<unsigned char>(c)));return out;
+}
 // numpy's dtype class name: int64 -> Int64DType, uint8 -> UInt8DType.
 std::string numpy_dtype_class(const std::string& dtype){
  if(dtype=="bool")return "BoolDType";
@@ -723,6 +730,11 @@ std::vector<EventAttribute> row_bounds(const EventAttribute& bound,std::size_t r
  if(rows==1)error("ValueError","Length of values ("+std::to_string(k)+") does not match length of index (1)");
  error("ValueError","operands could not be broadcast together with shapes ("+std::to_string(rows)+",) ("+std::to_string(k)+",) ");
 }
+// Round DU (probe du v1b): a Python float scalar is weak, so a float32
+// column (numpy or masked) rounds it to float32 first; an array operand (a
+// tuple or list) is float64 and promotes the column instead. The dtype an
+// item of an array compares under.
+std::string array_item_dtype(const std::string& dtype){return dtype=="float32"?"float64":dtype=="Float32"?"Float64":dtype;}
 bool comparison(const EventAttribute& value,const EventAttribute& bound,const std::string& op,const std::string& dtype){
  // Round CK: a NaN cell of a float column still compares with a dict, list
  // or set (Python's own comparison error).
@@ -737,9 +749,77 @@ bool comparison(const EventAttribute& value,const EventAttribute& bound,const st
  else if(date_value(value)&&date_value(bound)){
   const auto a=instant(value),b=instant(bound);if(!a||!b)return false;
   order=a->seconds==b->seconds?(a->nanoseconds<b->nanoseconds?-1:a->nanoseconds>b->nanoseconds?1:0):(a->seconds<b->seconds?-1:1);
- }else if(numeric(value)&&numeric(bound))order=native_scalar_key_compare(value,dtype=="float32"?float32_bound(bound):bound);
+ }else if(numeric(value)&&numeric(bound))order=native_scalar_key_compare(value,dtype=="float32"||dtype=="Float32"?float32_bound(bound):bound);
  else error("TypeError","'"+op+"' not supported between instances of '"+qualified_type_name(value)+"' and '"+qualified_type_name(bound)+"'");
  return op==">="?order>=0:op=="<="?order<=0:op=="<"?order<0:order>0;
+}
+// Round DU (probe du v1b; black-box probes du/u/mk3.py, mk4.py, mk5.py): a
+// list operand of a number column (numpy or masked; its length already
+// checked) is the array pandas infers from it. Numbers with NaN or None
+// (None only without a bool) are numbers, where NaN and None compare False;
+// str with None or NaN is a str array, which a numpy column compares
+// reflected (the str's own error) and a masked one as its first str; naive
+// datetimes, or aware ones of one offset, with None or NaN are a datetime
+// array, which a numpy column refuses as a whole and a masked one has no
+// loop for (naive) or compares as Timestamps (aware); anything else (only
+// None, a container, a mix) is an object array compared row by row, the
+// first item that is no number raising Python's TypeError.
+std::vector<bool> list_operand_mask(const EventTable& source,std::size_t attribute,const EventAttribute& list,const std::string& op,const std::string& dtype){
+ const bool masked=masked_number_dtype(dtype);
+ const auto numpy=masked?masked_numpy_dtype(dtype):dtype;
+ const std::string python=numpy.starts_with("float")?"float":numpy=="bool"?"bool":"int";
+ bool none=false,boolean=false,number=false,text=false,date=false,other=false,naive=false,aware=false,offsets=false;
+ std::optional<std::int32_t> offset;
+ for(const auto& item:list.children){
+  if(is_native_na_attribute(item)||item.container!=AttributeContainerKind::kScalar){other=true;continue;}
+  if(item.is_null){if(date_value(item))date=true;else none=true;continue;}
+  if(date_value(item)){
+   date=true;const auto at=instant(item);
+   if(!at){other=true;continue;}
+   if(!at->timezone_aware)naive=true;
+   else{aware=true;if(offset&&*offset!=at->offset_minutes)offsets=true;offset=at->offset_minutes;}
+   continue;
+  }
+  if(text_value(item)){text=true;continue;}
+  if(!numeric(item)){other=true;continue;}
+  if(item.kind==AttributeKind::kBoolean||std::holds_alternative<bool>(item.typed_value))boolean=true;
+  else if(!missing(item))number=true;
+ }
+ enum{kNumber,kString,kDatetime,kObject} kind=kObject;
+ if(other||(naive&&aware)||offsets)kind=kObject;
+ else if(text)kind=boolean||number||date?kObject:kString;
+ else if(date)kind=boolean||number?kObject:kDatetime;
+ else if(boolean&&none)kind=kObject;
+ else if(boolean||number||std::any_of(list.children.begin(),list.children.end(),[](const EventAttribute& e){return !e.is_null;}))kind=kNumber;
+ const auto n=source.size();
+ std::vector<bool> out(n);
+ if(kind==kString){
+  if(!masked){
+   const std::string reflected=op==">="?"<=":op=="<="?">=":op=="<"?">":"<";
+   error("TypeError","'"+reflected+"' not supported between instances of 'str' and '"+python+"'");
+  }
+  error("TypeError","'"+op+"' not supported between instances of '"+python+"' and 'str'");
+ }
+ if(kind==kDatetime){
+  if(!masked){
+   std::string zone;
+   if(aware){
+    const auto minutes=*offset;
+    if(minutes==0)zone=", UTC";
+    else{char buffer[32];std::snprintf(buffer,sizeof buffer,", UTC%c%02d:%02d",minutes<0?'-':'+',std::abs(minutes)/60,std::abs(minutes)%60);zone=buffer;}
+   }
+   error("TypeError","Invalid comparison between dtype=datetime64[us"+zone+"] and ndarray");
+  }
+  if(aware)error("TypeError","'"+op+"' not supported between instances of '"+python+"' and 'Timestamp'");
+  error("UFuncTypeError","ufunc '"+detail::numpy_ufunc_name(op)+"' did not contain a loop with signature matching types (<class 'numpy.dtypes."+numpy_dtype_class(numpy)+"'>, <class 'numpy.dtypes.DateTime64DType'>) -> None");
+ }
+ for(std::size_t i=0;i<n;++i){
+  const auto& item=list.children[i];
+  if(kind==kObject&&(item.is_null||item.container!=AttributeContainerKind::kScalar||!numeric(item)||date_value(item)||is_native_na_attribute(item)))
+   error("TypeError","'"+op+"' not supported between instances of '"+python+"' and '"+(item.is_null&&!date_value(item)?std::string("NoneType"):qualified_type_name(item))+"'");
+  out[i]=comparison(cell(source,i,attribute),item,op,array_item_dtype(dtype));
+ }
+ return out;
 }
 // Round DT (probe dt t1; black-box probes dt/nb/dtp.py, dtp2.py): a
 // datetime64 column checks a tuple's length, refuses an array of more than
@@ -903,13 +983,31 @@ EventTable numeric_filter(const EventTable& source,const EventAttribute& lower,c
    out=detail::numpy_tuple_mask(source.size(),bound,op,numpy_dtype_class(dtype),[&](std::size_t i,const EventAttribute& item){
     if(item.is_null||item.container!=AttributeContainerKind::kScalar||!numeric(item)||date_value(item)||is_native_na_attribute(item))
      error("TypeError","'"+op+"' not supported between instances of '"+python+"' and '"+(item.is_null?std::string("NoneType"):qualified_type_name(item))+"'");
-    return comparison(cell(source,i,attribute),item,op,dtype);
+    return comparison(cell(source,i,attribute),item,op,array_item_dtype(dtype));
+   },error);
+   return;
+  }
+  // Round DU (probe du v1): a masked column refuses a second dimension and
+  // another length before comparing row by row (pandas_numpy_operand.hpp);
+  // an item that is pd.NA has no truth value.
+  if(bound.container==AttributeContainerKind::kTuple&&masked_number_dtype(dtype)){
+   const auto numpy=masked_numpy_dtype(dtype);
+   const std::string python=numpy.starts_with("float")?"float":numpy=="bool"?"bool":"int";
+   out=detail::masked_tuple_mask(source.size(),bound,op,numpy_dtype_class(numpy),[&](std::size_t i,const EventAttribute& item){
+    if(is_native_na_attribute(item))error("TypeError","boolean value of NA is ambiguous");
+    if(item.is_null||item.container!=AttributeContainerKind::kScalar||!numeric(item)||date_value(item))
+     error("TypeError","'"+op+"' not supported between instances of '"+python+"' and '"+(item.is_null?std::string("NoneType"):qualified_type_name(item))+"'");
+    return comparison(cell(source,i,attribute),item,op,array_item_dtype(dtype));
    },error);
    return;
   }
   if(bound.container==AttributeContainerKind::kTuple&&dtype=="str"){out=string_tuple_mask(source,attribute,bound,op);return;}
   if(bound.container==AttributeContainerKind::kTuple&&dtype.starts_with("datetime64")){out=datetime_tuple_mask(source,attribute,bound,op,dtype);return;}
   const auto bounds=row_bounds(bound,source.size(),dtype);
+  if(bound.container==AttributeContainerKind::kList&&(numpy_number_dtype(dtype)||masked_number_dtype(dtype))){
+   out=list_operand_mask(source,attribute,bound,op,dtype);
+   return;
+  }
   for(std::size_t i=0;i<source.size();++i)out[i]=comparison(cell(source,i,attribute),bounds[i],op,dtype);
  };
  compare_all(lower,outside?"<":">=",low);

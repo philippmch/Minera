@@ -31043,3 +31043,110 @@ Tests:
   unchanged; the server sweep of 39 OCEL route variants on eight
   degenerate files agrees with the reference. Python script and frontend
   tests not rerun (scripts and frontend unchanged).
+
+## Review DU1: re-review of round DT, masked columns and list bounds in the numeric attribute filters, naive OCEL frames through the transport, frame shape after splits and playouts, fresh seeds (2026-11-18)
+
+Round DU checked DT's CI (run 44216750418 on 961de8d and 44216771591 on
+773854a: verifier, Python, frontend and the Linux native job green; the
+macOS and Windows jobs were still running when DU pushed), took DT's
+carried pandas operands and the frame types of OCELs that routes build,
+and replayed a batch of fresh seeds. The device check on the Mac was
+skipped (the Mac was not linked).
+
+- **DU1-1 Masked columns and list bounds in the numeric attribute
+  filters.** A masked column (`Int8` to `UInt64`, `Float32`, `Float64`,
+  `boolean`) makes a tuple bound a numpy array too but never broadcasts
+  it: an array of more than one dimension raises `NotImplementedError:
+  can only perform ops with 1-d structures`, one of another length
+  `ValueError: Lengths must match to compare`, a str array has no loop
+  (`UFuncTypeError ... (<class 'numpy.dtypes.Int64DType'>, <class
+  'numpy.dtypes.StrDType'>) -> None`, the masked dtype's numpy class);
+  the rows then compare with their items one by one (an item that is no
+  number raises `'<' not supported between instances of 'int' and
+  'NoneType'` at its row, an NA item `boolean value of NA is ambiguous`;
+  a NaN item gives NA, which the mask reads as False). A list bound is
+  inferred as pandas infers a list operand: numbers compare item by item;
+  a str item makes a string array (numpy columns raise the reflected
+  `'>' not supported between instances of 'str' and 'int'`, masked ones
+  `'<' ... 'int' and 'str'`); dates make a datetime array (`Invalid
+  comparison between dtype=datetime64[us, UTC] and ndarray` on numpy
+  columns, `... and 'Timestamp'` or the DateTime64DType loop error on
+  masked ones); anything else is an object array compared row by row.
+  `float32` and `Float32` columns compare an array item at float64 (NEP 50:
+  only a Python scalar is weak and rounds to float32). Probes
+  `du/specs/v1.py` (masked tuples, 12,600 calls in the bound bank)
+  12,456 -> 0 and `v1b.py` (lists and float32, 6,720) 376 -> 0; the timestamp
+  (`v2.py`, 1,560) and variants (`v3.py`, 644) filters already matched.
+- **DU1-2 Naive OCEL frames.** pm4py's `read_ocel_csv` reads times
+  without an offset as a naive `datetime64[us]` column (ns past six
+  fraction digits, s for a file without rows), and both playouts (OCPN and
+  OC causal net) build naive `datetime64[s]` frames. Filters, splits,
+  enrichment and sampling keep the frame. On such a log
+  `filter_ocel_events_timestamp` raises `TypeError: Invalid comparison
+  between dtype=datetime64[us] and datetime` (also for an empty result),
+  `write_ocel_csv`, `write_ocel2_xml`, `write_ocel2_sqlite`, the
+  flattening's XES and both descriptions print the wall clock without an
+  offset, and both JSON writers and the OCEL 1.0 XML writer print the
+  wall clock with `Z`. Native kept the naive texts in memory, so its
+  writers already printed them, but the transport stamped them UTC, so
+  every route after the import or the playout printed `+00:00` and the
+  timestamp filter filtered. Now `Ocel::naive_event_time_unit` holds the
+  frame's resolution (set by the CSV reader and the reference playouts),
+  the transport carries it as `"minera:naiveEventTimes"` with the texts as
+  written (both JSON forms), the timestamp filters (`timestamp` and
+  `timestamp_exact` on `ocel:timestamp`) raise pm4py's TypeError, and a
+  JSON download spells a naive event time with `Z` as the reference
+  writers do (removing part of an earlier declaration; the fraction is
+  still kept). Probes `du/nv/nv.py` (every writer, the descriptions,
+  features, flattening and the filter on naive, UTC, fractional and
+  midnight logs), `pl2.py`, `pl3.py`; the server agrees on all of them.
+- **DU1-3 Frame shape after splits and playouts.** pm4py's splits subset
+  the frames, so a sublog of an activity-first log (an XML read, a CSV
+  with the activity column first) keeps that column order, and both
+  playouts list events id, activity, timestamp. Native split sublogs
+  dropped the frame flags (`filter_objects` built a fresh log) and
+  playouts used the timestamp-first order, so their CSV, SQLite and OCEL
+  1.0 XML outputs had the other column order. Sublogs now keep the
+  globals' frame shape (declared columns, column order, float relations,
+  naive unit), and the reference playouts are activity first (probe
+  `du/nv/sp.py`: splits, enrichment, filters and sampling of six source
+  kinds; native agrees on all).
+- **DU1-4 Fresh seeds.** Batch 2026121400-11 (twelve banks): two calls,
+  both the declared struct-cast race (Polars CJ 2026121403
+  `apply_numeric_events` cases 286 and 658). Every other call replays
+  clean.
+
+Found, not taken (next round):
+- A relation-free OCEL CSV import (no object columns, or empty ones) and
+  an empty playout give pm4py a relations frame with only
+  `ocel:qualifier` (the playout's events and objects frames have no
+  columns either), where nearly every function raises KeyError (the
+  statistics, descriptions, discovery but ETOT, features, graphs,
+  enrichment, most filters, splits and the writers; the columns are
+  listed per function in `du/u/ocdeg_du.out`); native answers them as
+  for an empty log.
+- pm4py's CSV reader parses the timestamp column with the format pandas
+  infers from its first text: a later text of another shape raises
+  (`unconverted data remains when parsing with format "%Y-%m-%d
+  %H:%M:%S": "+02:00"`, `time data "..." doesn't match format`), as do
+  mixed offsets (`Mixed timezones detected`); native reads them.
+
+Declared:
+- Still declared from earlier rounds: link analysis under PROPAGATE
+  without look-forward and first occurrences (three calls), the
+  equal-size join order of the Polars sequence filters, the keep-once
+  relative occurrence count with a dict case key naming several columns
+  (DQ1-5), the nanosecond window at pandas' int64 range ends (DQ1-2),
+  dateutil-only date strings (DP1-4, DQ1-4), the eager paths performance
+  race (DO1-2), the thread-count quirk of DN1-6 and the struct cast race;
+  the JSON writers keep fractions of event times.
+
+Tests:
+- New: `minera_review_du1_tests` (the CSV reader's units, the transport
+  in both forms, downloads, the timestamp filter on naive and empty
+  frames, sublog frames, both playouts' frames);
+  `docs/pandas-filter-du-bank.json.gz` (21,524 calls of v1, v1b, v2 and
+  v3) with `minera_pandas_filter_du_bank_parity_tests`.
+- Full suite: 611 of 611 tests passed on the first run. The workbench
+  fixture replay gave 2,673 responses unchanged. Python script and
+  frontend tests not rerun (scripts and frontend unchanged).

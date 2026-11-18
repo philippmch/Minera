@@ -72,7 +72,13 @@ class OcpnReferenceOcelWriter {
   OcpnReferenceOcelWriter(const std::map<std::string, std::string>& object_types,
                           bool objects_unique_per_trace);
   void add(const OcpnReferenceTrace& trace);
-  [[nodiscard]] Ocel take() { return std::move(log_); }
+  // The reference playout frame (round DU, black-box): events listed id,
+  // activity, timestamp with naive datetime64[s] times.
+  [[nodiscard]] Ocel take() {
+    log_.event_activity_first = true;
+    log_.naive_event_time_unit = "s";
+    return std::move(log_);
+  }
 
  private:
   const std::map<std::string, std::string>& object_types_;

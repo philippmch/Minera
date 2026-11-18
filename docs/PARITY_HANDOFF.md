@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–DT (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–DU (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -6737,6 +6737,71 @@ Full suite 608 of 609 passed; the object attributes module test made the
 object-frame check narrower (only a frame declared without columns), after
 which the 32 OCEL tests passed; no fixture changed (2,673 responses). The
 device check on the Mac was skipped (the Mac was not linked).
+
+Round DU re-reviewed DT (Review DU1). DT's CI runs 44216750418 and
+44216771591: verifier, Python, frontend and the Linux native job green;
+macOS and Windows still running when DU pushed. DU took DT's carried
+pandas operands and the frame types of OCELs that routes build:
+- Masked columns (Int, UInt, Float, boolean) in the numeric attribute
+  filters: a tuple bound is a numpy array that never broadcasts (1-d, same
+  length, no str loop, then item by item; NaN items read False); list
+  bounds follow pandas' list inference (numbers, string array, datetime
+  array, object array) on numpy and masked columns; float32 columns
+  compare array items at float64 (`masked_tuple_mask`,
+  `list_operand_mask`). Probes v1 12,456 -> 0, v1b 376 -> 0; the
+  timestamp and variants filters (v2, v3) already matched.
+- Naive OCEL frames: a CSV import without offsets (datetime64[us], ns
+  past six fraction digits, s without rows) and both reference playouts
+  (datetime64[s]) are naive in pm4py, and stay so through filters,
+  splits and enrichment. `Ocel::naive_event_time_unit` holds it, the
+  transport carries it as `"minera:naiveEventTimes"` with the texts as
+  written, the timestamp filters raise pm4py's TypeError, and JSON
+  downloads spell naive times with `Z`. Before, the transport stamped
+  them UTC, so every route after the import printed `+00:00`.
+- Frame shape: split sublogs keep the source's column order, declared
+  columns, float relations and naive unit (they were rebuilt without
+  them); the reference playouts list events activity first.
+- Fresh seeds 2026121400-11: two calls, both the declared struct cast
+  race.
+
+In the suite: new `minera_review_du1_tests` and
+`docs/pandas-filter-du-bank.json.gz` (21,524 calls) with
+`minera_pandas_filter_du_bank_parity_tests`. The probes, the sweeps and
+the fresh banks are in the project files under `review-harness/round-du/`.
+
+Full suite 611 of 611 passed on the first run; no fixture changed (2,673
+responses). Python script and frontend tests not rerun (scripts and
+frontend unchanged). The device check on the Mac was skipped (the Mac was
+not linked).
+
+Next round (DV) should start by re-reviewing round DU:
+
+- DU's CI run (and DT's macOS and Windows jobs);
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- relation-free OCEL CSV imports and empty playouts: pm4py's relations
+  frame holds only `ocel:qualifier` (an empty playout's events and
+  objects frames have no columns), so nearly every function raises
+  KeyError (per function in `review-harness/round-du/u/ocdeg_du.out`);
+  native answers as for an empty log;
+- the OCEL CSV reader's timestamp parsing: pandas infers one format from
+  the first text and refuses later texts of another shape and mixed
+  offsets (`unconverted data remains`, `doesn't match format`, `Mixed
+  timezones detected`); native reads them;
+- link analysis under PROPAGATE without look-forward and first
+  occurrences (three declared calls; not taken in DT or DU);
+- the declared items (DQ1-5, DQ1-2, DO1-2, DN1-6), the rest of the CU
+  list, the Duration, Time, Decimal and Int128 Polars dtypes, and the open
+  choices on CSV timestamp columns of plain numbers and "roles to
+  diagnostics groups" (still declared unless Philipp answers).
+
+Round DT's targets, taken in DU (findings DU1-1 to DU1-4): DT's CI, the
+fresh seeds, the untyped-relations flag across routes that build logs
+(it was already carried; the naive frame and the column order were not),
+the tuple and masked operands. Not taken (carried to DV): PROPAGATE, the
+declared items, the CU list, the new dtypes and the open choices.
+
+Previous list for round DU (kept for its older items):
 
 Next round (DU) should start by re-reviewing round DT:
 

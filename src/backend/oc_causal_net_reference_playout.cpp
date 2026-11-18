@@ -444,6 +444,10 @@ Ocel reference_oc_causal_net_playout(const OcCausalNet& net,
       }
     }
   }
+  // The reference frame (round DU, black-box): id, activity, timestamp with
+  // naive datetime64[s] times.
+  log.event_activity_first = true;
+  log.naive_event_time_unit = "s";
   return log;
 }
 

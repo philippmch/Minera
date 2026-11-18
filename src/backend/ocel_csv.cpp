@@ -7,6 +7,7 @@
 #include "ocel_frame_types.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <cstdint>
@@ -692,6 +693,29 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   }
 
   log.objects = std::move(object_list);
+  // Round DU: the reference parses the whole timestamp column (dropped rows
+  // included) to one dtype; without any offset it is naive, datetime64[us]
+  // (ns past six fraction digits, s without any text), and stays so through
+  // filters, splits and enrichment (black-box: filter_ocel_events_timestamp
+  // then raises TypeError). See Ocel::naive_event_time_unit.
+  bool any_aware = false, nanoseconds = false;
+  for (const auto& [row, kept] : event_rows) {
+    (void)kept;
+    const auto& text = (*row)[timestamp];
+    if (text.empty()) continue;
+    const auto parsed = parse_timestamp_exact(text);
+    if (parsed && parsed->timezone_aware) any_aware = true;
+    const auto dot = text.find('.');
+    if (dot != std::string::npos) {
+      std::size_t digits = 0;
+      while (dot + 1 + digits < text.size() &&
+             std::isdigit(static_cast<unsigned char>(text[dot + 1 + digits])))
+        ++digits;
+      if (digits > 6) nanoseconds = true;
+    }
+  }
+  if (!any_aware)
+    log.naive_event_time_unit = event_rows.empty() ? "s" : nanoseconds ? "ns" : "us";
   return log;
 }
 

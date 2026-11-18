@@ -129,13 +129,27 @@ std::set<std::pair<std::string, std::string>> interaction_edges(
   return result;
 }
 
-Ocel filter_objects(const Ocel& log, const ObjectIds& selected) {
+// An OCEL without rows that keeps `log`'s globals, catalogs and reference
+// frame shape: pm4py's splits subset the frames (round DU: a sublog of an
+// XML or activity-first CSV log keeps the activity-first column order, of a
+// naive CSV log the naive dtype; black-box through write_ocel_csv and
+// filter_ocel_events_timestamp).
+Ocel empty_like(const Ocel& log) {
   Ocel result;
   result.globals = log.globals;
   result.global_event_scope = log.global_event_scope;
   result.global_object_scope = log.global_object_scope;
   result.event_type_attributes = log.event_type_attributes;
   result.object_type_attributes = log.object_type_attributes;
+  result.table_columns = log.table_columns;
+  result.event_activity_first = log.event_activity_first;
+  result.untyped_relations = log.untyped_relations;
+  result.naive_event_time_unit = log.naive_event_time_unit;
+  return result;
+}
+
+Ocel filter_objects(const Ocel& log, const ObjectIds& selected) {
+  Ocel result = empty_like(log);
   std::set<std::string> event_ids;
   for (const auto& object : log.objects) {
     if (selected.contains(object.id)) result.objects.push_back(object);
@@ -173,12 +187,7 @@ std::vector<Ocel> filter_disjoint_objects(const Ocel& log,
   std::vector<Ocel> result(sets.size());
   std::unordered_map<std::string_view, std::size_t> owner;
   for (std::size_t index = 0; index < sets.size(); ++index) {
-    auto& part = result[index];
-    part.globals = log.globals;
-    part.global_event_scope = log.global_event_scope;
-    part.global_object_scope = log.global_object_scope;
-    part.event_type_attributes = log.event_type_attributes;
-    part.object_type_attributes = log.object_type_attributes;
+    result[index] = empty_like(log);
     for (const auto& id : sets[index]) owner.emplace(id, index);
   }
   const auto owner_of = [&](const std::string& id) -> std::optional<std::size_t> {

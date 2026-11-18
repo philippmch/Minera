@@ -1221,6 +1221,17 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     if (std::get<bool>(marker->value) && !standard)
       for (const auto& event : result.events) offset_times.emplace(event.id, event.timestamp);
   }
+  // Round DU: a document Minera wrote for a log whose reference events frame
+  // is naive (an OCEL CSV import without offsets, a playout; see
+  // Ocel::naive_event_time_unit) names the frame's resolution and keeps the
+  // texts as written, in either form.
+  std::string naive_unit;
+  if (const auto* marker = optional(r, "minera:naiveEventTimes")) {
+    naive_unit = str(*marker, "minera:naiveEventTimes");
+    if (naive_unit != "s" && naive_unit != "ms" && naive_unit != "us" && naive_unit != "ns")
+      throw std::invalid_argument("minera:naiveEventTimes must be s, ms, us or ns");
+    for (const auto& event : result.events) offset_times.emplace(event.id, event.timestamp);
+  }
   // A document Minera wrote for a log with times past the microsecond (an
   // OCEL SQLite or CSV import, which the reference reads at nanoseconds)
   // says so, and keeps them; read_ocel_json and read_ocel2_json of any other
@@ -1297,6 +1308,7 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     result.table_columns.objects.emplace();
   result.untyped_relations = untyped_marker ? std::get<bool>(untyped_marker->value)
                                             : reference_read && result.relations.empty();
+  result.naive_event_time_unit = std::move(naive_unit);
   return result;
 }
 
@@ -2184,6 +2196,22 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     if (log.relations.empty())
       out << ",\"minera:untypedRelations\":" << (log.untyped_relations ? "true" : "false");
   };
+  // Round DU: a log whose reference events frame is naive travels with its
+  // resolution and its texts (see Ocel::naive_event_time_unit).
+  const auto write_naive_event_times = [&] {
+    if (log.naive_event_time_unit.empty()) return;
+    out << ",\"minera:naiveEventTimes\":";
+    write_string(out, log.naive_event_time_unit);
+  };
+  // A download spells a naive event time as both reference JSON writers do,
+  // the wall clock with "Z" (black-box, round DU), the fraction kept as for
+  // an aware time (declared); the transport keeps the text.
+  const auto event_time = [&](const std::string& text) -> std::string {
+    if (transport_markers) return text;
+    const auto exact = parse_timestamp_exact(text);
+    if (!exact || exact->timezone_aware) return text;
+    return utc_timestamp_text(exact->seconds, exact->nanoseconds, "Z");
+  };
   const auto write_keep_unrelated = [&] {
     std::unordered_set<std::string_view> related_events, related_objects;
     for (const auto& relation : log.relations) {
@@ -2443,7 +2471,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
       out << ",\"type\":";
       write_string(out, event->activity);
       out << ",\"time\":";
-      write_string(out, event->timestamp);
+      write_string(out, event_time(event->timestamp));
       out << ",\"attributes\":";
       write_standard_attributes(event->attributes);
       out << ",\"relationships\":[";
@@ -2535,6 +2563,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     // enriched logs) keeps times past the microsecond too (round BB).
     if (transport_markers) {
       write_untyped_relations();
+      write_naive_event_times();
       write_nanoseconds();
       write_order_markers(true);
     }
@@ -2555,7 +2584,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     out << ":{\"ocel:activity\":";
     write_string(out, event->activity);
     out << ",\"ocel:timestamp\":";
-    write_string(out, event->timestamp);
+    write_string(out, event_time(event->timestamp));
     const auto relations = event_relations(*event);
     out << ",\"ocel:omap\":[";
     bool relation_first = true;
@@ -2613,6 +2642,7 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   write_keep_unrelated();
   if (transport_markers) {
     write_untyped_relations();
+    write_naive_event_times();
     write_event_time_offset();
     write_nanoseconds();
     write_order_markers(false);

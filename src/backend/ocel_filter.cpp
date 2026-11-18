@@ -701,6 +701,11 @@ Ocel filter_ocel_events_timestamp_exact(
   const auto upper = event_filter_timestamp_bound(to);
   if (!event_filter_column_exists(log, timestamp_key))
     throw std::out_of_range("'" + std::string(timestamp_key) + "'");
+  // Round DU: both bounds are aware here (see event_filter_timestamp_bound),
+  // so a naive events frame raises (see filter_ocel_events_timestamp).
+  if (timestamp_key == "ocel:timestamp" && !log.naive_event_time_unit.empty())
+    throw std::invalid_argument("TypeError: Invalid comparison between dtype=datetime64[" +
+                                log.naive_event_time_unit + "] and datetime");
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
     const auto value = event_filter_scalar(event, timestamp_key);
@@ -817,6 +822,12 @@ Ocel filter_ocel_events_timestamp(const Ocel& log, std::string_view from,
       parse_bound(from, -std::numeric_limits<double>::infinity());
   const double upper =
       parse_bound(to, std::numeric_limits<double>::infinity());
+  // Round DU: the reference compares the events frame with aware bounds, so
+  // a naive frame (an OCEL CSV import without offsets, a playout) raises,
+  // empty or not (black-box).
+  if (!log.naive_event_time_unit.empty())
+    throw std::invalid_argument("TypeError: Invalid comparison between dtype=datetime64[" +
+                                log.naive_event_time_unit + "] and datetime");
   // Reversed bounds select no event, so the result is an empty OCEL, as in
   // the reference.
   Ocel filtered = log;

@@ -107,6 +107,15 @@ struct Ocel {
   // leaves this false; the OCEL transport carries it as
   // "minera:untypedRelations".
   bool untyped_relations = false;
+  // The resolution of a naive reference events frame (round DU), empty for
+  // an aware one: an OCEL CSV file whose times carry no offset reads as
+  // datetime64[us] (ns when a time has more than six fraction digits, s
+  // without rows), and both reference playouts build datetime64[s] frames.
+  // filter_ocel_events_timestamp then raises TypeError; the writers already
+  // print such a log's naive texts without offset. Filters, splits and
+  // enrichment keep it; the OCEL transport carries it as
+  // "minera:naiveEventTimes" (the texts as written).
+  std::string naive_event_time_unit;
 };
 
 using OCEL = Ocel;

@@ -1463,6 +1463,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_features(minera_review_dt1_tests PRIVATE cxx_std_20)
   target_compile_options(minera_review_dt1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_dt1_tests COMMAND minera_review_dt1_tests)
+
+  add_executable(minera_review_du1_tests src/backend/tests/test_review_du1.cpp)
+  target_link_libraries(minera_review_du1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_du1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_du1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_du1_tests COMMAND minera_review_du1_tests)
   add_executable(minera_review_ds1_tests src/backend/tests/test_review_ds1.cpp)
   target_link_libraries(minera_review_ds1_tests PRIVATE minera::core)
   target_compile_features(minera_review_ds1_tests PRIVATE cxx_std_20)
@@ -3899,6 +3905,12 @@ if(MINERA_BUILD_TESTS)
   add_test(NAME minera_pandas_filter_dt_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
            "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-dt-bank.json.gz")
   set_tests_properties(minera_pandas_filter_dt_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
+  # Round DU: masked (Int, UInt, Float, boolean) columns with tuple and list
+  # bounds in the numeric attribute filters, list bounds over numpy columns,
+  # tuple bounds in the timestamp and variants filters (probes v1-v3).
+  add_test(NAME minera_pandas_filter_du_bank_parity_tests COMMAND minera_pandas_filter_bank_parity_tests
+           "${CMAKE_CURRENT_SOURCE_DIR}/docs/pandas-filter-du-bank.json.gz")
+  set_tests_properties(minera_pandas_filter_du_bank_parity_tests PROPERTIES ENVIRONMENT "TZ=Europe/Berlin")
 
   add_executable(minera_llm_sql_utils_parity_tests
     src/backend/tests/test_llm_sql_utils_parity.cpp
