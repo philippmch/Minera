@@ -26,7 +26,9 @@
 #include "minera/timestamp.hpp"
 #include "../gzip_codec.hpp"
 #include "../pandas_to_datetime.hpp"
+#include "../sqlite_real_text.hpp"
 
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -206,6 +208,16 @@ void write_file(const std::filesystem::path& path, const std::string& coltype,
            "CREATE TABLE \"object_T\" (ocel_id TEXT, ocel_time TIMESTAMP, ocel_changed_field TEXT);"
            "INSERT INTO object VALUES ('o1','T');"
            "INSERT INTO \"object_T\" VALUES ('o1','1970-01-01 00:00:00',NULL);BEGIN;");
+  // A REAL stored in a column of TEXT affinity becomes the library's text
+  // of it, which moves with the library (Windows' winsqlite3 spells a value
+  // that does not round-trip in 15 digits with 17), so such a cell is
+  // stored as the text the reference's SQLite 3.45 makes of it (the Windows
+  // CI runs of rounds EB to ED; the reader reads that text as it is).
+  std::string upper = coltype;
+  for (auto& c : upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+  const bool text_affinity = upper.find("INT") == std::string::npos &&
+                             (upper.find("CHAR") != std::string::npos || upper.find("CLOB") != std::string::npos ||
+                              upper.find("TEXT") != std::string::npos);
   std::size_t n = 0;
   for (std::size_t k = 0; k < tables.size(); ++k) {
     const auto type = "a" + std::to_string(k), table = "A" + std::to_string(k);
@@ -219,6 +231,8 @@ void write_file(const std::filesystem::path& path, const std::string& coltype,
       sqlite3_prepare_v2(db, ("INSERT INTO \"event_" + table + "\" VALUES (?,?)").c_str(), -1, &statement, nullptr);
       sqlite3_bind_text(statement, 1, id.c_str(), -1, SQLITE_TRANSIENT);
       if (value.kind == 'i') sqlite3_bind_int64(statement, 2, value.integer);
+      else if (value.kind == 'f' && text_affinity && std::isfinite(value.real))
+        sqlite3_bind_text(statement, 2, sqlite_legacy_real_text(value.real).c_str(), -1, SQLITE_TRANSIENT);
       else if (value.kind == 'f') sqlite3_bind_double(statement, 2, value.real);
       else if (value.kind == 's')
         sqlite3_bind_text(statement, 2, value.text.data(), static_cast<int>(value.text.size()), SQLITE_TRANSIENT);

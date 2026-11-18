@@ -152,6 +152,9 @@ enum class OcelTimestampReader {
   // Classic OCEL JSON: the ISO reading, but a timestamp it cannot read keeps
   // the file order of the whole log instead of raising, because native
   // adapters use the classic format as transport (empty or NaT timestamps).
+  // parse_ocel_json raises read_ocel_json's error for such a time while it
+  // walks the file, unless the document is a transport that says it holds
+  // one ("minera:unreadableEventTimes", see serialize_ocel_json).
   kIsoFormatOrFileOrder,
   // OCEL 2.0 XML: the ISO reading above (wall clock), or else the reference's
   // dateutil fallback (dateutil.parser.parse, fuzzy, today's date for missing
@@ -293,7 +296,9 @@ bool ocel_reference_generated_global(std::string_view key, const OcelValue& valu
 
 // Reads OCEL 1.0 or 2.0 JSON as the reference readers do, including the
 // drop of unrelated events and objects, unless the document carries
-// "minera:keepUnrelated": true (see serialize_ocel_json).
+// "minera:keepUnrelated": true (see serialize_ocel_json). The classic form
+// follows read_ocel_json's walk, values and errors (round EE, see
+// parse_classic_reference in ocel.cpp).
 Ocel parse_ocel_json(std::string_view json,
                      const OcelJsonLimits& limits = {});
 // Exact native filter inputs may use literal empty IDs, type names and
@@ -306,8 +311,10 @@ Ocel parse_ocel_json_literal_names(std::string_view json,
 // entries rather than dropping them like the reference file readers (which
 // ignore the member): OCELs travel between routes as this JSON. The classic
 // transport also carries "minera:eventTimeOffset" and
-// "minera:eventActivityFirst" (see Ocel::event_activity_first);
-// `transport_markers` false leaves those two out, for a file a user keeps
+// "minera:eventActivityFirst" (see Ocel::event_activity_first), and
+// "minera:unreadableEventTimes" for a log holding an event time
+// read_ocel_json cannot read (an empty, NaT, text or float time);
+// `transport_markers` false leaves those three out, for a file a user keeps
 // (the CLI's JSON output, the export download), which then reads as the
 // reference's read_ocel_json reads it.
 std::string serialize_ocel_json(const Ocel& log,

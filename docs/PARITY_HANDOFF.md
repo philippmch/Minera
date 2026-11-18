@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–ED (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EE (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7141,6 +7141,77 @@ tests. The workbench fixture
 replay gave 2,673 responses unchanged. Python script and frontend tests
 not rerun (scripts and frontend unchanged). The device check on the Mac
 was skipped (the Mac was not linked).
+
+Round EE re-reviewed ED (Review EE1). ED's CI run 44367108210: the
+verifier, Python, frontend and Linux jobs green, the macOS job cancelled,
+and the Windows ctest failed `minera_review_eb2_tests` again on 13 bank
+files (9 + 4). Those were columns of TEXT affinity: the test bound a
+double, so SQLite itself turned it into text at insert, and winsqlite3
+spells it with 17 digits. The reader was right (it reads the stored text
+as it is); the test now stores the text SQLite 3.45 makes of such a REAL
+(EE1-8). EE took the classic JSON reader (`read_ocel_json`), which is also Minera's
+own transport between routes:
+- the walk: keys and values looked up as Python looks them up, so a
+  missing `ocel:vmap`, `ocel:ovmap`, link qualifier or global scope raises
+  its `KeyError` and a wrong type its `TypeError`/`AttributeError`; event
+  times read by `fromisoformat` while walking (EE1-1);
+- record frames: dtypes over all rows (int next to float or missing is
+  float, uint64-sized ints too), activities and types as `str()` of the
+  cell, non-str omap entries name nothing, a str omap is read by
+  character (EE1-2);
+- vmap/ovmap `ocel:*` overrides take the frame cell, the relations frame
+  keeps the own value; the time column's sort rules (EE1-3);
+- the reference filtering: per-frame drop, events/objects kept by the
+  remaining relations, then the relations; none left empties all (EE1-4);
+- object changes as a record frame (first entry a dict, `dict(entry)`),
+  ids as str, the object's type, column-wide raw times, value dtypes over
+  all change rows (EE1-5); the scopes required (EE1-6);
+- the transport: a log holding an event time read_ocel_json cannot read
+  travels with `"minera:unreadableEventTimes": true`; other transports read
+  as files do (int columns with a float or missing cell come back as
+  floats) (EE1-7).
+Main differed on 244 of 456 probes and 301 of 800 fuzzed files; now 0 of
+456 and 0 of 4,000 (seeds 1-10) besides declared refusals of rows native
+cannot hold (lists, dicts, big ints, override cells, change rows without a
+str id/time/field) and two messages.
+
+In the suite: `minera_review_ee1_tests` with
+`docs/ocel-json-reference-ee-bank.tsv.gz` (2,056 files). Handwritten
+classic documents in four tests and the CLI fixture `ocel_split.json` now
+hold what read_ocel_json needs. The probes, the fuzzer, the comparer, the
+bank generator and the dump driver are in the project files under
+`review-harness/round-ee/`.
+
+Next round (EF) should start by re-reviewing round EE:
+
+- EE's CI run (Windows in particular: `minera_review_eb2_tests` with
+  EE1-8's TEXT-affinity cells must pass; macOS was cancelled in ED's run);
+- routes fed classic JSON: their outputs on files EE now reads differently
+  (overrides kept, float columns, events kept without relations), and
+  transports of logs from the other readers (OCEL 1.0 XML vmap `ocel:*`
+  keys, CSV/SQLite empty times) through filters and exports;
+- fresh seeds of the CK, CN, CJ, CI and CH table domains, the CP, CK, CJ
+  and CH sequence domains and the pandas CK and CN domains;
+- the OCEL 1.0 XML vmap `ocel:eid`/`ocel:activity`/`ocel:timestamp`
+  overrides (refused; EE's three-step filtering model may now let them be
+  read as pm4py reads them) and keyless values (a NaN column);
+- the OCEL 2.0 XML/JSON day offsets that depend on the column, the SQLite
+  leftovers (texts beyond ASCII, the kept columns downstream);
+- the Duration, Time, Decimal and Int128 Polars dtypes (the transport has
+  no cells for them yet);
+- the declared row-mask keys, dicts mapping str index labels and list
+  stakes of str items (DW1), the declared items (DQ1-2, DO1-2, DN1-6), the
+  rest of the CU list, and the open choices on CSV timestamp columns of
+  plain numbers and "roles to diagnostics groups" (still declared unless
+  Philipp answers).
+
+Round ED's targets, taken in EE (findings EE1-1 to EE1-8): ED's Windows
+ctest, the classic JSON reader, its transport. Not taken (carried to EF):
+the fresh seeds, the XML vmap overrides and
+keyless values, the XML/JSON day offsets, the SQLite leftovers, the new
+dtypes, the DW1 keys, the declared items, the CU list and the open choices.
+
+Previous list for round EE (kept for its older items):
 
 Next round (EE) should start by re-reviewing round ED:
 

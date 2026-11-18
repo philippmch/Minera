@@ -52,11 +52,17 @@ std::optional<double> legacy_edge_elapsed(const std::string& from_text,
   return std::nullopt;
 }
 
+// An integer past 64 bits as Python's json.load reads it (an int of any
+// size): its digits as written (Parser::python_numbers).
+struct JsonBigInt {
+  std::string text;
+};
+
 struct Json {
   using Object = std::map<std::string, Json>;
   using Array = std::vector<Json>;
   std::variant<std::nullptr_t, bool, std::int64_t, std::uint64_t, double, std::string, Array,
-               Object>
+               Object, JsonBigInt>
       value;
   // An object's keys in document order, as the reference's dict keeps them.
   std::vector<std::string> keys;
@@ -64,6 +70,7 @@ struct Json {
   bool is_bool() const { return std::holds_alternative<bool>(value); }
   bool is_int() const { return std::holds_alternative<std::int64_t>(value); }
   bool is_uint() const { return std::holds_alternative<std::uint64_t>(value); }
+  bool is_big_int() const { return std::holds_alternative<JsonBigInt>(value); }
   bool is_number() const { return is_int() || std::holds_alternative<double>(value); }
   bool is_string() const { return std::holds_alternative<std::string>(value); }
   bool is_scalar() const {
@@ -90,6 +97,13 @@ class Parser {
   // Python's json.load (the reference OCEL JSON readers) builds a dict.
   Parser& last_repeated_key_wins() {
     last_repeated_key_wins_ = true;
+    return *this;
+  }
+  // Numbers as Python's json.load reads them (both reference OCEL JSON
+  // readers, round EE): NaN, Infinity and -Infinity, a real past the double
+  // range as an infinity, an integer past 64 bits as a JsonBigInt.
+  Parser& python_numbers() {
+    python_numbers_ = true;
     return *this;
   }
   Json parse() {
@@ -203,6 +217,11 @@ class Parser {
     if (input_.substr(pos_, 4) == "true") { pos_ += 4; return Json{true}; }
     if (input_.substr(pos_, 5) == "false") { pos_ += 5; return Json{false}; }
     if (input_.substr(pos_, 4) == "null") { pos_ += 4; return Json{nullptr}; }
+    if (python_numbers_) {
+      if (input_.substr(pos_, 3) == "NaN") { pos_ += 3; return Json{std::numeric_limits<double>::quiet_NaN()}; }
+      if (input_.substr(pos_, 8) == "Infinity") { pos_ += 8; return Json{std::numeric_limits<double>::infinity()}; }
+      if (input_.substr(pos_, 9) == "-Infinity") { pos_ += 9; return Json{-std::numeric_limits<double>::infinity()}; }
+    }
     const std::size_t start = pos_;
     if (input_[pos_] == '-') ++pos_;
     if (pos_ >= input_.size() || input_[pos_] < '0' || input_[pos_] > '9') fail("expected value");
@@ -211,7 +230,7 @@ class Parser {
     if (pos_ < input_.size() && input_[pos_] == '.') { real = true; ++pos_; if (pos_ >= input_.size() || input_[pos_] < '0' || input_[pos_] > '9') fail("bad number"); while (pos_ < input_.size() && input_[pos_] >= '0' && input_[pos_] <= '9') ++pos_; }
     if (pos_ < input_.size() && (input_[pos_] == 'e' || input_[pos_] == 'E')) { real = true; ++pos_; if (pos_ < input_.size() && (input_[pos_] == '+' || input_[pos_] == '-')) ++pos_; if (pos_ >= input_.size() || input_[pos_] < '0' || input_[pos_] > '9') fail("bad exponent"); while (pos_ < input_.size() && input_[pos_] >= '0' && input_[pos_] <= '9') ++pos_; }
     const auto token = input_.substr(start, pos_ - start);
-    if (real) { std::string text(token); char* end = nullptr; const double n = std::strtod(text.c_str(), &end); if (end != text.c_str() + text.size() || !std::isfinite(n)) fail("bad number"); return Json{n}; }
+    if (real) { std::string text(token); char* end = nullptr; const double n = std::strtod(text.c_str(), &end); if (end != text.c_str() + text.size() || (!std::isfinite(n) && !python_numbers_)) fail("bad number"); return Json{n}; }
     std::int64_t n = 0;
     const auto result = std::from_chars(token.data(), token.data() + token.size(), n);
     if (result.ec == std::errc() && result.ptr == token.data() + token.size())
@@ -224,11 +243,13 @@ class Parser {
           unsigned_result.ptr == token.data() + token.size())
         return Json{count};
     }
+    if (python_numbers_) return Json{JsonBigInt{std::string(token)}};
     fail("integer out of range");
   }
   std::string_view input_; const OcelJsonLimits& limits_; std::size_t pos_ = 0; std::size_t nodes_ = 0;
   bool unsigned_graph_counts_ = false;
   bool last_repeated_key_wins_ = false;
+  bool python_numbers_ = false;
 };
 
 const Json& required(const Json::Object& o, std::string_view key) {
@@ -483,6 +504,758 @@ OcelValue standard_scalar(const Json& value, std::string_view field,
   return scalar(value, field);
 }
 
+// ---------------------------------------------------------------------------
+// Round EE: read_ocel_json's reading of a classic OCEL JSON file (observed
+// black-box with pm4py 2.7.22, pandas 3.0.5; probes and fuzz in the round-ee
+// harness). The reference walks the objects first, then the events, each in
+// file order, and raises Python's own errors on the way: an object takes its
+// "ocel:type", "ocel:ovmap" and "ocel:o2o" in that order, an event its
+// "ocel:timestamp" (fromisoformat after a trailing Z becomes "+00:00"),
+// "ocel:activity", "ocel:vmap", "ocel:omap" and "ocel:typedOmap". A file
+// without events then raises KeyError 'ocel:timestamp', the three global
+// scopes are looked up (log, event, object) and the object changes read.
+// Its frames are pandas frames built from those records, so a column's dtype
+// comes from all its rows before any is dropped: an activity or object type
+// that is no string is str() of the column's value (an int next to a float
+// or a missing value is a float, "1.0"), a missing one (None, NaN) drops its
+// event or object, and an int attribute value in such a column is a float.
+std::int64_t iso_wall_microseconds(std::string_view original);
+
+namespace classic_json {
+
+[[noreturn]] void raise(const std::string& message) { throw std::invalid_argument(message); }
+
+std::string key_error(std::string_view key) {
+  return "KeyError: " + ocel_frame::python_str_repr(key);
+}
+
+// Python's type name of a value json.load built.
+std::string type_name(const Json& value) {
+  if (value.is_null()) return "NoneType";
+  if (value.is_bool()) return "bool";
+  if (value.is_int() || value.is_uint() || value.is_big_int()) return "int";
+  if (std::holds_alternative<double>(value.value)) return "float";
+  if (value.is_string()) return "str";
+  if (value.is_array()) return "list";
+  return "dict";
+}
+
+std::string repr(const Json& value) {
+  if (value.is_null()) return "None";
+  if (value.is_bool()) return std::get<bool>(value.value) ? "True" : "False";
+  if (value.is_int()) return std::to_string(std::get<std::int64_t>(value.value));
+  if (value.is_uint()) return std::to_string(std::get<std::uint64_t>(value.value));
+  if (value.is_big_int()) return std::get<JsonBigInt>(value.value).text;
+  if (const auto* real = std::get_if<double>(&value.value)) return ocel_frame::float_repr(*real);
+  if (value.is_string()) return ocel_frame::python_str_repr(value.string());
+  std::string out;
+  if (value.is_array()) {
+    out = "[";
+    for (std::size_t i = 0; i < value.array().size(); ++i) {
+      if (i) out += ", ";
+      out += repr(value.array()[i]);
+    }
+    return out + "]";
+  }
+  out = "{";
+  for (std::size_t i = 0; i < value.keys.size(); ++i) {
+    if (i) out += ", ";
+    out += ocel_frame::python_str_repr(value.keys[i]) + ": " + repr(value.object().at(value.keys[i]));
+  }
+  return out + "}";
+}
+
+// container[key] for a str key.
+const Json& getitem(const Json& container, const std::string& key) {
+  if (container.is_object()) {
+    const auto found = container.object().find(key);
+    if (found == container.object().end()) raise(key_error(key));
+    return found->second;
+  }
+  if (container.is_array()) raise("list indices must be integers or slices, not str");
+  if (container.is_string()) raise("string indices must be integers, not 'str'");
+  raise("'" + type_name(container) + "' object is not subscriptable");
+}
+
+// needle in container.
+bool contains(const Json& container, std::string_view needle) {
+  if (container.is_object()) return container.object().count(std::string(needle)) != 0;
+  if (container.is_array())
+    return std::any_of(container.array().begin(), container.array().end(),
+                       [&](const Json& item) { return item.is_string() && item.string() == needle; });
+  if (container.is_string()) return container.string().find(needle) != std::string::npos;
+  raise("argument of type '" + type_name(container) + "' is not iterable");
+}
+
+// The text a value names as a key of a dict of str keys (x in d, d[x]): a
+// str matches by its text, a list or dict raises, any other value matches
+// nothing.
+const std::string* hashable_text(const Json& value) {
+  if (value.is_array()) raise("unhashable type: 'list'");
+  if (value.is_object()) raise("unhashable type: 'dict'");
+  return value.is_string() ? &value.string() : nullptr;
+}
+
+// for item in value: a list's items, a dict's keys, a str's characters.
+template <class F>
+void for_each_item(const Json& value, F&& visit) {
+  if (value.is_array()) {
+    for (const auto& item : value.array()) visit(item);
+  } else if (value.is_object()) {
+    for (const auto& key : value.keys) visit(Json{key});
+  } else if (value.is_string()) {
+    const auto& text = value.string();
+    for (std::size_t p = 0; p < text.size();) {
+      const auto lead = static_cast<unsigned char>(text[p]);
+      const std::size_t length = lead < 0x80 ? 1 : lead < 0xe0 ? 2 : lead < 0xf0 ? 3 : 4;
+      visit(Json{text.substr(p, length)});
+      p += length;
+    }
+  } else {
+    raise("'" + type_name(value) + "' object is not iterable");
+  }
+}
+
+// for key in container: container[key], for "ocel:objects" and "ocel:events".
+template <class F>
+void for_each_entry(const Json& container, F&& visit) {
+  if (container.is_object()) {
+    for (const auto& key : container.keys) visit(key, container.object().at(key));
+    return;
+  }
+  if (container.is_array()) {
+    if (container.array().empty()) return;
+    const auto& first = container.array().front();
+    if (first.is_int() || first.is_bool() || first.is_uint() || first.is_big_int())
+      raise("OCEL JSON lists entries by position: read_ocel_json indexes the list with its own "
+            "items, which a native OCEL does not read");
+    raise("list indices must be integers or slices, not " + type_name(first));
+  }
+  if (container.is_string()) {
+    if (container.string().empty()) return;
+    raise("string indices must be integers, not 'str'");
+  }
+  raise("'" + type_name(container) + "' object is not iterable");
+}
+
+// The dtype pandas gives a column built from records of these values.
+struct Column {
+  bool text = false, container = false, boolean = false, integer = false;
+  bool big_unsigned = false, big_other = false, real = false, missing = false, negative = false;
+  void observe(const Json* value) {
+    if (value == nullptr || value->is_null()) { missing = true; return; }
+    if (value->is_string()) text = true;
+    else if (value->is_array() || value->is_object()) container = true;
+    else if (value->is_bool()) boolean = true;
+    else if (value->is_int()) {
+      integer = true;
+      negative = negative || std::get<std::int64_t>(value->value) < 0;
+    } else if (value->is_uint()) big_unsigned = true;
+    else if (value->is_big_int()) {
+      const auto& digits = std::get<JsonBigInt>(value->value).text;
+      const bool fits = digits.front() != '-' &&
+                        (digits.size() < 20 || (digits.size() == 20 && digits <= "18446744073709551615"));
+      (fits ? big_unsigned : big_other) = true;
+    } else real = true;
+  }
+  enum class Kind { kObject, kBool, kInt, kFloat };
+  [[nodiscard]] Kind kind() const {
+    if (text || container) return Kind::kObject;
+    if (boolean) return integer || big_unsigned || big_other || real || missing ? Kind::kObject : Kind::kBool;
+    // An integer past 64 bits keeps the column of Python objects; one that
+    // fits uint64 reads as float next to floats or missing values, and as
+    // uint64 next to non-negative integers only.
+    if (big_other) return Kind::kObject;
+    if (big_unsigned) return negative ? Kind::kObject : real || missing ? Kind::kFloat : Kind::kInt;
+    if (integer || real) return real || missing ? Kind::kFloat : Kind::kInt;
+    return Kind::kObject;
+  }
+};
+
+bool missing_value(const Json& value) {
+  if (value.is_null()) return true;
+  const auto* real = std::get_if<double>(&value.value);
+  return real != nullptr && std::isnan(*real);
+}
+
+// A number of a float column as that column holds it (the nearest double).
+std::optional<double> float_cell(const Json& value) {
+  if (value.is_int()) return static_cast<double>(std::get<std::int64_t>(value.value));
+  if (value.is_uint()) return static_cast<double>(std::get<std::uint64_t>(value.value));
+  if (value.is_big_int()) return std::strtod(std::get<JsonBigInt>(value.value).text.c_str(), nullptr);
+  if (const auto* real = std::get_if<double>(&value.value)) return *real;
+  return std::nullopt;
+}
+
+// astype(str) of a cell of a column of `kind`: nullopt for a missing one.
+std::optional<std::string> column_str(const Json& value, Column::Kind kind) {
+  if (missing_value(value)) return std::nullopt;
+  if (kind == Column::Kind::kFloat)
+    if (const auto real = float_cell(value)) return ocel_frame::float_repr(*real);
+  return value.is_string() ? value.string() : repr(value);
+}
+
+// A vmap, ovmap or change value: the native value, or the reason it cannot
+// be one (a list, dict or integer past 64 bits stays a Python object in the
+// reference frame).
+struct CellValue {
+  OcelValue value;
+  std::string unrepresentable;
+};
+
+CellValue cell_value(const Json& value) {
+  if (value.is_array() || value.is_object())
+    return {nullptr, "is a " + type_name(value) + " (" + repr(value) + "), which pandas keeps as a Python object"};
+  if (value.is_big_int() || value.is_uint())
+    return {nullptr, "is an integer past 64 bits (" + repr(value) + ")"};
+  if (value.is_null()) return {nullptr, {}};
+  if (value.is_bool()) return {std::get<bool>(value.value), {}};
+  if (value.is_int()) return {std::get<std::int64_t>(value.value), {}};
+  if (const auto* real = std::get_if<double>(&value.value)) return {*real, {}};
+  return {value.string(), {}};
+}
+
+// One table of attribute rows (events, objects or changes) with its columns.
+struct AttributeRows {
+  struct Row {
+    std::vector<std::pair<std::string, const Json*>> values;
+  };
+  std::vector<Row> rows;
+  std::vector<std::string> names;
+  std::unordered_map<std::string, Column> columns;
+  void finish() {
+    for (const auto& row : rows)
+      for (const auto& [key, value] : row.values)
+        if (!columns.count(key)) { names.push_back(key); columns[key]; }
+    for (const auto& name : names) {
+      auto& column = columns[name];
+      for (const auto& row : rows) {
+        const Json* cell = nullptr;
+        for (const auto& [key, value] : row.values) if (key == name) cell = value;
+        column.observe(cell);
+      }
+    }
+  }
+  // A cell of column `key` as the frame holds it.
+  [[nodiscard]] CellValue cell(const std::string& key, const Json& raw) const {
+    if (columns.at(key).kind() == Column::Kind::kFloat)
+      if (const auto real = float_cell(raw)) return {*real, {}};
+    return cell_value(raw);
+  }
+  // The row's attributes as the frame holds them; `bad` takes the reason a
+  // value cannot be held.
+  std::vector<OcelAttribute> attributes(std::size_t index, std::string& bad) const {
+    std::vector<OcelAttribute> out;
+    for (const auto& [key, raw] : rows[index].values) {
+      auto value = cell(key, *raw);
+      if (!value.unrepresentable.empty() && bad.empty()) bad = "value '" + key + "' " + value.unrepresentable;
+      out.push_back({key, std::move(value.value)});
+    }
+    return out;
+  }
+};
+
+}  // namespace classic_json
+
+// `lenient_times`: a transport that says it holds event times read_ocel_json
+// cannot read (see serialize_ocel_json) keeps them for the file-order sort.
+// `require_events`: the file is read as the reference reads it (no
+// keepUnrelated or untypedRelations marker), so a file without events
+// raises before the global scopes are looked up. `keep_unrelated`: a
+// transport keeping events and objects without relations (the reference's
+// filtering by relations is left out).
+//
+// The reference then drops, in each frame on its own, the rows with a
+// missing or empty id, activity or type (the relations frame by the event's
+// and object's own values), keeps the events and objects some remaining
+// relation names, and then the relations whose event and object remain
+// (observed black-box: an event an ovmap "ocel:oid" or "ocel:type" takes
+// from the objects frame stays without relations). A row whose frame cell
+// disagrees with the relations frame, or holds what a native OCEL cannot,
+// is refused when it remains.
+struct ClassicListing {
+  bool objects = false, relations = false;  // the file lists any (before the filtering)
+};
+
+Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, bool lenient_times,
+                             bool require_events, bool keep_unrelated, ClassicListing& listing) {
+  using namespace classic_json;
+  const auto& root = root_json.object();
+  Ocel log;
+  parse_classic_type_catalog(optional(root, "ocel:objectTypes"), log.object_type_attributes, "ocel:objectTypes");
+  parse_classic_type_catalog(optional(root, "ocel:eventTypes"), log.event_type_attributes, "ocel:eventTypes");
+
+  // Objects.
+  // An ovmap "ocel:oid" or "ocel:type" (a vmap "ocel:eid" or
+  // "ocel:activity") takes the objects-frame (events-frame) cell while the
+  // relations frame keeps the object's (event's) own value (observed): a
+  // type or activity read so must agree with the relations frame's (else
+  // refused when the row remains), and an id that names no related
+  // object (event) drops the row from the filtered frames.
+  struct RawObject {
+    std::string id;
+    const Json* type;
+    const Json* frame_type;
+    const Json* frame_id;
+  };
+  std::vector<RawObject> objects;
+  AttributeRows object_rows;
+  struct RawLink {
+    std::string source;
+    Json target;
+    const Json* qualifier;
+  };
+  std::vector<RawLink> links;
+  std::unordered_map<std::string, std::size_t> object_index;
+  for_each_entry(getitem(root_json, "ocel:objects"), [&](const std::string& id, const Json& raw) {
+    const Json& type = getitem(raw, "ocel:type");
+    const Json& ovmap = getitem(raw, "ocel:ovmap");
+    if (!ovmap.is_object()) raise("'" + type_name(ovmap) + "' object has no attribute 'items'");
+    AttributeRows::Row row;
+    const Json* frame_type = &type;
+    const Json* frame_id = nullptr;
+    for (const auto& key : ovmap.keys) {
+      const Json& value = ovmap.object().at(key);
+      if (key == "ocel:type") frame_type = &value;
+      else if (key == "ocel:oid") frame_id = &value;
+      else row.values.emplace_back(key, &value);
+    }
+    if (const auto* o2o = optional(raw.object(), "ocel:o2o")) {
+      for_each_item(*o2o, [&](const Json& entry) {
+        const Json& target = getitem(entry, "ocel:oid");
+        const Json& qualifier = getitem(entry, "ocel:qualifier");
+        links.push_back({id, target, &qualifier});
+      });
+    }
+    // A repeated id is one dict entry (json.load), so ids are unique here.
+    object_index.emplace(id, objects.size());
+    objects.push_back({id, &type, frame_type, frame_id});
+    object_rows.rows.push_back(std::move(row));
+  });
+
+  // Events.
+  struct RawEvent {
+    std::string id;
+    const Json* activity;
+    const Json* frame_activity;
+    const Json* frame_id;
+    const Json* frame_time;  // a vmap "ocel:timestamp", raw in the events frame
+    std::string time;
+    std::vector<std::size_t> relations;  // indices into `relations` below
+  };
+  std::vector<RawEvent> events;
+  AttributeRows event_rows;
+  struct RawRelation {
+    std::size_t event, object;
+    const Json* qualifier = nullptr;
+  };
+  std::vector<RawRelation> relations;
+  for_each_entry(getitem(root_json, "ocel:events"), [&](const std::string& id, const Json& raw) {
+    const Json& time = getitem(raw, "ocel:timestamp");
+    if (!time.is_string()) raise("'" + type_name(time) + "' object has no attribute 'endswith'");
+    if (!lenient_times) (void)iso_wall_microseconds(time.string());
+    const Json& activity = getitem(raw, "ocel:activity");
+    const Json& vmap = getitem(raw, "ocel:vmap");
+    if (!vmap.is_object()) raise("'" + type_name(vmap) + "' object has no attribute 'items'");
+    AttributeRows::Row row;
+    const Json* frame_activity = &activity;
+    const Json* frame_id = nullptr;
+    const Json* frame_time = nullptr;
+    for (const auto& key : vmap.keys) {
+      const Json& value = vmap.object().at(key);
+      if (key == "ocel:activity") frame_activity = &value;
+      else if (key == "ocel:eid") frame_id = &value;
+      else if (key == "ocel:timestamp") frame_time = &value;
+      else row.values.emplace_back(key, &value);
+    }
+    const auto event_index = events.size();
+    events.push_back({id, &activity, frame_activity, frame_id, frame_time, time.string(), {}});
+    auto& event = events.back();
+    std::unordered_map<std::string, std::vector<std::size_t>> related;
+    for_each_item(getitem(raw, "ocel:omap"), [&](const Json& item) {
+      const auto* oid = hashable_text(item);
+      if (oid == nullptr) return;
+      const auto found = object_index.find(*oid);
+      // The reference drops a relation to an object the file does not list.
+      if (found == object_index.end()) return;
+      auto& seen = related[*oid];
+      if (!seen.empty() && !repeated_relations) return;
+      seen.push_back(relations.size());
+      event.relations.push_back(relations.size());
+      relations.push_back({event_index, found->second, nullptr});
+    });
+    if (const auto* typed = optional(raw.object(), "ocel:typedOmap")) {
+      std::unordered_map<std::string, std::size_t> assigned;
+      for_each_item(*typed, [&](const Json& entry) {
+        if (!contains(entry, "ocel:oid")) return;
+        const auto* oid = hashable_text(getitem(entry, "ocel:oid"));
+        if (oid == nullptr) return;
+        const auto found = related.find(*oid);
+        // A qualifier only qualifies a relation the omap made.
+        if (found == related.end()) return;
+        const Json& qualifier = getitem(entry, "ocel:qualifier");
+        if (repeated_relations) {
+          const auto index = assigned[*oid]++;
+          if (index < found->second.size()) relations[found->second[index]].qualifier = &qualifier;
+          else {
+            event.relations.push_back(relations.size());
+            relations.push_back({event_index, object_index.at(*oid), &qualifier});
+          }
+        } else {
+          for (const auto index : found->second) relations[index].qualifier = &qualifier;
+        }
+      });
+    }
+    event_rows.rows.push_back(std::move(row));
+  });
+  if (require_events && events.empty()) raise(key_error("ocel:timestamp"));
+  // The events frame sorts its time column: a vmap "ocel:timestamp" puts
+  // its raw value there (a null is NaT), a list or dict
+  // cannot be hashed, and a number or boolean next to a parsed time raises.
+  // A text next to one leaves the column of Python objects (observed).
+  bool parsed_times = false, number_times = false, text_times = false;
+  for (const auto& event : events) {
+    if (event.frame_time == nullptr) {
+      parsed_times = true;
+      continue;
+    }
+    const auto& time = *event.frame_time;
+    if (time.is_array() || time.is_object()) (void)hashable_text(time);
+    if (time.is_string()) text_times = true;
+    else if (!missing_value(time)) number_times = true;
+  }
+  if (parsed_times && number_times)
+    raise("'values' is not ordered, please explicitly specify the categories order by passing in a "
+          "categories argument.");
+
+  // The global scopes (any value; a dict's scalars are read).
+  for (const auto& category : {"ocel:global-log", "ocel:global-event", "ocel:global-object"}) {
+    const Json& scope = getitem(root_json, category);
+    if (!scope.is_object()) continue;
+    for (const auto& key : scope.keys) {
+      const Json& value = scope.object().at(key);
+      if (value.is_scalar()) log.globals[std::string(category) + "." + key] = scalar(value, key);
+    }
+  }
+  log.global_event_scope = true;
+  log.global_object_scope = true;
+
+  // Object changes: a frame of their records, so a value column's dtype
+  // comes from every change row (other fields' rows are missing cells),
+  // also those of objects the file does not list, which are dropped. A
+  // change has its object's type whatever its own "ocel:type" says.
+  struct RawChange {
+    std::size_t object;
+    std::string time, field;
+    OcelValue value;
+    std::string refusal;  // why a native OCEL cannot hold it, if it remains
+  };
+  std::vector<RawChange> changes;
+  if (const auto* raw_changes = optional(root, "ocel:objectChanges"); raw_changes && !raw_changes->is_null()) {
+    if (raw_changes->is_object()) {
+      const bool scalars = std::all_of(raw_changes->keys.begin(), raw_changes->keys.end(), [&](const std::string& key) {
+        return raw_changes->object().at(key).is_scalar() || raw_changes->object().at(key).is_big_int();
+      });
+      raise(scalars && !raw_changes->keys.empty() ? "If using all scalar values, you must pass an index"
+                                                  : "OCEL JSON ocel:objectChanges must be a list of changes");
+    }
+    if (!raw_changes->is_array()) raise("DataFrame constructor not properly called!");
+    // pandas builds the changes frame from records when the first entry is
+    // a dict, taking dict(entry) of each (an empty str or list is an empty
+    // row); any other first entry gives a frame without an "ocel:oid"
+    // column (observed black-box).
+    static const Json empty_entry{Json::Object{}};
+    std::vector<const Json*> entries;
+    const auto& list = raw_changes->array();
+    const bool records = list.empty() || list.front().is_object();
+    for (const auto& entry : list) {
+      if (!records) break;
+      if (entry.is_object()) {
+        entries.push_back(&entry);
+      } else if (entry.is_string() || entry.is_array()) {
+        if (entry.is_string() ? entry.string().empty() : entry.array().empty()) {
+          entries.push_back(&empty_entry);
+        } else if (entry.is_string()) {
+          raise("dictionary update sequence element #0 has length 1; 2 is required");
+        } else {
+          raise("OCEL JSON object change " + repr(entry) +
+                ": pm4py reads a list of key-value pairs as a dict, which Minera does not read");
+        }
+      } else {
+        raise("'" + type_name(entry) + "' object is not iterable");
+      }
+    }
+    // Changes join the objects frame, which a file listing no object has
+    // without columns (observed).
+    if (objects.empty() && !list.empty())
+      raise("KeyError: \"None of [Index(['ocel:oid', 'ocel:type'], dtype='str')] are in the [columns]\"");
+    if (!records) raise(key_error("ocel:oid"));
+    if (!entries.empty() && std::none_of(entries.begin(), entries.end(), [](const Json* entry) {
+          return entry->object().count("ocel:oid") != 0;
+        }))
+      raise(key_error("ocel:oid"));
+    // The columns hold every row: the ids read as str (by the column's
+    // dtype), a time pm4py cannot read (or one that is no str) leaves every
+    // time as given, and each value column takes its dtype over all rows,
+    // the rows of unknown objects included (observed).
+    Column ids;
+    bool raw_times = false;
+    AttributeRows change_rows;
+    const auto readable_time = [](const std::string& text) {
+      try {
+        (void)iso_wall_microseconds(text);
+        return true;
+      } catch (const std::invalid_argument&) {
+        return false;
+      }
+    };
+    for (const auto* entry : entries) {
+      const auto& change = entry->object();
+      ids.observe(optional(change, "ocel:oid"));
+      if (const auto* time = optional(change, "ocel:timestamp"); time && !missing_value(*time))
+        raw_times = raw_times || !time->is_string() || !readable_time(time->string());
+      AttributeRows::Row row;
+      for (const auto& key : entry->keys)
+        if (key != "ocel:oid" && key != "ocel:type" && key != "ocel:timestamp" && key != "ocel:field")
+          row.values.emplace_back(key, &change.at(key));
+      change_rows.rows.push_back(std::move(row));
+    }
+    change_rows.finish();
+    for (const auto* entry : entries) {
+      const auto& change = entry->object();
+      const auto* raw_id = optional(change, "ocel:oid");
+      if (raw_id == nullptr) continue;
+      const auto id = column_str(*raw_id, ids.kind());
+      if (!id) continue;
+      const auto found = object_index.find(*id);
+      if (found == object_index.end()) continue;  // the reference drops it
+      // The change takes its object's type whatever its own "ocel:type"
+      // says; an id that is no str finds no type (the change keeps NaN).
+      RawChange raw{found->second, {}, {}, nullptr, {}};
+      const auto refuse = [&](const std::string& why) {
+        if (raw.refusal.empty())
+          raw.refusal = "OCEL JSON object change of " + *id + ": " + why + ", which a native OCEL cannot hold";
+      };
+      if (!raw_id->is_string()) refuse("its id " + repr(*raw_id) + " is no str, so pm4py gives it no object type");
+      const auto* time = optional(change, "ocel:timestamp");
+      if (time == nullptr || missing_value(*time)) {
+        refuse("it has no time (pm4py keeps NaT)");
+      } else if (!time->is_string()) {
+        refuse("its time " + repr(*time) + " is no str");
+      } else {
+        raw.time = time->string();
+        if (raw_times && readable_time(raw.time))
+          refuse("pm4py keeps its time '" + raw.time + "' as text next to a time it cannot read");
+      }
+      const auto* field = optional(change, "ocel:field");
+      if (field == nullptr || missing_value(*field)) {
+        refuse("it names no field");
+      } else if (!field->is_string()) {
+        refuse("its field " + repr(*field) + " is no str");
+      } else {
+        raw.field = field->string();
+        if (raw.field == "ocel:oid") {
+          raw.value = *id;
+        } else if (raw.field == "ocel:field") {
+          raw.value = raw.field;
+        } else if (raw.field == "ocel:type" || raw.field == "ocel:timestamp") {
+          refuse("its field names the frame column " + raw.field);
+        } else if (const auto* cell = optional(change, raw.field)) {
+          // A field without its value keeps NaN (null natively).
+          auto value = change_rows.cell(raw.field, *cell);
+          if (!value.unrepresentable.empty()) refuse("value '" + raw.field + "' " + value.unrepresentable);
+          else raw.value = std::move(value.value);
+        }
+      }
+      changes.push_back(std::move(raw));
+    }
+  }
+
+  // The frames' columns and texts.
+  Column activities, types, relation_activities, relation_types;
+  for (const auto& event : events) activities.observe(event.frame_activity);
+  for (const auto& object : objects) types.observe(object.frame_type);
+  for (const auto& relation : relations) {
+    relation_activities.observe(events[relation.event].activity);
+    relation_types.observe(objects[relation.object].type);
+  }
+  event_rows.finish();
+  object_rows.finish();
+  const auto nonempty = [](const std::optional<std::string>& text) { return text && !text->empty(); };
+  // A frame id: the row's own, or the override (missing drops the row; a
+  // value that is no str is refused if its row remains).
+  const auto frame_id = [](const Json* override_id, const std::string& own) -> std::optional<std::string> {
+    if (override_id == nullptr) return own;
+    if (override_id->is_string()) return override_id->string();
+    if (missing_value(*override_id)) return std::nullopt;
+    return "\x01" + repr(*override_id);
+  };
+  std::vector<std::optional<std::string>> event_activity(events.size()), event_frame_id(events.size()),
+      relation_activity(events.size());
+  std::vector<std::optional<std::string>> object_type(objects.size()), object_frame_id(objects.size()),
+      relation_type(objects.size());
+  for (std::size_t i = 0; i < events.size(); ++i) {
+    event_activity[i] = column_str(*events[i].frame_activity, activities.kind());
+    event_frame_id[i] = frame_id(events[i].frame_id, events[i].id);
+    if (!events[i].relations.empty())
+      relation_activity[i] = column_str(*events[i].activity, relation_activities.kind());
+  }
+  std::vector<bool> object_related(objects.size(), false);
+  for (const auto& relation : relations) object_related[relation.object] = true;
+  for (std::size_t i = 0; i < objects.size(); ++i) {
+    object_type[i] = column_str(*objects[i].frame_type, types.kind());
+    object_frame_id[i] = frame_id(objects[i].frame_id, objects[i].id);
+    if (object_related[i])
+      relation_type[i] = column_str(*objects[i].type, relation_types.kind());
+  }
+
+  // The reference's filtering (see above).
+  listing.objects = !objects.empty();
+  listing.relations = !relations.empty();
+  std::vector<bool> relation_kept(relations.size());
+  std::unordered_set<std::string> related_event_ids, related_object_ids;
+  for (std::size_t r = 0; r < relations.size(); ++r) {
+    const auto& relation = relations[r];
+    relation_kept[r] = !events[relation.event].id.empty() && nonempty(relation_activity[relation.event]) &&
+                       !objects[relation.object].id.empty() && nonempty(relation_type[relation.object]);
+    if (!relation_kept[r]) continue;
+    related_event_ids.insert(events[relation.event].id);
+    related_object_ids.insert(objects[relation.object].id);
+  }
+  std::vector<bool> event_kept(events.size()), object_kept(objects.size());
+  std::unordered_set<std::string> frame_event_ids, frame_object_ids;
+  for (std::size_t i = 0; i < events.size(); ++i) {
+    event_kept[i] = nonempty(event_frame_id[i]) && nonempty(event_activity[i]) &&
+                    (keep_unrelated || related_event_ids.count(*event_frame_id[i]));
+    if (event_kept[i]) frame_event_ids.insert(*event_frame_id[i]);
+  }
+  for (std::size_t i = 0; i < objects.size(); ++i) {
+    object_kept[i] = nonempty(object_frame_id[i]) && nonempty(object_type[i]) &&
+                     (keep_unrelated || related_object_ids.count(*object_frame_id[i]));
+    if (object_kept[i]) frame_object_ids.insert(*object_frame_id[i]);
+  }
+  // When no relation keeps both its event and its object, the frames keep
+  // no event and no object either (observed: an event whose only object the
+  // objects frame drops stays when another relation remains, and goes with
+  // the last one).
+  const bool relation_remains = std::any_of(relations.begin(), relations.end(), [&, r = std::size_t{0}](const RawRelation& relation) mutable {
+    const bool kept = relation_kept[r++];
+    return kept && frame_event_ids.count(events[relation.event].id) && frame_object_ids.count(objects[relation.object].id);
+  });
+  if (!keep_unrelated && !relation_remains) {
+    std::fill(event_kept.begin(), event_kept.end(), false);
+    std::fill(object_kept.begin(), object_kept.end(), false);
+  }
+  std::unordered_set<std::string> kept_event_ids, kept_object_ids;
+  for (std::size_t i = 0; i < events.size(); ++i) {
+    if (!event_kept[i]) continue;
+    if (*event_frame_id[i] != events[i].id)
+      raise("OCEL JSON event " + events[i].id + " vmap entry ocel:eid " + repr(*events[i].frame_id) +
+            ": pm4py puts it in the events frame next to the row it names, which a native OCEL cannot hold");
+    kept_event_ids.insert(events[i].id);
+  }
+  for (std::size_t i = 0; i < objects.size(); ++i) {
+    if (!object_kept[i]) continue;
+    if (*object_frame_id[i] != objects[i].id)
+      raise("OCEL JSON object " + objects[i].id + " ovmap entry ocel:oid " + repr(*objects[i].frame_id) +
+            ": pm4py puts it in the objects frame next to the row it names, which a native OCEL cannot hold");
+    kept_object_ids.insert(objects[i].id);
+  }
+
+  // The kept rows, in file order.
+  for (std::size_t i = 0; i < objects.size(); ++i) {
+    if (!object_kept[i]) continue;
+    std::string bad;
+    auto attributes = object_rows.attributes(i, bad);
+    if (!bad.empty()) raise("OCEL JSON object " + objects[i].id + ": " + bad + ", which a native OCEL cannot hold");
+    log.objects.push_back({objects[i].id, *object_type[i], std::move(attributes)});
+    log.object_type_attributes.try_emplace(*object_type[i]);
+  }
+  for (std::size_t i = 0; i < events.size(); ++i) {
+    if (!event_kept[i]) continue;
+    auto& raw = events[i];
+    if (raw.frame_time == nullptr && text_times)
+      raise("OCEL JSON event " + raw.id + ": another event's vmap entry ocel:timestamp puts a text in the "
+            "events frame's time column, which pm4py then keeps as Python objects; a native OCEL cannot hold that");
+    if (raw.frame_time != nullptr)
+      raise("OCEL JSON event " + raw.id + " vmap entry ocel:timestamp: pm4py puts the raw value " +
+            repr(*raw.frame_time) + " in the events frame and keeps the parsed time in the relations "
+            "frame, which a native OCEL cannot hold");
+    std::string bad;
+    auto attributes = event_rows.attributes(i, bad);
+    if (!bad.empty()) raise("OCEL JSON event " + raw.id + ": " + bad + ", which a native OCEL cannot hold");
+    log.events.push_back({raw.id, *event_activity[i], std::move(raw.time), std::move(attributes)});
+    log.event_type_attributes.try_emplace(*event_activity[i]);
+  }
+  for (std::size_t r = 0; r < relations.size(); ++r) {
+    const auto& relation = relations[r];
+    const auto& event = events[relation.event];
+    const auto& object = objects[relation.object];
+    if (!relation_kept[r] || !kept_event_ids.count(event.id) || !kept_object_ids.count(object.id)) continue;
+    if (*relation_activity[relation.event] != *event_activity[relation.event])
+      raise("OCEL JSON event " + event.id + ": pm4py reads its activity as '" + *event_activity[relation.event] +
+            "' in the events frame and '" + *relation_activity[relation.event] +
+            "' in the relations frame (the columns' dtypes differ), which a native OCEL cannot hold");
+    if (*relation_type[relation.object] != *object_type[relation.object])
+      raise("OCEL JSON object " + object.id + ": pm4py reads its type as '" + *object_type[relation.object] +
+            "' in the objects frame and '" + *relation_type[relation.object] +
+            "' in the relations frame (the columns' dtypes differ), which a native OCEL cannot hold");
+    std::string qualifier;
+    if (relation.qualifier != nullptr && !relation.qualifier->is_null()) {
+      if (!relation.qualifier->is_string())
+        raise("OCEL JSON relation " + event.id + " - " + object.id + ": qualifier " + repr(*relation.qualifier) +
+              " is no str, which a native OCEL cannot hold");
+      qualifier = relation.qualifier->string();
+    }
+    log.relations.push_back({event.id, object.id, std::move(qualifier)});
+  }
+
+  // Object links: the target column reads as str (an int target 1 names
+  // object "1"); a link to an object the frames do not keep is dropped.
+  Column targets;
+  for (const auto& link : links) targets.observe(&link.target);
+  for (const auto& link : links) {
+    const auto target = column_str(link.target, targets.kind());
+    if (!target || !kept_object_ids.count(link.source) || !kept_object_ids.count(*target)) continue;
+    std::string qualifier;
+    if (!link.qualifier->is_null()) {
+      if (!link.qualifier->is_string())
+        raise("OCEL JSON object link " + link.source + " - " + *target + ": qualifier " + repr(*link.qualifier) +
+              " is no str, which a native OCEL cannot hold");
+      qualifier = link.qualifier->string();
+    }
+    log.o2o.push_back({link.source, *target, std::move(qualifier)});
+  }
+  for (auto& change : changes) {
+    if (!object_kept[change.object]) continue;
+    if (!change.refusal.empty()) raise(change.refusal);
+    // The change takes the objects frame's type cell before it reads as str.
+    if (const auto* type = objects[change.object].frame_type; !type->is_string())
+      raise("OCEL JSON object change of " + objects[change.object].id + ": pm4py gives it the object type " +
+            repr(*type) + " as the file has it (no str), which a native OCEL cannot hold");
+    log.object_changes.push_back({objects[change.object].id, *object_type[change.object], std::move(change.time),
+                                  std::move(change.field), std::move(change.value)});
+  }
+
+  // Native extensions the reference ignores: event links (an entry native
+  // cannot read is skipped).
+  if (const auto* raw_e2e = optional(root, "ocel:e2e"); raw_e2e && raw_e2e->is_array()) {
+    for (const auto& raw : raw_e2e->array()) {
+      if (!raw.is_object()) continue;
+      const auto* source = optional(raw.object(), "ocel:eid");
+      const auto* target = optional(raw.object(), "ocel:eid_2");
+      const auto* qualifier = optional(raw.object(), "ocel:qualifier");
+      if (source == nullptr || target == nullptr || !source->is_string() || !target->is_string() ||
+          (qualifier != nullptr && !qualifier->is_string()) || !kept_event_ids.count(source->string()) ||
+          !kept_event_ids.count(target->string()))
+        continue;
+      log.e2e.push_back({source->string(), target->string(), qualifier == nullptr ? std::string{} : qualifier->string()});
+    }
+  }
+  return log;
+}
+
+// The former classic reading, kept for exact filter inputs (literal names).
 Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_relations = false) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
   parse_classic_type_catalog(optional(root, "ocel:objectTypes"),
@@ -1119,7 +1892,7 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   // pm4py reads the document with json.load: an object id repeated in the
   // classic "ocel:objects" (under another type, say) is the last entry, in
   // the place of the first.
-  const Json root = Parser(json, limits).last_repeated_key_wins().parse();
+  const Json root = Parser(json, limits).last_repeated_key_wins().python_numbers().parse();
   if (!root.is_object()) throw std::invalid_argument("OCEL root must be object");
   const auto& r = root.object();
   if(const auto* marker=optional(r,"minera:literalNames")) {
@@ -1139,7 +1912,27 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
       throw std::invalid_argument("minera:repeatedRelations must be boolean");
     repeated_relations = std::get<bool>(marker->value);
   }
-  Ocel result = standard ? parse_standard(r) : parse_classic(r, literal_names, repeated_relations);
+  // Round EE: a classic file reads as read_ocel_json walks it (see
+  // parse_classic_reference); exact filter inputs with literal names keep
+  // the former reading. A transport holding event times read_ocel_json
+  // cannot read says so and keeps them.
+  bool lenient_times = false;
+  if (const auto* marker = optional(r, "minera:unreadableEventTimes")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:unreadableEventTimes must be boolean");
+    lenient_times = std::get<bool>(marker->value);
+  }
+  const auto* keep_unrelated_marker = optional(r, "minera:keepUnrelated");
+  const bool classic_reference = !standard && !literal_names;
+  const bool keep_unrelated_flag = keep_unrelated_marker && keep_unrelated_marker->is_bool() &&
+                                  std::get<bool>(keep_unrelated_marker->value);
+  ClassicListing listing;
+  Ocel result = standard ? parse_standard(r)
+                : classic_reference
+                    ? parse_classic_reference(root, repeated_relations, lenient_times,
+                                              !keep_unrelated_flag && !optional(r, "minera:untypedRelations"),
+                                              keep_unrelated_flag, listing)
+                    : parse_classic(r, literal_names, repeated_relations);
   if (standard && !repeated_relations) {
     std::set<std::pair<std::string, std::string>> seen;
     std::vector<OcelRelation> kept;
@@ -1282,14 +2075,20 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   if (untyped_marker && !untyped_marker->is_bool())
     throw std::invalid_argument("minera:untypedRelations must be boolean");
   const bool reference_read = !literal_names && !keep_unrelated && !untyped_marker;
-  if (reference_read && result.events.empty())
+  // The classic reference reading raises that itself, and its frames keep
+  // their columns when the filtering empties them.
+  if (reference_read && !classic_reference && result.events.empty())
     throw std::invalid_argument("KeyError: 'ocel:timestamp'");
-  const bool no_object_listed = reference_read && result.objects.empty();
+  const bool no_object_listed =
+      reference_read && (classic_reference ? !listing.objects : result.objects.empty());
   // Both reference JSON readers drop events with an empty id or activity and
   // objects with an empty id or type (observed black-box); literal names
   // (exact filter inputs) keep them.
+  // The classic reference reading filters its frames itself (an event can
+  // stay without relations there); drop_empty_ocel_names then only clears
+  // empty type names from the catalogs.
   if (!literal_names) drop_empty_ocel_names(result);
-  if (!keep_unrelated) drop_unrelated_ocel_entries(result);
+  if (!keep_unrelated && !classic_reference) drop_unrelated_ocel_entries(result);
   // A log whose reference frame is activity first (read from XML, see
   // Ocel::event_activity_first) keeps that order between routes.
   if (const auto* marker = optional(r, "minera:eventActivityFirst")) {
@@ -1310,8 +2109,9 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   }
   if (no_object_listed && !result.table_columns.objects)
     result.table_columns.objects.emplace();
-  result.untyped_relations = untyped_marker ? std::get<bool>(untyped_marker->value)
-                                            : reference_read && result.relations.empty();
+  result.untyped_relations =
+      untyped_marker ? std::get<bool>(untyped_marker->value)
+                     : reference_read && (classic_reference ? !listing.relations : result.relations.empty());
   result.naive_event_time_unit = std::move(naive_unit);
   return result;
 }
@@ -2826,6 +3626,18 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
     write_event_time_offset();
     write_nanoseconds();
     write_order_markers(false);
+    // Round EE: read_ocel_json raises on an event time fromisoformat cannot
+    // read (an empty or NaT time of a CSV or SQLite import, a text or float
+    // time of an OCEL 1.0 XML one); the transport keeps them.
+    if (std::any_of(log.events.begin(), log.events.end(), [](const OcelEvent& event) {
+          try {
+            (void)iso_wall_microseconds(event.timestamp);
+            return false;
+          } catch (const std::invalid_argument&) {
+            return true;
+          }
+        }))
+      out << ",\"minera:unreadableEventTimes\":true";
     if (log.event_activity_first) out << ",\"minera:eventActivityFirst\":true";
   }
   out << '}';

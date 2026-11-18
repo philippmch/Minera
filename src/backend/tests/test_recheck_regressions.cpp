@@ -296,12 +296,16 @@ void ocel_wall_clock_order(){
    {"2024-01-01T24:00:00","hour must be in 0..23"},{"2024-01-01T05:00:00 ","Invalid isoformat string: '2024-01-01T05:00:00 '"},
    {"2024-01-01T05:00:00+08:00x","Invalid isoformat string: '2024-01-01T05:00:00+08:00x'"},{"2024-02-30","day is out of range for month"}})
   check(import_error([&]{(void)parse_ocel_json(ocel2_json({"2024-01-01T00:00:00",bad}));})==message,"OCEL JSON rejects timestamp '"+bad+"'");
- // Classic JSON is native transport: an unreadable timestamp keeps file order.
+ // Classic JSON is native transport: an unreadable timestamp keeps file order
+ // when the document says it holds one (round EE); a file without the marker
+ // raises read_ocel_json's error.
  const std::string classic_nat=R"({"ocel:objects":{"o1":{"ocel:type":"T","ocel:ovmap":{}}},"ocel:events":{
   "late":{"ocel:activity":"A","ocel:timestamp":"2020-01-02T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}},
   "nat":{"ocel:activity":"A","ocel:timestamp":"NaT","ocel:omap":["o1"],"ocel:vmap":{}},
-  "early":{"ocel:activity":"A","ocel:timestamp":"2020-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}}}})";
- check(event_ids(parse_ocel_json(classic_nat))=="late,nat,early,","classic OCEL JSON transport keeps NaT logs in file order");
+  "early":{"ocel:activity":"A","ocel:timestamp":"2020-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}}},
+  "ocel:global-log":{},"ocel:global-event":{},"ocel:global-object":{})";
+ check(event_ids(parse_ocel_json(classic_nat+R"(,"minera:unreadableEventTimes":true})"))=="late,nat,early,","classic OCEL JSON transport keeps NaT logs in file order");
+ check(import_error([&]{(void)parse_ocel_json(classic_nat+"}");})=="Invalid isoformat string: 'NaT'","a classic OCEL JSON file with a NaT time raises");
  const auto xml=parse_ocel_xml(ocel2_xml({"2024-01-01T05:00:00+08:00","2024-01-01T01:00:00Z","2024-01-01 03:00:00"}));
  check(event_ids(xml)=="e1,e2,e0,","OCEL XML wall-clock order");
  check(import_error([&]{(void)parse_ocel_xml(ocel2_xml({"2024-01-01T00:00:00","garbage"}));})=="String does not contain a date: garbage","OCEL XML rejects an unreadable timestamp");

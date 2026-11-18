@@ -606,7 +606,8 @@ void date_attributes_read_as_reference() {
   const auto classic_json = minera::parse_ocel_json(
       R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01T00:00:00Z","ocel:activity":"A",)"
       R"("ocel:vmap":{"d":"2024-02-01T08:30:00+02:00"},"ocel:omap":["o1"]}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}},"ocel:eventTypes":{"A":{"d":"date"}}})");
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}},"ocel:eventTypes":{"A":{"d":"date"}},)"
+      R"("ocel:global-log":{},"ocel:global-event":{},"ocel:global-object":{}})");
   assert(text(classic_json.events[0].attributes[0].value) == "2024-02-01T08:30:00+02:00");
 }
 
@@ -778,7 +779,8 @@ void reference_writer_shapes() {
       R"({"ocel:events":{"e1":{"ocel:activity":"go","ocel:timestamp":"2020-01-01T00:00:00","ocel:vmap":{},"ocel:omap":["o1"]}},)"
       R"("ocel:objects":{"o1":{"ocel:type":"A","ocel:ovmap":{"a":1}}},)"
       R"("ocel:objectChanges":[{"ocel:oid":"o1","ocel:timestamp":"2020-01-02T00:00:00","ocel:field":"a","a":5},)"
-      R"({"ocel:oid":"o1","ocel:timestamp":"2020-01-03T00:00:00+01:00","ocel:field":"a","a":6}]})");
+      R"({"ocel:oid":"o1","ocel:timestamp":"2020-01-03T00:00:00+01:00","ocel:field":"a","a":6}],)"
+      R"("ocel:global-log":{},"ocel:global-event":{},"ocel:global-object":{}})");
   assert(classic_changes.object_changes.size() == 2);
   assert(classic_changes.object_changes[0].timestamp == "2020-01-02T00:00:00+00:00");
   assert(classic_changes.object_changes[1].timestamp == "2020-01-02T23:00:00+00:00");

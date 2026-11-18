@@ -91,7 +91,10 @@ void transport() {
          "the OCEL 2.0 transport keeps the unit and the texts");
   const auto reread = parse_ocel_json(download);
   expect(reread.naive_event_time_unit.empty(), "a downloaded file reads aware, as the reference reads it");
-  expect(error_of([&] { (void)parse_ocel_json(R"({"ocel:events":{},"ocel:objects":{},"minera:naiveEventTimes":"h"})"); })
+  expect(error_of([&] { (void)parse_ocel_json(
+                     R"({"ocel:events":{"e1":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o1"],"ocel:vmap":{}}},)"
+                     R"("ocel:objects":{"o1":{"ocel:type":"t","ocel:ovmap":{}}},"ocel:global-log":{},"ocel:global-event":{},)"
+                     R"("ocel:global-object":{},"minera:naiveEventTimes":"h"})"); })
                  .find("minera:naiveEventTimes") != std::string::npos,
          "an unknown unit is refused");
 }

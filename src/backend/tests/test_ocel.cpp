@@ -21,6 +21,13 @@ namespace {
 
 constexpr std::size_t kOcelOverLimitPadding = 128u * 1024u * 1024u;
 
+// pm4py's read_ocel_json reads a classic file's three global scopes (round
+// EE), so the handwritten classic documents here add empty ones.
+std::string with_globals(std::string doc) {
+  doc.insert(doc.rfind('}'), R"(,"ocel:global-log":{},"ocel:global-event":{},"ocel:global-object":{})");
+  return doc;
+}
+
 std::string policy_net_signature(const minera::PetriNet& net) {
   std::ostringstream out;
   out << net.place_count() << ':' << net.source() << ':' << net.sink() << ':';
@@ -246,16 +253,16 @@ void readers_drop_unrelated_entries_contract() {
   assert(standard.relations.size() == 1);
   assert(standard.o2o.empty() && standard.object_changes.empty());
 
-  const auto classic = minera::parse_ocel_json(
+  const auto classic = minera::parse_ocel_json(with_globals(
       R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}},)"
       R"("e2":{"ocel:activity":"B","ocel:timestamp":"2024-01-01T01:00:00","ocel:omap":[],"ocel:vmap":{}}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}},"o2":{"ocel:type":"order","ocel:ovmap":{}}}})");
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}},"o2":{"ocel:type":"order","ocel:ovmap":{}}}})"));
   assert(classic.events.size() == 1 && classic.events[0].id == "e1");
   assert(classic.objects.size() == 1 && classic.objects[0].id == "o1");
 
-  const auto unrelated = minera::parse_ocel_json(
+  const auto unrelated = minera::parse_ocel_json(with_globals(
       R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":[],"ocel:vmap":{}}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})"));
   assert(unrelated.events.empty() && unrelated.objects.empty());
 
   // Native callers that build an OCEL in memory keep their entries until a
@@ -273,9 +280,9 @@ void readers_drop_unrelated_entries_contract() {
 void json_limits_contract() {
   assert(minera::ocel_limit_text(128u * 1024u * 1024u) == "128 MiB");
   assert(minera::ocel_limit_text(1000) == "1000 bytes");
-  const std::string small =
+  const std::string small = with_globals(
       R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})";
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
   assert(!minera::ocel_json_limit_violation(small));
   minera::OcelJsonLimits tight;
   tight.max_bytes = 64;
@@ -301,6 +308,7 @@ void json_limits_contract() {
   std::string large = R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{"pad":")";
   large.append(17u * 1024u * 1024u, ' ');
   large += R"("}}},"ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})";
+  large = with_globals(std::move(large));
   minera::OcelJsonLimits long_strings;
   long_strings.max_string_bytes = 32u * 1024u * 1024u;
   assert(!minera::ocel_json_limit_violation(large, long_strings));
@@ -320,11 +328,11 @@ void json_limits_contract() {
 // the log's event, object and attribute order and print floats as Python's
 // repr.
 void json_order_contract() {
-  const auto classic = minera::parse_ocel_json(
+  const auto classic = minera::parse_ocel_json(with_globals(
       R"({"ocel:events":{"e2":{"ocel:activity":"B","ocel:timestamp":"2024-01-02T00:00:00","ocel:omap":["o2","o1"],)"
       R"("ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"q1"},{"ocel:oid":"o2","ocel:qualifier":"q2"}],"ocel:vmap":{"z":0.1,"a":1e20}},)"
       R"("e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00","ocel:omap":["o1"],"ocel:vmap":{}}},)"
-      R"("ocel:objects":{"o2":{"ocel:type":"item","ocel:ovmap":{"w":2,"b":true}},"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+      R"("ocel:objects":{"o2":{"ocel:type":"item","ocel:ovmap":{"w":2,"b":true}},"o1":{"ocel:type":"order","ocel:ovmap":{}}}})"));
   assert(classic.events.size() == 2 && classic.events[1].id == "e2");
   assert(classic.events[1].attributes[0].key == "z" && classic.events[1].attributes[1].key == "a");
   assert(classic.objects[0].id == "o2" && classic.objects[0].attributes[0].key == "w");
@@ -336,7 +344,8 @@ void json_order_contract() {
   assert(qualified == 2);
   const auto written = minera::serialize_ocel_json(classic, minera::OcelJsonFormat::kClassic);
   assert(written.find(R"("z":0.1,"a":1e+20)") != std::string::npos);
-  assert(written.find(R"("w":2,"b":true)") != std::string::npos);
+  // o1 holds no "w", so the column is float64 and pm4py writes 2.0 (round EE).
+  assert(written.find(R"("w":2.0,"b":true)") != std::string::npos);
   assert(written.find(R"("e1":)") < written.find(R"("e2":)"));
   assert(written.find(R"("o2":)") < written.find(R"("o1":)"));
   assert(written.find("minera:keepUnrelated") == std::string::npos);
@@ -425,11 +434,11 @@ void repeated_object_ids_contract() {
   assert(standard.object_changes[1].object_type == "item" &&
          std::get<std::string>(standard.object_changes[1].value) == "8");
 
-  const auto classic = minera::parse_ocel_json(
+  const auto classic = minera::parse_ocel_json(with_globals(
       R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01T00:00:00Z","ocel:activity":"A","ocel:vmap":{},"ocel:omap":["o1","o2"]}},)"
       R"("ocel:objectChanges":[{"ocel:oid":"o1","ocel:type":"order","ocel:timestamp":"2024-01-02T00:00:00Z","ocel:field":"p","p":5}],)"
       R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{"p":1}},"o2":{"ocel:type":"item","ocel:ovmap":{}},)"
-      R"("o1":{"ocel:type":"item","ocel:ovmap":{"q":2}}}})");
+      R"("o1":{"ocel:type":"item","ocel:ovmap":{"q":2}}}})"));
   assert(classic.objects.size() == 2 && classic.objects[0].id == "o1" && classic.objects[0].type == "item");
   assert(classic.objects[0].attributes.size() == 1 && classic.objects[0].attributes[0].key == "q");
   assert(classic.object_changes.size() == 1 && classic.object_changes[0].object_type == "item");
@@ -456,16 +465,16 @@ void naive_timestamps_read_as_utc_contract() {
   assert(standard.find(R"("time":"2024-01-01T00:00:00Z")") != std::string::npos);
   assert(standard.find(R"("time":"2024-01-05T12:00:00+00:00")") != std::string::npos);
   assert(standard.find(R"("time":"1970-01-01T00:00:00Z")") != std::string::npos);
-  const auto classic = minera::parse_ocel_json(
+  const auto classic = minera::parse_ocel_json(with_globals(
       R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01 08:00","ocel:activity":"A","ocel:vmap":{},"ocel:omap":["o1"]}},)"
       R"("ocel:objectChanges":[{"ocel:oid":"o1","ocel:timestamp":"2024-01-02T00:00:00","ocel:field":"p","p":5}],)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})"));
   assert(classic.events[0].timestamp == "2024-01-01T08:00:00Z");
   assert(classic.object_changes[0].timestamp == "2024-01-02T00:00:00+00:00");
   // An aware text is kept as written.
-  const auto aware = minera::parse_ocel_json(
-      R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01T08:00:00+00:00","ocel:activity":"A","ocel:omap":["o1"]}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  const auto aware = minera::parse_ocel_json(with_globals(
+      R"({"ocel:events":{"e1":{"ocel:timestamp":"2024-01-01T08:00:00+00:00","ocel:activity":"A","ocel:omap":["o1"],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})"));
   assert(aware.events[0].timestamp == "2024-01-01T08:00:00+00:00");
 }
 
@@ -495,10 +504,10 @@ void global_scope_defaults_contract() {
   assert(standard_read.global_event_scope && standard_read.global_object_scope);
   const auto empty_scopes = minera::serialize_ocel_json(standard_read, minera::OcelJsonFormat::kClassic, false);
   assert(empty_scopes.find(R"("ocel:global-event":{},"ocel:global-object":{})") != std::string::npos);
-  // A file's declared empty scope stays empty; an absent one gets its default.
-  const auto one_scope = minera::parse_ocel_json(
-      R"({"ocel:global-event":{},"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"],"ocel:vmap":{}}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}}}})");
+  // A declared empty scope stays empty; an absent one gets its default
+  // (read_ocel_json needs all three in a file, so the log is built here).
+  auto one_scope = log;
+  one_scope.global_event_scope = true;
   const auto one_written = minera::serialize_ocel_json(one_scope, minera::OcelJsonFormat::kClassic, false);
   assert(one_written.find(R"("ocel:global-event":{},"ocel:global-object":{"ocel:type":"__INVALID__"})") !=
          std::string::npos);
@@ -552,7 +561,7 @@ void standard_json_declares_frame_column_types_contract() {
 // it (observed black-box); an event left without relations goes too. The
 // readers used to refuse the whole log.
 void readers_drop_unknown_object_references_contract() {
-  const auto classic = minera::parse_ocel_json(
+  const auto classic = minera::parse_ocel_json(with_globals(
       R"({"ocel:events":{"e1":{"ocel:activity":"A","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1","zz"],)"
       R"("ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"q"},{"ocel:oid":"zz","ocel:qualifier":"w"},{"ocel:oid":"o2","ocel:qualifier":"v"}],"ocel:vmap":{}},)"
       R"("e2":{"ocel:activity":"B","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o2"],"ocel:vmap":{}},)"
@@ -560,7 +569,7 @@ void readers_drop_unknown_object_references_contract() {
       R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{},"ocel:o2o":[{"ocel:oid":"zz","ocel:qualifier":"x"},{"ocel:oid":"o2","ocel:qualifier":"y"}]},)"
       R"("o2":{"ocel:type":"order","ocel:ovmap":{}}},)"
       R"("ocel:objectChanges":[{"ocel:oid":"zz","ocel:type":"order","ocel:field":"st","st":"a","ocel:timestamp":"2024-01-02T00:00:00Z"},)"
-      R"({"ocel:oid":"o1","ocel:type":"order","ocel:field":"st","st":"b","ocel:timestamp":"2024-01-02T00:00:00Z"}]})");
+      R"({"ocel:oid":"o1","ocel:type":"order","ocel:field":"st","st":"b","ocel:timestamp":"2024-01-02T00:00:00Z"}]})"));
   assert(classic.events.size() == 2 && classic.events[0].id == "e1" && classic.events[1].id == "e2");
   assert(classic.relations.size() == 2);
   assert(classic.relations[0].event_id == "e1" && classic.relations[0].object_id == "o1" &&
@@ -587,12 +596,13 @@ void readers_drop_unknown_object_references_contract() {
 // also takes a repeated event id from its last listing, in the place of the
 // first, and reads empty attribute names and repeated declarations.
 void readers_drop_empty_names_contract() {
-  const auto classic = minera::parse_ocel_json(
-      R"({"ocel:events":{"e1":{"ocel:activity":"","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]},)"
-      R"("":{"ocel:activity":"a","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o1"]},)"
-      R"("e3":{"ocel:activity":"b","ocel:timestamp":"2024-01-01T00:02:00Z","ocel:omap":["o1","p1",""]},)"
-      R"("e4":{"ocel:activity":"c","ocel:timestamp":"2024-01-01T00:03:00Z","ocel:omap":["p1"]}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"o","ocel:o2o":[{"ocel:oid":"p1"},{"ocel:oid":""}]},"p1":{"ocel:type":""},"":{"ocel:type":"o"}}})");
+  const auto classic = minera::parse_ocel_json(with_globals(
+      R"({"ocel:events":{"e1":{"ocel:activity":"","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"],"ocel:vmap":{}},)"
+      R"("":{"ocel:activity":"a","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o1"],"ocel:vmap":{}},)"
+      R"("e3":{"ocel:activity":"b","ocel:timestamp":"2024-01-01T00:02:00Z","ocel:omap":["o1","p1",""],"ocel:vmap":{}},)"
+      R"("e4":{"ocel:activity":"c","ocel:timestamp":"2024-01-01T00:03:00Z","ocel:omap":["p1"],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"o","ocel:ovmap":{},"ocel:o2o":[{"ocel:oid":"p1","ocel:qualifier":""},{"ocel:oid":"","ocel:qualifier":""}]},)"
+      R"("p1":{"ocel:type":"","ocel:ovmap":{}},"":{"ocel:type":"o","ocel:ovmap":{}}}})"));
   assert(classic.events.size() == 1 && classic.events[0].id == "e3");
   assert(classic.objects.size() == 1 && classic.objects[0].id == "o1");
   assert(classic.relations.size() == 1 && classic.relations[0].object_id == "o1");
@@ -633,12 +643,12 @@ void readers_drop_empty_names_contract() {
 // OCDFG edge keys are labels: "a" -> "b->c" and "a->b" -> "c" both read
 // "a->b->c", so the second gets "#2" and the JSON object keeps both edges.
 void ocdfg_edge_keys_stay_unique_contract() {
-  const auto log = minera::parse_ocel_json(
-      R"({"ocel:events":{"e1":{"ocel:activity":"a","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]},)"
-      R"("e2":{"ocel:activity":"b->c","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o1"]},)"
-      R"("e3":{"ocel:activity":"a->b","ocel:timestamp":"2024-01-01T00:02:00Z","ocel:omap":["o2"]},)"
-      R"("e4":{"ocel:activity":"c","ocel:timestamp":"2024-01-01T00:03:00Z","ocel:omap":["o2"]}},)"
-      R"("ocel:objects":{"o1":{"ocel:type":"order"},"o2":{"ocel:type":"order"}}})");
+  const auto log = minera::parse_ocel_json(with_globals(
+      R"({"ocel:events":{"e1":{"ocel:activity":"a","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"],"ocel:vmap":{}},)"
+      R"("e2":{"ocel:activity":"b->c","ocel:timestamp":"2024-01-01T00:01:00Z","ocel:omap":["o1"],"ocel:vmap":{}},)"
+      R"("e3":{"ocel:activity":"a->b","ocel:timestamp":"2024-01-01T00:02:00Z","ocel:omap":["o2"],"ocel:vmap":{}},)"
+      R"("e4":{"ocel:activity":"c","ocel:timestamp":"2024-01-01T00:03:00Z","ocel:omap":["o2"],"ocel:vmap":{}}},)"
+      R"("ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{}},"o2":{"ocel:type":"order","ocel:ovmap":{}}}})"));
   const auto graph = minera::discover_ocdfg_classic(log);
   assert(graph.edges.at("order").size() == 2);
   const auto json = minera::serialize_ocdfg_json(graph);
@@ -672,8 +682,8 @@ int main() {
   standard_json_declared_type_fallback_contract();
   ocpn_miner_policy_contract();
   const std::string input =
-      R"({"ocel:events":{"e2":{"ocel:activity":"Ship","ocel:timestamp":"2024-01-02T00:00:00Z","ocel:omap":["o1","o2"],"ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"source"},{"ocel:oid":"o2","ocel:qualifier":"target"}],"ocel:vmap":{"count":2}},"e1":{"ocel:activity":"Create","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"]}},"ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{"amount":12.5}},"o2":{"ocel:type":"item","ocel:ovmap":{}}}})";
-  auto log = minera::parse_ocel_json(input);
+      R"({"ocel:events":{"e2":{"ocel:activity":"Ship","ocel:timestamp":"2024-01-02T00:00:00Z","ocel:omap":["o1","o2"],"ocel:typedOmap":[{"ocel:oid":"o1","ocel:qualifier":"source"},{"ocel:oid":"o2","ocel:qualifier":"target"}],"ocel:vmap":{"count":2}},"e1":{"ocel:activity":"Create","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o1"],"ocel:vmap":{}}},"ocel:objects":{"o1":{"ocel:type":"order","ocel:ovmap":{"amount":12.5}},"o2":{"ocel:type":"item","ocel:ovmap":{}}}})";
+  auto log = minera::parse_ocel_json(with_globals(input));
   assert(log.events.size() == 2 && log.objects.size() == 2 &&
          log.relations.size() == 3);
   assert(log.relations[1].qualifier == "source");
@@ -686,6 +696,8 @@ int main() {
        std::string("shipped")});
   log.globals["ocel:global-log.version"] = std::int64_t{2};
   log.globals["ocel:global-event.owner"] = std::string("a\"b\\c");
+  // As a log read from a format that declares no scope.
+  log.global_event_scope = log.global_object_scope = false;
 
   const auto etot = minera::discover_etot_classic(log);
   assert(etot.edges.size() == 3);
@@ -917,26 +929,24 @@ int main() {
 
   // A repeated key is the last entry in the place of the first, as
   // json.load reads it (pm4py.read_ocel_json keeps event "e" as "b").
-  const auto repeated = minera::parse_ocel_json(
-      R"({"ocel:objects":{"o":{"ocel:type":"x"}},"ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o"]},)"
-      R"("f":{"ocel:activity":"c","ocel:timestamp":"2024-01-03","ocel:omap":["o"]},"e":{"ocel:activity":"b","ocel:timestamp":"2024-01-02","ocel:omap":["o"]}}})");
+  const auto repeated = minera::parse_ocel_json(with_globals(
+      R"({"ocel:objects":{"o":{"ocel:type":"x","ocel:ovmap":{}}},"ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o"],"ocel:vmap":{}},)"
+      R"("f":{"ocel:activity":"c","ocel:timestamp":"2024-01-03","ocel:omap":["o"],"ocel:vmap":{}},"e":{"ocel:activity":"b","ocel:timestamp":"2024-01-02","ocel:omap":["o"],"ocel:vmap":{}}}})"));
   assert(repeated.events.size() == 2 && repeated.events[0].id == "e" && repeated.events[0].activity == "b");
   assert(repeated.relations.size() == 2);
 
   // An object link to an unlisted object is dropped, as the reference
   // reader drops it (it used to refuse the log).
-  const auto bad_o2o = minera::parse_ocel_json(
-      R"({"ocel:objects":{"o":{"ocel:type":"x","ocel:o2o":[{"ocel:oid":"missing"}]}},)"
-      R"("ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o"]}}})");
+  const auto bad_o2o = minera::parse_ocel_json(with_globals(
+      R"({"ocel:objects":{"o":{"ocel:type":"x","ocel:ovmap":{},"ocel:o2o":[{"ocel:oid":"missing","ocel:qualifier":"q"}]}},)"
+      R"("ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o"],"ocel:vmap":{}}}})"));
   assert(bad_o2o.objects.size() == 1 && bad_o2o.o2o.empty());
-  bool bad_e2e = false;
-  try {
-    (void)minera::parse_ocel_json(
-        R"({"ocel:objects":{},"ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"t","ocel:omap":[]}},"ocel:e2e":[{"ocel:eid":"e","ocel:eid_2":"missing"}]})");
-  } catch (...) {
-    bad_e2e = true;
-  }
-  assert(bad_e2e);
+  // Event links are a native extension read_ocel_json ignores: one to an
+  // unlisted event is skipped (round EE; it used to refuse the log).
+  const auto bad_e2e = minera::parse_ocel_json(with_globals(
+      R"({"ocel:objects":{"o":{"ocel:type":"x","ocel:ovmap":{}}},"ocel:events":{"e":{"ocel:activity":"a","ocel:timestamp":"2024-01-01","ocel:omap":["o"],"ocel:vmap":{}}},)"
+      R"("ocel:e2e":[{"ocel:eid":"e","ocel:eid_2":"missing"}]})"));
+  assert(bad_e2e.events.size() == 1 && bad_e2e.e2e.empty());
   assert(minera::etot_json(etot).find("\"frequency\":1") !=
          std::string::npos);
   const auto etot_round = minera::parse_etot_json(minera::etot_json(etot));
@@ -1606,7 +1616,7 @@ int main() {
     "ocel:objects":{"o":{"ocel:type":"Order","ocel:ovmap":{"amount":2.5}}},
     "ocel:events":{"e":{"ocel:activity":"Create","ocel:timestamp":"2024-01-01T00:00:00Z","ocel:omap":["o"],"ocel:vmap":{"approved":true}}}
   })json";
-  const auto classic_metadata_log = minera::parse_ocel_json(classic_metadata);
+  const auto classic_metadata_log = minera::parse_ocel_json(with_globals(classic_metadata));
   assert(classic_metadata_log.event_type_attributes.at("Create").at("approved") ==
          "boolean");
   assert(classic_metadata_log.event_type_attributes.at("Create").at("when") ==

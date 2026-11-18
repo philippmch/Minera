@@ -32202,3 +32202,150 @@ Tests:
   replay gave 2,673 responses unchanged. Python script and frontend tests
   not rerun (scripts and frontend unchanged). The device check on the Mac
   was skipped (the Mac was not linked).
+
+## Review EE1: re-review of round ED, the classic OCEL JSON reader as read_ocel_json reads it (its walk, frames, overrides, filtering and object changes), Minera's JSON transport (2026-11-18)
+
+Round EE checked ED's CI (run 44367108210 on 928705b4: the verifier,
+Python, frontend and Linux jobs green, macOS cancelled, the Windows ctest
+failed `minera_review_eb2_tests` on 13 bank files, see EE1-8) and took the
+classic JSON findings ED kept. Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in
+the reference venv with `pm4py.read_ocel_json` (`ee/js/jp2.py`-`jp12.py`,
+456 probes with ED's `ed/js` ones; `ee/js/jfz.py`, a fuzzer of classic
+files with every odd shape the probes found):
+
+- **EE1-1 The walk.** The file is read as `json.load` reads it (`NaN`,
+  `Infinity`, integers of any size, a repeated key's last value at its
+  first place). `ocel:objects`, then each object's `ocel:type` and
+  `ocel:ovmap` (and its `ocel:o2o` entries' `ocel:oid` and
+  `ocel:qualifier`), then `ocel:events` and each event's
+  `ocel:timestamp`, `ocel:activity`, `ocel:omap` and `ocel:vmap` (and its
+  `ocel:typedOmap`), then the three global scopes `ocel:global-log`,
+  `ocel:global-event` and `ocel:global-object` are looked up as Python
+  looks them up, so a missing key raises its `KeyError` and a value of the
+  wrong type the `TypeError` or `AttributeError` Python gives
+  (`list indices must be integers or slices, not str`, `'int' object has
+  no attribute 'endswith'` for a time that is no str, `'list' object has no
+  attribute 'items'` for a vmap). An event time is read by
+  `fromisoformat` as the file is walked (`Invalid isoformat string: 'x'`);
+  a file without events raises `KeyError: 'ocel:timestamp'` before the
+  scopes are looked up. An omap entry that is no str names no object, a str
+  omap is read character by character, a list or dict entry raises
+  `unhashable type`.
+- **EE1-2 Record frames.** The events, objects and relations frames are
+  pandas record frames: a column's dtype comes from all its rows, the rows
+  the filtering drops later included, so an integer next to a float or a
+  missing cell reads as a float, an integer past int64 that fits uint64
+  reads as a float next to a float or a missing cell (an object next to a
+  negative one), a larger one keeps the column of Python objects, and a
+  boolean next to anything else does too. Activities and types read as
+  `str()` of their column's cell (`1` is `"1"`, `"1.0"` in a float
+  column); a null or empty one drops the row.
+- **EE1-3 Overrides.** A vmap `ocel:eid`, `ocel:activity` or
+  `ocel:timestamp` and an ovmap `ocel:oid` or `ocel:type` take the events
+  or objects frame's cell while the relations frame keeps the event's or
+  object's own value. The events frame then sorts its time column: a list
+  or dict there raises `unhashable type`, a number or boolean next to a
+  parsed time raises `'values' is not ordered, please explicitly specify
+  the categories order by passing in a categories argument.`, a text next
+  to one leaves the column of Python objects, and a null or NaN is NaT.
+- **EE1-4 Filtering.** Each frame drops its rows with a missing or empty
+  id, activity or type (the relations frame by the event's and object's
+  own values); the events and objects frames then keep the rows some
+  remaining relation names, and the relations frame those whose event and
+  object remain. So an event whose only object the objects frame drops
+  stays without relations while another relation remains, and when no
+  relation remains no event and no object remains either.
+- **EE1-5 Object changes.** `ocel:objectChanges` is a record frame when its
+  first entry is a dict, built from `dict(entry)` of each (an empty str or
+  list is an empty row, a non-empty str raises `dictionary update sequence
+  element #0 has length 1; 2 is required`, a number `'int' object is not
+  iterable`); any other first entry gives a frame without an `ocel:oid`
+  column (`KeyError: 'ocel:oid'`, also when no entry has one); a dict
+  raises `If using all scalar values, you must pass an index`, and a file
+  listing no object raises `None of [Index(['ocel:oid', 'ocel:type'],
+  dtype='str')] are in the [columns]`. A change of an unlisted object (or
+  with a missing id) is dropped; its id reads as str (`1` names object
+  `"1"`); the change takes its object's type cell whatever its own
+  `ocel:type` says; a change time pm4py cannot read, or one that is no
+  str, leaves every change time as written, a missing one is NaT; a value
+  column takes its dtype from every change row (unlisted objects'
+  included).
+- **EE1-6 Globals.** The three scopes are required; their scalar values
+  are read and both entity scopes count as declared.
+
+Native read classic JSON with its own rules (missing `ocel:vmap`, globals
+or qualifiers allowed, a non-string activity, omap entry or value refused,
+`ocel:*` keys dropped, ints kept as ints, unreadable times kept in file
+order, events and objects without relations dropped together): main
+(928705b4) differed on 244 of the 456 probes and on 301 of 800 fuzzed files
+(seeds 1-2). The classic reader now follows the walk above
+(`parse_classic_reference` in `ocel.cpp`: `classic_json::Column` for the
+record dtypes, `AttributeRows` for the attribute frames, the three-step
+filtering, the change frame): 0 of the 456 probes and 0 of 4,000 fuzzed
+files (seeds 1-10) differ besides the declared refusals below (94 of the
+probes, 287 of the fuzzed files) and two messages (a root that is no
+object, a change given as a list of pairs).
+
+- **EE1-7 The transport.** Classic JSON is also Minera's transport between
+  routes. A transport (`transport_markers`) of a log holding an event time
+  read_ocel_json cannot read (an empty or NaT time of a CSV or SQLite
+  import, a text or float time of an OCEL 1.0 XML one) carries
+  `"minera:unreadableEventTimes": true` and keeps those times in file
+  order; a download leaves it out and reads as pm4py reads the file. Other
+  transports read as files do: an int attribute column with a float or a
+  missing cell comes back as floats, as the reference frames of every OCEL
+  reader hold it. Documents with literal names (exact filter inputs) keep
+  the former reading.
+- **EE1-8 ED's Windows ctest, re-review of ED1-7.** ED's Windows run failed
+  `minera_review_eb2_tests` on the same 13 bank files as EC's (9 of the EB
+  bank, 4 of the EC bank), all with a time column declared `TEXT`: the
+  test bound the double, and SQLite turns a REAL stored in a column of
+  TEXT affinity into its own text at insert, which winsqlite3 spells with
+  17 digits (`210234042488.69626`). The reader reads that stored text as
+  it is, as pandas does, so it was right; the file the test built was not
+  the file the reference read. The test now stores such a cell as the text
+  SQLite 3.45 makes of it (`sqlite_legacy_real_text`, finite values; a
+  column of any other affinity still gets the double), which leaves every
+  Linux file as before.
+
+Declared:
+- A row that remains after the filtering and holds what a native OCEL
+  cannot is refused with a message naming it: a list, dict or integer past
+  64 bits as a value; a frame cell the relations frame disagrees with (a
+  vmap `ocel:activity`, an ovmap `ocel:type`, or columns whose dtypes give
+  different texts); a vmap `ocel:eid` or ovmap `ocel:oid` naming another
+  row; any vmap `ocel:timestamp`, and a parsed time in a column a text
+  override left of Python objects; a qualifier that is no str; an object
+  change without a str id (pm4py gives it no type), time or field, one
+  whose field names a frame column (`ocel:type`, `ocel:timestamp`), one
+  whose object's type is no str in the file, or a readable change time
+  pm4py keeps as text next to an unreadable one.
+- A change entry given as a non-empty list (pm4py reads key-value pairs
+  through `dict()`) is refused; a root that is no object raises Minera's
+  own message (pm4py's TypeError differs between its two JSON readers).
+- Event links (`ocel:e2e`, a native extension pm4py ignores) to an event
+  the frames do not keep are skipped (they used to refuse the file).
+
+Tests:
+- New: `minera_review_ee1_tests` (25 hand cases from EE1-1 to EE1-6, the
+  transport marker of EE1-7, and `docs/ocel-json-reference-ee-bank.tsv.gz`:
+  2,056 files, the probes and fuzz seeds 7-10, each with native's reading
+  checked against pm4py on 2026-11-18).
+- Handwritten classic documents in `minera_ocel_tests`,
+  `minera_ocel_csv_tests`, `minera_recheck_regression_tests`,
+  `minera_review_du1_tests` and the CLI fixture `ocel_split.json` now hold
+  what read_ocel_json needs (the scopes, `ocel:vmap`, `ocel:ovmap`, link
+  qualifiers); `json_order_contract` writes `"w":2.0` (o1 has no `w`, as
+  pm4py writes it), the e2e check reads instead of refusing, and the NaT
+  transport check carries the marker (the file without it raises).
+- `minera_review_eb2_tests` stores a REAL in a TEXT column as SQLite
+  3.45's text of it (EE1-8).
+
+Runs: the full ctest gave 621 of 625 on the first run; the 4 failures were
+the handwritten classic documents above, and after they were updated the
+11 OCEL, review EB/EE, recheck and CLI tests passed; after EE1-8
+`minera_review_eb2_tests` passed. The workbench fixture replay gave 2,673
+responses unchanged; the `minera_ocel` CLI read about 860 bank files with
+six option sets without a crash. Python script tests: 397 of 406, the 9
+errors only for duckdb missing in this container (scripts unchanged);
+frontend not rerun (unchanged).
