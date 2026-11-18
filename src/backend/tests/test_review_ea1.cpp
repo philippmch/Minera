@@ -143,17 +143,13 @@ void shapes() {
   check({"NaT", "01/02/2024", "01/03/2024"}, "ok us NaT|2024-01-02T00:00:00|2024-01-03T00:00:00");
   check({"NA", "01/02/2024"}, "ok us NaT|2024-01-02T00:00:00");
   check({"01/02/2024", "Nat"}, "ValueError: time data \"Nat\" doesn't match format \"%m/%d/%Y\"");
-  // An event whose time is missing is NaT in the reference, which a native
-  // event cannot hold (declared).
+  // An event whose time is missing is NaT in the reference: an empty native
+  // time (round EH; it was refused before).
   {
-    std::string message;
-    try {
-      (void)parse_ocel_csv("ocel:eid,ocel:timestamp,ocel:activity,ocel:type:t\ne1,01/02/2024,a,['o1']\n"
-                           "e2,null,a,['o1']\n");
-    } catch (const std::exception& error) {
-      message = error.what();
-    }
-    expect(message.find("has no timestamp") != std::string::npos, "an NA event time is refused: " + message);
+    const auto log = parse_ocel_csv("ocel:eid,ocel:timestamp,ocel:activity,ocel:type:t\ne1,01/02/2024,a,['o1']\n"
+                                    "e2,null,a,['o1']\n");
+    expect(log.events.size() == 2 && log.events[1].id == "e2" && log.events[1].timestamp.empty(),
+           "an NA event time is NaT");
   }
 }
 

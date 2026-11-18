@@ -1,4 +1,5 @@
 #include "minera/ocel_statistics.hpp"
+#include "ocel_frame_types.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -532,6 +533,21 @@ OcelEdgeAssociations edge_associations(
         const auto target_it = event_by_id.find(target_id);
         if (source_it == event_by_id.end() || target_it == event_by_id.end())
           return std::nullopt;
+        // Round EH: a pair with a NaT time on either end measures 0, as
+        // pm4py's timedelta of NaT does; with business hours pm4py raises
+        // (observed black-box, as OC-DFG's EG1-3).
+        // A time column of None fails instead (Ocel::none_event_times).
+        if (log.none_event_times)
+          throw std::invalid_argument(
+              options.use_business_hours
+                  ? "AttributeError: 'NoneType' object has no attribute 'replace'"
+                  : "TypeError: unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
+        if (ocel_frame::nat_time_text(source_it->second->timestamp) ||
+            ocel_frame::nat_time_text(target_it->second->timestamp)) {
+          if (options.use_business_hours)
+            throw std::invalid_argument("ValueError: cannot convert float NaN to integer");
+          return 0.0;
+        }
         const auto from = options.use_business_hours
                               ? local_wall_instant(source_it->second->timestamp)
                               : parse_timestamp(source_it->second->timestamp);

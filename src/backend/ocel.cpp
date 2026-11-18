@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iomanip>
+#include <iterator>
 #include <limits>
 #include <locale>
 #include <map>
@@ -2116,6 +2117,10 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
       untyped_marker ? std::get<bool>(untyped_marker->value)
                      : reference_read && (classic_reference ? !listing.relations : result.relations.empty());
   result.naive_event_time_unit = std::move(naive_unit);
+  if (const auto* marker = optional(r, "minera:noneEventTimes")) {
+    if (!marker->is_bool()) throw std::invalid_argument("minera:noneEventTimes must be boolean");
+    result.none_event_times = std::get<bool>(marker->value);
+  }
   return result;
 }
 
@@ -2408,6 +2413,70 @@ bool ocel_reference_generated_global(std::string_view key, const OcelValue& valu
   return key == "ocel:global-log.attribute-names" || key == "ocel:global-log.object-types" ||
          key == "ocel:global-log.ocel:attribute-names" ||
          key == "ocel:global-log.ocel:object-types";
+}
+
+bool ocel_has_unrelated_entries(const Ocel& log) {
+  std::unordered_set<std::string_view> events;
+  std::unordered_set<std::string_view> objects;
+  for (const auto& event : log.events) events.insert(event.id);
+  for (const auto& object : log.objects) objects.insert(object.id);
+  std::unordered_set<std::string_view> related_events;
+  std::unordered_set<std::string_view> related_objects;
+  for (const auto& relation : log.relations) {
+    if (!events.count(relation.event_id) || !objects.count(relation.object_id)) return true;
+    related_events.insert(relation.event_id);
+    related_objects.insert(relation.object_id);
+  }
+  if (related_events.size() != events.size() || related_objects.size() != objects.size())
+    return true;
+  return std::any_of(log.o2o.begin(), log.o2o.end(),
+                     [&](const OcelO2oRelation& relation) {
+                       return !objects.count(relation.source_id) ||
+                              !objects.count(relation.target_id);
+                     }) ||
+         std::any_of(log.e2e.begin(), log.e2e.end(),
+                     [&](const OcelE2eRelation& relation) {
+                       return !events.count(relation.source_id) ||
+                              !events.count(relation.target_id);
+                     }) ||
+         std::any_of(log.object_changes.begin(), log.object_changes.end(),
+                     [&](const OcelObjectChange& change) {
+                       return !objects.count(change.object_id);
+                     });
+}
+
+namespace {
+// Whether a relation, object link, event link or object change names a
+// missing event or object (no reader leaves one; the writers refuse it
+// themselves when they validate references).
+bool ocel_has_dangling_references(const Ocel& log) {
+  std::unordered_set<std::string_view> events, objects;
+  for (const auto& event : log.events) events.insert(event.id);
+  for (const auto& object : log.objects) objects.insert(object.id);
+  return std::any_of(log.relations.begin(), log.relations.end(),
+                     [&](const OcelRelation& relation) {
+                       return !events.count(relation.event_id) || !objects.count(relation.object_id);
+                     }) ||
+         std::any_of(log.o2o.begin(), log.o2o.end(),
+                     [&](const OcelO2oRelation& relation) {
+                       return !objects.count(relation.source_id) || !objects.count(relation.target_id);
+                     }) ||
+         std::any_of(log.e2e.begin(), log.e2e.end(),
+                     [&](const OcelE2eRelation& relation) {
+                       return !events.count(relation.source_id) || !events.count(relation.target_id);
+                     }) ||
+         std::any_of(log.object_changes.begin(), log.object_changes.end(),
+                     [&](const OcelObjectChange& change) { return !objects.count(change.object_id); });
+}
+}  // namespace
+
+const Ocel& ocel_written_entries(const Ocel& log, std::optional<Ocel>& storage) {
+  if (!ocel_has_unrelated_entries(log)) return log;
+  // A dangling reference stays for the writer's own validation to refuse.
+  if (ocel_has_dangling_references(log)) return log;
+  storage.emplace(log);
+  drop_unrelated_ocel_entries(*storage);
+  return *storage;
 }
 
 void drop_unrelated_ocel_entries(Ocel& log) {
@@ -3166,8 +3235,11 @@ Ocel parse_ocel_json_literal_names(std::string_view json, const OcelJsonLimits& 
   return parse_ocel_json_names(json,limits,true);
 }
 
-std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
+std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
                                 bool transport_markers) {
+  // Round EH: a user's file leaves out events and objects without relations.
+  std::optional<Ocel> written;
+  const Ocel& log = transport_markers ? input : ocel_written_entries(input, written);
   std::ostringstream out;
   // Marks a log that holds events or objects without an event-object
   // relation, so parse_ocel_json keeps them instead of dropping them as the
@@ -3182,6 +3254,8 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   // Round DU: a log whose reference events frame is naive travels with its
   // resolution and its texts (see Ocel::naive_event_time_unit).
   const auto write_naive_event_times = [&] {
+    // Round EH: see Ocel::none_event_times.
+    if (log.none_event_times) out << ",\"minera:noneEventTimes\":true";
     if (log.naive_event_time_unit.empty()) return;
     out << ",\"minera:naiveEventTimes\":";
     write_string(out, log.naive_event_time_unit);
@@ -3216,6 +3290,9 @@ std::string serialize_ocel_json(const Ocel& log, OcelJsonFormat format,
   const auto write_event_time_offset = [&] {
     std::optional<std::int32_t> offset;
     for (const auto& event : log.events) {
+      // Round EH: a NaT time keeps the column's offset (pandas keeps the
+      // dtype); the transport keeps its empty text.
+      if (ocel_frame::nat_time_text(event.timestamp)) continue;
       const auto parsed = parse_timestamp_exact(event.timestamp);
       if (!parsed || !parsed->timezone_aware || parsed->offset_minutes == 0 ||
           (offset && *offset != parsed->offset_minutes))
@@ -3948,6 +4025,11 @@ OcdfgGraph discover_ocdfg_classic_with_options(
           log, object_couples, timing_options);
       edge.performance = edge.performance_total_objects;
     } else if (options.compute_edges_performance) {
+      // Round EH: a time column of None (Ocel::none_event_times) fails on
+      // the first pair, as the reference's OC-DFG does (observed black-box).
+      if (log.none_event_times && (!edge.event_couples.empty() || !edge.total_objects.empty()))
+        throw OcdfgPerformanceError("TypeError",
+                                    "unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
       for (const auto& couple : edge.event_couples) {
         if (const auto seconds = legacy_edge_elapsed(timestamp[couple.first],
                                                      timestamp[couple.second]))
@@ -4388,8 +4470,20 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       if (!trace.events.empty()) replay_flattened.traces.push_back(std::move(trace));
     }
     EventLog flattened = replay_flattened;
+    // Round EH: events with a NaT time go after the dated ones, in relation
+    // order, as pandas sorts NaT last (observed black-box).
     if (!options.mine_in_relation_order)
-      for (auto& trace : flattened.traces) order_events_by_time(trace.events);
+      for (auto& trace : flattened.traces) {
+        const auto undated = std::stable_partition(
+            trace.events.begin(), trace.events.end(),
+            [](const Event& event) { return !ocel_frame::nat_time_text(event.timestamp); });
+        std::vector<Event> dated(std::make_move_iterator(trace.events.begin()),
+                                 std::make_move_iterator(undated));
+        order_events_by_time(dated);
+        std::move(trace.events.begin() + (undated - trace.events.begin()), trace.events.end(),
+                  std::back_inserter(dated));
+        trace.events = std::move(dated);
+      }
 
     InductiveMinerOptions miner_options;
     miner_options.noise_threshold = options.noise_threshold;
@@ -4752,13 +4846,19 @@ std::string serialize_ocpn_json(const OcpnGraph& graph) {
 
 namespace {
 // An event time as the reference prints its pandas Timestamp (str): UTC with
-// "+00:00", fraction digits as stored (round BX).
-std::string description_time(const std::string& text) {
+// "+00:00", fraction digits as stored (round BX). Round EH: in the column's
+// offset when every time shares one non-zero offset (an OCEL CSV or SQLite
+// import: pandas keeps that fixed offset as the column's zone, observed
+// black-box), see ocel_frame::shared_nonzero_offset.
+std::string description_time(const std::string& text, std::optional<std::int32_t> frame_offset) {
   // Round EG: a NaT time (an OCEL 2.0 SQLite '' or NULL) prints "NaT".
   if (ocel_frame::nat_time_text(text)) return "NaT";
-  const auto parsed = parse_timestamp_exact(text);
+  auto parsed = parse_timestamp_exact(text);
   if (!parsed) return text;
-  return parsed->timezone_aware ? frame_times::utc_text(*parsed) : python::timestamp_str(*parsed);
+  if (!parsed->timezone_aware) return python::timestamp_str(*parsed);
+  if (!frame_offset) return frame_times::utc_text(*parsed);
+  parsed->offset_minutes = *frame_offset;
+  return python::timestamp_str(*parsed);
 }
 }  // namespace
 
@@ -4824,7 +4924,7 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
     if (std::all_of(object_events.begin(), object_events.end(), [&](const std::string& id) {
           return ocel_frame::nat_time_text(events.at(id)->timestamp);
         }))
-      throw std::invalid_argument("ValueError: NaTType does not support timestamp");
+      throw std::invalid_argument(ocel_frame::nat_timestamp_error(log));
   // Round EF: the reference looks every event up among the related objects,
   // in this order, so an event without relations (kept by a CSV import or a
   // classic JSON whose objects frame dropped its objects) raises KeyError
@@ -4842,12 +4942,18 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
           "KeyError: " + ocel_frame::python_str_repr(
                              *std::min_element(unrelated_objects.begin(), unrelated_objects.end())));
   }
+  const auto frame_offset = [&] {
+    std::vector<std::string_view> texts;
+    texts.reserve(log.events.size());
+    for (const auto& event : log.events) texts.push_back(event.timestamp);
+    return ocel_frame::shared_nonzero_offset(texts);
+  }();
   for (const auto& event_id : event_ids) {
     const auto* event = events.at(event_id);
     OcelTupleEventDescription description;
     description.activity = event->activity;
     description.related_objects = related_by_event[event_id];
-    if (options.include_timestamps) description.timestamp = description_time(event->timestamp);
+    if (options.include_timestamps) description.timestamp = description_time(event->timestamp, frame_offset);
     result.events.push_back(std::move(description));
   }
 
@@ -4869,8 +4975,8 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
         });
         const auto* first = events.at(it->second.front());
         const auto* last = events.at(*std::prev(timed_end));
-        description.lifecycle_start = description_time(first->timestamp);
-        description.lifecycle_end = description_time(last->timestamp);
+        description.lifecycle_start = description_time(first->timestamp, frame_offset);
+        description.lifecycle_end = description_time(last->timestamp, frame_offset);
         const auto start = parse_timestamp_exact(first->timestamp);
         const auto end = parse_timestamp_exact(last->timestamp);
         if (!start || !end)

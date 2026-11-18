@@ -145,6 +145,7 @@ Ocel empty_like(const Ocel& log) {
   result.event_activity_first = log.event_activity_first;
   result.untyped_relations = log.untyped_relations;
   result.naive_event_time_unit = log.naive_event_time_unit;
+  result.none_event_times = log.none_event_times;
   return result;
 }
 
@@ -356,6 +357,10 @@ std::vector<std::pair<std::string, ObjectIds>> ancestors_descendants(
     // SQLite '' or NULL) starts at NaT, which compares neither before, after
     // nor equal to any start: such a pair gets no direction (observed
     // black-box).
+    // Round EH: starts of None (Ocel::none_event_times) cannot be compared.
+    if (log.none_event_times)
+      throw std::invalid_argument(
+          "TypeError: '<' not supported between instances of 'NoneType' and 'NoneType'");
     if (!a.known || !b.known) continue;
     if (before(a, b)) {
       directed[left].insert(right);

@@ -16,6 +16,7 @@
 #include "minera/ltl_filter_workbench.hpp"
 #include "minera/ocel_exact_filter_controls.hpp"
 #include "minera/ocel_activity_type_matching.hpp"
+#include "minera/ocdfg_edge_performance.hpp"
 #include "ocdfg_performance_route.hpp"
 #include "ocdfg_edge_metrics_route.hpp"
 #include "case_relations_input.hpp"
@@ -3082,6 +3083,17 @@ void handle_ocel_discovery(const httplib::Request& request,
       envelope += ",\"edge_metrics\":" + ocdfg_edge_metrics_report_from_request(log, request) + '}';
     }
     response.set_content(envelope, "application/json");
+  } catch (const minera::OcdfgPerformanceError& error) {
+    // Round EH: the edge performance errors carry pm4py's exception type.
+    response.status = 400;
+    response.set_content(error_json(error.type + ": " + error.what()), "application/json");
+  } catch (const std::out_of_range& error) {
+    // Round EH: the discoveries' missing keys (an event without relations in
+    // the OTG, a missing OC-DFG selector column) are pm4py's KeyError.
+    response.status = 400;
+    const std::string message = error.what();
+    response.set_content(error_json(message.starts_with('\'') ? "KeyError: " + message : message),
+                         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

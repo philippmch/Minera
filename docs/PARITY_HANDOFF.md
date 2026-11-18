@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EG (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EH (2026-11-05 to 2026-11-18, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7253,6 +7253,66 @@ full ctest passed 627 of 628 on the first run (the EE1 case, fixed), the
 fixture replay gave 2,673 responses unchanged. The generators, the sweep, the
 comparers and the probes are in the project files under
 `review-harness/round-eg/`.
+
+Round EH re-reviewed EG (Review EH1). EG's CI run 44405676226 on
+86d06261: the verifier, Python, frontend and macOS jobs green, the Linux
+and Windows ctest steps still running when EH pushed (check them with EH's
+own run); EF's run 44395233990 finished green (Linux and Windows ctest
+passed). EH took NaT event times from the OCEL CSV reader (`eh/csv/
+cgen3.py`, 240 files in seven shapes with naive, UTC and offset times) and
+the OCEL 1.0 XML reader (`eh/xg/xgen.py`, 71 files with missing timestamp
+elements) through EG's routes (`eh/rt/rsw.py`, now with the CSV download)
+and the time-based routes rsw leaves out (`eh/rt/xsw.py`):
+- `read_ocel_csv` reads empty cells, NA spellings and NaT spellings as
+  NaT, sorted last; native refused them (EH1-1); it sorts the relations by
+  time too (EH1-2);
+- the edge association performance measures a NaT pair as `0` (EH1-3);
+  OCPN puts NaT events last in its traces (EH1-4);
+- an OCEL 1.0 XML file without any timestamp element gives pm4py a time
+  column of None, with other errors than NaT in the time routes; native
+  marks such a log (`"minera:noneEventTimes"`) and raises them (EH1-5);
+- every pm4py writer leaves out events and objects without relations,
+  with their O2O links and changes; the native file writers now do too,
+  the transport keeps them (EH1-6);
+- a NaT time keeps the column's shared offset in the downloads, the
+  descriptions print a CSV import's times in its offset, and the CSV
+  download writes a NaT time as an empty cell (EH1-7).
+Fresh OCEL 2.0 SQLite NaT files (seed 7): 0 of 3,621 calls differ. The
+counts for the CSV and XML files are in Review EH1. OCEL 1.0 XML keyless
+values and the vmap entries whose row stays stay declared.
+
+In the suite: `minera_review_eh1_tests` (hand cases);
+`minera_ocel_csv_tests` and `minera_review_ea1_tests` now read an event
+without a time as NaT (EH1-1). The generators, the sweeps, the comparers
+and the probes are in the project files under `review-harness/round-eh/`.
+
+Next round (EI) should start by re-reviewing round EH:
+
+- EH's CI run, and the end of EG's Linux and Windows ctest (run
+  44405676226);
+- NaT and None event times through the routes rsw and xsw do not cover
+  (the LLM abstractions, conformance on flattened logs, the OCEL feature
+  variants beyond compatibility, the playout and causal-net routes), and
+  the OCEL 2.0 JSON/XML readers' frames when an event time is unreadable
+  (they raise in pm4py; check native refuses alike);
+- CSV imports with mixed offsets and NaT, the descriptions and LLM
+  context on such logs (the LLM context still prints UTC: its model is
+  read_ocel_json's frame);
+- the OCEL 1.0 XML vmap entries still refused (EG1-6) and the keyless
+  values (pm4py's NaN-named column; EH1 notes `write_ocel_json` raises
+  `AttributeError: 'float' object has no attribute 'startswith'`);
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EG's list, taken in EH: EG's CI and EF's ctest, the NaT times from
+the other readers and the time-based routes on mixed NaT logs, the XML
+vmap entries and keyless values (probed again, still declared). Not taken
+(carried to EI): the fresh seeds, the XML/JSON day offsets, the SQLite
+leftovers, the new dtypes, the DW1 keys, the declared items, the CU list
+and the open choices.
+
+Previous list for round EH (kept for its older items):
 
 Next round (EH) should start by re-reviewing round EG:
 

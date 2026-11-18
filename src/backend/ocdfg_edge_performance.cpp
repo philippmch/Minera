@@ -78,6 +78,13 @@ std::vector<double> calculate_ocdfg_edge_performance(const std::vector<OcdfgPerf
 std::vector<double> calculate_ocdfg_edge_performance(const Ocel& log,const std::vector<std::pair<std::string,std::string>>& couples,const OcdfgEdgePerformanceOptions& options){
  const auto id_key=options.event_id_attribute.value_or("ocel:eid"),time_key=options.timestamp_attribute.value_or("ocel:timestamp");
  if(!has_column(log,id_key))missing(id_key);if(!has_column(log,time_key))missing(time_key,true);
+ // Round EH: a time column of None (Ocel::none_event_times) fails on the
+ // first pair it measures: the difference of two None, or their replace()
+ // for business hours (observed black-box).
+ if(time_key=="ocel:timestamp"&&log.none_event_times&&!couples.empty()){
+  if(options.business_hours)throw OcdfgPerformanceError("AttributeError","'NoneType' object has no attribute 'replace'");
+  throw OcdfgPerformanceError("TypeError","unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
+ }
  std::vector<OcdfgPerformanceEvent> events;events.reserve(log.events.size());
  for(const auto& source:log.events){OcdfgPerformanceEvent event;event.id=source.id;
   const auto identifier=selected_string(source,id_key);

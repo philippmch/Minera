@@ -32554,3 +32554,123 @@ its change. The workbench fixture replay gave 2,673 responses unchanged.
 Python script and frontend tests not rerun (scripts and frontend
 unchanged). The device check on the Mac was skipped (the Mac was not
 linked).
+
+## Review EH1: re-review of round EG, NaT event times from the OCEL CSV and OCEL 1.0 XML readers, a time column of None, and the writers on events and objects without relations (2026-11-18)
+
+Round EH checked EG's CI (run 44405676226 on 86d06261: the verifier,
+Python, frontend and macOS jobs green; the Linux and Windows ctest steps
+were still running when EH pushed) and the end of EF's (run 44395233990:
+the Linux and Windows ctest steps passed, so every EF job is green).
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the
+reference venv: `eh/csv/cgen3.py` writes OCEL CSV event files whose time
+cells pandas reads as NaT (empty, NA spellings, `NaT`) in seven shapes (no
+event, one, all, all but one, a subset, every event of one object, every
+event of one activity; naive, UTC, `Z`, shared `+02:00` and ISO times; 240
+files over two seeds); `eh/xg/xgen.py` writes OCEL 1.0 XML files from
+round-ED fuzz logs and removes the timestamp element of events in the same
+shapes (71 files); `eg/sq/sgen2.py` gave 70 fresh OCEL 2.0 SQLite files
+(seed 7). The server's imports send them on as transports and
+`eh/rt/rsw.py` (EG's 38 routes, `STRICT=1`) and `eh/rt/xsw.py` (the
+time-based routes rsw leaves out: association prefilters, edge
+associations with performance and business hours, OC-DFG with business
+hours, OCPN im/imd, token replay, SAW nets, the event/object graph with DF
+edges) compare each route with pm4py on the same reader's frame; `eh/w/`,
+`eh/w2/` and `eh/p2/` hold the writer and hand probes.
+
+- **EH1-1 OCEL CSV NaT event times.** `read_ocel_csv` reads an empty time
+  cell, a `read_csv` NA spelling (`NA`, `null`, `None`, `n/a`, `#N/A`, ...)
+  and `to_datetime`'s NaT spellings (`NaT`, `nat`, `NAT`, `nan`, `NaN`,
+  `NAN`) as NaT, also with a guessed format, and sorts such events after
+  every time in file order; a column of NaT only is `datetime64[s]`.
+  Native refused the file (`event CSV event ... has no timestamp (the
+  reference reads NaT)`). Now it keeps an empty time, as for the SQLite
+  reader (EG), and the transports carry it with
+  `"minera:unreadableEventTimes"`.
+- **EH1-2 OCEL CSV relations order.** `read_ocel_csv` sorts the relations
+  frame by time too (stably, NaT last), so relations follow their events'
+  time order, ties in row order. Native kept row order, which showed in the
+  route sweeps on files whose rows are not in time order.
+- **EH1-3 Edge association performance with a NaT end.** pm4py measures
+  such a pair as `0`, and raises `ValueError: cannot convert float NaN to
+  integer` with business hours. Native left the pair out. Now it does as
+  pm4py does.
+- **EH1-4 OCPN and its inductive miner on NaT times.** The flattened traces
+  put events with a NaT time after the dated ones, in relation order (the
+  frame's sort puts NaT last); native ordered them among the times and
+  could fail with `inductive miner: single-activity graph has no start
+  activity` where pm4py answers (OCPN imd). Where pm4py's inductive miner fails on a
+  single-activity graph without a start activity, the message is now its
+  `IndexError: list index out of range`.
+- **EH1-5 A time column of None.** `read_ocel_xml` on a file where no event
+  has a timestamp element holds an object column of `None` (not NaT), and
+  the time routes raise other errors: the descriptions and the
+  compatibility features `AttributeError: 'NoneType' object has no
+  attribute 'timestamp'`, `write_ocel2_xml` `... no attribute 'isoformat'`,
+  the OC-DFG and edge performance `TypeError: unsupported operand type(s)
+  for -: 'NoneType' and 'NoneType'` (with business hours `... no attribute
+  'replace'`), the ancestors/descendants split `TypeError: '<' not
+  supported between instances of 'NoneType' and 'NoneType'`. Native gave
+  the NaT errors or answered. Now the reader marks such a log
+  (`Ocel::none_event_times`, carried by the transport as
+  `"minera:noneEventTimes"` and kept by filters, which keep pm4py's column
+  of None) and these routes raise as pm4py does. The OC-DFG route's
+  performance errors now carry their Python type (`AttributeError: ...`).
+- **EH1-6 Writers leave out events and objects without relations.** Every
+  pm4py writer (OCEL 1.0 and 2.0 JSON and XML, SQLite, CSV) leaves out the
+  events and objects without an event-object relation, with their O2O
+  links and object changes. Native wrote them in every download (a CSV
+  import keeps them); now the file writers write the log without them
+  (`ocel_written_entries`), while the classic JSON transport between
+  routes keeps them with `"minera:keepUnrelated"`. EG1-5's NaT rules then
+  apply to the written events only (an unrelated NaT event no longer makes
+  the OCEL 2.0 JSON download raise).
+- **EH1-7 Shared offsets next to NaT times, and in the descriptions.** A
+  NaT time keeps the column's shared non-zero offset (pandas keeps the
+  dtype), so the XML, SQLite and CSV downloads of a CSV import with
+  `+02:00` times and a NaT time print `+02:00` as pm4py does; native fell
+  back to UTC. The descriptions print an event time and the lifecycle
+  bounds as pandas prints the frame's Timestamp: in the column's shared
+  non-zero offset (an OCEL CSV import; pm4py's SQLite and JSON/XML readers
+  hold UTC), where native printed UTC (found on CSV files without NaT too).
+  The CSV download writes a NaT time as an empty cell, in the column's
+  format of its other values, as pandas' `to_csv` does; native refused the
+  log (`OCEL CSV requires non-empty event id, activity, and timestamp`).
+
+After the fixes, on the rebuilt server: the CSV files differ on 229 of
+4,680 (seed 1) and 274 of 4,680 (seed 2) rsw calls, all declared (EF's
+graph and enrichment messages on events without relations, 465; the
+flattening's hash-seed trace order, 38), and on 0 of 1,560 xsw calls each;
+the XML files on 9 of 2,769 rsw calls (declared below) and 0 of 923 xsw
+calls; fresh OCEL 2.0 SQLite NaT files (seed 7) on 0 of 2,698 rsw and 0 of
+923 xsw calls.
+
+Declared:
+- The edge association route answers the associations together with their
+  performance, so on a time column of None it raises pm4py's performance
+  error, where pm4py's `find_associations_per_edge` alone answers (9 calls
+  on the XML files).
+- The flattening's trace order within a type, and the object order of a
+  CSV without an object table, follow the hash seed in pm4py (set
+  iteration, EF1-5); the CSV files show it on 38 calls.
+- The graph and enrichment messages on events without relations stay as
+  EF declared them (pm4py's `KeyError: 'e1'`).
+- OCEL 1.0 XML keyless values stay refused: pm4py names the column NaN
+  (float), the last keyless value of an event or object winning, and
+  `write_ocel_json` then raises `AttributeError: 'float' object has no
+  attribute 'startswith'`. The vmap `ocel:*` entries whose row stays and
+  differs stay refused (EG1-6).
+
+Tests:
+- New: `minera_review_eh1_tests` (hand cases of EH1-1 to EH1-7).
+- Changed: `minera_ocel_csv_tests` and `minera_review_ea1_tests` (an event
+  without a time now reads as NaT instead of being refused, EH1-1).
+
+Runs: the full ctest passed 628 of 629 on the first run (35 min at -j2,
+next to the sweeps); the one failure was `minera_ocel_sqlite_tests`, whose
+export of a log with an event link to a missing event must still be
+refused: the written log now keeps a log with dangling references as it is,
+for the writers' reference validation, and the test passed after that
+change (with the other OCEL writer tests). The workbench fixture replay
+gave 2,673 responses unchanged. Python script and frontend tests not rerun
+(scripts and frontend unchanged). The device check on the Mac was skipped
+(the Mac was not linked).

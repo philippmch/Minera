@@ -12,6 +12,7 @@
 #include <set>
 #include <sstream>
 #include <stdexcept>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -1139,18 +1140,21 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
 #endif
 }
 
-void export_ocel_sqlite(const Ocel& log, const std::filesystem::path& path,
+void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
                         const OcelSqliteOptions& options) {
   // Round DV: it selects the events frame's id and activity first (an empty
   // playout has no column), and the relations' event and object ids after
   // the objects (a degenerate relations frame, black-box).
-  if (ocel_events_frame_columnless(log))
+  if (ocel_events_frame_columnless(input))
     throw std::invalid_argument(
         "KeyError: \"None of [Index(['ocel:eid', 'ocel:activity'], dtype='str')] are in the [columns]\"");
   // Round DT: the reference writer selects the objects frame's id and type.
-  require_ocel_object_columns(log);
-  if (ocel_relations_frame_degenerate(log))
+  require_ocel_object_columns(input);
+  if (ocel_relations_frame_degenerate(input))
     throw std::invalid_argument("KeyError: \"['ocel:eid', 'ocel:oid'] not in index\"");
+  // Round EH: without the events and objects that have no relation.
+  std::optional<Ocel> written;
+  const Ocel& log = ocel_written_entries(input, written);
 #if !defined(MINERA_HAS_SQLITE)
   (void)log;
   (void)path;

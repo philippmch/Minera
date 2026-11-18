@@ -2,6 +2,7 @@
 #include "frame_cells.hpp"
 #include "frame_temporal_profile.hpp"
 #include "frame_times.hpp"
+#include "ocel_frame_types.hpp"
 #include "python_scalar.hpp"
 #include "minera/llm_abstractions.hpp"
 #include "minera/original_model_context.hpp"
@@ -212,7 +213,7 @@ LlmContextResult build_llm_context(const Ocel& log,const LlmContextOptions& opti
   // one raises, also without timestamps (observed black-box).
   const auto nat=[](const OcelEvent& event){return event.timestamp.empty();};
   {std::map<std::string,bool> all_nat;for(const auto& relation:log.relations)if(auto found=events.find(relation.event_id);found!=events.end()){auto [entry,added]=all_nat.try_emplace(relation.object_id,true);entry->second=entry->second&&nat(*found->second);}
-   for(const auto& [object,only_nat]:all_nat)if(only_nat)throw std::invalid_argument("ValueError: NaTType does not support timestamp");}
+   for(const auto& [object,only_nat]:all_nat)if(only_nat)throw std::invalid_argument(ocel_frame::nat_timestamp_error(log));}
   // The events print sorted by timestamp, activity and event id.
   std::stable_sort(listed_events.begin(),listed_events.end(),[&](const auto& a,const auto& b){if(nat(*a.second)!=nat(*b.second))return nat(*b.second);if(a.first&&b.first&&(a.first->seconds!=b.first->seconds||a.first->nanoseconds!=b.first->nanoseconds))return before(*a.first,*b.first);if(a.second->activity!=b.second->activity)return a.second->activity<b.second->activity;return a.second->id<b.second->id;});
   text.value="\n\nevents:\n\n";for(const auto& [stamp_key,listed]:listed_events){(void)stamp_key;const auto& event=*listed;auto related=objects[event.id];std::sort(related.begin(),related.end());std::string line=event.activity+" ( related objects: ";for(std::size_t i=0;i<related.size();++i){if(i)line+=", ";line+=related[i];}line+=" ) ";if(options.include_timestamps){const auto stamp=instant(event.timestamp);line+=" timestamp: "+(stamp?frame_times::utc_text(*stamp):nat(event)?std::string("NaT"):date(event.timestamp));}if(!text.line(line+"\n"))break;}text.value+="\nobjects:\n\n";auto ordered=log.objects;std::sort(ordered.begin(),ordered.end(),[](const auto& a,const auto& b){return a.id<b.id;});

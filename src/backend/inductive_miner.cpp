@@ -1716,7 +1716,7 @@ ProcessTreeNode mine_dfg(LocalDfg dfg, double f,
       const bool starts = (!dfg.is_start.empty() && dfg.is_start.front()) ||
                           (!dfg.start_count.empty() && dfg.start_count.front() > 0);
       if (!starts)
-        throw std::out_of_range("inductive miner: single-activity graph has no start activity");
+        throw std::out_of_range("IndexError: list index out of range");
       return ProcessTreeNode::leaf(dfg.to_global.front());
     }
     return FlowerFallThrough::build(dfg.to_global, labels);

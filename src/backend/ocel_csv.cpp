@@ -295,8 +295,9 @@ ObjectIndex validate_objects(const Ocel& log) {
 std::map<std::string, const OcelEvent*> validate_events(const Ocel& log) {
   std::map<std::string, const OcelEvent*> result;
   for (const auto& event : log.events) {
-    if (event.id.empty() || event.activity.empty() || event.timestamp.empty()) {
-      throw std::invalid_argument("OCEL CSV requires non-empty event id, activity, and timestamp");
+    // Round EH: an empty time is NaT, which pandas writes as an empty cell.
+    if (event.id.empty() || event.activity.empty()) {
+      throw std::invalid_argument("OCEL CSV requires non-empty event id and activity");
     }
     if (!result.emplace(event.id, &event).second) {
       throw std::invalid_argument("duplicate OCEL event id: " + event.id);
@@ -788,6 +789,17 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   const auto time_text = [&](std::size_t row_index) -> const std::string& {
     return guessed ? guessed->texts[row_index - 1] : event_table[row_index][timestamp];
   };
+  // Round EH: a time cell pandas reads as NaT (an empty cell, a read_csv NA
+  // spelling, or one of to_datetime's NaT, nat, NAT, nan, NaN, NAN) is an
+  // event time the reference holds as NaT; native keeps an empty time (see
+  // ocel_frame::nat_time_text), as for the SQLite reader (round EG).
+  const auto nat_cell = [&](std::size_t row_index) {
+    const auto& text = time_text(row_index);
+    if (text.empty()) return true;
+    if (guessed || !options.sort_events_by_timestamp) return false;
+    return pandas_guess::na_text(text) || text == "NaT" || text == "nat" || text == "NAT" ||
+           text == "NAN";
+  };
 
   std::vector<std::pair<std::string, std::size_t>> object_columns;
   // Columns as pm4py.read_ocel_csv selects them (observed black-box): every
@@ -855,26 +867,27 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     // A missing id or activity (an empty cell or a short row) is NaN in the
     // reference frame, which drops the event; without an object table its
     // objects are still listed, as the reference collects them from every
-    // row. A missing timestamp is NaT there, which a native event cannot hold.
-    // The reference parses the timestamp column before it drops rows, so a
-    // dropped row's unreadable timestamp still refuses the file.
+    // row. A missing timestamp is NaT there (round EH: an empty native time,
+    // sorted last). The reference parses the timestamp column before it drops
+    // rows, so a dropped row's unreadable timestamp still refuses the file.
     if (row[event_id].empty() || row[activity].empty()) {
-      if (options.sort_events_by_timestamp && !time_text(row_index).empty() &&
+      if (options.sort_events_by_timestamp && !nat_cell(row_index) &&
           !parse_timestamp(time_text(row_index))) {
         throw std::invalid_argument("event CSV timestamp is not ISO-8601: " + row[timestamp]);
       }
       event_rows.emplace_back(&row, false);
       continue;
     }
-    OcelEvent event{row[event_id], row[activity], time_text(row_index), {}};
-    if (event.timestamp.empty()) {
+    const bool nat = nat_cell(row_index);
+    OcelEvent event{row[event_id], row[activity], nat ? std::string() : time_text(row_index), {}};
+    if (event.timestamp.empty() && !options.sort_events_by_timestamp) {
       throw std::invalid_argument("event CSV event " + event.id +
                                   " has no timestamp (the reference reads NaT)");
     }
     if (!event_ids.insert(event.id).second) {
       throw std::invalid_argument("duplicate event CSV id: " + event.id);
     }
-    if (options.sort_events_by_timestamp) {
+    if (options.sort_events_by_timestamp && !nat) {
       const auto parsed = parse_timestamp(event.timestamp);
       if (!parsed) throw std::invalid_argument("event CSV timestamp is not ISO-8601: " + event.timestamp);
     }
@@ -985,11 +998,24 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     }
   }
   if (options.sort_events_by_timestamp) {
+    // NaT times go after every time, in file order (pandas' na_position).
     std::stable_sort(log.events.begin(), log.events.end(),
                      [](const OcelEvent& left, const OcelEvent& right) {
+                       if (ocel_frame::nat_time_text(left.timestamp)) return false;
+                       if (ocel_frame::nat_time_text(right.timestamp)) return true;
                        const auto l = parse_timestamp(left.timestamp);
                        const auto r = parse_timestamp(right.timestamp);
                        return l.value() < r.value();
+                     });
+    // Round EH: the reference sorts the relations frame by time too, stably
+    // (NaT last), so relations follow their events' order, ties in row order
+    // (observed black-box on files whose rows are not in time order).
+    std::unordered_map<std::string, std::size_t> position;
+    for (std::size_t index = 0; index < log.events.size(); ++index)
+      position.emplace(log.events[index].id, index);
+    std::stable_sort(log.relations.begin(), log.relations.end(),
+                     [&position](const OcelRelation& left, const OcelRelation& right) {
+                       return position.at(left.event_id) < position.at(right.event_id);
                      });
   }
 
@@ -1015,10 +1041,11 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   // (ns past six fraction digits, s without any text), and stays so through
   // filters, splits and enrichment (black-box: filter_ocel_events_timestamp
   // then raises TypeError). See Ocel::naive_event_time_unit.
-  bool any_aware = false, nanoseconds = false;
+  bool any_aware = false, nanoseconds = false, any_time = false;
   for (std::size_t row_index = 1; row_index < event_table.size(); ++row_index) {
+    if (nat_cell(row_index)) continue;
     const auto& text = time_text(row_index);
-    if (text.empty()) continue;
+    any_time = true;
     const auto parsed = parse_timestamp_exact(text);
     if (parsed && parsed->timezone_aware) any_aware = true;
     const auto dot = text.find('.');
@@ -1031,7 +1058,7 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     }
   }
   if (!any_aware)
-    log.naive_event_time_unit = event_rows.empty() ? "s" : nanoseconds ? "ns" : "us";
+    log.naive_event_time_unit = !any_time ? "s" : nanoseconds ? "ns" : "us";
   // Round DV: a file whose rows (dropped ones included) name no object, not
   // even None, gets a relations frame with only ocel:qualifier, where nearly
   // every later function raises KeyError (black-box; see
@@ -1088,14 +1115,18 @@ Ocel import_ocel_csv(const std::filesystem::path& event_path,
   return import_ocel_csv(events, objects, options);
 }
 
+// Round EH: the CSV writers, as every reference writer, leave out the events
+// and objects without an event-object relation (ocel_written_entries).
 void write_ocel_csv(std::ostream& out, const Ocel& log,
                     const OcelCsvExportOptions& options) {
-  write_event_table(out, log, options, false);
+  std::optional<Ocel> written;
+  write_event_table(out, ocel_written_entries(log, written), options, false);
 }
 
 void write_ocel_objects_csv(std::ostream& out, const Ocel& log,
                             const OcelCsvExportOptions& options) {
-  write_object_table(out, log, options);
+  std::optional<Ocel> written;
+  write_object_table(out, ocel_written_entries(log, written), options);
 }
 
 std::string serialize_ocel_csv(const Ocel& log,
@@ -1112,16 +1143,20 @@ std::string serialize_ocel_objects_csv(const Ocel& log,
   return out.str();
 }
 
-void export_ocel_csv(const Ocel& log, const std::filesystem::path& event_path,
+void export_ocel_csv(const Ocel& input, const std::filesystem::path& event_path,
                      const OcelCsvExportOptions& options) {
+  std::optional<Ocel> written;
+  const Ocel& log = ocel_written_entries(input, written);
   std::ofstream events(event_path, std::ios::binary);
   if (!events) throw std::runtime_error("Unable to create OCEL event CSV: " + event_path.string());
   write_event_table(events, log, options, false);
 }
 
-void export_ocel_csv(const Ocel& log, const std::filesystem::path& event_path,
+void export_ocel_csv(const Ocel& input, const std::filesystem::path& event_path,
                      const std::filesystem::path& object_path,
                      const OcelCsvExportOptions& options) {
+  std::optional<Ocel> written;
+  const Ocel& log = ocel_written_entries(input, written);
   std::ofstream events(event_path, std::ios::binary);
   if (!events) throw std::runtime_error("Unable to create OCEL event CSV: " + event_path.string());
   // When the object table is suppressed, object attributes have no lossless

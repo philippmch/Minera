@@ -1352,9 +1352,7 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     // of the others); both families come before the lookups below (observed
     // black-box).
     const auto nat = [&](std::size_t event) { return ocel_frame::nat_time_text(log.events[event].timestamp); };
-    const auto nat_error = [] {
-      return std::invalid_argument("ValueError: NaTType does not support timestamp");
-    };
+    const auto nat_error = [&] { return std::invalid_argument(ocel_frame::nat_timestamp_error(log)); };
     if (variant == OcelFeatureVariant::kEvents && options.include_timestamp_features)
       for (std::size_t event = 0; event < log.events.size(); ++event)
         if (nat(event)) throw nat_error();

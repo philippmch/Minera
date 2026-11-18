@@ -116,6 +116,14 @@ struct Ocel {
   // enrichment keep it; the OCEL transport carries it as
   // "minera:naiveEventTimes" (the texts as written).
   std::string naive_event_time_unit;
+  // Round EH: an OCEL 1.0 XML file none of whose events has a timestamp
+  // element reads in pm4py as an object column of None rather than NaT
+  // (observed black-box), so the routes that use the times raise Python's
+  // None errors (AttributeError, TypeError) where a NaT log raises
+  // ValueError or measures 0. The times stay empty (NaT) natively; filters
+  // and splits keep the flag, and the OCEL transport carries it as
+  // "minera:noneEventTimes".
+  bool none_event_times = false;
 };
 
 using OCEL = Ocel;
@@ -249,6 +257,16 @@ void check_ocel2_xml_date_text(std::string_view text);
 // a log without relations ends up with no events and no objects. Order,
 // multiplicity and the type catalogs are kept.
 void drop_unrelated_ocel_entries(Ocel& log);
+// Round EH: whether drop_unrelated_ocel_entries would change `log`.
+bool ocel_has_unrelated_entries(const Ocel& log);
+// Round EH: the log a file writer writes. Every reference writer (OCEL 1.0
+// and 2.0 JSON and XML, SQLite, CSV) leaves out the events and objects
+// without an event-object relation, with their O2O links and object
+// changes (black-box), so the native writers for a user's file (the export
+// downloads, the CLI) write `log` without them: `log` itself when it holds
+// none, else a copy kept in `storage`. The classic JSON transport between
+// routes keeps them (with "minera:keepUnrelated").
+const Ocel& ocel_written_entries(const Ocel& log, std::optional<Ocel>& storage);
 // Drops the events with an empty id or activity and the objects with an empty
 // id or type, with the relations, object links, event links and changes that
 // name them, and the empty type names of both catalogs: the reference OCEL

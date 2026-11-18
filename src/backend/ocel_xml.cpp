@@ -1205,6 +1205,12 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   if (standard) sort_ocel_events_by_timestamp(log, OcelTimestampReader::kDateutil);
   else sort_ocel_xml_events(log, classic_times);
+  // Round EH: no event with a timestamp element leaves pm4py a time column
+  // of None (see Ocel::none_event_times).
+  if (!standard && !classic_times.empty() &&
+      std::all_of(classic_times.begin(), classic_times.end(),
+                  [](const OcelXmlTime& time) { return time.kind == OcelXmlTime::Kind::kMissing; }))
+    log.none_event_times = true;
   // Both XML readers convert date values: OCEL 2.0 the declared ones here,
   // OCEL 1.0 each <date> element as parse_classic reads it.
   if (standard) convert_ocel_date_attributes(log, OcelTimestampReader::kDateutil);
@@ -1473,8 +1479,12 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
 // <objects> child of each object), with events, objects, attributes and
 // relations in log order. Event-to-event links and globals, which the
 // reference format lacks, follow in their own sections.
-void write_ocel_xml(std::ostream& out, const Ocel& log,
+void write_ocel_xml(std::ostream& out, const Ocel& input,
                     const OcelXmlExportOptions& options) {
+  // Round EH: as both reference XML writers, without the events and objects
+  // that have no event-object relation.
+  std::optional<Ocel> written;
+  const Ocel& log = ocel_written_entries(input, written);
   if (options.format != OcelXmlFormat::kStandard) {
     write_ocel_xml_legacy(out, log, options);
     return;
@@ -1534,6 +1544,10 @@ void write_ocel_xml(std::ostream& out, const Ocel& log,
   // A CSV log whose times share an offset is written in that offset, as
   // the reference does (see shared_nonzero_offset).
   const auto event_offset = event_time_offset(log);
+  // Round EH: a time column of None (Ocel::none_event_times) fails on the
+  // first event's isoformat (observed black-box).
+  if (log.none_event_times && !log.events.empty())
+    throw std::invalid_argument("AttributeError: 'NoneType' object has no attribute 'isoformat'");
   out << (log.events.empty() ? "  <events/>\n" : "  <events>\n");
   for (const auto& event : log.events) {
     out << "    <event id=\"" << esc(event.id) << "\" type=\""

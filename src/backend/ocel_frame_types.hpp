@@ -298,6 +298,13 @@ inline std::string civil_timestamp_text(const CivilTimestamp& time, char separat
 // OCEL 2.0 SQLite '' or NULL time, sent on in transports (round EG). pandas
 // sorts it after every time and prints it "NaT".
 inline bool nat_time_text(std::string_view text) { return text.empty(); }
+// The error pm4py raises taking .timestamp() of a missing event time: NaT's,
+// or None's for a log whose time column holds None (Ocel::none_event_times,
+// round EH).
+inline std::string nat_timestamp_error(const Ocel& log) {
+  return log.none_event_times ? "AttributeError: 'NoneType' object has no attribute 'timestamp'"
+                              : "ValueError: NaTType does not support timestamp";
+}
 
 // The text pandas prints for a timestamp the reference holds as UTC:
 // "YYYY-MM-DD HH:MM:SS[.ffffff]+00:00" (separator ' ', suffix "+00:00"), or
@@ -330,6 +337,20 @@ inline std::string utc_timestamp_text(std::string_view text, char separator,
 // pm4py.write_ocel_csv).
 inline std::vector<std::string> pandas_timestamp_column_text(
     const std::vector<std::string_view>& texts) {
+  // Round EH: a NaT time (an empty text) is an empty cell, and the column's
+  // format follows its other values, as pandas' to_csv writes it (observed
+  // black-box).
+  if (std::any_of(texts.begin(), texts.end(), [](std::string_view text) { return nat_time_text(text); })) {
+    std::vector<std::string_view> known;
+    for (const auto text : texts)
+      if (!nat_time_text(text)) known.push_back(text);
+    auto printed = pandas_timestamp_column_text(known);
+    std::vector<std::string> out;
+    out.reserve(texts.size());
+    std::size_t next = 0;
+    for (const auto text : texts) out.push_back(nat_time_text(text) ? std::string() : std::move(printed[next++]));
+    return out;
+  }
   std::vector<CivilTimestamp> times;
   times.reserve(texts.size());
   bool naive_column = true, aware_column = true;
@@ -408,6 +429,8 @@ inline std::optional<std::int32_t> shared_nonzero_offset(
     const std::vector<std::string_view>& texts) {
   std::optional<std::int32_t> offset;
   for (const auto text : texts) {
+    // Round EH: a NaT time leaves the column's offset as it is.
+    if (nat_time_text(text)) continue;
     const auto parsed = parse_timestamp_exact(text);
     if (!parsed || !parsed->timezone_aware) return std::nullopt;
     if (offset && *offset != parsed->offset_minutes) return std::nullopt;
