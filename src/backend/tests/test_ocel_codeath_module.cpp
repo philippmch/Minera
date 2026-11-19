@@ -241,7 +241,7 @@ void check(const Ocel& source, std::vector<Edge> expected,
     assert(result.object_ids == ids);
   } catch (const std::out_of_range& error) {
     if (!missing_event) throw;
-    assert(error.what() == "OCEL codeath event has no object relations: " + *missing_event);
+    assert(error.what() == "KeyError: '" + *missing_event + "'");
   }
   assert(serialize_oc_playout_workbench_ocel_json(source) == before);
 }

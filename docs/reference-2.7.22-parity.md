@@ -32922,3 +32922,139 @@ a time, an integer column turned float), which then passed. The workbench
 fixture replay gave 2,673 responses unchanged. Python script and frontend
 tests not rerun (scripts and frontend unchanged). The device check on the
 Mac was skipped (the Mac was not linked).
+
+## Review EK1: re-review of round EJ, the spoiled OCEL 2.0 JSON bank through the writers and routes, NaT change times, the OCEL 2.0 SQLite reader's structure errors, spoiled SQLite logs (2026-11-19)
+
+Round EK checked EJ's CI (run 44451181228 on 5a11fbdf: all six jobs
+green, the Linux, macOS and Windows ctest included). Observed black-box on pm4py 2.7.22 (pandas 3.0.5,
+no pyarrow) in the reference venv, on EJ's banks (`ej/b51`: 100 clean
+OCEL 2.0 logs in JSON, XML and SQLite; `ej/b52`: 300 spoiled JSON logs)
+and on a new spoiled SQLite bank: `ek/s/sgen.py 53 300 b53` copies the
+pm4py-written b51 SQLite files and mutates their values (texts in numeric
+columns and numbers in text columns under SQLite's column affinity, NULL
+and empty ids, types and qualifiers, odd `ocel_time` cells, duplicate rows,
+all-NULL columns, change rows without a field, other activities). The
+writer fuzz `ek/w/wgen.py` (seed 81, 200 files), `w/wcmp.py` and
+`w/cls.py` compared every download of native's and pm4py's frames; `ek/t/`,
+`ek/s/p9.py` (60 structural SQLite spoils), `ek/s/tsort.py`, `ek/t/p10.py`
+to `p12.py` and `ek/hc/` hold the probes.
+
+- **EK1-1 The writers' types and spellings.** pm4py's writers type and
+  spell a column by its pandas dtype, computed over the frame before the
+  rows without relations are dropped: a datetime64 column prints
+  `%Y-%m-%dT%H:%M:%SZ` in the JSON and OCEL 1.0 XML writers, an object
+  column (dates next to texts, numbers or booleans, naive next to aware)
+  prints each date as its isoformat (`+00:00`); write_ocel2_json and the
+  OCEL 2.0 XML writer declare a type per object or event type from the
+  column dtype and that owner's values (float64 "float", datetime64
+  "date", an object column "string" with a text, "date" with dates only,
+  "float" with floats); the SQLite writer declares TIMESTAMP for a
+  datetime64 column, TEXT for an object column with texts or dates, REAL
+  for an integer column with a missing cell, and writes an object column's
+  dates as isoformat. Null values are left out, and a change of a null
+  value is left out by write_ocel2_json, has no value key in
+  write_ocel_json and prints "None" in write_ocel2_xml. read_ocel2_json
+  reads a float-declared `"nan"` (any case, a sign allowed) as NaN, a
+  missing cell. Native wrote its own transport types and spellings (211
+  of the first 250 fuzz files differed; 29 after, all of the two classes
+  open below).
+- **EK1-2 The OCEL 2.0 SQLite reader's structure errors.**
+  read_ocel2_sqlite reads the event table, then the object table
+  (pandas.read_sql: `Execution failed on sql 'SELECT * FROM event': no
+  such table: event`), sorts each one's distinct types (`sorted` of
+  `unique()`: a NULL type next to texts is NaN in pandas' str dtype, so it
+  raises `'<' not supported between instances of 'str' and 'float'` when
+  the NaN comes first and `'float' and 'str'` otherwise, the operand order
+  of CPython 3.11's list.sort, checked on 20,000 lists; a column of NULLs
+  is None, which no map holds: `KeyError: None`), reads both map tables
+  (a dict in row order: a later row for a type wins), reads each event
+  type's table and then each object type's in sorted order (`KeyError:
+  '<type>'` for an unmapped type, the empty type too; `can only
+  concatenate str (not "float") to str` for a NULL map entry next to
+  texts, `"NoneType"` in a column of NULLs; `Execution failed on sql
+  'SELECT * FROM "event_X"': no such table: event_X` for a missing table),
+  then concatenates (`No objects to concatenate` without types; a type
+  whose rows all lack an id still has its table read) and reads
+  event_object and object_object (a missing one raises). Native refused
+  with its own messages ("type table is missing", "has a NULL ocel_type",
+  "requires event and object tables"), fell back to a derived table name
+  for an unmapped type, kept the first map row, dropped rows with an
+  empty type before the lookup and read files without the relation
+  tables. Table names now match without regard to ASCII case, as SQLite
+  resolves them.
+- **EK1-3 Unreadable change times in the writers.** read_ocel2_json keeps
+  a change time it cannot read (`+25:00`, `abc`) as text, so the
+  change-time column is an object column (None for a missing time next to
+  read dates) or pandas' str dtype (NaN without any read date); pandas'
+  NaT strings (`NaT`, `nat`, `NAT`, `nan`, `NaN`, `NAN`) and the empty
+  text are NaT. write_ocel2_xml takes each change time's isoformat in log
+  order, so the first such text raises `AttributeError: 'str' object has
+  no attribute 'isoformat'` and a missing time before it `'NoneType'` or
+  `'float'`; write_ocel2_sqlite writes such times as NULL. Native wrote
+  the text (pm4py then failed reading native's file) and printed a NaT
+  string as written.
+- **EK1-4 Messages on spoiled SQLite logs.** The object graphs (descendants,
+  inheritance, cobirth, codeath) raise `KeyError: '<event id>'` for an
+  event left without relations (native: "OCEL ... event has no object
+  relations"); the OCEL conformance checks raise `ZeroDivisionError:
+  division by zero` (the type name was missing); the LLM OCEL abstraction
+  of a log without objects ends with the header `objects:\n` (native added
+  a blank line).
+
+Harness, not product: EJ's note that pm4py's OCEL filters raise
+`tz_convert` on `+25:00` change times was rsw2's normalizer calling
+`tz_convert` on `datetime.datetime` values (fixed); rsw2 also read a
+transport's empty date value as NaT (pm4py keeps the text), spelled an
+unreadable change time differently on the two sides and read a naive
+change time naive where pm4py's column is aware (o2gen writes every static
+time with `Z`). NaT change times reach no route beyond the writers and the
+filters' propagation (object changes are filtered by object id only; no
+feature, statistic or graph reads them), all in rsw2.
+
+Declared:
+- The fraction of a datetime64 column (pm4py's JSON and OCEL 1.0 XML
+  writers drop it; native keeps it): the 159 b51 JSON route differences
+  and most of the b52 downloads.
+- A float-declared `"inf"` stays its text (the transport holds no
+  infinity), which keeps its change column a text column after a SQLite
+  or OCEL 2.0 XML round trip.
+- Duplicate type-table rows (pm4py keeps two events or objects with one
+  id; a native OCEL cannot hold them), an empty type's rows (not read
+  natively), a log whose types and map keys are all NULL (pm4py reads it),
+  and the operand order of a sort that only its merges would meet (64 or
+  more types).
+
+Open (to round EL):
+- The frame column order and the pre-drop dtype: pm4py orders a row's
+  attributes by the frame's column order (file order, including dropped
+  rows) and types a column over rows it drops later (an unrelated
+  object's text makes a date column an object column: g52_0127,
+  g52_0290); both need the frame order and the dropped rows' dtypes in
+  the OCEL struct or the transport.
+- A naive change time next to aware ones prints `+00:00` in pm4py's OCEL
+  2.0 XML writer (its column is aware; native prints it naive: g52_0047,
+  g52_0107, g52_0223), and float-declared change texts that pm4py keeps as
+  text after a round trip (g52_0173).
+- The spoiled SQLite bank through the routes (imports agree on all 300;
+  rsw2 586 of 10,101, esw 136 of 4,144, xsw 92 of 3,367): event type
+  tables whose `ocel_time` holds invalid dates, integers, floats, `''` or
+  texts (pm4py keeps an object or str time column, and each route fails
+  its own way: edge associations, OC-DFG business hours, features,
+  playout), change rows without a field (`''`), attribute columns mixing
+  texts and numbers, and duplicate rows (declared above).
+
+Tests:
+- New: `minera_review_ek1_tests` (hand cases of EK1-1 to EK1-3; its 19
+  SQLite cases were checked against pm4py with `ek/hc/ek1sql.py`).
+- Changed: `minera_ocel_sqlite_tests` (two hand-built files get an
+  object_object table; an unmapped type raises `KeyError: 'item'`),
+  `minera_ocel_tests` (the conformance ZeroDivisionError), the object
+  graph module tests (`minera_ocel20_computation_module_tests`,
+  `minera_ocel_cobirth_module_tests`, `minera_ocel_codeath_module_tests`,
+  `minera_ocel_descendants_module_tests`,
+  `minera_ocel_inheritance_module_tests`: the KeyError).
+
+Runs: the full ctest passed 632 of 632 on the first run (29 min at -j2).
+The workbench fixture replay gave 2,673 responses unchanged. Python script
+and frontend tests not rerun (scripts and frontend unchanged). The device
+check on the Mac was skipped (the Mac was not linked).

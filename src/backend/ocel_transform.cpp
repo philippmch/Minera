@@ -468,9 +468,11 @@ std::set<ObjectPair> enrichment_descendants_graph(
   for (const auto& event_id : index.event_order) {
     const auto found = index.objects_by_event.find(event_id);
     if (found == index.objects_by_event.end()) {
+      // Round EK: the reference graphs look the event's objects up, a
+      // KeyError for an event left without relations (observed black-box).
       if (require_event_relations)
         throw std::out_of_range(
-            "OCEL descendants event has no object relations: " + event_id);
+            "KeyError: " + ocel_frame::python_str_repr(event_id));
       continue;
     }
     std::vector<std::string> unseen;
@@ -495,7 +497,7 @@ std::set<ObjectPair> enrichment_cobirth_graph(
     if (found == index.objects_by_event.end()) {
       if (require_event_relations)
         throw std::out_of_range(
-            "OCEL cobirth event has no object relations: " + event_id);
+            "KeyError: " + ocel_frame::python_str_repr(event_id));
       continue;
     }
     std::vector<std::string> unseen;
@@ -519,7 +521,7 @@ std::set<ObjectPair> enrichment_codeath_graph(
     if (found == index.objects_by_event.end()) {
       if (require_event_relations)
         throw std::out_of_range(
-            "OCEL codeath event has no object relations: " + *event);
+            "KeyError: " + ocel_frame::python_str_repr(*event));
       continue;
     }
     std::vector<std::string> unseen;
@@ -542,7 +544,7 @@ std::set<ObjectPair> enrichment_inheritance_graph(
          ++event) {
       if (!index.objects_by_event.contains(*event))
         throw std::out_of_range(
-            "OCEL inheritance event has no object relations: " + *event);
+            "KeyError: " + ocel_frame::python_str_repr(*event));
     }
   }
   std::set<ObjectPair> result;

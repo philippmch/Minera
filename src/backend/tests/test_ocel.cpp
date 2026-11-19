@@ -1100,7 +1100,7 @@ int main() {
     try {
       compare();
     } catch (const std::domain_error& error) {
-      rejected = std::string(error.what()) == "division by zero";
+      rejected = std::string(error.what()) == "ZeroDivisionError: division by zero";
     }
     assert(rejected);
   };

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EJ (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EK (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7351,6 +7351,76 @@ In the suite: `minera_review_ej1_tests` (hand cases);
 The full ctest passed 629 of 631 on the first run (those two, fixed), the
 fixture replay gave 2,673 responses unchanged. The generators, the sweeps, the comparers
 and the probes are in the project files under `review-harness/round-ej/`.
+
+Round EK re-reviewed EJ (Review EK1). EJ's CI run 44451181228 on
+5a11fbdf: all six jobs green. EK fuzzed the writers on native's and
+pm4py's frames (`ek/w/wgen.py`, seed 81), swept the spoiled JSON bank
+through every route with its xsw and esw, and spoiled the clean SQLite
+files (`ek/s/sgen.py 53 300 b53`):
+- the writers type and spell each column by its pandas dtype (datetime64
+  `...Z`, an object column's dates as isoformat, declared types per owner,
+  SQLite TIMESTAMP/TEXT/REAL), leave null values out, and a float-declared
+  `"nan"` reads as a missing cell (EK1-1);
+- the OCEL 2.0 SQLite reader raises pm4py's structure errors in pm4py's
+  order: missing tables (pandas.read_sql's message), NULL types (the sort's
+  TypeError in CPython's operand order), unmapped types (KeyError, the
+  empty type too), NULL map entries, later map rows winning, the relation
+  tables required (EK1-2);
+- write_ocel2_xml raises AttributeError on a change time pm4py kept as
+  text (or a missing one before it), pandas' NaT strings are missing
+  times, and write_ocel2_sqlite writes them as NULL (EK1-3);
+- the object graphs' KeyError, the OCEL conformance ZeroDivisionError and
+  the LLM text of a log without objects (EK1-4).
+EJ's "filters raise tz_convert on +25:00 change times" was a harness bug;
+object changes reach no route beyond the writers and the filters'
+propagation. After the fixes: b51 imports 0, b51 routes JSON 159 (the
+declared fraction), SQLite 0 of 3,900; the spoiled JSON bank 349 of
+10,062 (EJ: 866), xsw 0 of 3,354, esw 0 of 4,128; the spoiled SQLite
+bank's imports 0 of 300, its routes open for EL (below).
+
+In the suite: `minera_review_ek1_tests` (hand cases, its SQLite cases
+checked against pm4py); `minera_ocel_sqlite_tests`, `minera_ocel_tests`
+and the four object graph module tests plus
+`minera_ocel20_computation_module_tests` follow EK1-2 and EK1-4.
+The full ctest passed 632 of 632 on the first run, the fixture replay
+gave 2,673 responses unchanged. The generators, the sweeps, the
+comparers and the probes are in the project files under
+`review-harness/round-ek/`.
+
+Next round (EL) should start by re-reviewing round EK:
+
+- EK's CI run;
+- the spoiled SQLite bank through the routes (`ek/run7.sh`, out7/b53s.*:
+  rsw2 586 of 10,101, esw 136 of 4,144, xsw 92 of 3,367): event type
+  tables whose `ocel_time` holds invalid dates, integers, floats, `''` or
+  texts (pm4py keeps an object/str time column and each route fails its
+  own way), change rows with an empty field, attribute columns mixing
+  texts and numbers; duplicate rows are declared;
+- the frame column order and the pre-drop dtype in the writers (file
+  order including dropped rows; an unrelated object's value retypes a
+  column: g52_0127, g52_0290), which need frame hints in the OCEL struct
+  or the transport;
+- a naive change time next to aware ones in write_ocel2_xml (`+00:00`:
+  g52_0047, g52_0107, g52_0223) and float-declared change texts pm4py
+  keeps as text after a round trip (g52_0173);
+- from EK's list, not taken: the remaining OCEL routes on a time column of
+  None and NaT times, the LLM OCEL context on the other readers' frames,
+  the OCEL 1.0 XML vmap entries and keyless values, causal-net routes on
+  NaT logs;
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EK's list, taken in EK: EJ's CI, the spoiled OCEL 2.0 JSON bank
+through the routes (writer types and spellings, NaN, `+25:00` change
+times, its xsw and esw), NaT change times beyond the writers (none reach
+other routes), the SQLite reader's other dtypes (a spoiled bank: its
+structure errors fixed, its routes open above). Not taken (carried to
+EL): the remaining None/NaT time routes, the LLM context on the other
+readers, the XML vmap entries and keyless values, causal-net routes on
+NaT logs, and the carried items.
+
+Previous list for round EK (kept for its older items):
 
 Next round (EK) should start by re-reviewing round EJ:
 

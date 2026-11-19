@@ -2509,7 +2509,7 @@ void retained_public_ocel20_cases() {
     } catch (const std::out_of_range& error) {
       ++errors;
       okay = fixture.missing && std::string(error.what()) ==
-          "OCEL descendants event has no object relations: " + *fixture.missing;
+          "KeyError: '" + *fixture.missing + "'";
     }
     okay = okay && selected_before == fixture.selection &&
         serialize_oc_playout_workbench_ocel_json(fixture.input) == before;
@@ -2577,7 +2577,7 @@ void selected_graph_diagnostics_and_legacy_separation() {
     try { (void)compute_ocel20(log, std::vector<std::string>{name}); }
     catch (const std::out_of_range& error) {
       rejected = std::string(error.what()) ==
-          "OCEL " + word + " event has no object relations: " + event;
+          "KeyError: '" + event + "'";
     }
     assert(rejected);
   }

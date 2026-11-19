@@ -497,6 +497,14 @@ OcelValue standard_scalar(const Json& value, std::string_view field,
     if (value.is_bool()) return std::get<bool>(value.value) ? 1.0 : 0.0;
     if (value.is_string()) {
       const auto text = trimmed(value.string());
+      // Round EK: float("nan") (any case, a sign allowed) is NaN, a missing
+      // cell of the frame (observed black-box: the writers leave it out).
+      // float("inf") stays the text (declared: the transport holds no
+      // infinity).
+      const auto unsigned_text = lowercase(!text.empty() && (text.front() == '+' || text.front() == '-')
+                                               ? text.substr(1)
+                                               : text);
+      if (unsigned_text == "nan") return nullptr;
       if (!text.empty() && text.find_first_of("xXpP") == std::string::npos) {
         char* end = nullptr;
         const double number = std::strtod(text.c_str(), &end);
@@ -1673,8 +1681,17 @@ void write_value(std::ostringstream& out, const OcelValue& value) {
 }
 // A value as write_ocel2_json prints its frame cell: an integer in a float64
 // column (one some row lacks, or one holding floats too) prints as a float.
+// Round EK: a datetime (`date`) prints as its column holds it: "...Z" in a
+// datetime64 column (fraction kept, declared), its isoformat in an object
+// one (observed black-box).
 void write_frame_value(std::ostringstream& out, const OcelValue& value,
-                       ocel_frame::Dtype dtype) {
+                       ocel_frame::Dtype dtype, bool date = false) {
+  if (date) {
+    const auto& text = std::get<std::string>(value);
+    write_string(out, dtype == ocel_frame::Dtype::kDatetime ? ocel_frame::datetime64_json_text(text)
+                                                            : ocel_frame::object_datetime_text(text));
+    return;
+  }
   if (const auto* int_value = std::get_if<std::int64_t>(&value);
       int_value != nullptr && dtype == ocel_frame::Dtype::kFloat64) {
     write_value(out, OcelValue(static_cast<double>(*int_value)));
@@ -1881,6 +1898,9 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
   std::vector<const OcelObjectChange*> changes;
   changes.reserve(log.object_changes.size());
   for (const auto& change : log.object_changes) changes.push_back(&change);
+  std::unordered_map<std::string_view, std::string_view> object_type_of;
+  if (!transport_markers)
+    for (const auto& object : log.objects) object_type_of.emplace(object.id, object.type);
   out << '[';
   bool first = true;
   for (const auto* change : changes) {
@@ -1890,19 +1910,65 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
     write_string(out, change->object_id);
     out << ",\"ocel:type\":";
     write_string(out, change->object_type);
-    if (transport_markers || !nat_change_time(change->timestamp)) {
+    if (transport_markers) {
       out << ",\"ocel:timestamp\":";
       write_string(out, change->timestamp);
     }
     out << ",\"ocel:field\":";
     write_string(out, change->field);
-    out << ',';
-    write_string(out, change->field);
-    out << ':';
-    write_value(out, change->value);
+    // Round EK: a download writes a change as write_ocel_json does (observed
+    // black-box): a datetime value and the time as their isoformat, the time
+    // after the value, no value key for a null value.
+    std::string owner = change->object_type;
+    if (owner.empty())
+      if (const auto found = object_type_of.find(change->object_id); found != object_type_of.end())
+        owner = std::string(found->second);
+    if (transport_markers || !std::holds_alternative<std::nullptr_t>(change->value)) {
+      out << ',';
+      write_string(out, change->field);
+      out << ':';
+      if (!transport_markers &&
+          ocel_frame::reference_date_value(log.object_type_attributes, owner, change->field, change->value))
+        write_string(out, ocel_frame::object_datetime_text(std::get<std::string>(change->value)));
+      else
+        write_value(out, change->value);
+    }
+    if (!transport_markers && !nat_change_time(change->timestamp)) {
+      out << ",\"ocel:timestamp\":";
+      write_string(out, ocel_frame::utc_timestamp_text(change->timestamp, 'T', "+00:00"));
+    }
     out << '}';
   }
   out << ']';
+}
+
+// Round EK: a download's vmap or ovmap, as write_ocel_json prints its frame
+// cells: a datetime as its column holds it (write_frame_value).
+// In the frame's column order, null cells left out (round EK, observed
+// black-box).
+void write_frame_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs,
+                       const ocel_frame::Columns& frame, const OcelTypeCatalog& catalog,
+                       const std::string& owner) {
+  std::vector<std::pair<std::string_view, const OcelValue*>> ordered;
+  for (const auto* attribute : ocel_frame::frame_row(attrs, frame))
+    ordered.emplace_back(attribute->key, &attribute->value);
+  out << '{';
+  bool first = true;
+  for (const auto& [k, v] : ordered) {
+    if (!first) out << ',';
+    first = false;
+    write_string(out, k);
+    out << ':';
+    const std::string key(k);
+    if (ocel_frame::reference_date_value(catalog, owner, key, *v)) {
+      const auto& text = std::get<std::string>(*v);
+      write_string(out, frame.dtype(key) == ocel_frame::Dtype::kDatetime ? ocel_frame::datetime64_json_text(text)
+                                                                         : ocel_frame::object_datetime_text(text));
+    } else {
+      write_value(out, *v);
+    }
+  }
+  out << '}';
 }
 
 }  // namespace
@@ -3587,27 +3653,59 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     out << ']';
   };
   // The frames the reference prints its cells from (write_frame_value).
+  // Round EK: date values count as datetimes (a date column next to other
+  // values is an object column, see write_frame_value).
   ocel_frame::Columns event_frame, object_frame, change_frame;
-  if (format == OcelJsonFormat::kStandard) {
-    for (const auto& event : log.events) event_frame.observe_row(event.attributes);
-    for (const auto& object : log.objects) object_frame.observe_row(object.attributes);
+  std::unordered_map<std::string_view, std::string_view> object_type_of;
+  for (const auto& object : log.objects) object_type_of.emplace(object.id, object.type);
+  const auto change_owner = [&](const OcelObjectChange& change) -> std::string {
+    if (!change.object_type.empty()) return change.object_type;
+    const auto found = object_type_of.find(change.object_id);
+    return found == object_type_of.end() ? std::string() : std::string(found->second);
+  };
+  const auto change_date = [&](const OcelObjectChange& change) {
+    return ocel_frame::reference_date_value(log.object_type_attributes, change_owner(change), change.field,
+                                            change.value);
+  };
+  {
+    for (const auto& event : log.events)
+      event_frame.observe_row(event.attributes, log.event_type_attributes, event.activity);
+    for (const auto& object : log.objects)
+      object_frame.observe_row(object.attributes, log.object_type_attributes, object.type);
     for (const auto& change : log.object_changes) {
       change_frame.add_rows(1);
-      change_frame.observe(change.field, change.value);
+      change_frame.observe(change.field, change.value, change_date(change));
     }
   }
-  auto write_standard_attributes = [&](const std::vector<OcelAttribute>& attrs) {
+  // Round EK: a download prints an object change's time as the reference
+  // writers print the changes frame's datetime64 column, its isoformat
+  // ("+00:00"); the transport keeps the text.
+  const auto change_time = [&](const std::string& text) -> std::string {
+    if (transport_markers || nat_change_time(text)) return text;
+    return ocel_frame::utc_timestamp_text(text, 'T', "+00:00");
+  };
+  // Round EK: a download prints a row as the reference frame holds it:
+  // attributes in the frame's column order, null cells left out (observed
+  // black-box); the transport keeps the attributes as they are.
+  const auto row_of = [&](const std::vector<OcelAttribute>& attrs, const ocel_frame::Columns& frame) {
+    if (!transport_markers) return ocel_frame::frame_row(attrs, frame);
+    std::vector<const OcelAttribute*> row;
+    for (const auto& attribute : attrs) row.push_back(&attribute);
+    return row;
+  };
+  auto write_standard_attributes = [&](const std::vector<OcelAttribute>& attrs, const std::string& owner) {
     out << '[';
     bool first = true;
-    for (const auto& attribute_value : attrs) {
-      const auto* attribute = &attribute_value;
+    for (const auto* attribute : row_of(attrs, event_frame)) {
       if (reference_drops_attribute(attribute->key)) continue;
       if (!first) out << ',';
       first = false;
       out << "{\"name\":";
       write_string(out, attribute->key);
       out << ",\"value\":";
-      write_frame_value(out, attribute->value, event_frame.dtype(attribute->key));
+      write_frame_value(out, attribute->value, event_frame.dtype(attribute->key),
+                        ocel_frame::reference_date_value(log.event_type_attributes, owner, attribute->key,
+                                                         attribute->value));
       out << '}';
     }
     out << ']';
@@ -3663,7 +3761,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << ",\"time\":";
       write_string(out, event_time(event->timestamp));
       out << ",\"attributes\":";
-      write_standard_attributes(event->attributes);
+      write_standard_attributes(event->attributes, event->activity);
       out << ",\"relationships\":[";
       bool relation_first = true;
       for (const auto* relation : event_relations(*event)) {
@@ -3689,8 +3787,8 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << ",\"attributes\":[";
       bool attribute_first = true;
       std::vector<const OcelAttribute*> static_attributes;
-      for (const auto& attribute : object->attributes)
-        if (!reference_drops_attribute(attribute.key)) static_attributes.push_back(&attribute);
+      for (const auto* attribute : row_of(object->attributes, object_frame))
+        if (!reference_drops_attribute(attribute->key)) static_attributes.push_back(attribute);
       for (const auto* attribute : static_attributes) {
         if (!attribute_first) out << ',';
         attribute_first = false;
@@ -3698,7 +3796,9 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         write_string(out, attribute->key);
         out << ",\"time\":\"1970-01-01T00:00:00Z\"";
         out << ",\"value\":";
-        write_frame_value(out, attribute->value, object_frame.dtype(attribute->key));
+        write_frame_value(out, attribute->value, object_frame.dtype(attribute->key),
+                          ocel_frame::reference_date_value(log.object_type_attributes, object->type,
+                                                           attribute->key, attribute->value));
         out << '}';
       }
       std::vector<const OcelObjectChange*> changes;
@@ -3711,14 +3811,21 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       // the first change as the base, as pm4py reads its own export.
       for (const auto* change : changes) {
         if (reference_drops_attribute(change->field)) continue;
+        // Round EK: write_ocel2_json leaves out a change whose value is
+        // null (observed black-box); the transport keeps it.
+        if (!transport_markers && std::holds_alternative<std::nullptr_t>(change->value)) continue;
         if (!attribute_first) out << ',';
         attribute_first = false;
         out << "{\"name\":";
         write_string(out, change->field);
         out << ",\"value\":";
-        write_frame_value(out, change->value, change_frame.dtype(change->field));
+        // Round EK: a change's datetime prints its isoformat (the reference
+        // writes the changes frame's values so, observed black-box).
+        write_frame_value(out, change->value,
+                          change_date(*change) ? ocel_frame::Dtype::kObject : change_frame.dtype(change->field),
+                          change_date(*change));
         out << ",\"time\":";
-        write_string(out, change->timestamp);
+        write_string(out, change_time(change->timestamp));
         out << '}';
       }
       out << "],\"relationships\":";
@@ -3765,6 +3872,30 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   OcelTypeCatalog classic_object_types;
   OcelTypeCatalog classic_event_types;
   collect_classic_types(log, classic_object_types, classic_event_types);
+  // Round EK: a download's type catalogs are write_ocel_json's, typed by
+  // what each type's rows hold as write_ocel2_json types them (observed
+  // black-box); the transport keeps the declared catalogs.
+  if (!transport_markers) {
+    StandardTypeTable object_table, event_table;
+    collect_standard_types(log, object_table, event_table);
+    const auto to_catalog = [](const StandardTypeTable& table) {
+      OcelTypeCatalog catalog;
+      for (const auto& [owner, declarations] : table) {
+        auto& attributes = catalog[owner];
+        for (const auto& [name, type] : declarations) attributes.emplace(name, type);
+      }
+      return catalog;
+    };
+    classic_object_types = to_catalog(object_table);
+    classic_event_types = to_catalog(event_table);
+  }
+  ocel_frame::Columns classic_event_frame, classic_object_frame;
+  if (!transport_markers) {
+    for (const auto& event : log.events)
+      classic_event_frame.observe_row(event.attributes, log.event_type_attributes, event.activity);
+    for (const auto& object : log.objects)
+      classic_object_frame.observe_row(object.attributes, log.object_type_attributes, object.type);
+  }
 
   out << "{\"ocel:events\":{";
   bool first = true;
@@ -3800,7 +3931,8 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << '}';
     }
     out << "],\"ocel:vmap\":";
-    write_attrs(out, event->attributes);
+    if (transport_markers) write_attrs(out, event->attributes);
+    else write_frame_attrs(out, event->attributes, classic_event_frame, log.event_type_attributes, event->activity);
     out << '}';
   }
   out << "},\"ocel:eventTypes\":";
@@ -3820,7 +3952,8 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     out << ":{\"ocel:type\":";
     write_string(out, object->type);
     out << ",\"ocel:ovmap\":";
-    write_attrs(out, object->attributes);
+    if (transport_markers) write_attrs(out, object->attributes);
+    else write_frame_attrs(out, object->attributes, classic_object_frame, log.object_type_attributes, object->type);
     out << ",\"ocel:o2o\":";
     write_o2o(out, source_o2o(object->id));
     out << '}';
@@ -5279,7 +5412,7 @@ std::string serialize_ocel_description_json(
 namespace {
 
 double conformance_count_ratio(std::size_t numerator, std::size_t denominator) {
-  if (denominator == 0) throw std::domain_error("division by zero");
+  if (denominator == 0) throw std::domain_error("ZeroDivisionError: division by zero");
   constexpr std::uint64_t exact_double_limit = std::uint64_t{1} << 53;
   if (numerator <= exact_double_limit && denominator <= exact_double_limit)
     return static_cast<double>(numerator) / static_cast<double>(denominator);
@@ -5447,7 +5580,7 @@ EtotConformanceResult compare_etot(const EtotGraph& real,
       options.beta * static_cast<double>(normative_edges.size()) +
       options.gamma * static_cast<double>(normative_edges.size());
   if (normalizer == 0.0) {
-    throw std::domain_error("division by zero");
+    throw std::domain_error("ZeroDivisionError: division by zero");
   } else {
     const double numerator =
         options.alpha * static_cast<double>(result.missing_activities.size() +
@@ -5513,7 +5646,7 @@ OtgConformanceResult compare_otg(const OtgGraph& real,
       options.beta * static_cast<double>(normative_edges.size()) +
       options.gamma * static_cast<double>(normative_edges.size());
   if (normalizer == 0.0) {
-    throw std::domain_error("division by zero");
+    throw std::domain_error("ZeroDivisionError: division by zero");
   } else {
     const double numerator =
         options.alpha * static_cast<double>(result.missing_object_types.size()) +

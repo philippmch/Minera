@@ -551,6 +551,8 @@ int main() {
            "CREATE TABLE event_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
            "CREATE TABLE object_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
            "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+           // pm4py reads object_object too (round EK: a missing table raises).
+           "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
            "CREATE TABLE event_Create (ocel_id TEXT PRIMARY KEY, ocel_time TEXT, priority INTEGER, active BOOLEAN);"
            "CREATE TABLE object_order (ocel_id TEXT, ocel_time TEXT, status TEXT, ocel_changed_field TEXT, \"@@cumcount\" INTEGER);"
            "INSERT INTO event VALUES ('e1', 'Create');"
@@ -681,6 +683,7 @@ int main() {
            "CREATE TABLE event_map_type (ocel_type TEXT, ocel_type_map TEXT);"
            "CREATE TABLE object_map_type (ocel_type TEXT, ocel_type_map TEXT);"
            "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
+           "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
            "CREATE TABLE event_Create (ocel_id TEXT, ocel_time TEXT);"
            "CREATE TABLE event_None (ocel_id TEXT, ocel_time TEXT);"
            "CREATE TABLE object_order (ocel_id TEXT);"
@@ -758,8 +761,8 @@ int main() {
       try {
         (void)minera::import_ocel_sqlite(naive_path);
       } catch (const std::invalid_argument& error) {
-        refused = std::string(error.what()).find("object type table is missing") !=
-                  std::string::npos;
+        // Round EK: pm4py's KeyError for the type the map does not list.
+        refused = std::string(error.what()) == "KeyError: 'item'";
       }
       assert(refused);
       continue;

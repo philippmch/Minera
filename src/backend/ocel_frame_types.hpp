@@ -27,22 +27,37 @@
 namespace minera::ocel_frame {
 
 // The dtype pandas gives a column of a frame built from records: an integer
-// column with a missing cell becomes float64, a boolean one object.
-enum class Dtype { kEmpty, kInt64, kFloat64, kBool, kObject };
+// column with a missing cell becomes float64, a boolean one object. A column
+// of datetimes alone (missing cells are NaT) is datetime64, naive or aware;
+// next to any other value, or naive next to aware, it is object (round EK).
+enum class Dtype { kEmpty, kInt64, kFloat64, kBool, kObject, kDatetime };
+
+// Whether `text` (a timestamp text) is a naive one.
+inline bool naive_timestamp_text(std::string_view text) {
+  const auto parsed = parse_timestamp_exact(text);
+  return parsed && !parsed->timezone_aware;
+}
 
 struct ColumnStats {
   bool has_bool = false;
   bool has_int = false;
   bool has_float = false;
   bool has_string = false;
+  // Round EK: date values (a date-declared text the reference reads as a
+  // datetime), naive and aware apart.
+  bool has_naive_date = false;
+  bool has_aware_date = false;
   std::size_t present = 0;
 
-  void observe(const OcelValue& value) {
+  void observe(const OcelValue& value) { observe(value, false); }
+  // `date`: the value is a datetime in the reference frame.
+  void observe(const OcelValue& value, bool date) {
     if (std::holds_alternative<std::nullptr_t>(value)) return;
     ++present;
     if (std::holds_alternative<bool>(value)) has_bool = true;
     else if (std::holds_alternative<std::int64_t>(value)) has_int = true;
     else if (std::holds_alternative<double>(value)) has_float = true;
+    else if (date) (naive_timestamp_text(std::get<std::string>(value)) ? has_naive_date : has_aware_date) = true;
     else has_string = true;
   }
   void merge(const ColumnStats& other) {
@@ -50,12 +65,19 @@ struct ColumnStats {
     has_int = has_int || other.has_int;
     has_float = has_float || other.has_float;
     has_string = has_string || other.has_string;
+    has_naive_date = has_naive_date || other.has_naive_date;
+    has_aware_date = has_aware_date || other.has_aware_date;
     present += other.present;
   }
+  [[nodiscard]] bool has_date() const { return has_naive_date || has_aware_date; }
 
   [[nodiscard]] Dtype dtype(std::size_t rows) const {
     if (present == 0) return Dtype::kEmpty;
     const bool missing = present < rows;
+    if (has_date())
+      return has_string || has_bool || has_int || has_float || (has_naive_date && has_aware_date)
+                 ? Dtype::kObject
+                 : Dtype::kDatetime;
     if (has_string) return Dtype::kObject;
     if (has_bool)
       return has_int || has_float || missing ? Dtype::kObject : Dtype::kBool;
@@ -63,6 +85,35 @@ struct ColumnStats {
     return Dtype::kInt64;
   }
 };
+
+// The dtype of two frames' column concatenated (pandas concat): equal dtypes
+// stay, an empty side (the column missing there, so NaN cells) keeps the
+// other's dtype save that ints and booleans then hold NaN, anything else is
+// object; ints and floats make float64.
+inline Dtype concat_dtype(Dtype left, Dtype right) {
+  if (left == right) return left;
+  if (left == Dtype::kEmpty) std::swap(left, right);
+  if (right == Dtype::kEmpty)
+    return left == Dtype::kInt64 ? Dtype::kFloat64 : left == Dtype::kBool ? Dtype::kObject : left;
+  if ((left == Dtype::kInt64 && right == Dtype::kFloat64) || (left == Dtype::kFloat64 && right == Dtype::kInt64))
+    return Dtype::kFloat64;
+  return Dtype::kObject;
+}
+
+// Whether a catalog declares `key` of `owner` a date ("date", "time",
+// "timestamp", ... in any case), as the reference OCEL 2.0 readers convert.
+inline bool declared_date(const OcelTypeCatalog& catalog, const std::string& owner,
+                          const std::string& key);
+// A date attribute's string value as a timestamp text, or nullptr when the
+// value is no string or the text is no timestamp (kept as written).
+inline const std::string* date_value_text(const OcelValue& value);
+// Whether `value` of `owner`'s `key` is a datetime in the reference frame: a
+// text the catalog declares a date and that reads as a timestamp (the native
+// readers keep the texts the reference keeps as texts unread).
+inline bool reference_date_value(const OcelTypeCatalog& catalog, const std::string& owner,
+                                 const std::string& key, const OcelValue& value) {
+  return date_value_text(value) != nullptr && declared_date(catalog, owner, key);
+}
 
 // Columns in first-appearance order with their value statistics.
 class Columns {
@@ -75,13 +126,34 @@ class Columns {
     }
     stats_[slot->second].observe(value);
   }
+  void observe(const std::string& key, const OcelValue& value, bool date) {
+    auto [slot, added] = index_.try_emplace(key, names_.size());
+    if (added) {
+      names_.push_back(key);
+      stats_.emplace_back();
+    }
+    stats_[slot->second].observe(value, date);
+  }
   void observe_row(const std::vector<OcelAttribute>& attributes) {
     ++rows_;
     for (const auto& attribute : attributes) observe(attribute.key, attribute.value);
   }
+  // Round EK: a row of `owner`, its date values (by `catalog`) as datetimes.
+  void observe_row(const std::vector<OcelAttribute>& attributes, const OcelTypeCatalog& catalog,
+                   const std::string& owner) {
+    ++rows_;
+    for (const auto& attribute : attributes)
+      observe(attribute.key, attribute.value,
+              reference_date_value(catalog, owner, attribute.key, attribute.value));
+  }
   void add_rows(std::size_t rows) { rows_ += rows; }
 
   [[nodiscard]] const std::vector<std::string>& names() const { return names_; }
+  // The column's position in first-appearance order (the end for no column).
+  [[nodiscard]] std::size_t position(const std::string& key) const {
+    const auto found = index_.find(key);
+    return found == index_.end() ? names_.size() : found->second;
+  }
   [[nodiscard]] std::size_t rows() const { return rows_; }
   [[nodiscard]] const ColumnStats* stats(const std::string& key) const {
     const auto found = index_.find(key);
@@ -99,43 +171,93 @@ class Columns {
   std::size_t rows_ = 0;
 };
 
+// Round EK: a row's attributes as the reference writers print a frame row:
+// in the frame's column order (first appearance over the rows), null cells
+// left out unless `keep_null`; a repeated key keeps its last value.
+inline std::vector<const OcelAttribute*> frame_row(const std::vector<OcelAttribute>& attributes,
+                                                   const Columns& frame, bool keep_null = false) {
+  std::vector<const OcelAttribute*> out;
+  std::unordered_map<std::string_view, std::size_t> seen;
+  for (const auto& attribute : attributes) {
+    const auto [slot, added] = seen.try_emplace(attribute.key, out.size());
+    if (added) out.push_back(&attribute);
+    else out[slot->second] = &attribute;
+  }
+  if (!keep_null)
+    std::erase_if(out, [](const OcelAttribute* attribute) {
+      return std::holds_alternative<std::nullptr_t>(attribute->value);
+    });
+  std::stable_sort(out.begin(), out.end(), [&](const OcelAttribute* left, const OcelAttribute* right) {
+    return frame.position(left->key) < frame.position(right->key);
+  });
+  return out;
+}
+
 // One owner's attribute declarations in output order, per owner.
 using TypeDeclarations =
     std::map<std::string, std::vector<std::pair<std::string, std::string>>>;
 
-// The reference OCEL 2.0 writers (write_ocel2_xml, write_ocel2_json) declare
-// what their frame column holds: "float" for a
-// float64 column (an integer column with a missing cell is one), "date" for
-// a timestamp column (here: a catalog date or time declaration), otherwise
-// "string". Each type lists its attributes with a value in global column
-// order (changed fields after the static ones); declared-only catalog entries
-// follow with their declared type, so empty types and attributes survive.
+// The reference OCEL 2.0 writers (write_ocel2_xml, write_ocel2_json) and
+// write_ocel_json's type catalogs declare what each type's rows hold
+// (observed black-box, round EK): "float" for a float64 frame column (an
+// integer column with a missing cell is one), "date" for a datetime64 one;
+// in an object column, by the type's own values: "date" when all are
+// datetimes, "float" when floats with no text or datetime (ints and booleans
+// next to them), otherwise "string" (also integer and boolean columns). Each
+// type lists its attributes with a value in global column order (changed
+// fields after the static ones, typed by the changes frame when the type
+// holds no static value); declared-only catalog entries follow with their
+// declared type, so empty types and attributes survive.
+inline std::string reference_declared_type(Dtype column, const ColumnStats* owner) {
+  if (column == Dtype::kFloat64) return "float";
+  if (column == Dtype::kDatetime) return "date";
+  if (column != Dtype::kObject || owner == nullptr) return "string";
+  if (owner->has_string) return "string";
+  if (owner->has_date())
+    return owner->has_bool || owner->has_int || owner->has_float || (owner->has_naive_date && owner->has_aware_date)
+               ? "string"
+               : "date";
+  return owner->has_float ? "float" : "string";
+}
+
 inline void reference_type_declarations(const Ocel& log, TypeDeclarations& object_types,
                                         TypeDeclarations& event_types) {
   Columns object_columns, change_columns, event_columns;
-  for (const auto& object : log.objects) object_columns.observe_row(object.attributes);
-  for (const auto& change : log.object_changes) {
-    change_columns.add_rows(1);
-    change_columns.observe(change.field, change.value);
+  // Per owner: the stats of its own rows (objects frame and changes frame).
+  std::map<std::string, Columns> object_owner, change_owner, event_owner;
+  std::unordered_map<std::string_view, std::string_view> object_type_of;
+  for (const auto& object : log.objects) {
+    object_type_of.emplace(object.id, object.type);
+    object_columns.observe_row(object.attributes, log.object_type_attributes, object.type);
+    object_owner[object.type].observe_row(object.attributes, log.object_type_attributes, object.type);
   }
-  for (const auto& event : log.events) event_columns.observe_row(event.attributes);
-  const auto declare = [](const OcelTypeCatalog& catalog, const std::string& owner,
-                          const std::string& key, Dtype dtype) {
-    if (const auto schema = catalog.find(owner); schema != catalog.end())
-      if (const auto found = schema->second.find(key); found != schema->second.end()) {
-        std::string lowered = found->second;
-        for (auto& ch : lowered) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-        // The reference XML reader reads only "date" as a timestamp ("time",
-        // the OCEL 2.0 JSON spelling, stays text there), and both writers
-        // declare a timestamp column "date".
-        if (lowered.find("date") != std::string::npos || lowered.find("time") != std::string::npos)
-          return std::string("date");
-      }
-    return std::string(dtype == Dtype::kFloat64 ? "float" : "string");
+  for (const auto& change : log.object_changes) {
+    std::string owner = change.object_type;
+    if (owner.empty())
+      if (const auto found = object_type_of.find(change.object_id); found != object_type_of.end())
+        owner = std::string(found->second);
+    const bool date = reference_date_value(log.object_type_attributes, owner, change.field, change.value);
+    change_columns.add_rows(1);
+    change_columns.observe(change.field, change.value, date);
+    auto& own = change_owner[owner];
+    own.add_rows(1);
+    own.observe(change.field, change.value, date);
+  }
+  for (const auto& event : log.events) {
+    event_columns.observe_row(event.attributes, log.event_type_attributes, event.activity);
+    event_owner[event.activity].observe_row(event.attributes, log.event_type_attributes, event.activity);
+  }
+  const auto owner_stats = [](const std::map<std::string, Columns>& owners, const std::string& owner,
+                              const std::string& key) -> const ColumnStats* {
+    const auto found = owners.find(owner);
+    if (found == owners.end()) return nullptr;
+    const auto* stats = found->second.stats(key);
+    return stats == nullptr || stats->present == 0 ? nullptr : stats;
   };
   using Present = std::map<std::string, std::unordered_set<std::string>>;
   const auto build = [&](const OcelTypeCatalog& catalog, const Present& present,
                          const std::vector<const Columns*>& order,
+                         const std::vector<const std::map<std::string, Columns>*>& owners,
                          TypeDeclarations& table) {
     for (const auto& [owner, keys] : present) {
       auto& declarations = table[owner];
@@ -143,10 +265,17 @@ inline void reference_type_declarations(const Ocel& log, TypeDeclarations& objec
       for (const auto* columns : order)
         for (const auto& name : columns->names()) {
           if (!keys.contains(name) || !written.insert(name).second) continue;
-          auto dtype = columns->dtype(name);
-          if (columns == &change_columns) dtype = change_columns.dtype(name);
-          else if (dtype == Dtype::kEmpty) dtype = change_columns.dtype(name);
-          declarations.emplace_back(name, declare(catalog, owner, name, dtype));
+          // The static frame's column types a type holding a static value,
+          // the changes frame's one holding only changes.
+          std::size_t frame = 0;
+          const ColumnStats* own = owner_stats(*owners[0], owner, name);
+          if (own == nullptr && order.size() > 1) {
+            frame = 1;
+            own = owner_stats(*owners[1], owner, name);
+          }
+          auto dtype = order[frame]->dtype(name);
+          if (frame == 0 && dtype == Dtype::kEmpty && order.size() > 1) dtype = order[1]->dtype(name);
+          declarations.emplace_back(name, reference_declared_type(dtype, own));
         }
     }
     for (const auto& [owner, schema] : catalog) {
@@ -170,8 +299,9 @@ inline void reference_type_declarations(const Ocel& log, TypeDeclarations& objec
     for (const auto& attribute : event.attributes)
       if (!std::holds_alternative<std::nullptr_t>(attribute.value))
         event_present[event.activity].insert(attribute.key);
-  build(log.object_type_attributes, object_present, {&object_columns, &change_columns}, object_types);
-  build(log.event_type_attributes, event_present, {&event_columns}, event_types);
+  build(log.object_type_attributes, object_present, {&object_columns, &change_columns},
+        {&object_owner, &change_owner}, object_types);
+  build(log.event_type_attributes, event_present, {&event_columns}, {&event_owner}, event_types);
   for (auto* table : {&object_types, &event_types})
     for (auto& [owner, declarations] : *table)
       std::erase_if(declarations, [](const auto& entry) { return entry.first.starts_with("ocel:"); });
@@ -180,22 +310,26 @@ inline void reference_type_declarations(const Ocel& log, TypeDeclarations& objec
 }
 
 // pandas to_sql's column type: from the dtype, or for an object column from
-// the kinds of its non-null values in the written table.
-inline std::string sql_type(Dtype dtype, const ColumnStats& table_values) {
+// the kinds of its non-null values in the written table. Round EK: ints with
+// a missing cell in the table (`rows` its rows) are REAL there (observed
+// black-box: the table's column is float64, an int stored as a float).
+inline std::string sql_type(Dtype dtype, const ColumnStats& table_values, std::size_t rows = 0) {
   switch (dtype) {
     case Dtype::kInt64:
     case Dtype::kBool:
       return "INTEGER";
     case Dtype::kFloat64:
       return "REAL";
+    case Dtype::kDatetime:
+      return "TIMESTAMP";
     default:
       break;
   }
-  if (table_values.has_string) return "TEXT";
+  if (table_values.has_string || table_values.has_date()) return "TEXT";
   if (table_values.has_bool)
     return table_values.has_int || table_values.has_float ? "TEXT" : "INTEGER";
   if (table_values.has_float) return "REAL";
-  if (table_values.has_int) return "INTEGER";
+  if (table_values.has_int) return table_values.present < rows ? "REAL" : "INTEGER";
   return "TEXT";
 }
 
@@ -298,6 +432,13 @@ inline std::string civil_timestamp_text(const CivilTimestamp& time, char separat
 // OCEL 2.0 SQLite '' or NULL time, sent on in transports (round EG). pandas
 // sorts it after every time and prints it "NaT".
 inline bool nat_time_text(std::string_view text) { return text.empty(); }
+// Round EK: a change time pandas reads as NaT from a text (its NaT strings:
+// "NaT", "nat", "NAT", "nan", "NaN", "NAN"; observed black-box in
+// read_ocel2_json's change frame), or the empty text.
+inline bool pandas_nat_time_text(std::string_view text) {
+  return text.empty() || text == "NaT" || text == "nat" || text == "NAT" || text == "nan" ||
+         text == "NaN" || text == "NAN";
+}
 // The error pm4py raises taking .timestamp() of a missing event time: NaT's,
 // or None's for a log whose time column holds None (Ocel::none_event_times,
 // round EH).
@@ -322,6 +463,23 @@ inline std::string utc_timestamp_text(std::string_view text, char separator,
   auto out = civil_timestamp_text(*time, separator, digits, true);
   if (time->timezone_aware) out += suffix;
   return out;
+}
+
+// Round EK: a datetime cell as the reference JSON and OCEL 1.0 XML writers
+// print a datetime64 column ("%Y-%m-%dT%H:%M:%SZ", a naive one too), the
+// fraction kept (declared: pm4py drops it); text that is no timestamp stays.
+inline std::string datetime64_json_text(std::string_view text) {
+  const auto parsed = parse_timestamp_exact(text);
+  const auto time = parsed ? civil_timestamp(*parsed) : std::nullopt;
+  if (!time) return std::string(text);
+  const int digits = time->nanoseconds == 0 ? 0 : time->nanoseconds % 1000 == 0 ? 6 : 9;
+  return civil_timestamp_text(*time, 'T', digits, true) + "Z";
+}
+// Round EK: a datetime cell of an object column (dates next to other values)
+// as every reference writer prints it: its isoformat ("+00:00", a naive one
+// without offset).
+inline std::string object_datetime_text(std::string_view text) {
+  return utc_timestamp_text(text, 'T', "+00:00");
 }
 
 // The texts DataFrame.to_csv writes for a timestamp column holding `texts`.

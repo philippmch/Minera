@@ -212,6 +212,9 @@ LlmContextResult build_llm_context(const Ocel& log,const LlmContextOptions& opti
   text.value+="\nobjects:\n\n";
   bool listed=false;for(const auto& object:described.objects){std::string line=object.id+" object type: "+object.type;if(described.includes_timestamps&&object.has_lifecycle)line+=" ( lifecycle start: "+object.lifecycle_start+" ; lifecycle end: "+object.lifecycle_end+" ; lifecycle duration: "+ocel_frame::float_repr(object.lifecycle_seconds)+" )";if(!text.line(line+"\n"))break;listed=true;}
   if(listed&&text.value.ends_with('\n'))text.value.pop_back();
+  // Round EK: without objects the header ends the text ("objects:\n"), as
+  // the description route's (observed black-box).
+  if(described.objects.empty()&&text.value.ends_with("\n\n"))text.value.pop_back();
  }
  return text.finish(options.variant);
 }
