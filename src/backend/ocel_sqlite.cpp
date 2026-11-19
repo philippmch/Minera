@@ -458,6 +458,45 @@ struct TypeTableRow {
   std::size_t position = 0;
 };
 
+// Round EJ: read_sql types each column of a type table over all of its
+// rows, base and change rows alike: a column of integers with a NULL or a
+// REAL cell anywhere in the table is float64, so its integers read as floats
+// (observed black-box: a change row of another field leaves the column NULL,
+// so a pm4py-written object table with changes of two fields reads its
+// integer and boolean columns as floats). The names of those columns.
+std::unordered_set<std::string> float64_integer_columns(sqlite3* db, std::string_view table,
+                                                        const std::vector<TableColumn>& columns) {
+  struct Seen {
+    bool integer = false, real = false, null = false, other = false;
+  };
+  std::vector<Seen> seen(columns.size());
+  Statement statement(db, "SELECT * FROM " + quote_identifier(table));
+  while (true) {
+    const auto status = sqlite3_step(statement.get());
+    if (status == SQLITE_DONE) break;
+    if (status != SQLITE_ROW) throw std::runtime_error("SQLite type-table column query failed");
+    const auto count = std::min<std::size_t>(columns.size(),
+                                             static_cast<std::size_t>(sqlite3_column_count(statement.get())));
+    for (std::size_t index = 0; index < count; ++index) {
+      switch (sqlite3_column_type(statement.get(), static_cast<int>(index))) {
+        case SQLITE_INTEGER: seen[index].integer = true; break;
+        case SQLITE_FLOAT: seen[index].real = true; break;
+        case SQLITE_NULL: seen[index].null = true; break;
+        default: seen[index].other = true; break;
+      }
+    }
+  }
+  std::unordered_set<std::string> result;
+  for (std::size_t index = 0; index < columns.size(); ++index)
+    if (seen[index].integer && !seen[index].other && (seen[index].null || seen[index].real))
+      result.insert(columns[index].name);
+  return result;
+}
+
+void floatify_integer(OcelValue& value) {
+  if (const auto* integer = std::get_if<std::int64_t>(&value)) value = static_cast<double>(*integer);
+}
+
 // Which rows of a type table are rows of the event or object itself. An
 // event table's rows all are. In object tables the reference reader takes
 // the rows without a changed field, or, when no object table has one, each
@@ -542,6 +581,10 @@ class TypeTableRows {
     }
     if (!objects && !nulls)
       time_column_ = integers ? OcelSqliteTimeColumn::kInteger : OcelSqliteTimeColumn::kReal;
+    if (const auto floats = float64_integer_columns(db, table, columns); !floats.empty())
+      for (auto& [id, row] : rows_)
+        for (auto& attribute : row.attributes)
+          if (floats.contains(attribute.key)) floatify_integer(attribute.value);
   }
 
   bool exists() const { return exists_; }
@@ -622,6 +665,7 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
   const auto id_index = static_cast<int>(id - columns.begin());
   const auto changed_index = static_cast<int>(changed - columns.begin());
   const auto timestamp_index = static_cast<int>(timestamp - columns.begin());
+  const auto floats = float64_integer_columns(db, table, columns);
   for (std::size_t position = 0;; ++position) {
     const auto status = sqlite3_step(statement.get());
     if (status == SQLITE_DONE) break;
@@ -657,6 +701,7 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
                        : read_sqlite_cell(statement.get(),
                                           static_cast<int>(value_column - columns.begin()),
                                           value_column->declared_type);
+    if (floats.contains(field)) floatify_integer(change.value);
     log.object_changes.push_back(std::move(change));
     places.emplace_back(position, type_rank);
   }

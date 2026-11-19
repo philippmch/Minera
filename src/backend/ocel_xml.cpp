@@ -661,46 +661,79 @@ void read_reference_event(const Node& en, Ocel& log, bool reject_lists,
 using StandardXmlAttributeTypes =
     std::map<std::string, std::map<std::string, std::string>>;
 
+// Declared attribute names whose entry has no type attribute: read_ocel2_xml
+// keeps None as their type and raises "argument of type 'NoneType' is not
+// iterable" when it reads a value under one (round EJ, observed black-box).
+using StandardXmlUntypedNames = std::map<std::string, std::set<std::string>>;
+
+// One <object-types> or <event-types> section, read where the walk meets it
+// (round EJ: read_ocel2_xml reads the file's sections in document order, so
+// values listed before the table are read without declared types).
 void parse_standard_xml_type_table(
-    const Node& root, std::string_view container_name,
-    std::string_view type_name, StandardXmlAttributeTypes& result) {
-  for (const auto* container : children(root, container_name)) {
-    for (const auto* descriptor : children(*container, type_name)) {
-      // read_ocel2_xml takes a type listed twice from its last listing and
-      // an attribute listed twice from its last entry; an empty type name is
-      // no error (its events or objects are dropped), observed black-box.
-      // Values under an empty attribute name are skipped, so is its entry.
-      const auto name = attr_or(*descriptor, "name");
-      std::map<std::string, std::string> attributes;
-      if (const auto* attribute_container = child(*descriptor, "attributes")) {
-        for (const auto* attribute : children(*attribute_container, "attribute")) {
-          const auto attribute_name = attr_or(*attribute, "name", attr_or(*attribute, "key"));
-          const auto attribute_type = attr_or(*attribute, "type", "string");
-          if (attribute_name.empty()) continue;
-          if (attribute_type.empty()) attributes.erase(attribute_name);
-          else attributes.insert_or_assign(attribute_name, attribute_type);
+    const Node& container, std::string_view type_name, StandardXmlAttributeTypes& result,
+    StandardXmlUntypedNames& untyped) {
+  for (const auto* descriptor : children(container, type_name)) {
+    // read_ocel2_xml takes a type listed twice from its last listing and
+    // an attribute listed twice from its last entry; an empty type name is
+    // no error (its events or objects are dropped), observed black-box.
+    // Values under an empty attribute name are skipped, so is its entry.
+    const auto name = attr_or(*descriptor, "name");
+    std::map<std::string, std::string> attributes;
+    std::set<std::string> untyped_names;
+    if (const auto* attribute_container = child(*descriptor, "attributes")) {
+      for (const auto* attribute : children(*attribute_container, "attribute")) {
+        // Round EJ: the name attribute alone (an empty one is a name; none
+        // declares None, which only a keyless value could use).
+        const auto* named = attr(*attribute, "name");
+        if (named == nullptr) continue;
+        const auto& attribute_name = *named;
+        const auto* declared = attr(*attribute, "type");
+        if (declared == nullptr) {
+          untyped_names.insert(attribute_name);
+          attributes.insert_or_assign(attribute_name, "string");
+          continue;
         }
+        untyped_names.erase(attribute_name);
+        if (declared->empty()) attributes.erase(attribute_name);
+        else attributes.insert_or_assign(attribute_name, *declared);
       }
-      result.insert_or_assign(name, std::move(attributes));
     }
+    result.insert_or_assign(name, std::move(attributes));
+    untyped.insert_or_assign(name, std::move(untyped_names));
   }
 }
 
+// read_ocel2_xml's reading of a value element's text (round EJ, observed
+// black-box): a declared type naming "date" is dateutil's (the text stays,
+// convert_ocel_date_attributes converts it), one naming "float" is float()'s,
+// anything else (integer, boolean, double, ...) and an undeclared name keep
+// the text as written; no text is None ("None" as a text, an error for a
+// date or float). Native files name each value's type and keep their own
+// reading.
 OcelValue standard_xml_value(const Node& node, const std::string* declared_type,
-                             bool reject_lists) {
+                             bool reject_lists, bool untyped = false) {
   if (attr(node, "type") != nullptr) return value_node(node, reject_lists);
-  // Reference capture (pm4py 2.7.22 read_ocel2_xml): an attribute element
-  // without text reads as the text "None" unless its type is a float (which
-  // raises there and here). Native files name each value's type and keep an
-  // empty string.
-  if (attr(node, "value") == nullptr && node.text.empty() && node.children.empty() &&
-      (declared_type == nullptr ||
-       (*declared_type != "float" && *declared_type != "double" && *declared_type != "number")))
-    return std::string("None");
-  if (declared_type == nullptr) return value_node(node, reject_lists);
-  Node typed = node;
-  typed.attrs.emplace_back("type", *declared_type);
-  return value_node(typed, reject_lists);
+  if (attr(node, "value") != nullptr) {
+    if (declared_type == nullptr) return value_node(node, reject_lists);
+    Node typed = node;
+    typed.attrs.emplace_back("type", *declared_type);
+    return value_node(typed, reject_lists);
+  }
+  if (untyped) throw std::invalid_argument("argument of type 'NoneType' is not iterable");
+  const bool none = node.text.empty() && node.children.empty();
+  if (declared_type != nullptr && declared_type->find("date") != std::string::npos) {
+    if (none) throw std::invalid_argument("Parser must be a string or character stream, not NoneType");
+    check_ocel2_xml_date_text(node.text);
+    return node.text;
+  }
+  if (declared_type != nullptr && declared_type->find("float") != std::string::npos) {
+    if (none)
+      throw std::invalid_argument("float() argument must be a string or a real number, not 'NoneType'");
+    if (const auto parsed = detail::parse_python_float_text(node.text)) return *parsed;
+    throw std::invalid_argument("could not convert string to float: " + ocel_frame::python_str_repr(node.text));
+  }
+  if (none) return std::string("None");
+  return node.text;
 }
 
 // Returns the typed times of the events, in file order, for
@@ -828,77 +861,58 @@ std::vector<OcelXmlTime> parse_classic(const Node& root, Ocel& log, bool reject_
 // file (round EB, observed black-box): objects and events in document order,
 // an event's time before its attributes, an object attribute's value before
 // its time, so the first unreadable text raises its dateutil error.
-void check_standard_xml_dates(const Node& root, const StandardXmlAttributeTypes& object_attribute_types,
-                              const StandardXmlAttributeTypes& event_attribute_types, bool reject_lists) {
-  const auto date_type = [](const StandardXmlAttributeTypes& table, const std::string& owner,
-                            const std::string& key) -> const std::string* {
-    const auto found_owner = table.find(owner);
-    if (found_owner == table.end()) return nullptr;
-    const auto found = found_owner->second.find(key);
-    if (found == found_owner->second.end() || found->second.find("date") == std::string::npos) return nullptr;
-    return &found->second;
-  };
-  const auto check_value = [&](const Node& node, const std::string* declared) {
-    if (declared == nullptr) return;
-    // An empty element's text is None, which dateutil refuses.
-    if (attr(node, "type") == nullptr && attr(node, "value") == nullptr && node.text.empty() &&
-        node.children.empty())
-      throw std::invalid_argument("Parser must be a string or character stream, not NoneType");
-    const auto value = standard_xml_value(node, declared, reject_lists);
-    if (const auto* text = std::get_if<std::string>(&value)) check_ocel2_xml_date_text(*text);
-  };
-  for (const auto& section : root.children) {
-    const auto name = local(section.name);
-    if (name == "objects") {
-      for (const auto* on : children(section, "object")) {
-        const std::string type = attr_or(*on, "type");
-        if (const auto* a = child(*on, "attributes"))
-          for (const auto& av : a->children) if (local(av.name) == "attribute") {
-            const std::string key = attr_or(av, "name", attr_or(av, "key"));
-            if (key.empty()) continue;
-            check_value(av, date_type(object_attribute_types, type, key));
-            // "0" and the 1970-01-01T00:00:00 base entries stay texts (observed
-            // black-box).
-            if (const auto* when = attr(av, "time");
-                when && *when != "0" && !when->starts_with("1970-01-01T00:00:00"))
-              check_ocel2_xml_date_text(*when);
-          }
-      }
-    } else if (name == "events") {
-      for (const auto* en : children(section, "event")) {
-        if (const auto* when = attr(*en, "time") ? attr(*en, "time") : attr(*en, "timestamp"))
-          check_ocel2_xml_date_text(*when);
-        const std::string activity = attr_or(*en, "type", attr_or(*en, "activity"));
-        if (const auto* a = child(*en, "attributes"))
-          for (const auto& av : a->children) if (local(av.name) == "attribute") {
-            const auto key = attr_or(av, "name", attr_or(av, "key"));
-            if (key.empty()) continue;
-            check_value(av, date_type(event_attribute_types, activity, key));
-          }
-      }
-    }
-  }
-}
-
 void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
   std::unordered_map<std::string, std::string> types;
   StandardXmlAttributeTypes object_attribute_types;
   StandardXmlAttributeTypes event_attribute_types;
-  parse_standard_xml_type_table(root, "object-types", "object-type",
-                                object_attribute_types);
-  parse_standard_xml_type_table(root, "event-types", "event-type",
-                                event_attribute_types);
-  check_standard_xml_dates(root, object_attribute_types, event_attribute_types, reject_lists);
-  log.object_type_attributes = object_attribute_types;
-  log.event_type_attributes = event_attribute_types;
+  StandardXmlUntypedNames object_untyped;
+  StandardXmlUntypedNames event_untyped;
+  // Round EJ: the names whose values were read under a "date" declaration,
+  // and those read without one (a value met before its type table stays a
+  // text in read_ocel2_xml, observed black-box).
+  StandardXmlUntypedNames object_dates_read, object_texts_read;
+  StandardXmlUntypedNames event_dates_read, event_texts_read;
+  const auto note_read = [](StandardXmlUntypedNames& dates, StandardXmlUntypedNames& texts,
+                            const std::string& owner, const std::string& key, const std::string* declared) {
+    if (declared != nullptr && declared->find("date") != std::string::npos) dates[owner].insert(key);
+    else texts[owner].insert(key);
+  };
   struct StandardAttribute {
     std::string name;
     OcelValue value;
     bool has_time = false;
     std::string time;
   };
-  for (const auto* objects : children(root, "objects"))
-    for (const auto* on : children(*objects, "object")) {
+  const auto declared_in = [](const StandardXmlAttributeTypes& table, const std::string& owner,
+                              const std::string& key) -> const std::string* {
+    const auto found_owner = table.find(owner);
+    if (found_owner == table.end()) return nullptr;
+    const auto found = found_owner->second.find(key);
+    return found == found_owner->second.end() ? nullptr : &found->second;
+  };
+  const auto untyped_in = [](const StandardXmlUntypedNames& table, const std::string& owner,
+                             const std::string& key) {
+    const auto found = table.find(owner);
+    return found != table.end() && found->second.count(key) != 0;
+  };
+  // Round EJ: read_ocel2_xml walks the root's sections in document order and
+  // reads each value where it meets it, so the first value it cannot read
+  // raises: an object attribute's value (by its declared type), then its
+  // time (none raises AttributeError, "0" and the 1970-01-01T00:00:00 base
+  // entries stay texts, any other is dateutil's), an event's time, then its
+  // attribute values (observed black-box).
+  for (const auto& section : root.children) {
+    const auto section_name = local(section.name);
+    if (section_name == "object-types") {
+      parse_standard_xml_type_table(section, "object-type", object_attribute_types, object_untyped);
+      continue;
+    }
+    if (section_name == "event-types") {
+      parse_standard_xml_type_table(section, "event-type", event_attribute_types, event_untyped);
+      continue;
+    }
+    if (section_name == "objects") {
+    for (const auto* on : children(section, "object")) {
       const std::string id = attr_or(*on, "id"), type = attr_or(*on, "type");
       // An empty id or type is no error: drop_empty_ocel_names drops the
       // object (observed black-box), so an empty id may repeat.
@@ -911,19 +925,23 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
         std::vector<std::pair<std::string, std::vector<StandardAttribute>>> grouped;
         std::unordered_map<std::string, std::size_t> group_index;
         for (const auto& av : a->children) if (local(av.name) == "attribute") {
-          const std::string key = attr_or(av, "name", attr_or(av, "key"));
-          if (key.empty()) continue;
-          const auto* declared = [&]() -> const std::string* {
-            const auto owner = object_attribute_types.find(type);
-            if (owner == object_attribute_types.end()) return nullptr;
-            const auto found = owner->second.find(key);
-            return found == owner->second.end() ? nullptr : &found->second;
-          }();
-          StandardAttribute entry{key, standard_xml_value(av, declared, reject_lists)};
-          if (const auto* when = attr(av, "time")) {
-            entry.has_time = true;
-            entry.time = *when;
-          }
+          // Round EJ: read_ocel2_xml takes the name attribute alone: an empty
+          // name is a column, none a NaN-named one (keyless, declared:
+          // skipped). Its value and time are still read.
+          const auto* named = attr(av, "name");
+          const std::string key = named != nullptr ? *named : std::string{};
+          const auto* declared = declared_in(object_attribute_types, type, key);
+          StandardAttribute entry{key, named == nullptr
+                                           ? standard_xml_value(av, nullptr, reject_lists)
+                                           : standard_xml_value(av, declared, reject_lists,
+                                                                untyped_in(object_untyped, type, key))};
+          if (named != nullptr) note_read(object_dates_read, object_texts_read, type, key, declared);
+          const auto* when = attr(av, "time");
+          if (when == nullptr) throw std::invalid_argument("'NoneType' object has no attribute 'startswith'");
+          if (*when != "0" && !when->starts_with("1970-01-01T00:00:00")) check_ocel2_xml_date_text(*when);
+          entry.has_time = true;
+          entry.time = *when;
+          if (named == nullptr) continue;
           const auto [slot, added] = group_index.try_emplace(key, grouped.size());
           if (added) grouped.emplace_back(key, std::vector<StandardAttribute>{});
           grouped[slot->second].second.push_back(std::move(entry));
@@ -931,12 +949,9 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
         for (auto& [key, entries] : grouped) {
           if (entries.empty()) continue;
           o.attributes.push_back({key, entries.front().value});
-          for (std::size_t i = 1; i < entries.size(); ++i) {
-            if (!entries[i].has_time)
-              throw std::invalid_argument("OCEL XML object attribute change requires a timestamp");
+          for (std::size_t i = 1; i < entries.size(); ++i)
             log.object_changes.push_back({id, type, entries[i].time, key,
                                            entries[i].value});
-          }
         }
       } else append_values(*on, o.attributes, reject_lists);
       log.objects.push_back(std::move(o));
@@ -948,42 +963,72 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
         for (const auto* r : children(*rs, "relationship"))
           log.o2o.push_back({id, attr_or(*r, "object-id", attr_or(*r, "objectId")), attr_or(*r, "qualifier")});
     }
-  for (const auto* events : children(root, "events"))
-    for (const auto* en : children(*events, "event")) {
+      continue;
+    }
+    if (section_name != "events") continue;
+    for (const auto* en : children(section, "event")) {
       OcelEvent e{attr_or(*en, "id"), attr_or(*en, "type", attr_or(*en, "activity")), attr_or(*en, "time", attr_or(*en, "timestamp")), {}};
       // An event without id or type is dropped later (drop_empty_ocel_names);
       // one without time raises, as the reference's date reading does: its
-      // dateutil parser on None (round EI, observed black-box; an empty
-      // time raises before, as dateutil does on "").
-      if (e.timestamp.empty())
+      // dateutil parser on None (round EI, observed black-box), an empty
+      // time as dateutil does on "".
+      const auto* when = attr(*en, "time") ? attr(*en, "time") : attr(*en, "timestamp");
+      if (when == nullptr)
         throw std::invalid_argument("Parser must be a string or character stream, not NoneType");
+      check_ocel2_xml_date_text(*when);
       if (const auto* a = child(*en, "attributes")) {
         for (const auto& av : a->children) if (local(av.name) == "attribute") {
-          const auto key = attr_or(av, "name", attr_or(av, "key"));
-          if (key.empty()) continue;
-          const auto owner = event_attribute_types.find(e.activity);
-          const auto found = owner == event_attribute_types.end()
-                                 ? std::map<std::string, std::string>::const_iterator{}
-                                 : owner->second.find(key);
-          const auto* declared = owner == event_attribute_types.end() ||
-                                         found == owner->second.end()
-                                     ? nullptr
-                                     : &found->second;
-          e.attributes.push_back({key, standard_xml_value(av, declared,
-                                                           reject_lists)});
+          const auto* named = attr(av, "name");
+          if (named == nullptr) {
+            // A keyless value (declared: skipped) is still read, untyped.
+            (void)standard_xml_value(av, nullptr, reject_lists);
+            continue;
+          }
+          const auto& key = *named;
+          const auto* declared = declared_in(event_attribute_types, e.activity, key);
+          e.attributes.push_back({key, standard_xml_value(av, declared, reject_lists,
+                                                           untyped_in(event_untyped, e.activity, key))});
+          note_read(event_dates_read, event_texts_read, e.activity, key, declared);
         }
       }
       log.events.push_back(std::move(e));
       log.event_type_attributes.try_emplace(log.events.back().activity);
+      // read_ocel2_xml drops a relation to an object it has not read yet
+      // (and the event when it keeps none), observed black-box: an object
+      // listed after the event, also in a later <objects> section, is not
+      // related (round EJ).
       for (const auto* rs : children(*en, "objects"))
         for (const auto* r : children(*rs, "relationship")) {
-          const std::string oid = attr_or(*r, "object-id", attr_or(*r, "objectId"));
-          // read_ocel2_xml drops a relation to an unlisted object (and the
-          // event when it keeps none), observed black-box.
-          if (!types.count(oid)) continue;
-          log.relations.push_back({log.events.back().id, oid, attr_or(*r, "qualifier")});
+          auto object_id = attr_or(*r, "object-id", attr_or(*r, "objectId"));
+          if (!types.count(object_id)) continue;
+          log.relations.push_back({log.events.back().id, std::move(object_id), attr_or(*r, "qualifier")});
         }
     }
+  }
+  // Round EJ: read_ocel2_xml converts a type naming "date" (case-sensitive)
+  // alone; "time", "Date", "timestamp", ... stay texts, which the catalog
+  // records as "string" so later routes (writers, flattening) do not take
+  // them for timestamps as the OCEL 2.0 JSON reader's would be.
+  // A "date" declared after all of its values were read (a type table that
+  // follows the objects or events) left them texts: the catalog says
+  // "string" too. Values read both ways are a mixed column (declared).
+  const auto as_read = [&untyped_in](std::map<std::string, std::string> attributes, const std::string& owner,
+                                     const StandardXmlUntypedNames& dates, const StandardXmlUntypedNames& texts) {
+    for (auto& [key, type] : attributes) {
+      if (type.find("date") != std::string::npos) {
+        if (untyped_in(texts, owner, key) && !untyped_in(dates, owner, key)) type = "string";
+        continue;
+      }
+      std::string lowered = type;
+      for (auto& ch : lowered) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+      if (lowered.find("date") != std::string::npos || lowered.find("time") != std::string::npos) type = "string";
+    }
+    return attributes;
+  };
+  for (auto& [owner, attributes] : object_attribute_types)
+    log.object_type_attributes[owner] = as_read(attributes, owner, object_dates_read, object_texts_read);
+  for (auto& [owner, attributes] : event_attribute_types)
+    log.event_type_attributes[owner] = as_read(attributes, owner, event_dates_read, event_texts_read);
   if (const auto* globals = child(root, "globals")) { std::vector<OcelAttribute> vals; append_values(*globals, vals, reject_lists); for (auto& a : vals) log.globals[a.key] = std::move(a.value); }
   for (const auto* links : children(root, "e2e"))
     for (const auto* rel : children(*links, "relationship")) {
@@ -1203,8 +1248,11 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   validate_references(log);
   // Both reference XML readers fail on a file without an event-object
   // relation to a listed object (observed black-box: AttributeError).
+  // Round EJ: read_ocel2_xml says "'NoneType' object has no attribute
+  // 'index'" (observed black-box).
   if (log.relations.empty())
-    throw std::invalid_argument("OCEL XML file has no event-object relation");
+    throw std::invalid_argument(standard ? "'NoneType' object has no attribute 'index'"
+                                         : "OCEL XML file has no event-object relation");
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   if (standard) sort_ocel_events_by_timestamp(log, OcelTimestampReader::kDateutil);
   else sort_ocel_xml_events(log, classic_times);
@@ -1517,18 +1565,18 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
     for (const auto& attribute : object.attributes)
       write_standard_value(attributes, attribute.value, attribute.key, "        ",
                            "1970-01-01T00:00:00Z", object_date(attribute.key), true);
-    std::vector<const OcelObjectChange*> object_changes = rows_of(changes, object.id);
-    std::stable_sort(object_changes.begin(), object_changes.end(),
-                     [](const auto* left, const auto* right) {
-                       return std::tie(left->timestamp, left->field) <
-                              std::tie(right->timestamp, right->field);
-                     });
+    // Round EJ: an object's changes in log order, as write_ocel2_xml writes
+    // them (observed black-box: not sorted by time).
+    const std::vector<const OcelObjectChange*>& object_changes = rows_of(changes, object.id);
     // Like the reference, a field without a base value gets no null base
     // entry: its first change reads back as the base, as PM4Py reads its own
     // export.
+    // A NaT change time (the empty text) prints "NaT" (observed black-box).
     for (const auto* change : object_changes)
       write_standard_value(attributes, change->value, change->field, "        ",
-                           ocel_frame::utc_timestamp_text(change->timestamp, 'T', "+00:00"),
+                           ocel_frame::nat_time_text(change->timestamp)
+                               ? std::string("NaT")
+                               : ocel_frame::utc_timestamp_text(change->timestamp, 'T', "+00:00"),
                            object_date(change->field), true);
     const auto text = attributes.str();
     if (text.empty()) out << "      <attributes/>\n";

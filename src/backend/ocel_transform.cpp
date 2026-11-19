@@ -1,5 +1,6 @@
 #include "minera/ocel_transform.hpp"
 #include "minera/timestamp.hpp"
+#include "ocel_frame_types.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -1068,9 +1069,17 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
         });
   }
 
-  const auto convert_attribute = [](const OcelAttribute& source)
+  // Round EJ: a value the reference reader holds as a timestamp (a declared
+  // date, see ocel_frame::declared_date) is a datetime in pm4py's flattened
+  // frame, which its XES exporter writes as <date> in isoformat, whether the
+  // frame column is datetime64 or mixed (observed black-box).
+  const auto convert_attribute = [](const OcelAttribute& source, bool declared_date = false)
       -> std::optional<EventAttribute> {
     if (std::holds_alternative<std::nullptr_t>(source.value)) return std::nullopt;
+    if (declared_date)
+      if (const auto* text = ocel_frame::date_value_text(source.value))
+        return EventAttribute{source.key, ocel_frame::utc_timestamp_text(*text, 'T', "+00:00", true),
+                              AttributeKind::kDate};
     if (const auto* value = std::get_if<bool>(&source.value))
       return EventAttribute{source.key, *value ? "true" : "false",
                             AttributeKind::kBoolean};
@@ -1154,7 +1163,8 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
     trace.attributes.push_back(
         {"ocel:type", object->type, AttributeKind::kString});
     for (const auto& attribute : object->attributes) {
-      const auto converted = convert_attribute(attribute);
+      const auto converted = convert_attribute(
+          attribute, ocel_frame::declared_date(log.object_type_attributes, object->type, attribute.key));
       if (converted) trace.attributes.push_back(*converted);
     }
     return trace;
@@ -1189,7 +1199,8 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
             (!options.event_timestamp_attribute.empty() &&
              attribute.key == options.event_timestamp_attribute))
           continue;
-        const auto converted = convert_attribute(attribute);
+        const auto converted = convert_attribute(
+            attribute, ocel_frame::declared_date(log.event_type_attributes, source.activity, attribute.key));
         if (converted) event.attributes.push_back(*converted);
       }
       result.traces[trace_it->second].events.push_back(std::move(event));

@@ -32799,3 +32799,126 @@ fixed above; it then passed). The workbench fixture replay gave 2,673
 responses unchanged. Python script and frontend tests not rerun (scripts
 and frontend unchanged). The device check on the Mac was skipped (the Mac
 was not linked).
+
+## Review EJ1: re-review of round EI, the OCEL 2.0 readers and writers on declared attribute types, object changes and O2O links, XML section order, JSON change times, SQLite column types (2026-11-19)
+
+Round EJ checked EI's CI (run 44436185156 on 070218f: all six jobs green,
+the Linux, macOS and Windows ctest included). Observed black-box on pm4py
+2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv: `ej/g2/o2gen.py`
+writes OCEL 2.0 JSON logs by hand with declared attribute types (string,
+integer, float, boolean, time, date), object changes, O2O links, objects
+with only links or changes, events and objects without relations, offsets
+and fractional seconds, and has pm4py write each as OCEL 2.0 XML and SQLite
+(seed 51, 100 logs per format); with `spoil` it writes values of the wrong
+type for their declared type and spoiled object attribute times (seed 52,
+300 JSON files, `modes.json` says what each holds). `ej/rt/rsw2.py` is EH's
+route sweep with the O2O links and the object changes compared and the
+dates read by the transport's catalogs; EH's `xsw` and EI's `esw` ran on the
+same banks. `ej/g2/xfz.py` mutates the pm4py-written XML files (dropped
+attributes, elements and texts, garbage attributes; `MODE=order` also
+shuffles and splits the root's sections) and `ej/g2/jfz.py` the JSON files;
+`ej/t/`, `ej/hc/` and `ej/sq/` hold the hand probes.
+
+- **EJ1-1 The OCEL 2.0 XML reader's walk and values.** `read_ocel2_xml`
+  makes one pass over the root's sections in document order and reads each
+  value where it meets it, by the type its table declared so far: a type
+  naming `float` goes through `float()` (Python's messages, `1e3` reads),
+  one naming `date` through dateutil, any other (integer and boolean
+  included) stays text; an element without text reads `"None"` (`float()`
+  and dateutil raise on it); an entry declared without a `type` raises
+  `argument of type 'NoneType' is not iterable` on a value under it. An
+  object attribute's value is read before its time (none raises
+  `'NoneType' object has no attribute 'startswith'`; `0` and the
+  `1970-01-01T00:00:00` base entries are not parsed), an event's time
+  before its attributes; the `name` attribute alone names a value (an empty
+  name is a column); a file without relations raises `'NoneType' object
+  has no attribute 'index'`. Native converted integer, boolean and double
+  values, checked the dates in a pass of its own and named its errors
+  (`invalid OCEL XML integer value`, `OCEL XML file has no event-object
+  relation`, ...): xfz differed on 84 of 300 files (seed 61), now 31, all
+  nameless values (below).
+- **EJ1-2 Sections in another order.** A relation to an object the walk
+  has not read yet is dropped (an `<events>` section before the objects, or
+  an object in a later `<objects>` section); O2O links are filtered after
+  the walk. A value read before its type table stays text, so a `date`
+  declared after all of its values is a text column. Native kept the
+  relations to objects listed anywhere and took the final catalog: the
+  order fuzz (`MODE=order`, seed 71, 300 files) differed on 53, now 20
+  (nameless values and the mixed columns below).
+- **EJ1-3 Flattening keeps declared dates.** `ocel_flattening` keeps a
+  declared date attribute (an event's or an object's, by the catalog as the
+  reader reads it) a datetime, which the XES exporter writes as `<date>`
+  in isoformat; native wrote `<string>` (72 of 3,900 calls per JSON and XML
+  reader, now 0).
+- **EJ1-4 Float columns of the OCEL 2.0 JSON reader.** pandas types each
+  frame column over all of its rows, the rows of events and objects it
+  drops later (no relation) included, so an integer column with a missing
+  cell is float64 and its integers read as floats (the writers then
+  declare `float` and print `5.0`); native kept the integers.
+- **EJ1-5 Change order of the OCEL 2.0 writers.** `write_ocel2_json` and
+  `write_ocel2_xml` list an object's changes in log order; native sorted
+  them by time and field.
+- **EJ1-6 SQLite integer columns with NULLs.** `read_ocel2_sqlite` reads
+  each type table with `read_sql`, whose dtype comes from every row: a
+  pm4py-written object table with changes of two fields has NULL cells in
+  the change rows, so its integer and boolean columns read as floats, in
+  the base rows too. Native kept the base rows' integers, so its OCEL 2.0
+  XML export declared such a column `string` and wrote `1` where pm4py
+  writes `1.0` (19 values in 4 of 100 files).
+- **EJ1-7 OCEL 2.0 JSON change times.** `read_ocel2_json` takes no time for
+  an attribute's first entry (null, an int or no time read), and reads a
+  change without a time, or with null, as NaT. `write_ocel2_json` then
+  raises `KeyError: 'ocel:timestamp'`, `write_ocel_json` leaves the key out
+  and `write_ocel2_xml` prints `NaT`. Native refused both (`OCEL field must
+  be string: time`, `OCEL object attribute change requires a timestamp`;
+  26 of 300 spoiled files), and a change time it did import empty or
+  `NaT` made every later route refuse the log (the transport's classic
+  reader took it for a text pm4py keeps as such); the transport now marks
+  such times (`minera:unreadableChangeTimes`) and keeps them. A change
+  time of another JSON type stays refused (EI1's declared JSON types), now
+  after the walk, so pm4py's `KeyError` of a later entry comes first.
+
+Imports: 0 of 300 differ on the clean banks (JSON, XML, SQLite; outcome
+and message), 42 of 300 on the spoiled JSON bank (68 before; 34 list or
+dict values and 8 int change times, declared). After the fixes, on the
+rebuilt server, rsw2 differs on 198 of 3,900 calls on the JSON files, 200
+on the XML files and 0 on the SQLite files (4 before), the rest all in the declared date
+spellings of the writers (fractions kept, isoformat where pm4py writes `Z`
+or `Z` where it writes isoformat, SQLite's `T`); xsw and esw differ on 0 of
+1,300 and 1,600 calls per reader. XML fuzz: seeds 72 (order, 600 files) and
+73 (600 files) differ on 56 and 53 files, all nameless values and mixed
+columns.
+
+Declared:
+- An XML attribute without a `name` is a NaN-named column in pm4py (a value
+  frame column whose name is no str); native skips it, as it does the
+  keyless OCEL 1.0 values (EG1).
+- A column whose values were read both before and after its `date`
+  declaration (a type table between two object or event sections) mixes
+  texts and datetimes in pm4py; native reads the parseable texts as dates.
+- A change time of the wrong JSON type (an int) stays refused.
+
+Open (to round EK), seen on the spoiled bank through all routes (rsw2
+differs on 866 of 10,062 calls: 561 downloads, mostly the declared date
+spellings, 299 filter calls on a few files' spoiled change times and
+values, 6 flattenings): a
+date-declared column holding non-date values (the writers' types and
+spellings; dateutil reads native's XML `type="date"` value `123` as the
+year 123), float-declared texts in the change frame (`'inf'`, `'1000.0'`),
+change times with an invalid offset (`+25:00`: pm4py's OCEL filters raise
+`AttributeError: 'datetime.datetime' object has no attribute
+'tz_convert'`), a NaN value where pm4py has none.
+
+Tests:
+- New: `minera_review_ej1_tests` (hand cases of EJ1-1 to EJ1-7).
+- Changed: `minera_ocel_xml_tests` (an OCEL 2.0 XML fixture's object
+  attribute gets a time, EJ1-1; integer and boolean values with whitespace
+  stay texts), `minera_ocel_tests` (an OCEL 2.0 JSON integer column with a
+  missing cell in dropped rows reads 7.0, EJ1-4).
+
+Runs: the full ctest passed 629 of 631 on the first run (37 min at -j2);
+the two failures were the tests changed above (an object attribute without
+a time, an integer column turned float), which then passed. The workbench
+fixture replay gave 2,673 responses unchanged. Python script and frontend
+tests not rerun (scripts and frontend unchanged). The device check on the
+Mac was skipped (the Mac was not linked).

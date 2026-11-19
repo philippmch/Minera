@@ -615,7 +615,7 @@ int main() {
   <event-types><event-type name="ship"/></event-types>
   <objects>
     <object id="o1" type="Order">
-      <attributes><attribute name="state" type="string">new</attribute></attributes>
+      <attributes><attribute name="state" time="1970-01-01T00:00:00Z" type="string">new</attribute></attributes>
       <objects><relationship object-id="o2" qualifier="contains"/></objects>
     </object>
     <object id="o2" type="Item"><attributes/></object>
@@ -629,6 +629,9 @@ int main() {
   <e2e><relationship source-event-id="e1" target-event-id="e1" qualifier="self"/></e2e>
 </log>
 )xml";
+  // Round EJ: an object attribute without a time raises in read_ocel2_xml
+  // ("'NoneType' object has no attribute 'startswith'"), so the fixture's
+  // attribute has one.
   const auto standard_fixture = minera::parse_ocel_xml(standard_links);
   assert(standard_fixture.o2o.size() == 1);
   assert(standard_fixture.o2o.front().qualifier == "contains");
@@ -723,8 +726,9 @@ int main() {
   }
   assert(missing_change_time);
 
-  // Typed values with surrounding whitespace read like PM4Py's float()/int()
-  // and date parser; string values keep their whitespace.
+  // Typed values with surrounding whitespace read like PM4Py's float() and
+  // date parser; string values keep their whitespace, and so do integer and
+  // boolean ones, which read_ocel2_xml keeps as texts (round EJ).
   const auto spaced = minera::parse_ocel_xml(R"xml(
 <log><object-types><object-type name="Order"><attributes>
   <attribute name="w" type="float"/><attribute name="n" type="integer"/>
@@ -750,8 +754,8 @@ int main() {
   assert(spaced.objects.size() == 1);
   for (const auto& attribute : spaced.objects[0].attributes) {
     if (attribute.key == "w") assert(std::get<double>(attribute.value) == 4.5);
-    if (attribute.key == "n") assert(std::get<std::int64_t>(attribute.value) == 3);
-    if (attribute.key == "ok") assert(std::get<bool>(attribute.value));
+    if (attribute.key == "n") assert(std::get<std::string>(attribute.value) == " 3\n");
+    if (attribute.key == "ok") assert(std::get<std::string>(attribute.value) == "\tTrue ");
     if (attribute.key == "due")
       assert(std::get<std::string>(attribute.value) == "2024-01-02T00:00:00Z");
     if (attribute.key == "s") assert(std::get<std::string>(attribute.value) == " x ");

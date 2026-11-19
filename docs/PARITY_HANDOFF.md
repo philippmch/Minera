@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EI (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EJ (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7318,6 +7318,74 @@ In the suite: `minera_review_ei1_tests` (hand cases);
 fixed), the fixture replay gave 2,673 responses unchanged. The generators,
 the sweeps, the comparers and the probes are in the project files under
 `review-harness/round-ei/`.
+
+Round EJ re-reviewed EI (Review EJ1). EI's CI run 44436185156 on 070218f:
+all six jobs green. EJ wrote OCEL 2.0 JSON logs with declared attribute
+types, object changes and O2O links (`ej/g2/o2gen.py`, seed 51) and had
+pm4py write them as XML and SQLite, spoiled values and change times in
+300 more (seed 52), swept the routes with `ej/rt/rsw2.py` (EH's sweep plus
+O2O links and changes) and EH's/EI's xsw and esw, and fuzzed the XML and
+JSON files (`ej/g2/xfz.py`, also reordering and splitting sections, and
+`jfz.py`):
+- the OCEL 2.0 XML reader walks the sections in document order and reads
+  each value by the type declared so far (only `float` and `date`
+  convert), an object value before its time, an event time before its
+  values, with pm4py's messages (EJ1-1); a relation to an object not read
+  yet is dropped, and a date declared after its values is text (EJ1-2);
+- flattening keeps declared dates as `<date>` (EJ1-3); the OCEL 2.0 JSON
+  reader's integer columns with a missing cell (dropped rows included)
+  read as floats (EJ1-4), and so do the SQLite reader's when a change row
+  leaves them NULL (EJ1-6);
+- both OCEL 2.0 writers list an object's changes in log order (EJ1-5);
+- OCEL 2.0 JSON: a static value's time is not read, a change without a
+  time is NaT, kept between routes, and the writers treat it as pm4py's
+  do (EJ1-7).
+After the fixes the clean banks differ only in the declared date
+spellings of the writers (rsw2 198, 200 and 0 of 3,900 calls for JSON,
+XML and SQLite; xsw and esw 0); the XML fuzz only on nameless values and
+mixed date columns (declared). The spoiled bank's other route differences
+are open for EK (below).
+
+In the suite: `minera_review_ej1_tests` (hand cases);
+`minera_ocel_xml_tests` and `minera_ocel_tests` follow EJ1-1 and EJ1-4.
+The full ctest passed 629 of 631 on the first run (those two, fixed), the
+fixture replay gave 2,673 responses unchanged. The generators, the sweeps, the comparers
+and the probes are in the project files under `review-harness/round-ej/`.
+
+Next round (EK) should start by re-reviewing round EJ:
+
+- EJ's CI run;
+- the spoiled OCEL 2.0 JSON bank through the routes (`ej/run4.sh`,
+  out4/b52j.rsw.*; its xsw and esw are still to run): date-declared
+  columns holding non-date values (writer types and
+  spellings; dateutil reads native's XML `type="date"` value `123` as the
+  year 123 with today's month and day), float-declared texts in the change
+  frame (`'inf'`, `'1000.0'` read as floats by pm4py), change times with an
+  invalid offset (`+25:00`: pm4py's OCEL filters raise `AttributeError ...
+  'tz_convert'`), a NaN value where pm4py has none (g52_0038);
+- NaT change times (EJ1-7) through the routes beyond the writers (the
+  filters with time bounds, the temporal and object-change features);
+- the OCEL 2.0 SQLite reader's other `read_sql` dtypes (text and integer
+  mixes, NULL ids, event tables);
+- from EJ's list, not taken: the remaining OCEL routes on a time column of
+  None and NaT times (time-bound filters, other splits, temporal and
+  statistics routes), the LLM OCEL context on the other readers' frames,
+  the OCEL 1.0 XML vmap entries and keyless values, causal-net routes on
+  NaT logs;
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EI's list, taken in EJ: EI's CI, the OCEL 2.0 JSON reader's
+values of the wrong declared type and object attribute times (the
+imports; the routes are open above), the OCEL 2.0 XML walk order. Not
+taken (carried to EK): the LLM context on the other readers, the
+remaining None/NaT time routes, the XML vmap entries and keyless values,
+causal-net routes on NaT logs, the fresh seeds, the day offsets, the
+SQLite leftovers, the dtypes, DW1, the declared items, the CU list and the
+open choices.
+
+Previous list for round EJ (kept for its older items):
 
 Next round (EJ) should start by re-reviewing round EI:
 

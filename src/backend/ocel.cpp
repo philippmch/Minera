@@ -800,7 +800,9 @@ struct AttributeRows {
 }  // namespace classic_json
 
 // `lenient_times`: a transport that says it holds event times read_ocel_json
-// cannot read (see serialize_ocel_json) keeps them for the file-order sort.
+// cannot read (see serialize_ocel_json) keeps them for the file-order sort;
+// `lenient_change_times` likewise keeps the change times as written (an
+// OCEL 2.0 JSON import's NaT change time, round EJ).
 // `require_events`: the file is read as the reference reads it (no
 // keepUnrelated or untypedRelations marker), so a file without events
 // raises before the global scopes are looked up. `keep_unrelated`: a
@@ -820,7 +822,8 @@ struct ClassicListing {
 };
 
 Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, bool lenient_times,
-                             bool require_events, bool keep_unrelated, ClassicListing& listing) {
+                             bool require_events, bool keep_unrelated, ClassicListing& listing,
+                             bool lenient_change_times = false) {
   using namespace classic_json;
   const auto& root = root_json.object();
   Ocel log;
@@ -1055,7 +1058,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
       const auto& change = entry->object();
       ids.observe(optional(change, "ocel:oid"));
       if (const auto* time = optional(change, "ocel:timestamp"); time && !missing_value(*time))
-        raw_times = raw_times || !time->is_string() || !readable_time(time->string());
+        raw_times = raw_times || (!lenient_change_times && (!time->is_string() || !readable_time(time->string())));
       AttributeRows::Row row;
       for (const auto& key : entry->keys)
         if (key != "ocel:oid" && key != "ocel:type" && key != "ocel:timestamp" && key != "ocel:field")
@@ -1401,6 +1404,9 @@ Ocel parse_standard(const Json::Object& root) {
     bool has_time = false;
     std::string time;
   };
+  // A change time of a JSON type other than str or null (refused after the
+  // walk, see the objects below).
+  bool untexted_change_time = false;
   const auto& event_array = standard_key(root, "events");
   if (!event_array.is_array())
     throw std::invalid_argument("events must be array");
@@ -1489,9 +1495,19 @@ Ocel parse_standard(const Json::Object& root) {
                                     raw_value, "value",
                                     standard_attribute_type(object_attribute_types,
                                                             type, name))};
-        if (const auto* time = optional(a, "time")) {
+        // Round EJ: read_ocel2_json takes no time for an attribute's first
+        // entry (the static value), and reads a change's missing or null
+        // time as NaT, kept here as the empty text (observed
+        // black-box). A time of another JSON type stays refused (EI1:
+        // values of the wrong JSON type), after the walk.
+        if (const auto* time = optional(a, "time"); time != nullptr && !time->is_null()) {
+          if (time->is_string()) {
+            entry.has_time = true;
+            entry.time = str(*time, "time");
+          }
+        } else {
           entry.has_time = true;
-          entry.time = str(*time, "time");
+          entry.time.clear();
         }
         const auto [slot, added] = group_index.try_emplace(name, grouped.size());
         if (added) grouped.emplace_back(name, std::vector<StandardAttribute>{});
@@ -1517,9 +1533,10 @@ Ocel parse_standard(const Json::Object& root) {
       if (entries.empty()) continue;
       object.attributes.push_back({name, entries.front().value});
       for (std::size_t i = 1; i < entries.size(); ++i) {
-        if (!entries[i].has_time)
-          throw std::invalid_argument(
-              "OCEL object attribute change requires a timestamp");
+        if (!entries[i].has_time) {
+          untexted_change_time = true;
+          continue;
+        }
         log.object_changes.push_back(
             {id, type, entries[i].time, name, entries[i].value});
       }
@@ -1545,6 +1562,7 @@ Ocel parse_standard(const Json::Object& root) {
         throw std::invalid_argument("'" + found->second + "' object has no attribute 'endswith'");
       iso_wall_microseconds(event.timestamp);
     }
+  if (untexted_change_time) throw std::invalid_argument("OCEL field must be string: time");
   // read_ocel2_json drops a relation to an unlisted object (and the event
   // when it keeps none), observed black-box.
   for (auto& relations : event_relations)
@@ -1584,6 +1602,44 @@ Ocel parse_standard(const Json::Object& root) {
   }
   // The reference readers drop an object link to an unlisted object.
   std::erase_if(log.o2o, [&](const OcelO2oRelation& r) { return !types.count(r.target_id); });
+  // Round EJ: read_ocel2_json builds its events, objects and changes frames
+  // from every listed row before it drops any (events and objects without
+  // relations, empty names), so a column of ints with a missing cell in any
+  // of those rows is float64, the ints floats, which the writers then
+  // declare and print as floats (observed black-box). The rows that stay may
+  // all hold a value, so the ints become floats here. A change row holds
+  // only its own field.
+  const auto floatify = [](std::size_t rows, const ocel_frame::Columns& columns, auto&& for_each_value) {
+    (void)rows;
+    for_each_value([&](const std::string& key, OcelValue& value) {
+      if (const auto* integer = std::get_if<std::int64_t>(&value);
+          integer != nullptr && columns.dtype(key) == ocel_frame::Dtype::kFloat64)
+        value = static_cast<double>(*integer);
+    });
+  };
+  {
+    ocel_frame::Columns columns;
+    for (const auto& event : log.events) columns.observe_row(event.attributes);
+    floatify(log.events.size(), columns, [&](auto&& visit) {
+      for (auto& event : log.events)
+        for (auto& attribute : event.attributes) visit(attribute.key, attribute.value);
+    });
+  }
+  {
+    ocel_frame::Columns columns;
+    for (const auto& object : log.objects) columns.observe_row(object.attributes);
+    floatify(log.objects.size(), columns, [&](auto&& visit) {
+      for (auto& object : log.objects)
+        for (auto& attribute : object.attributes) visit(attribute.key, attribute.value);
+    });
+  }
+  {
+    ocel_frame::Columns columns;
+    for (const auto& change : log.object_changes) columns.observe_row({{change.field, change.value}});
+    floatify(log.object_changes.size(), columns, [&](auto&& visit) {
+      for (auto& change : log.object_changes) visit(change.field, change.value);
+    });
+  }
   return log;
 }
 
@@ -1814,7 +1870,14 @@ void write_global_category(std::ostringstream& out, const Ocel& log,
   out << '}';
 }
 
-void write_object_changes(std::ostringstream& out, const Ocel& log) {
+// A change time pandas holds as NaT: the empty text (see
+// ocel_frame::nat_time_text, an OCEL 2.0 JSON change without a time) and
+// "NaT" as written.
+bool nat_change_time(std::string_view text) { return text.empty() || text == "NaT"; }
+
+// Round EJ: write_ocel_json leaves out a NaT change time (observed
+// black-box); the transport keeps it.
+void write_object_changes(std::ostringstream& out, const Ocel& log, bool transport_markers) {
   std::vector<const OcelObjectChange*> changes;
   changes.reserve(log.object_changes.size());
   for (const auto& change : log.object_changes) changes.push_back(&change);
@@ -1827,8 +1890,10 @@ void write_object_changes(std::ostringstream& out, const Ocel& log) {
     write_string(out, change->object_id);
     out << ",\"ocel:type\":";
     write_string(out, change->object_type);
-    out << ",\"ocel:timestamp\":";
-    write_string(out, change->timestamp);
+    if (transport_markers || !nat_change_time(change->timestamp)) {
+      out << ",\"ocel:timestamp\":";
+      write_string(out, change->timestamp);
+    }
     out << ",\"ocel:field\":";
     write_string(out, change->field);
     out << ',';
@@ -1981,6 +2046,12 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
       throw std::invalid_argument("minera:unreadableEventTimes must be boolean");
     lenient_times = std::get<bool>(marker->value);
   }
+  bool lenient_change_times = false;
+  if (const auto* marker = optional(r, "minera:unreadableChangeTimes")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:unreadableChangeTimes must be boolean");
+    lenient_change_times = std::get<bool>(marker->value);
+  }
   const auto* keep_unrelated_marker = optional(r, "minera:keepUnrelated");
   const bool classic_reference = !standard && !literal_names;
   const bool keep_unrelated_flag = keep_unrelated_marker && keep_unrelated_marker->is_bool() &&
@@ -1990,7 +2061,7 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
                 : classic_reference
                     ? parse_classic_reference(root, repeated_relations, lenient_times,
                                               !keep_unrelated_flag && !optional(r, "minera:untypedRelations"),
-                                              keep_unrelated_flag, listing)
+                                              keep_unrelated_flag, listing, lenient_change_times)
                     : parse_classic(r, literal_names, repeated_relations);
   if (standard && !repeated_relations) {
     std::set<std::pair<std::string, std::string>> seen;
@@ -3422,13 +3493,6 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       relations = found->second;
     return relations;
   };
-  // An object's changes as the OCEL 2.0 form writes them.
-  const auto sort_written_changes = [](std::vector<const OcelObjectChange*>& changes) {
-    std::stable_sort(changes.begin(), changes.end(), [](const auto* left, const auto* right) {
-      return std::tie(left->timestamp, left->field, left->object_type) <
-             std::tie(right->timestamp, right->field, right->object_type);
-    });
-  };
   // "minera:relationOrder" and "minera:objectChangeOrder" (see
   // parse_ocel_json_names): written when the log order of the relations, or
   // of the changes a reader takes back, is not the order the document nests
@@ -3495,7 +3559,6 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       std::vector<const OcelObjectChange*> changes;
       if (const auto found = changes_by_object.find(object->id); found != changes_by_object.end())
         changes = found->second;
-      sort_written_changes(changes);
       for (const auto* change : changes) {
         if (reference_drops_attribute(change->field)) continue;
         if (groups.try_emplace(change->field).second) names.push_back(change->field);
@@ -3575,6 +3638,11 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       for (const auto* event : events)
         if (ocel_frame::nat_time_text(event->timestamp))
           throw std::invalid_argument("KeyError: 'ocel:timestamp'");
+    // Round EJ: and on a NaT change time (an OCEL 2.0 JSON change without a
+    // time; observed black-box).
+    if (!transport_markers)
+      for (const auto& change : log.object_changes)
+        if (nat_change_time(change.timestamp)) throw std::invalid_argument("KeyError: 'ocel:timestamp'");
     StandardTypeTable object_types;
     StandardTypeTable event_types;
     collect_standard_types(log, object_types, event_types);
@@ -3636,7 +3704,8 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       std::vector<const OcelObjectChange*> changes;
       if (const auto found = changes_by_object.find(object->id); found != changes_by_object.end())
         changes = found->second;
-      sort_written_changes(changes);
+      // Round EJ: in log order, as write_ocel2_json writes an object's
+      // changes (observed black-box: not sorted by time).
       // A field without a static value gets no base entry: write_ocel2_json
       // writes only its changes (observed black-box), and a reader takes
       // the first change as the base, as pm4py reads its own export.
@@ -3757,7 +3826,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     out << '}';
   }
   out << "},\"ocel:objectChanges\":";
-  write_object_changes(out, log);
+  write_object_changes(out, log, transport_markers);
   out << ",\"ocel:global-log\":";
   write_global_category(out, log, "ocel:global-log");
   out << ",\"ocel:global-event\":";
@@ -3784,6 +3853,17 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
           }
         }))
       out << ",\"minera:unreadableEventTimes\":true";
+    // Round EJ: a change time read_ocel_json cannot read (the NaT of an
+    // OCEL 2.0 JSON change without a time) is kept between routes too.
+    if (std::any_of(log.object_changes.begin(), log.object_changes.end(), [](const OcelObjectChange& change) {
+          try {
+            (void)iso_wall_microseconds(change.timestamp);
+            return false;
+          } catch (const std::invalid_argument&) {
+            return true;
+          }
+        }))
+      out << ",\"minera:unreadableChangeTimes\":true";
     if (log.event_activity_first) out << ",\"minera:eventActivityFirst\":true";
   }
   out << '}';

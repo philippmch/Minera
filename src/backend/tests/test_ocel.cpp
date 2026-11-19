@@ -623,8 +623,10 @@ void readers_drop_empty_names_contract() {
   assert(standard.events.size() == 2 && standard.events[0].id == "e1" &&
          standard.events[0].activity == "c" && standard.events[1].id == "e3");
   assert(standard.objects.size() == 1 && standard.objects[0].id == "o1");
+  // Round EJ: the dropped objects have no value of "", so pandas types the
+  // column float64 before the drop and reads 7.0 (observed black-box).
   assert(standard.objects[0].attributes.size() == 1 && standard.objects[0].attributes[0].key.empty() &&
-         std::get<std::int64_t>(standard.objects[0].attributes[0].value) == 7);
+         std::get<double>(standard.objects[0].attributes[0].value) == 7.0);
   assert(standard.relations.size() == 2 && standard.relations[0].event_id == "e1" &&
          standard.relations[0].qualifier == "q" && standard.relations[1].event_id == "e3");
   assert(!standard.event_type_attributes.contains("") && !standard.object_type_attributes.contains(""));
