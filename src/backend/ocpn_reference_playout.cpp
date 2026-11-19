@@ -3,6 +3,7 @@
 #include "portable_time.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <ctime>
 #include <iterator>
@@ -41,6 +42,17 @@ struct Search {
   std::vector<std::vector<std::uint32_t>> markings;
   std::vector<std::size_t> fired;
   OcpnReferenceTrace current;
+  // Round ER: the wall-clock limit (OcpnReferencePlayoutOptions).
+  std::optional<std::chrono::steady_clock::time_point> deadline;
+  double time_limit_seconds = 0;
+  std::size_t steps = 0;
+
+  void check_deadline() {
+    if (deadline && (++steps & 255) == 0 && std::chrono::steady_clock::now() > *deadline)
+      throw std::runtime_error("OCPN playout exceeded its " +
+                               std::to_string(static_cast<long long>(time_limit_seconds)) +
+                               "-second limit; lower max_bindings_per_activity or set max_traces");
+  }
 
   bool final_reached() const {
     for (std::size_t t = 0; t < types.size(); ++t) {
@@ -126,6 +138,7 @@ struct Search {
   // Returns whether this state reaches a complete sequence.
   bool run() {
     if (stopped) return true;
+    check_deadline();
     if (final_reached()) {
       ++visited;
       if (!(*visit)(current)) stopped = true;
@@ -168,6 +181,12 @@ struct Search {
 Search prepare(const OcpnGraph& graph, const OcpnReferencePlayoutOptions& options) {
   Search search;
   search.bound = options.max_bindings_per_activity;
+  if (options.time_limit_seconds > 0) {
+    search.time_limit_seconds = options.time_limit_seconds;
+    search.deadline = std::chrono::steady_clock::now() +
+                      std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                          std::chrono::duration<double>(options.time_limit_seconds));
+  }
   for (const auto& [type, net] : graph.petri_nets) {
     if (net.place_count() == 0 || net.source() >= net.place_count() || net.sink() >= net.place_count())
       throw std::invalid_argument("OCPN playout net for type " + type + " has no workflow places");

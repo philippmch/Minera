@@ -958,6 +958,10 @@ namespace {
 // operating system stopped the server (bank b58, q58_0144). pm4py has no
 // such cap (it had not finished there after ten minutes; declared).
 constexpr std::size_t kReferenceOcpnPlayoutEvents = 2'000'000;
+// Round ER: and past 120 seconds of search, like the causal-net playout
+// (kReferenceCausalPlayoutSeconds), so that a search that finds traces
+// slowly cannot hold the server either (declared with EQ1-3).
+constexpr double kReferenceOcpnPlayoutSeconds = 120.0;
 
 OcpnPlayoutResult reference_mode_playout(const OcpnGraph& graph,
                                          const OcpnPlayoutOptions& options) {
@@ -968,6 +972,7 @@ OcpnPlayoutResult reference_mode_playout(const OcpnGraph& graph,
   OcpnReferencePlayoutOptions reference;
   reference.max_bindings_per_activity = options.max_bindings_per_activity;
   reference.objects_unique_per_trace = options.objects_unique_per_trace;
+  reference.time_limit_seconds = kReferenceOcpnPlayoutSeconds;
   OcpnPlayoutResult result;
   result.exists_trace_requested = options.exists_trace;
   result.return_sequences_requested = options.return_sequences;

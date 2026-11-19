@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EQ (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–ER (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7633,6 +7633,81 @@ expected the native table's spelling of a change time; updated, then
 passed), the fixture replay gave 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-eq/`.
+
+Round ER re-reviewed EQ (Review ER1). EQ's CI run 44610157456 on 22ead16f:
+six jobs green, the Linux, macOS and Windows ctest included. ER read native
+SQLite downloads of b52, b55 and b56 back through every sweep (`er/runR.sh`:
+0 differences but the comparer's spelling), ran one fresh CSV bank per
+feature (`er/csv/fr`) through imports, esw, fsw and fsw2, 774 hand-built
+SQLite files (`er/sq/hb1.py` to `hb6.py`, the fuzz banks hb71 and hb72)
+through imports, osw, dsw, rsw3 and fsw (`er/runH.sh`), the blow-up OCPN
+playouts against `max_traces` (`er/ps/ptime.sh`) and the objects named but
+not listed over two hash seeds (`er/nl`):
+- read_ocel2_sqlite's tables: views and WITHOUT ROWID tables, `SELECT *`
+  with columns by exact name, `ocel:eid`/`ocel:oid`/`ocel:timestamp` in a
+  type table, BOOLEAN cells as stored (ER1-1), and its fault order and
+  KeyErrors on missing tables and columns (ER1-2);
+- an event table's `ocel_changed_field`, `@@cumcount` and `ocel:` columns
+  and an object table's `ocel:activity` are attributes, `ocel:type` is not,
+  and write_ocel2_sqlite writes them back (ER1-3);
+- change rows of an object table without a time column keep a NaT time
+  (the writers then raise), or raise KeyError 'ocel:timestamp' when no
+  object table has a time column (ER1-4);
+- the events frame's activity-first order follows the type tables' column
+  union (ER1-5);
+- the classic JSON download writes an event's `ocel:` attribute as a key
+  of the event entry and leaves an object's out, the classic XML download
+  writes the id first and the other fields in the frame's order (ER1-6,
+  declared in CU);
+- a SQLite export statement error says OperationalError (ER1-7);
+- the reference-binding OCPN playout also stops after 120 s (ER1-8;
+  `max_traces` and `exists_trace` stop the blow-up log at once);
+- a listed type's type table without rows gives the frames its columns as
+  object columns, NaN where it lacks one, and an object time column
+  (ER1-9; EN1-3's empty tables were unlisted types).
+The objects named but not listed stay declared: deterministic in 194 of
+205 esw differences over two seeds, but spread over 26+ routes and needing
+an unlisted-object notion in the transport. After the fixes the native
+SQLite downloads read back differ only in the comparer's spelling, the
+CSV feature banks' downloads in none, and the hand-built files only in
+the declared classes (duplicate labels, extra or reordered object_object
+columns, EK1's duplicate rows and tables without a changed field).
+
+In the suite: `minera_review_er1_tests` (hand cases of ER1-1 to ER1-4,
+ER1-6, ER1-8 and ER1-9); `minera_ocel_sqlite_tests` reads a BOOLEAN cell as
+stored. The full ctest passed 639 of 639 on the first run (30 min at -j2),
+the fixture replay gave 2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-er/`.
+
+Next round (ES) should start by re-reviewing round ER:
+
+- ER's CI run;
+- the classic JSON download (ER1-6) on CSV and OCEL 2.0 banks whose
+  columns or attributes start with `ocel:` (osw, dsw), and the SQLite
+  writer's reserved-looking columns (ER1-3) on CSV and JSON inputs that
+  carry them;
+- untimed SQLite change rows (ER1-4) through rsw3, esw and xsw, with
+  integer, real and text time columns in the other tables;
+- listed types with empty type tables (ER1-9) through esw and xsw, and in
+  the structural fuzz (empty a listed type's table, keep its columns);
+- a fresh structural SQLite fuzz (`er/sq/hb2.py` with new seeds and more
+  mutations per file), and the declared duplicate-label and extra
+  object_object column cases if a cheap model appears;
+- the carried items below (the XML/JSON day offsets, the SQLite leftovers,
+  the new Polars dtypes, DW1, the declared items, the CU list and the open
+  choices).
+
+Round ER's list, taken in ER: EQ's CI, native SQLite downloads read back
+(b52, b55, b56), the CSV feature banks through esw, fsw and fsw2, the
+SQLite files of other writers (hand-built and fuzzed), the OCPN cap
+against `max_traces` and the other playouts, the objects named but not
+listed (kept declared), CU's classic JSON prefixed attributes. Carried to
+ES: the XML/JSON day offsets, the SQLite leftovers, the new Polars dtypes,
+DW1, the other declared items, the rest of the CU list and the open
+choices.
+
+Previous list for round ER (kept for its older items):
 
 Next round (ER) should start by re-reviewing round EQ:
 

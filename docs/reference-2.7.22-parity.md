@@ -33881,3 +33881,149 @@ spelling of a change time; updated, then passed), the fixture replay gave
 2,673 responses unchanged. Python script and frontend tests not rerun
 (scripts and frontend unchanged). The device check on the Mac was skipped
 (the Mac was not linked).
+
+## Review ER1: re-review of round EQ, hand-built SQLite files, reserved-looking columns, untimed change rows, empty type tables, prefixed attributes in the classic downloads, OCPN playout time limit (2026-11-19)
+
+Round ER checked EQ's CI (run 44610157456 on 22ead16f: six jobs green, the
+Linux, macOS and Windows ctest included). Observed black-box on pm4py
+2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv, on native SQLite
+downloads of b52, b55 and b56 (JSON and XML) read back through every sweep
+(`er/runR.sh`), one fresh CSV bank per generator feature (`er/csv/fr`, 17
+features of 40 logs: imports, esw, fsw, fsw2), 774 hand-built SQLite files
+(`er/sq/hb1.py` to `hb6.py`: views, WITHOUT ROWID tables, a column named
+rowid, dropped and renamed columns, the reader's fault order, reserved and
+alias column names, empty link tables; `hb2.py`, a structural fuzz of
+pm4py's and native's files, banks hb71 and hb72 of 300 and 400; `hb7e.py`,
+listed types with empty tables) through imports, osw, dsw, rsw3 and fsw
+(`er/runH.sh`), the CSV feature banks' downloads (`er/runX.sh`), the OCPN
+playouts that blow up (`er/ps/ptime.sh`) and the objects named but not
+listed over two hash seeds (`er/nl`).
+
+- **ER1-1 Unusual SQLite tables.** read_ocel2_sqlite reads every table
+  with `SELECT *` and takes its columns by exact name: a view or a WITHOUT
+  ROWID table reads like a table, rows in table order; a type table may
+  name its id and time columns `ocel:eid` / `ocel:oid` and
+  `ocel:timestamp`, the names the reader renames them to; a BOOLEAN column
+  reads its cells as stored (integers). Native looked tables up among
+  tables only, read in rowid order (which a WITHOUT ROWID table lacks),
+  refused the renamed columns and read BOOLEAN cells as booleans (hb71
+  imports: 130 of 300 differed on EQ's server).
+- **ER1-2 The reader's fault order.** A missing table or column raises in
+  pm4py's order: the event and object tables, their `ocel_id` (KeyError
+  'ocel_id'), their `ocel_type` and the type sorts, the map tables and
+  their columns (KeyError 'ocel_type', 'ocel_type_map'), each event type's
+  table and id (KeyError 'ocel:eid'), each object type's (KeyError
+  'ocel:oid'), "No objects to concatenate", KeyError "['ocel:timestamp'] not
+  in index" when no event table has a time column, the event_object table
+  and its columns ('ocel:eid', 'ocel:oid'; a qualifier is optional), the
+  object_object table, whose columns are needed only when it has rows.
+  Native checked in its own order and refused with its own messages.
+- **ER1-3 Reserved-looking columns.** An event table's
+  `ocel_changed_field`, `@@cumcount` and `ocel:`-prefixed columns are
+  attributes; an object table's `ocel:type` is not (the object keeps its
+  type) and its `ocel:activity` is. write_ocel2_sqlite writes them back as
+  columns of their tables. Native dropped them on the read or on the write.
+- **ER1-4 Change rows without a time column.** An object table without a
+  time column keeps its change rows with a NaT time when another object
+  table has one (pandas' concat then leaves the table out of the time
+  column's dtype: a float64 column stays float64), and write_ocel2_json and
+  write_ocel2_sqlite raise KeyError 'ocel:timestamp' and 'ocel_time' on
+  them; with no time column in any object table a change row raises
+  KeyError 'ocel:timestamp' in the reader. Native dropped such rows.
+- **ER1-5 Activity-first event frames.** The events frame orders
+  `ocel:activity` and `ocel:timestamp` as the type tables' column union
+  does: a first table without a time column puts the activity first.
+  Native looked at the first table alone (the OCEL 1.0 XML download listed
+  the time first: 3 of 774 files).
+- **ER1-6 Prefixed attributes in the classic downloads** (declared in
+  CU). write_ocel_json writes an event's `ocel:`-prefixed attribute as a
+  key of the event entry, after its time and before `ocel:vmap`, and
+  leaves an object's out; write_ocel_xml writes an event's id first, then
+  its activity, its time and its `ocel:` attributes (the prefix dropped)
+  in the events frame's column order. The native downloads now do; the
+  transport keeps both in the maps. A CSV bank whose event columns start
+  with `ocel:` (`er/csv/pxgen.py`, 20 logs) reads 0 of 20 differences in
+  the imports, 0 of 120 in osw, 0 of 140 in dsw and 0 of 780 in rsw3.
+- **ER1-7 SQLite export statement errors.** pandas' to_sql raises sqlite3's
+  OperationalError when a table would repeat a column name in another case
+  (`OCEL:ACTIVITY` next to `ocel:activity`); native's message now names
+  OperationalError too (it said "SQLite statement failed").
+- **ER1-8 OCPN playout time limit.** With `max_traces` the reference-binding
+  playout of q58_0144 (EQ1-3) stops at once (10 traces, 0.04 s), as with
+  `exists_trace`; without it the 2,000,000-event cap stops it after 4 s. A
+  search that keeps exploring without completing traces is not bounded by
+  that cap, so native now also stops the playout after 120 s, as the
+  causal-net playout's time limit does. Declared: pm4py has neither.
+- **ER1-9 Listed types whose type table has no rows.** read_ocel2_sqlite
+  reads the type table of every type the event and object tables list, so
+  a listed type's table without rows takes part in the concatenation:
+  its columns join the frames in type order (an activity-first table
+  among them), each an object column (pandas 3 counts the empty frame's
+  dtypes), a column it lacks holds NaN there (an int column is float64, so
+  `1.0` in the CSV and a `float` declaration), and its time column makes
+  the events' one object, so numbers there are epoch nanoseconds; without
+  a time column it makes an int64 one float64. The listed event or
+  object is not read (no row). EN1-3's "a table without rows adds none"
+  was a table of a type nothing lists, which is not read at all; native
+  skipped every table without rows (t6 of the hand-built files: the
+  objects CSV lacked five columns). Native now adds their columns and
+  types the frames with a dropped row holding None in the table's
+  columns (`hc/empty_tables.py`, `hc/empty_dtypes.py`; bank
+  `sq/hb7e.py`, 16 files: imports 0, osw, dsw, rsw3 and fsw 0 but for
+  the declared numeric event times of e9, e10 and e14).
+
+Objects named but not listed (`FEAT=notlisted`, EQ's largest declared
+class): pm4py's outcomes are the same over two hash seeds in 194 of the 205
+esw differences (the 11 others name a type or id in a set's order), but
+they spread over 26 routes in esw, fsw and fsw2 alone (more in rsw3, xsw,
+osw and dsw), each raising KeyError or dropping rows in its own way, and a
+model needs an "unlisted object" carried through the transport, which the
+classic JSON readers drop. The class stays declared, with object rows
+without id or type (`noid`, `notype`: the same KeyErrors).
+
+After the fixes: native SQLite downloads read back: b52 imports 0 of 255,
+rsw3 0 of 9,945, esw 0 of 4,080, xsw 0 of 3,315, osw 0 of 1,530, dsw 0 of
+1,785, fsw 0 of 3,318; b55 imports 0 of 266, rsw3 0 of 10,374, esw 0 of
+4,256, xsw 0 of 3,458, osw 0 of 1,596, dsw 0 of 1,862, fsw 0 of 3,468; b56
+imports 8 of 200 (JSON) and 2 of 194 (XML), all the comparer's spelling of
+"No objects to concatenate", rsw3 0 of 7,488, esw 0 of 3,072, xsw 0 of
+2,496, osw 0 of 1,152, dsw 0 of 1,344, fsw 0 of 2,658 and 2,656. The
+feature banks: imports 0 of 40 each, esw, fsw and fsw2 0 but for the
+declared features (`notlisted` 205 of 640, 173 of 504, 330 of 663; `noid`
+82, 78, 147; `notype` 94, 84, 153; `noobj` esw 3, the hash-seed object
+order); their downloads (`er/runX.sh`, 10 features of 40 logs) 0 of 240
+in osw and 0 of 280 in dsw each. The hand-built files (hb71's imports
+differed in 130 of 300 on EQ's server): imports 3 of 774 (the duplicate
+labels), osw 36 of 3,942, dsw 71 of 4,599, rsw3 116 of 25,506, fsw 78 of
+8,650, all in declared classes: the duplicate labels (s10, r10, r12),
+extra or reordered object_object columns (20 fuzzed files), EK1's
+duplicate type-table rows and object tables without a changed-field
+column (t1, t4, t5, t7, h72_0161, h72_0236, h72_0308); t6's missing
+columns were ER1-9's. The fixture replay gave 2,673 responses unchanged.
+
+Declared (outside the model), new:
+- a type table holding a column next to its alias (`ocel_id` and
+  `ocel:eid`, `ocel_time` and `ocel:timestamp`) or a column named like the
+  one a rename makes (`ocel:field` beside other tables' changed fields):
+  pandas raises on the repeated labels, at different points with
+  different messages (three probes); native reads the canonical column;
+- extra or reordered object_object columns: pm4py's o2o frame keeps them,
+  write_ocel2_sqlite writes them and write_ocel2_xml takes the columns by
+  position; native's object links hold source, target and qualifier.
+As before: duplicate type-table rows (EK1: also an object table without a
+changed-field column, which lists every row as an object), the hash-seed
+object order of a CSV without an objects file, duplicate CSV event ids,
+objects the events name that the objects file lacks or drops, object rows
+without id or type, EP1-5, EP1-6, the c56 and c59 files, EQ1-2's name,
+OCPN playouts past the caps.
+
+Tests:
+- New: `minera_review_er1_tests` (hand cases of ER1-1 to ER1-4, ER1-6's
+  event keys and XML field order, ER1-8's limit and ER1-9's empty tables;
+  its SQLite cases were checked against pm4py with `er/hc/er1sql.py` and
+  `er/hc/er1empty.py`).
+- Changed: `minera_ocel_sqlite_tests` (a BOOLEAN cell reads as stored, its
+  catalog type "int").
+
+The full ctest passed 639 of 639 on the first run (30 min at -j2); the
+fixture replay gave 2,673 responses unchanged.

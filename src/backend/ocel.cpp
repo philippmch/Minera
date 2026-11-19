@@ -2143,16 +2143,21 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
 // In the frame's column order, null cells left out (round EK, observed
 // black-box). Round EO: an int as a float where the column prints as float64
 // (Columns::printed_dtype).
-void write_frame_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs,
-                       const ocel_frame::Columns& frame, const OcelTypeCatalog& catalog,
-                       const std::string& owner) {
+// Round ER: write_ocel_json writes an "ocel:"-prefixed attribute (see
+// reference_drops_attribute) of an event as a key of the event entry, after
+// its time and before "ocel:vmap", and leaves an object's out (observed
+// black-box, probe er h10); `prefixed` writes those keys (each after a
+// comma), otherwise the map without them.
+void write_frame_entries(std::ostringstream& out, const std::vector<OcelAttribute>& attrs,
+                         const ocel_frame::Columns& frame, const OcelTypeCatalog& catalog,
+                         const std::string& owner, bool prefixed) {
   std::vector<std::pair<std::string_view, const OcelValue*>> ordered;
   for (const auto* attribute : ocel_frame::frame_row(attrs, frame))
-    ordered.emplace_back(attribute->key, &attribute->value);
-  out << '{';
+    if (reference_drops_attribute(attribute->key) == prefixed) ordered.emplace_back(attribute->key, &attribute->value);
+  if (!prefixed) out << '{';
   bool first = true;
   for (const auto& [k, v] : ordered) {
-    if (!first) out << ',';
+    if (!first || prefixed) out << ',';
     first = false;
     write_string(out, k);
     out << ':';
@@ -2168,7 +2173,12 @@ void write_frame_attrs(std::ostringstream& out, const std::vector<OcelAttribute>
       write_value(out, *v);
     }
   }
-  out << '}';
+  if (!prefixed) out << '}';
+}
+void write_frame_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs,
+                       const ocel_frame::Columns& frame, const OcelTypeCatalog& catalog,
+                       const std::string& owner) {
+  write_frame_entries(out, attrs, frame, catalog, owner, false);
 }
 
 }  // namespace
@@ -4456,6 +4466,8 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << ",\"ocel:timestamp\":";
       write_string(out, event_time(event->timestamp));
     }
+    if (!transport_markers)
+      write_frame_entries(out, event->attributes, classic_event_frame, log.event_type_attributes, event->activity, true);
     const auto relations = event_relations(*event);
     out << ",\"ocel:omap\":[";
     bool relation_first = true;

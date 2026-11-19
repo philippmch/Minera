@@ -573,7 +573,8 @@ int main() {
   assert(external.events.size() == 1 && external.objects.size() == 1);
   assert(external.events[0].timestamp == "2024-02-01T00:00:00Z");
   assert(std::get<std::int64_t>(external.events[0].attributes[0].value) == 7);
-  assert(std::get<bool>(external.events[0].attributes[1].value));
+  // Round ER: a BOOLEAN column's 1 reads as the integer 1 (read_sql).
+  assert(std::get<std::int64_t>(external.events[0].attributes[1].value) == 1);
   assert(std::get<std::string>(external.objects[0].attributes[0].value) == "open");
   assert(external.relations.size() == 1);
   assert(external.object_changes.size() == 1);
@@ -581,7 +582,7 @@ int main() {
   assert(external.object_changes[0].field == "status");
   assert(std::get<std::string>(external.object_changes[0].value) == "paid");
   assert(external.event_type_attributes.at("Create").at("priority") == "int");
-  assert(external.event_type_attributes.at("Create").at("active") == "boolean");
+  assert(external.event_type_attributes.at("Create").at("active") == "int");
   assert(external.object_type_attributes.at("order").at("status") == "string");
 
   // Reference capture (pm4py 2.7.22 read_ocel2_sqlite): an event and an object

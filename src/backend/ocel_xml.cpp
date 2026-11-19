@@ -1470,36 +1470,56 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
     out << "  <events/>\n";
   } else {
     out << "  <events>\n";
+    // Round ER: the event's id, then its other own fields (activity,
+    // timestamp and the "ocel:"-prefixed attributes, unprefixed) in the
+    // frame's column order (OcelFrameHint::reserved; the id comes first even
+    // where the frame puts the time first; observed black-box, probes er
+    // csv/px and the time-first CSV bank).
+    std::vector<std::string> fields{"ocel:eid"};
+    for (auto& name : ocel_frame::frame_column_order(
+             log.event_frame_hint,
+             log.event_activity_first ? std::vector<std::string>{"ocel:eid", "ocel:activity", "ocel:timestamp"}
+                                      : std::vector<std::string>{"ocel:eid", "ocel:timestamp", "ocel:activity"},
+             event_frame.names()))
+      if (reserved_name(name) && name != "ocel:eid") fields.push_back(std::move(name));
     for (const auto& event : log.events) {
       // Fields in the reference frame's column order: id, timestamp,
       // activity for a log read from JSON, activity first after XML.
-      const auto activity_line = "      <string key=\"activity\" value=\"" + esc(event.activity) + "\"/>\n";
-      out << "    <event>\n      <string key=\"id\" value=\"" << esc(event.id) << "\"/>\n";
-      if (log.event_activity_first) out << activity_line;
-      // Round EG: the reference writes no timestamp for a NaT time (an
-      // OCEL 2.0 SQLite '' or NULL), as for any missing cell (observed
-      // black-box).
-      // Round EL: a raw time (OcelRawTime) as its Python value: a str as a
-      // string, NaN left out, an int or float raises lxml's TypeError
-      // (observed black-box, probe el wo.py).
-      if (event.raw_time == OcelRawTime::kInt || event.raw_time == OcelRawTime::kFloat)
-        throw std::invalid_argument(std::string("TypeError: Argument must be bytes or unicode, got '") +
-                                    (event.raw_time == OcelRawTime::kInt ? "int" : "float") + "'");
-      if (event.raw_time == OcelRawTime::kStr)
-        out << "      <string key=\"timestamp\" value=\"" << esc(event.timestamp) << "\"/>\n";
-      else if (ocel_raw_time_missing(event.raw_time)) {
-      } else if (!ocel_frame::nat_time_text(event.timestamp))
-        out << "      <date key=\"timestamp\" value=\""
-            << esc(event_offset ? ocel_frame::offset_timestamp_text(event.timestamp, 'T',
-                                                                    event_offset, "Z")
-                                : classic_xml_timestamp_text(event.timestamp))
-            << "\"/>\n";
-      if (!log.event_activity_first) out << activity_line;
-      for (const auto& attribute : event.attributes)
-        if (reserved_name(attribute.key))
-          write_classic_value(out, attribute.value, std::string_view(attribute.key).substr(5),
-                              "      ",
-                              event_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64);
+      out << "    <event>\n";
+      for (const auto& field : fields) {
+        if (field == "ocel:eid") {
+          out << "      <string key=\"id\" value=\"" << esc(event.id) << "\"/>\n";
+        } else if (field == "ocel:activity") {
+          out << "      <string key=\"activity\" value=\"" << esc(event.activity) << "\"/>\n";
+        } else if (field == "ocel:timestamp") {
+          // Round EG: the reference writes no timestamp for a NaT time (an
+          // OCEL 2.0 SQLite '' or NULL), as for any missing cell (observed
+          // black-box).
+          // Round EL: a raw time (OcelRawTime) as its Python value: a str as a
+          // string, NaN left out, an int or float raises lxml's TypeError
+          // (observed black-box, probe el wo.py).
+          if (event.raw_time == OcelRawTime::kInt || event.raw_time == OcelRawTime::kFloat)
+            throw std::invalid_argument(std::string("TypeError: Argument must be bytes or unicode, got '") +
+                                        (event.raw_time == OcelRawTime::kInt ? "int" : "float") + "'");
+          if (event.raw_time == OcelRawTime::kStr)
+            out << "      <string key=\"timestamp\" value=\"" << esc(event.timestamp) << "\"/>\n";
+          else if (ocel_raw_time_missing(event.raw_time)) {
+          } else if (!ocel_frame::nat_time_text(event.timestamp))
+            out << "      <date key=\"timestamp\" value=\""
+                << esc(event_offset ? ocel_frame::offset_timestamp_text(event.timestamp, 'T',
+                                                                        event_offset, "Z")
+                                    : classic_xml_timestamp_text(event.timestamp))
+                << "\"/>\n";
+        } else {
+          for (const auto& attribute : event.attributes)
+            if (attribute.key == field) {
+              write_classic_value(out, attribute.value, std::string_view(attribute.key).substr(5),
+                                  "      ",
+                                  event_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64);
+              break;
+            }
+        }
+      }
       const auto& rows = rows_of(relations, event.id);
       std::unordered_set<std::string_view> listed;
       write_list("omap", [&] {

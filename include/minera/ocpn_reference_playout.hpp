@@ -39,6 +39,10 @@ using OcpnReferenceTrace = std::vector<OcpnReferenceStep>;
 struct OcpnReferencePlayoutOptions {
   std::size_t max_bindings_per_activity = 1;
   bool objects_unique_per_trace = false;
+  // Round ER: wall-clock limit on the search; zero is unlimited. Exceeding
+  // it throws std::runtime_error (as the OC causal-net reference playout's
+  // time_limit_seconds does).
+  double time_limit_seconds = 0;
 };
 
 // RETURN_TRACES: every complete firing sequence, in search order.
