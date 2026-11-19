@@ -460,10 +460,15 @@ IdSet expand_object_ids(const Ocel& log, IdSet selected, std::size_t level) {
   // Round DT: every requested id is then looked up in that graph, so an id
   // the objects table does not list raises KeyError (several such ids: the
   // first in its set order, which varies with the hash seed; native names
-  // the smallest).
+  // the smallest). Round EQ: the smallest by code point, whatever the
+  // unordered set's iteration order (which differs between standard
+  // libraries).
+  const std::string* missing = nullptr;
   for (const auto& object_id : selected)
-    if (!adjacency.contains(object_id))
-      throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(object_id));
+    if (!adjacency.contains(object_id) && (missing == nullptr || object_id < *missing))
+      missing = &object_id;
+  if (missing != nullptr)
+    throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(*missing));
   for (std::size_t depth = 1; depth < level; ++depth) {
     const IdSet frontier = selected;
     bool changed = false;

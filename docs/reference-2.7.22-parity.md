@@ -33778,3 +33778,106 @@ download; updated, then passed), the fixture replay gave 2,673 responses
 unchanged. Python script and frontend tests not rerun (scripts and
 frontend unchanged). The device check on the Mac was skipped (the Mac was
 not linked).
+
+## Review EQ1: re-review of round EP, native SQLite files read back, several unlisted ids at a deeper level, OCPN playout memory (2026-11-19)
+
+Round EQ checked EP's CI (run 44587308518 on 652ae8e2: six jobs green, the Linux, macOS and Windows ctest included). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference
+venv, on two fresh OCEL CSV banks (`eq/csv/q2gen.py`, EP's `q1gen.py` with
+`TF=1` putting the time column and the objects' type first more often:
+`b60` with every feature, `b61` without the declared ones, 200 logs each),
+one fresh CSV bank per generator feature (`eq/csv/f5`, 18 banks of 60 logs:
+EP's 17 features and `unrnat`, objects listed but not related next to NaT
+times), a fresh OCEL 1.0 JSON/XML bank (`eo/c1/c1gen.py 59 200`, b59: objects
+no relation names, keys only some rows hold), SQLite logs written from
+time-first CSV logs (`eq/sq/mk.py`, b62: pm4py's writer and native's, 150
+logs each), native SQLite downloads of b51, b59 and b61 read back
+(`eq/sq/mkn.py`, `eq/runN.sh`), causal-net and OCPN playout on NaT CSV logs
+(`eq/ps/psw.py` on b58, b60, b61), and a new filter sweep (`eq/rt/fsw2.py`:
+the object and object-type filters at levels 2 to 4, kept and negated, one
+and several ids and types) on b56, b59 and the CSV banks.
+
+- **EQ1-1 Native SQLite files read back.** read_ocel2_sqlite reads a file
+  native wrote through its type tables, like any other file: it ignores
+  native's own tables (`event_attributes`, `object_attributes`,
+  `event_type_attributes`, `object_type_attributes`, `object_changes`,
+  `ocel_globals`, `event_event`). So a boolean reads as an integer, a date
+  as the type table's text, the changes are the type tables' change rows
+  (with `@@cumcount`, in the tables' order), and the read has no event
+  links and no globals; the frames take the union of the type tables'
+  columns in table order, whatever order the attribute tables hold (b62's
+  native files: dsw 47 of 861, osw 47 of 738; b51 read back: dsw 552 of
+  700, osw 156 of 600, rsw3 311 and more; b59: rsw3 229 (JSON) and 107
+  (XML) and more). Native read its own tables back. An import now reads
+  every file through its type tables; `OcelSqliteOptions::read_native_tables`
+  keeps the lossless read for callers that ask for it (no route does).
+- **EQ1-2 Several unlisted ids at a deeper level.** filter_ocel_objects at
+  a level above 1 raises KeyError on a requested id the objects table does
+  not list (EP1-7); with several such ids pm4py names the first in its
+  set's order (the hash seed, declared), and native named the first in its
+  unordered set's order, which differs between standard libraries (fsw2:
+  b59 30 (JSON) of 2,943, the same files through XML). Native now names
+  the smallest by code point, on every platform.
+- **EQ1-3 OCPN playout memory.** The reference-binding OCPN playout of a
+  ten-event CSV log (b58, q58_0144) took 8 GB before the operating system
+  stopped the server; pm4py had not finished it after ten minutes (`eq/hc/
+  oom_ref.py`, under a 6 GB limit). Native now stops a playout past
+  2,000,000 events with an error that names `max_bindings_per_activity`
+  and `max_traces`, as the causal-net playout does (4 s, 497 MB on that
+  log). Declared: pm4py has no such cap.
+
+After the fixes: native SQLite downloads read back: b51 imports 0
+of 100, osw 0 of 600, dsw 0 of 700, rsw3 0 of 3,900; b59 (JSON) osw 0 of
+1,140, dsw 0 of 1,330, rsw3 0 of 7,410; b61 osw 0 of 996, dsw 0 of 1,162,
+rsw3 0 of 6,474; b62's native files osw 0 of 738, dsw 0 of 861, rsw3 0 of
+4,797. Their imports differ in 10 of 200 (b59), 4 of 170 (b61) and 5 of 128
+(b62) only in the comparer's spelling of the same error (pm4py's "No
+objects to concatenate" without its type). The other sweeps, on the EP
+server (EQ1-1 to EQ1-3 do not touch them): b61 imports 0 of 200, rsw3 0 of
+7,800, esw 0 of 3,200, xsw 6 of 2,600 (EP1-6's declared name order), osw 0
+of 1,200, dsw 0 of 1,400, fsw 0 of 2,558, fsw2 0 of 3,357; b60 imports 24 of
+200 (duplicate event ids), and every other difference in a log with a
+declared feature (rsw3 1,266 of 6,864, esw 739, xsw 590, osw 335, dsw 660,
+fsw 703, fsw2 1,293); the feature banks imports 0 of 60 each and esw, fsw
+and fsw2 0 but for the declared features (objects named but not listed,
+object rows without id or type, no objects file) and the declared OCPN
+type (EP1-5: one log each in three banks), `unrnat` 0 of 960, 770 and
+1,029; b59 imports 0 of 200 (JSON and XML), rsw3 0 of 7,800 and 68 of
+7,527 (XML: the c59 files), esw 0 of 3,200 and 3,088, xsw 0 of 2,600 and
+2,509, osw 0 of 1,200 and 1,158; b62's pm4py files imports 0 of 150 (CSV)
+and 5 of 150 (the comparer's spelling), rsw3 0 of 4,797, esw 0 of 1,968,
+xsw 0 of 1,599, osw 0 of 738, dsw 0 of 861, fsw 0 of 1,552; fsw2 b56 0 of
+2,904 (JSON) and 33 of 2,814 (XML, the c56 files), b59 30 of 2,943 (JSON,
+EQ1-2) and 61 of 2,838 (XML, the c59 files); psw b58 1 of 800 (the causal-net cap against pm4py's MemoryError, declared
+in EO), b61 5 of 800 (the declared OCPN type of EP1-5 in one log, the
+causal-net cap), b60 244 of 704 (all in logs with a declared feature). The fresh seeds of
+the table, sequence and pandas domains (`eq/banks/capeq.sh`: pandas ck,
+cn_ltl and sequence ck, Polars cn, ck, cj, ci, ch and sequence cp, ck, cj,
+ch, 12 banks) match native in every case.
+
+Declared (outside the model), all as before: the hash-seed object order of
+a CSV without an objects file, duplicate CSV event ids, objects the events
+name that the objects file lacks or drops, object rows without id or type,
+the type pm4py's OCPN discovery and playout name (EP1-5) and the order of
+the two names in the event/object graph's KeyError (EP1-6), the c56 and
+c59 files (an OCEL 1.0 XML `<date>` beside a date text `<string>`, EO),
+which of several unlisted ids pm4py names (EQ1-2), OCPN playouts past the
+cap (EQ1-3).
+
+Tests:
+- New: `minera_review_eq1_tests` (native SQLite files read back: frame
+  order, values, changes, no links or globals, and the lossless read on
+  request; several unlisted ids at levels 2 and 3, kept and negated,
+  through the direct read and the transport).
+- `minera_ocel_sqlite_tests` and `minera_ocel_xml_tests` read their
+  native files back with `read_native_tables` where they check the
+  lossless round trip (and the XML test that the default read has no
+  globals); `minera_recheck_regression_tests` expects the type table's
+  spelling of a change time.
+
+The full ctest passed 637 of 638 on the first run (38 min at -j2 next to
+the sweeps; `minera_recheck_regression_tests` expected the native table's
+spelling of a change time; updated, then passed), the fixture replay gave
+2,673 responses unchanged. Python script and frontend tests not rerun
+(scripts and frontend unchanged). The device check on the Mac was skipped
+(the Mac was not linked).

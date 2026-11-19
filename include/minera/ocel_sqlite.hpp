@@ -12,7 +12,7 @@ namespace minera {
 // tables carry typed columns and object-change rows; compact auxiliary tables
 // mirror scalar attributes, event links, object changes, and globals so the
 // native representation remains lossless for values outside the relational
-// column contract.
+// column contract (read back with read_native_tables).
 struct OcelSqliteOptions {
   // Refuse relations, object links and changes that name an unknown event or
   // object. Unset: an import drops such rows, as the reference SQLite reader
@@ -22,6 +22,11 @@ struct OcelSqliteOptions {
   // Keep type names readable in the event_<type>/object_<type> table names.
   // Names that are not safe SQLite identifiers are encoded deterministically.
   bool readable_type_table_names = true;
+  // Read the native auxiliary tables back (declared types, attribute values,
+  // changes, globals, event links), so that a native file round-trips
+  // losslessly. Unset: an import reads every file through its type tables,
+  // as the reference reader does, native files included (round EQ).
+  bool read_native_tables = false;
 };
 
 [[nodiscard]] Ocel import_ocel_sqlite(

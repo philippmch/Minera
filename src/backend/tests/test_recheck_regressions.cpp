@@ -370,7 +370,9 @@ void ocel_wall_clock_order(){
  std::filesystem::remove(changes_db);
  bool instant_four=false;
  for(const auto& change:instant_reread.object_changes)
-  instant_four|=change.value==OcelValue(std::string("y"))&&change.timestamp=="2020-01-01T04:00:00+00:00";
+  // Round EQ: read through the type table, whose text spells the instant
+  // with a space.
+  instant_four|=change.value==OcelValue(std::string("y"))&&change.timestamp=="2020-01-01 04:00:00+00:00";
  check(instant_four,"OCEL SQLite stores an object change with an offset as its UTC instant");
  const auto changes_xml=parse_ocel_xml(R"(<?xml version="1.0"?><log><object-types><object-type name="item"><attributes><attribute name="p" type="string"/></attributes></object-type></object-types><event-types><event-type name="A"><attributes/></event-type></event-types><objects><object id="o1" type="item"><attributes><attribute name="p" time="1970-01-01T00:00:00Z">x</attribute><attribute name="p" time="2020-01-01T09:00:00+05:00">y</attribute><attribute name="p" time="Jan 1 2020 10:00 +0500">w</attribute></attributes></object></objects><events><event id="e1" type="A" time="2020-01-01T05:00:00Z"><objects><relationship object-id="o1" qualifier="q"/></objects></event></events></log>)");
  check(changes_xml.object_changes.size()==2&&changes_xml.object_changes[0].timestamp=="2020-01-01T09:00:00+00:00"&&changes_xml.object_changes[1].timestamp=="2020-01-01T05:00:00+00:00","OCEL XML stores object changes like events");

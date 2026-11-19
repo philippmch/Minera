@@ -1313,7 +1313,7 @@ void read_declared_type_catalog(sqlite3* db, std::string_view table,
   }
 }
 
-void read_relations(sqlite3* db, Ocel& log, bool validate_references) {
+void read_relations(sqlite3* db, Ocel& log, bool validate_references, bool native_tables) {
   const std::set<std::string> event_ids = [&] {
     std::set<std::string> result;
     for (const auto& event : log.events) result.insert(event.id);
@@ -1364,7 +1364,7 @@ void read_relations(sqlite3* db, Ocel& log, bool validate_references) {
       log.o2o.push_back(std::move(relation));
     }
   }
-  if (table_exists(db, "event_event")) {
+  if (native_tables && table_exists(db, "event_event")) {
     Statement statement(db, "SELECT source_event_id, target_event_id, "
                            "qualifier FROM event_event ORDER BY rowid");
     while (true) {
@@ -1498,14 +1498,23 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   const auto object_map = mapped_types(object_type_map);
   read_type_catalog(db, event_map, "event_", log.event_type_attributes);
   read_type_catalog(db, object_map, "object_", log.object_type_attributes);
-  read_declared_type_catalog(db, "event_type_attributes",
-                             log.event_type_attributes);
-  read_declared_type_catalog(db, "object_type_attributes",
-                             log.object_type_attributes);
+  // Round EQ: the reference reads a native file through its type tables
+  // like any other, so the native tables (declared types, attribute
+  // values, changes, globals, event links) are read only on request
+  // (observed black-box: native files read back, banks b51, b59 and b61).
+  const bool native_tables = options.read_native_tables;
+  if (native_tables) {
+    read_declared_type_catalog(db, "event_type_attributes",
+                               log.event_type_attributes);
+    read_declared_type_catalog(db, "object_type_attributes",
+                               log.object_type_attributes);
+  }
   std::map<std::string, std::vector<OcelAttribute>> event_attributes;
   std::map<std::string, std::vector<OcelAttribute>> object_attributes;
-  read_attributes(db, "event_attributes", event_attributes);
-  read_attributes(db, "object_attributes", object_attributes);
+  if (native_tables) {
+    read_attributes(db, "event_attributes", event_attributes);
+    read_attributes(db, "object_attributes", object_attributes);
+  }
 
   // Every listed type has its table now (resolve_type_tables).
   const auto event_table = [&](const std::string& activity) { return event_tables.at(activity); };
@@ -1700,9 +1709,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     throw std::invalid_argument("ValueError: No objects to concatenate");
   require_table(db, "event_object");
   require_table(db, "object_object");
-  read_relations(db, log, options.validate_references.value_or(false));
+  read_relations(db, log, options.validate_references.value_or(false), native_tables);
 
-  if (table_exists(db, "object_changes")) {
+  if (native_tables && table_exists(db, "object_changes")) {
     Statement statement(db, "SELECT object_id, object_type, ocel_time, "
                            "changed_field, value_type, text_value, integer_value, "
                            "real_value, bool_value FROM object_changes ORDER BY rowid");
@@ -1771,7 +1780,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       if (const auto listed = object_types.find(change.object_id); listed != object_types.end())
         change.object_type = listed->second;
   }
-  if (table_exists(db, "ocel_globals")) {
+  if (native_tables && table_exists(db, "ocel_globals")) {
     Statement statement(db, "SELECT attribute_name, value_type, text_value, "
                            "integer_value, real_value, bool_value FROM ocel_globals "
                            "ORDER BY attribute_name");
@@ -1787,11 +1796,17 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   // Round EN: the frames' build order (see event_columns), the changes
   // frame's "@@cumcount" last unless a table has one, its field and time
   // columns placed when not after the others.
-  const bool attribute_tables = table_exists(db, "event_attributes") || table_exists(db, "object_attributes");
+  const bool attribute_tables =
+      native_tables && (table_exists(db, "event_attributes") || table_exists(db, "object_attributes"));
+  // Round EQ: a native file (with its attribute tables) is read by the
+  // reference through its type tables too, so its frames take their
+  // columns in the type tables' union order, not in the attribute tables'
+  // first appearance (observed black-box: a CSV log with its attribute
+  // columns in file order, written by native and read back, bank b62).
+  log.event_frame_hint.columns = event_columns;
+  log.object_frame_hint.columns = object_columns;
   if (!attribute_tables) {
-    log.event_frame_hint.columns = event_columns;
-    log.object_frame_hint.columns = object_columns;
-    if (!log.object_changes.empty() && !table_exists(db, "object_changes")) {
+    if (!log.object_changes.empty() && !(native_tables && table_exists(db, "object_changes"))) {
       auto& hint = log.change_frame_hint;
       hint.columns.clear();
       std::optional<std::size_t> field_at, time_at;

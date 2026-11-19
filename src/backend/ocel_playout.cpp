@@ -952,6 +952,13 @@ void validate_reference_playout_controls(const OcpnPlayoutOptions& options) {
 
 namespace {
 
+// Round EQ: cap on the events one reference-binding playout keeps (the
+// causal-net playout has the same cap), so that a request cannot exhaust
+// the server's memory: a ten-event CSV log's OCPN took 8 GB before the
+// operating system stopped the server (bank b58, q58_0144). pm4py has no
+// such cap (it had not finished there after ten minutes; declared).
+constexpr std::size_t kReferenceOcpnPlayoutEvents = 2'000'000;
+
 OcpnPlayoutResult reference_mode_playout(const OcpnGraph& graph,
                                          const OcpnPlayoutOptions& options) {
   validate_reference_playout_controls(options);
@@ -979,7 +986,14 @@ OcpnPlayoutResult reference_mode_playout(const OcpnGraph& graph,
   // full list would keep).
   OcpnReferenceOcelWriter writer(object_types, options.objects_unique_per_trace);
   std::size_t index = 0;
+  std::size_t events = 0;
   reference_ocpn_extensive_visit(graph, reference, [&](const OcpnReferenceTrace& found) {
+    for (const auto& step : found)
+      if (step.activity) ++events;
+    if (events > kReferenceOcpnPlayoutEvents)
+      throw std::runtime_error("OCPN playout would produce more than " +
+                               std::to_string(kReferenceOcpnPlayoutEvents) +
+                               " events; lower max_bindings_per_activity or set max_traces");
     writer.add(found);
     if (options.return_sequences || options.return_traces) {
       std::vector<OcpnBinding> sequence;

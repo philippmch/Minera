@@ -392,7 +392,11 @@ void standard_writers_drop_reference_generated_globals() {
   assert(kept.find("ocel:global-event.version") != std::string::npos);
   assert(kept.find("__INVALID__") == std::string::npos);
   minera::export_ocel_sqlite(custom, path);
-  const auto reread = minera::import_ocel_sqlite(path).globals;
+  // Round EQ: the globals table is native's, read back only on request.
+  assert(minera::import_ocel_sqlite(path).globals.empty());
+  minera::OcelSqliteOptions lossless;
+  lossless.read_native_tables = true;
+  const auto reread = minera::import_ocel_sqlite(path, lossless).globals;
   assert(reread.size() == 1 && reread.count("ocel:global-event.version") == 1);
   std::filesystem::remove(path);
 }

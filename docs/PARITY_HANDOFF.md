@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EP (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EQ (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7593,6 +7593,74 @@ message and the old JSON download; updated, then passed), the fixture
 replay gave 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-ep/`.
+
+Round EQ re-reviewed EP (Review EQ1). EP's CI run 44587308518 on 652ae8e2:
+six jobs green, the Linux, macOS and Windows ctest included. EQ ran two fresh OCEL CSV banks (`eq/csv/q2gen.py 60 200 b60`, every
+feature, and `b61` without the declared ones; `TF=1` puts the time column
+and the objects' type first more often) through imports, rsw3, esw, xsw,
+osw, dsw, fsw and a new sweep of the object filters at levels 2 to 4
+(`eq/rt/fsw2.py`: kept and negated, one and several ids and types), one
+fresh bank per CSV feature (`eq/csv/f5`, EP's 17 and `unrnat`: objects
+listed but not related next to NaT times) through imports, esw, fsw and
+fsw2, a fresh OCEL 1.0 bank with objects no relation names (`eo/c1/c1gen.py
+59 200`, b59, JSON and XML) through every sweep, SQLite logs written from
+time-first CSV logs by pm4py and by native (`eq/sq/mk.py`, b62), native
+SQLite downloads of b51, b59 and b61 read back (`eq/sq/mkn.py`,
+`eq/runN.sh`), psw on the NaT CSV banks (b58, b60, b61) and fsw2 on b56
+and b59:
+- an import reads a native SQLite file through its type tables, as
+  read_ocel2_sqlite does: values, changes and frame order from the type
+  tables, native's own tables (attribute values, declared types, changes,
+  globals, event links) only with `OcelSqliteOptions::read_native_tables`
+  (EQ1-1);
+- filter_ocel_objects at a level above 1 names the smallest of several
+  unlisted ids in its KeyError, whatever the standard library (EQ1-2);
+- the reference-binding OCPN playout stops past 2,000,000 events instead
+  of exhausting the server's memory (EQ1-3, declared: pm4py has no cap).
+After the fixes the native SQLite downloads read back give 0 of 600 to
+7,410 per sweep (b51, b59, b61, b62: osw, dsw, rsw3; EQ's server gave up to
+552 of 700). The other sweeps differ only in the declared classes: b61 0
+but for xsw 6 of 2,600 (EP1-6's name order), b60 and the feature banks only
+in logs with a declared feature, b59 only in the c59 XML files, b62's pm4py
+files 0, fsw2 only in the c56/c59 files and in EQ1-2; psw b58 1 and b61 5 of 800 (the causal-net cap, the declared OCPN type), b60 only in logs with a declared feature.
+
+In the suite: `minera_review_eq1_tests` (hand cases of EQ1-1 and EQ1-2);
+`minera_ocel_sqlite_tests` and `minera_ocel_xml_tests` ask for the lossless
+read where they check the native round trip, `minera_recheck_regression_tests`
+expects the type table's spelling of a change time.
+The full ctest passed 637 of 638 on the first run (38 min at -j2; that one
+expected the native table's spelling of a change time; updated, then
+passed), the fixture replay gave 2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-eq/`.
+
+Next round (ER) should start by re-reviewing round EQ:
+
+- EQ's CI run;
+- native SQLite downloads read back through every sweep on more banks
+  (EQ1-1: the OCEL 2.0 JSON/XML banks with object changes, b55 and b56,
+  and the CSV feature banks), and the SQLite files of other writers
+  (hand-built files with native's tables and unusual type tables);
+- the OCPN playout cap (EQ1-3) against `max_traces` and the causal-net
+  cap, and the other playouts and simulations on logs that blow up;
+- CSV objects named but not listed (the largest declared class: every
+  object route on `FEAT=notlisted`); model it if the reference's choices
+  turn out deterministic;
+- the carried items below (the XML/JSON day offsets, the SQLite leftovers,
+  the new Polars dtypes, DW1, the declared items, the CU list and the open
+  choices); the fresh seeds of the table, sequence and pandas domains were
+  taken in EQ (12 banks, 0 mismatches).
+
+Round EQ's list, taken in EQ: EP's CI, esw on the CSV feature banks and on
+unrelated objects next to NaT times, a fresh OCEL 1.0 bank with unrelated
+objects through the features, the routes on SQLite read back from
+time-first CSV logs, psw on NaT logs (b58), the deeper object filters on
+`notlisted` banks and fsw2 at levels 3 and 4, fresh seeds of the table,
+sequence and pandas domains. Carried to ER: the XML/JSON day offsets, the
+SQLite leftovers, the new Polars dtypes, DW1, the declared items, the CU
+list and the open choices.
+
+Previous list for round EQ (kept for its older items):
 
 Next round (EQ) should start by re-reviewing round EP:
 

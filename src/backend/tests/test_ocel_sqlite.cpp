@@ -514,7 +514,11 @@ int main() {
   reference_capture_tests();
   reference_frame_tests();
 
-  const auto round = minera::import_ocel_sqlite(path);
+  // Round EQ: the native tables are read back only on request (an import
+  // reads a native file through its type tables, as the reference does).
+  minera::OcelSqliteOptions lossless;
+  lossless.read_native_tables = true;
+  const auto round = minera::import_ocel_sqlite(path, lossless);
   assert(round.events.size() == 2 && round.objects.size() == 2);
   assert(round.events[0].id == "e1" && round.events[0].activity == "Create");
   assert(std::get<double>(round.events[0].attributes[0].value) == 2.5);
