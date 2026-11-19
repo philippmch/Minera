@@ -367,6 +367,42 @@ std::string lowercase(std::string value) {
   return value;
 }
 
+// Round EI: read_ocel2_json walks the file in this order (observed
+// black-box): the eventTypes table (each entry's attribute names and types,
+// then its name), the objectTypes table, the events (type, time, attributes'
+// names and values, relationships' objectId and qualifier, then id), the
+// objects (type, attributes' values and names, relationships, then id), and
+// only then reads the event times (fromisoformat, a time that is no str
+// raising AttributeError on .endswith). A missing key raises KeyError with
+// the key, a relationship without a qualifier too, and empty or null
+// attribute and relationship lists are skipped. Native named the field
+// ("missing OCEL field: ...") and read relationships without a qualifier.
+const Json& standard_key(const Json::Object& o, std::string_view key) {
+  auto it = o.find(std::string(key));
+  if (it == o.end()) throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(key));
+  return it->second;
+}
+bool standard_truthy(const Json* value) {
+  if (value == nullptr || value->is_null()) return false;
+  if (value->is_bool()) return std::get<bool>(value->value);
+  if (value->is_int()) return std::get<std::int64_t>(value->value) != 0;
+  if (std::holds_alternative<double>(value->value)) return std::get<double>(value->value) != 0.0;
+  if (value->is_string()) return !value->string().empty();
+  if (value->is_array()) return !value->array().empty();
+  if (value->is_object()) return !value->object().empty();
+  return true;
+}
+std::string python_json_type_name(const Json& value) {
+  if (value.is_null()) return "NoneType";
+  if (value.is_bool()) return "bool";
+  if (std::holds_alternative<double>(value.value)) return "float";
+  if (value.is_string()) return "str";
+  if (value.is_array()) return "list";
+  if (value.is_object()) return "dict";
+  return "int";
+}
+std::int64_t iso_wall_microseconds(std::string_view original);
+
 void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
                                std::string_view field) {
   if (!raw) return;
@@ -379,7 +415,8 @@ void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
     // attribute listed twice from its last entry, and reads a value whose
     // declared type is empty as undeclared; an empty type name is no error
     // (its events or objects are dropped later), observed black-box.
-    const auto name = str(required(descriptor, "name"), "type name");
+    // Round EI: the attributes are read before the name (pm4py assigns
+    // types[et["name"]] = {x["name"]: x["type"] ...}).
     std::map<std::string, std::string> attributes;
     if (const auto* raw_attributes = optional(descriptor, "attributes")) {
       if (!raw_attributes->is_array())
@@ -387,13 +424,14 @@ void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
       for (const auto& raw_attribute : raw_attributes->array()) {
         const auto& attribute = obj(raw_attribute, "type attributes[]");
         const auto attribute_name =
-            str(required(attribute, "name"), "attribute name");
+            str(standard_key(attribute, "name"), "attribute name");
         const auto attribute_type =
-            str(required(attribute, "type"), "attribute type");
+            str(standard_key(attribute, "type"), "attribute type");
         if (attribute_type.empty()) attributes.erase(attribute_name);
         else attributes.insert_or_assign(attribute_name, attribute_type);
       }
     }
+    const auto name = str(standard_key(descriptor, "name"), "type name");
     types.insert_or_assign(name, std::move(attributes));
   }
 }
@@ -1351,21 +1389,76 @@ Ocel parse_standard(const Json::Object& root) {
   std::unordered_map<std::string, std::string> types;
   StandardAttributeTypes object_attribute_types;
   StandardAttributeTypes event_attribute_types;
-  parse_standard_type_table(optional(root, "objectTypes"), object_attribute_types,
-                            "objectTypes");
   parse_standard_type_table(optional(root, "eventTypes"), event_attribute_types,
                             "eventTypes");
+  parse_standard_type_table(optional(root, "objectTypes"), object_attribute_types,
+                            "objectTypes");
   log.object_type_attributes = object_attribute_types;
   log.event_type_attributes = event_attribute_types;
-  const auto& object_array = required(root, "objects");
-  if (!object_array.is_array())
-    throw std::invalid_argument("objects must be array");
   struct StandardAttribute {
     std::string name;
     OcelValue value;
     bool has_time = false;
     std::string time;
   };
+  const auto& event_array = standard_key(root, "events");
+  if (!event_array.is_array())
+    throw std::invalid_argument("events must be array");
+  // An id listed twice is one event, as the reference reader keeps it
+  // (observed black-box): in the place of its first listing with everything
+  // of its last one, relations included.
+  std::unordered_map<std::string, std::size_t> event_index;
+  std::vector<std::vector<OcelRelation>> event_relations;
+  // The Python type of each event time that is no str (by event id, the
+  // last listing's), raised when the times are read.
+  std::unordered_map<std::string, std::string> untexted_times;
+  for (const auto& raw : event_array.array()) {
+    const auto& x = obj(raw, "events[]");
+    const auto activity = str(standard_key(x, "type"), "type");
+    const auto& raw_time = standard_key(x, "time");
+    const bool texted_time = raw_time.is_string();
+    OcelEvent event{{}, activity, texted_time ? raw_time.string() : std::string{}, {}};
+    if (const auto* aa = optional(x, "attributes"); standard_truthy(aa)) {
+      if (!aa->is_array())
+        throw std::invalid_argument("event attributes must be array");
+      for (const auto& ar : aa->array()) {
+        const auto& a = obj(ar, "attributes[]");
+        const auto name = str(standard_key(a, "name"), "name");
+        event.attributes.push_back(
+            {name, standard_scalar(
+                       standard_key(a, "value"), "value",
+                       standard_attribute_type(event_attribute_types, activity,
+                                               name))});
+      }
+    }
+    std::vector<OcelRelation> relations;
+    if (const auto* rels = optional(x, "relationships"); standard_truthy(rels)) {
+      if (!rels->is_array())
+        throw std::invalid_argument("event relationships must be array");
+      for (const auto& r : rels->array()) {
+        const auto& y = obj(r, "relationship");
+        const auto oid = str(standard_key(y, "objectId"), "objectId");
+        const auto qualifier = str(standard_key(y, "qualifier"), "qualifier");
+        relations.push_back({{}, oid, qualifier});
+      }
+    }
+    const auto id = str(standard_key(x, "id"), "id");
+    event.id = id;
+    for (auto& relation : relations) relation.event_id = id;
+    if (texted_time) untexted_times.erase(id);
+    else untexted_times.insert_or_assign(id, python_json_type_name(raw_time));
+    const auto [slot, added] = event_index.try_emplace(id, log.events.size());
+    if (added) {
+      log.events.push_back(std::move(event));
+      event_relations.push_back(std::move(relations));
+    } else {
+      log.events[slot->second] = std::move(event);
+      event_relations[slot->second] = std::move(relations);
+    }
+  }
+  const auto& object_array = standard_key(root, "objects");
+  if (!object_array.is_array())
+    throw std::invalid_argument("objects must be array");
   // An id listed twice (under another type, say) is one object, as the
   // reference reader keeps it (observed black-box): in the place of its
   // first listing with the type, attribute values and object relationships
@@ -1377,24 +1470,23 @@ Ocel parse_standard(const Json::Object& root) {
   for (const auto& raw : object_array.array()) {
     const auto& x = obj(raw, "objects[]");
     // An empty id or type is dropped with drop_empty_ocel_names.
-    const auto id = str(required(x, "id"), "id");
-    const auto type = str(required(x, "type"), "type");
-    types.insert_or_assign(id, type);
-    OcelObject object{id, type, {}};
-    if (const auto* aa = optional(x, "attributes")) {
+    const auto type = str(standard_key(x, "type"), "type");
+    OcelObject object{{}, type, {}};
+    std::vector<std::pair<std::string, std::vector<StandardAttribute>>> grouped;
+    if (const auto* aa = optional(x, "attributes"); standard_truthy(aa)) {
       if (!aa->is_array())
         throw std::invalid_argument("object attributes must be array");
       // Grouped by name in first-appearance order (the reference's frame
       // columns follow first appearance).
-      std::vector<std::pair<std::string, std::vector<StandardAttribute>>> grouped;
       std::unordered_map<std::string, std::size_t> group_index;
       for (const auto& ar : aa->array()) {
         const auto& a = obj(ar, "attributes[]");
+        const auto& raw_value = standard_key(a, "value");
         // An empty name is a name: read_ocel2_json keeps that column.
-        const auto name = str(required(a, "name"), "name");
+        const auto name = str(standard_key(a, "name"), "name");
         StandardAttribute entry{name,
                                 standard_scalar(
-                                    required(a, "value"), "value",
+                                    raw_value, "value",
                                     standard_attribute_type(object_attribute_types,
                                                             type, name))};
         if (const auto* time = optional(a, "time")) {
@@ -1405,29 +1497,31 @@ Ocel parse_standard(const Json::Object& root) {
         if (added) grouped.emplace_back(name, std::vector<StandardAttribute>{});
         grouped[slot->second].second.push_back(std::move(entry));
       }
-      for (auto& [name, entries] : grouped) {
-        if (entries.empty()) continue;
-        object.attributes.push_back({name, entries.front().value});
-        for (std::size_t i = 1; i < entries.size(); ++i) {
-          if (!entries[i].has_time)
-            throw std::invalid_argument(
-                "OCEL object attribute change requires a timestamp");
-          log.object_changes.push_back(
-              {id, type, entries[i].time, name, entries[i].value});
-        }
-      }
     }
     std::vector<OcelO2oRelation> o2o;
-    if (const auto* rr = optional(x, "relationships")) {
+    if (const auto* rr = optional(x, "relationships"); standard_truthy(rr)) {
       if (!rr->is_array())
         throw std::invalid_argument("object relationships must be array");
       for (const auto& r : rr->array()) {
         const auto& y = obj(r, "relationship");
-        o2o.push_back(
-            {id, str(required(y, "objectId"), "objectId"),
-             optional(y, "qualifier")
-                 ? str(*optional(y, "qualifier"), "qualifier")
-                 : ""});
+        const auto target = str(standard_key(y, "objectId"), "objectId");
+        const auto qualifier = str(standard_key(y, "qualifier"), "qualifier");
+        o2o.push_back({{}, target, qualifier});
+      }
+    }
+    const auto id = str(standard_key(x, "id"), "id");
+    object.id = id;
+    for (auto& relation : o2o) relation.source_id = id;
+    types.insert_or_assign(id, type);
+    for (auto& [name, entries] : grouped) {
+      if (entries.empty()) continue;
+      object.attributes.push_back({name, entries.front().value});
+      for (std::size_t i = 1; i < entries.size(); ++i) {
+        if (!entries[i].has_time)
+          throw std::invalid_argument(
+              "OCEL object attribute change requires a timestamp");
+        log.object_changes.push_back(
+            {id, type, entries[i].time, name, entries[i].value});
       }
     }
     const auto [slot, added] = object_index.try_emplace(id, log.objects.size());
@@ -1443,57 +1537,18 @@ Ocel parse_standard(const Json::Object& root) {
     for (auto& relation : relations) log.o2o.push_back(std::move(relation));
   for (auto& change : log.object_changes) change.object_type = types.at(change.object_id);
   for (const auto& object : log.objects) log.object_type_attributes.try_emplace(object.type);
-  const auto& event_array = required(root, "events");
-  if (!event_array.is_array())
-    throw std::invalid_argument("events must be array");
-  // An id listed twice is one event, as the reference reader keeps it
-  // (observed black-box): in the place of its first listing with everything
-  // of its last one, relations included.
-  std::unordered_map<std::string, std::size_t> event_index;
-  std::vector<std::vector<OcelRelation>> event_relations;
-  for (const auto& raw : event_array.array()) {
-    const auto& x = obj(raw, "events[]");
-    const auto id = str(required(x, "id"), "id");
-    const auto activity = str(required(x, "type"), "type");
-    OcelEvent event{id, activity, str(required(x, "time"), "time"), {}};
-    if (const auto* aa = optional(x, "attributes")) {
-      if (!aa->is_array())
-        throw std::invalid_argument("event attributes must be array");
-      for (const auto& ar : aa->array()) {
-        const auto& a = obj(ar, "attributes[]");
-        const auto name = str(required(a, "name"), "name");
-        event.attributes.push_back(
-            {name, standard_scalar(
-                       required(a, "value"), "value",
-                       standard_attribute_type(event_attribute_types, activity,
-                                               name))});
-      }
+  // The times are read after the walk, in event order: a time that is no
+  // str raises there, a text fromisoformat cannot read before it raises too.
+  if (!untexted_times.empty())
+    for (const auto& event : log.events) {
+      if (const auto found = untexted_times.find(event.id); found != untexted_times.end())
+        throw std::invalid_argument("'" + found->second + "' object has no attribute 'endswith'");
+      iso_wall_microseconds(event.timestamp);
     }
-    std::vector<OcelRelation> relations;
-    if (const auto* rels = optional(x, "relationships")) {
-      if (!rels->is_array())
-        throw std::invalid_argument("event relationships must be array");
-      for (const auto& r : rels->array()) {
-        const auto& y = obj(r, "relationship");
-        const auto oid = str(required(y, "objectId"), "objectId");
-        // read_ocel2_json drops a relation to an unlisted object (and the
-        // event when it keeps none), observed black-box.
-        if (!types.count(oid)) continue;
-        relations.push_back(
-            {id, oid, optional(y, "qualifier")
-                         ? str(*optional(y, "qualifier"), "qualifier")
-                         : ""});
-      }
-    }
-    const auto [slot, added] = event_index.try_emplace(id, log.events.size());
-    if (added) {
-      log.events.push_back(std::move(event));
-      event_relations.push_back(std::move(relations));
-    } else {
-      log.events[slot->second] = std::move(event);
-      event_relations[slot->second] = std::move(relations);
-    }
-  }
+  // read_ocel2_json drops a relation to an unlisted object (and the event
+  // when it keeps none), observed black-box.
+  for (auto& relations : event_relations)
+    std::erase_if(relations, [&](const OcelRelation& relation) { return !types.count(relation.object_id); });
   for (auto& relations : event_relations)
     for (auto& relation : relations) log.relations.push_back(std::move(relation));
   for (const auto& event : log.events) log.event_type_attributes.try_emplace(event.activity);
@@ -5465,7 +5520,10 @@ OcdfgConformanceResult compare_ocdfg(
     const Ocel& real, const OcdfgGraph& normative,
     const OcdfgConformanceOptions& options) {
   OcdfgDiscoveryOptions discovery;
-  discovery.compute_edges_performance = false;
+  // Round EI: pm4py's discover_ocdfg always measures the edges, which fails
+  // on a time column of None (Ocel::none_event_times), so that log measures
+  // them here too, to raise as pm4py does.
+  discovery.compute_edges_performance = real.none_event_times;
   return compare_ocdfg(
       discover_ocdfg_classic_with_options(real, discovery), normative,
       options);

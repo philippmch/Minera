@@ -952,8 +952,11 @@ void parse_standard(const Node& root, Ocel& log, bool reject_lists) {
     for (const auto* en : children(*events, "event")) {
       OcelEvent e{attr_or(*en, "id"), attr_or(*en, "type", attr_or(*en, "activity")), attr_or(*en, "time", attr_or(*en, "timestamp")), {}};
       // An event without id or type is dropped later (drop_empty_ocel_names);
-      // one without time raises, as the reference's date reading does.
-      if (e.timestamp.empty()) throw std::invalid_argument("invalid OCEL XML event");
+      // one without time raises, as the reference's date reading does: its
+      // dateutil parser on None (round EI, observed black-box; an empty
+      // time raises before, as dateutil does on "").
+      if (e.timestamp.empty())
+        throw std::invalid_argument("Parser must be a string or character stream, not NoneType");
       if (const auto* a = child(*en, "attributes")) {
         for (const auto& av : a->children) if (local(av.name) == "attribute") {
           const auto key = attr_or(av, "name", attr_or(av, "key"));

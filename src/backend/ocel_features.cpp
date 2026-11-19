@@ -1353,31 +1353,54 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     // black-box).
     const auto nat = [&](std::size_t event) { return ocel_frame::nat_time_text(log.events[event].timestamp); };
     const auto nat_error = [&] { return std::invalid_argument(ocel_frame::nat_timestamp_error(log)); };
-    if (variant == OcelFeatureVariant::kEvents && options.include_timestamp_features)
-      for (std::size_t event = 0; event < log.events.size(); ++event)
-        if (nat(event)) throw nat_error();
-    if (variant == OcelFeatureVariant::kObjects && options.include_lifecycle_features.value_or(true) &&
-        options.include_lifecycle_duration_features.value_or(true))
-      for (const auto& events : object_events)
-        if (!events.empty() && std::all_of(events.begin(), events.end(), nat)) throw nat_error();
-    if (variant == OcelFeatureVariant::kEvents) {
-      const bool relation_counts =
-          options.include_event_num_rel_objs_features.value_or(options.include_relation_features) ||
-          options.include_event_num_rel_objs_type_features.value_or(options.include_relation_features);
-      const bool endpoints =
-          options.include_event_start_ot_features.value_or(options.include_endpoint_features) ||
-          options.include_event_end_ot_features.value_or(options.include_endpoint_features);
+    // Round EI: the checks follow the reference's order of feature
+    // families. The work-in-progress family takes the lifecycle durations,
+    // the related-event and related-activity families take the event
+    // features (their timestamps, relation counts and endpoints), the
+    // neighbor family the default object features (durations, then the
+    // graphs), and the related-object family of the events the default object
+    // features too, so each raises as those do (observed black-box: they
+    // answered on NaT times and events without relations).
+    bool nat_object = false;
+    for (const auto& events : object_events)
+      if (!events.empty() && std::all_of(events.begin(), events.end(), nat)) nat_object = true;
+    bool nat_event = false;
+    for (std::size_t event = 0; event < log.events.size(); ++event)
+      if (nat(event)) nat_event = true;
+    const bool relation_counts =
+        options.include_event_num_rel_objs_features.value_or(options.include_relation_features) ||
+        options.include_event_num_rel_objs_type_features.value_or(options.include_relation_features);
+    const bool endpoints =
+        options.include_event_start_ot_features.value_or(options.include_endpoint_features) ||
+        options.include_event_end_ot_features.value_or(options.include_endpoint_features);
+    const auto event_family_errors = [&] {
+      if (options.include_timestamp_features && nat_event) throw nat_error();
       if (relation_counts && first_event) throw key_error(log.events[*first_event].id);
       if (endpoints && first_object) throw key_error(log.objects[*first_object].id);
-    } else if (variant == OcelFeatureVariant::kObjects && first_event) {
-      const bool all = options.include_all_object_features.value_or(false);
-      if (options.include_general_descendants_features.value_or(all))
-        throw key_error(log.events[*first_event].id);
-      if (options.include_general_inheritance_features.value_or(all))
-        throw key_error(log.events[*last_event].id);
-      if (options.include_cobirth_features.value_or(all)) throw key_error(log.events[*first_event].id);
-      if (options.include_codeath_features.value_or(all)) throw key_error(log.events[*last_event].id);
-      if (options.include_obj_con_in_graph_features) throw key_error(log.events[*first_event].id);
+    };
+    const auto default_object_family_errors = [&] {
+      if (nat_object) throw nat_error();
+      if (first_event) throw key_error(log.events[*first_event].id);
+    };
+    if (variant == OcelFeatureVariant::kEvents) {
+      event_family_errors();
+      if (options.include_related_objects_features) default_object_family_errors();
+    } else if (variant == OcelFeatureVariant::kObjects) {
+      const bool lifecycle = options.include_lifecycle_features.value_or(true);
+      if (lifecycle && options.include_lifecycle_duration_features.value_or(true) && nat_object) throw nat_error();
+      if (first_event) {
+        const bool all = options.include_all_object_features.value_or(false);
+        if (options.include_general_descendants_features.value_or(all))
+          throw key_error(log.events[*first_event].id);
+        if (options.include_general_inheritance_features.value_or(all))
+          throw key_error(log.events[*last_event].id);
+        if (options.include_cobirth_features.value_or(all)) throw key_error(log.events[*first_event].id);
+        if (options.include_codeath_features.value_or(all)) throw key_error(log.events[*last_event].id);
+      }
+      if (lifecycle && options.include_lifecycle_wip_features.value_or(false) && nat_object) throw nat_error();
+      if (options.include_related_events_features || options.include_related_activities_features)
+        event_family_errors();
+      if (options.include_obj_con_in_graph_features) default_object_family_errors();
     }
   }
 

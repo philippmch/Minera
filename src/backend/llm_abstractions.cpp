@@ -1,4 +1,5 @@
 #include "minera/llm_abstractions.hpp"
+#include "minera/ocdfg_edge_performance.hpp"
 
 #include <algorithm>
 #include <array>
@@ -1396,8 +1397,19 @@ std::string llm_log_skeleton_description(const EventLog& log, const LlmAbstracti
 }
 
 std::string llm_ocel_ocdfg_description(const Ocel& log, const LlmAbstractionOptions& options) {
+  // Round EI: pm4py discovers the OC-DFG (with its edge performance) before
+  // it looks at include_header, so a log whose performance fails (a time
+  // column of None) raises without the header too, and the error carries
+  // its Python type (observed black-box: native answered "\n\n" and printed
+  // the bare message).
+  const auto graph = [&] {
+    try {
+      return discover_ocdfg_classic(log, options.compute_edges_performance);
+    } catch (const OcdfgPerformanceError& error) {
+      throw std::invalid_argument(error.type + ": " + error.what());
+    }
+  }();
   if (!options.include_header) return "\n\n";
-  const auto graph = discover_ocdfg_classic(log, options.compute_edges_performance);
   struct Edge {
     std::size_t events, objects;
     double duration;
@@ -1460,11 +1472,11 @@ std::string llm_ocel_features_description(const Ocel& log, const std::string& ob
   // (round BU).
   feature_options.include_lifecycle_path_features = options.ocel_lifecycle_paths;
   // The reference graph families look up every event's objects and raise
-  // KeyError for an event without any.
-  std::set<std::string> related;
-  for (const auto& relation : log.relations) related.insert(relation.event_id);
-  for (const auto& event : log.events)
-    if (!related.contains(event.id)) throw std::out_of_range("event without objects: " + event.id);
+  // KeyError for an event without any; extract_ocel_features raises as
+  // pm4py.extract_ocel_features does under the reference names, in its order
+  // of feature families (round EI: a NaT lifecycle raises first, and the
+  // message is pm4py's KeyError, where this description refused every event
+  // without relations up front with its own message, observed black-box).
   const auto table = extract_ocel_features(log, OcelFeatureVariant::kObjects, feature_options);
   // The reference default has no object-type indicators or attribute counts.
   std::vector<std::string> descriptions;

@@ -32674,3 +32674,128 @@ change (with the other OCEL writer tests). The workbench fixture replay
 gave 2,673 responses unchanged. Python script and frontend tests not rerun
 (scripts and frontend unchanged). The device check on the Mac was skipped
 (the Mac was not linked).
+
+## Review EI1: re-review of round EH, NaT and None event times through the LLM abstractions, OCEL conformance, feature families and playout, the OCEL 2.0 JSON and XML readers on unreadable times, CSV imports with mixed offsets (2026-11-19)
+
+Round EI checked EH's CI (run 44422565629 on b63e6875: the verifier,
+Python, frontend and macOS jobs green; the Linux and Windows ctest steps
+were still running when EI started) and the end of EG's (run 44405676226
+finished green). Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no
+pyarrow) in the reference venv: `ei/csv/cgen4.py` writes OCEL CSV event
+files mixing offsets within the time column (per-file pools of naive, `Z`,
+`+00:00`, `+02:00`, `-05:30`, `+0200`, ... with NaT cells; seed 21, and
+seed 22 with one offset per file spelled two ways; 150 files each), and
+fresh seeds of EH's banks gave 120 NaT CSV files (`cgen3.py`, seed 31), 71
+OCEL 1.0 XML files without some timestamp elements (`xgen.py`, seed 33) and
+71 OCEL 2.0 SQLite NaT files (`sgen2.py`, seed 37); `ei/o2/ogen.py` has
+pm4py write round-ED fuzz logs as OCEL 2.0 JSON and XML and spoils the
+time of some events (empty, NaT, NA spellings, garbage, dates out of
+range, JSON null, a missing key or attribute; seed 41, 72 and 71 files),
+and `ei/o2/sfz.py` and `sfz2.py` mutate pm4py-written OCEL 2.0 JSON files
+(wrong value types, deleted keys). The new route sweep `ei/rt/esw.py`
+compares the routes EH's rsw and xsw leave out on each reader's frame: the
+LLM contexts `ocel` (with and without timestamps), `ocel_ocdfg` (with and
+without header) and `ocel_features` (with and without lifecycle paths),
+the compatibility features with one family on at a time (events and
+objects), OC-DFG, OTG and ETOT conformance of the log against its own
+model filtered to one object type, and the OCPN playout's traces;
+`ei/fm/fm.py` runs each feature family alone on four hand logs and
+`ei/p3/` holds the hand probes.
+
+- **EI1-1 The LLM OCEL context is the description.** `pm4py.llm.
+  abstract_ocel` is the OCEL description (variant 1) with timestamps, so
+  it prints a CSV import's times in the column's shared offset, a naive
+  column without an offset and nanoseconds as pandas keeps them, and
+  raises `KeyError` on an event without relations. Native modelled
+  `read_ocel_json`'s frame: it printed UTC (`+00:00` also on naive times),
+  cut the digits past the sixth and listed such events (93 calls on the
+  CSV files). Now the context is built on the description
+  route (`describe_ocel_tuples`), whose NaT and None rules it shares; the
+  budget still cuts whole lines.
+- **EI1-2 The LLM OCEL features raise as the features do.**
+  `abstract_ocel_features` raises what `extract_ocel_features` raises, in
+  its order of families: an object whose events all have NaT times raises
+  the NaT error in the lifecycle durations before the graphs look up an
+  event without relations (`KeyError: 'e3'`). Native refused every event
+  without relations up front with its own message (`event without
+  objects: e3`, 76 calls on the CSV files).
+- **EI1-3 OC-DFG description and conformance on a time column of None.**
+  `abstract_ocel_ocdfg` discovers the OC-DFG with its edge performance
+  before it looks at `include_header`, and `conformance_ocdfg` discovers
+  the log's OC-DFG (and a normative log's) with that performance, so on a
+  time column of None (EH1-5) both raise `TypeError: unsupported operand
+  type(s) for -: 'NoneType' and 'NoneType'`. Native answered `"\n\n"`
+  without the header, printed the message without its type with it, and
+  answered the conformance (30 calls on the XML files).
+- **EI1-4 OTG conformance on events without relations.** pm4py's
+  `KeyError` reached the client as the bare key (`'e1'`); now it reads
+  `KeyError: 'e1'` as elsewhere (37 calls on the NaT CSV files).
+- **EI1-5 Feature families in pm4py's order on NaT times and events
+  without relations.** pm4py's work-in-progress family takes the lifecycle
+  durations, the related-event and related-activity families take the
+  event features (timestamps, relation counts, endpoints), and the neighbor
+  family (`obj_con_in_graph`) and the events' related-object family take
+  the default object features (durations, then the graphs), so each raises
+  the NaT error or the `KeyError` those raise. Native answered them (561
+  calls over the four banks, part of them a harness coupling since
+  fixed).
+- **EI1-6 The OCEL 2.0 JSON reader's walk.** `read_ocel2_json` reads the
+  `eventTypes` table (each entry's attribute names and types, then its
+  name), the `objectTypes` table, the events (type, time, attributes'
+  names and values, relationships' `objectId` and `qualifier`, then id) and
+  the objects (type, attributes' values and names, relationships, then id)
+  before it reads the event times; empty or null attribute and
+  relationship lists are skipped. A missing key raises `KeyError` with the
+  key, a relationship without a qualifier too, and a time that is no str
+  raises `AttributeError: 'NoneType' object has no attribute 'endswith'`
+  (or `'int'`, ...) in event order with `fromisoformat`'s `Invalid
+  isoformat string`. Native named the field (`missing OCEL field: time`,
+  `OCEL field must be string: time`), read relationships without a
+  qualifier and read the objects first (10 of 72 spoiled files, now 0 of
+  71).
+- **EI1-7 The OCEL 2.0 XML reader on an event without a time.** pm4py's
+  dateutil parser raises `Parser must be a string or character stream, not
+  NoneType` (a `TypeError`); native said `invalid OCEL XML event` (4 of 71
+  spoiled files, now 0 of 71).
+
+Imports: 0 of 562 differ (outcome and message; the 420 CSV files with
+mixed offsets and NaT, the 71 XML and the 71 SQLite files), so no change was
+needed in the readers; the descriptions on such logs matched in EH's
+sweeps, and the LLM context now follows them (EI1-1). After the fixes, on
+the rebuilt server, esw differs on 5 of 1,920 calls on the NaT CSV files
+and 9 of 1,712 on the mixed-offset files (all the declared WIP order
+below), on 0 of 1,136 on the XML files and 0 of 1,136 on the SQLite files
+(before: 362, 205, 143 and 116); EH's rsw and xsw sweeps on the fresh banks gave only the
+differences EH declared.
+
+Declared:
+- The work-in-progress values of a CSV without an object table follow
+  the hash seed in pm4py (the object order is set iteration, EF1-5): 5 and
+  9 calls.
+- The events' related-object family computes pm4py's object features with
+  the event call's parameters (`enable_all` included), so with
+  `enable_all=False` it answers no or other columns; native aggregates the
+  object families its own options select, and raises where those raise.
+- Native's lifecycle paths belong to the lifecycle group
+  (`include_lifecycle_features`), where pm4py's paths family is
+  independent of the lifecycle metrics; ask for the group with its other
+  columns off to get the paths alone.
+- An OCEL 2.0 JSON value of the wrong JSON type stays refused with
+  native's message (`OCEL ... must be an array`, `OCEL field must be
+  string: ...`), where pm4py raises Python's (`'int' object is not
+  iterable`, `unhashable type: 'list'`, ...) or reads it (140 of 300 type
+  mutations); a file with neither an `events` nor an `objects` key reads
+  as the classic format (`KeyError: 'ocel:objects'`, pm4py `KeyError:
+  'events'`; 6 of 400 deletions).
+
+Tests:
+- New: `minera_review_ei1_tests` (hand cases of EI1-1 to EI1-7).
+- Changed: `minera_ocel_tests` (its OCEL 2.0 JSON inputs give each
+  relationship a qualifier, which the reader now requires, EI1-6).
+
+Runs: the full ctest passed 629 of 630 on the first run (37 min at -j2);
+the one failure was `minera_ocel_tests` (relationships without a qualifier,
+fixed above; it then passed). The workbench fixture replay gave 2,673
+responses unchanged. Python script and frontend tests not rerun (scripts
+and frontend unchanged). The device check on the Mac was skipped (the Mac
+was not linked).

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EH (2026-11-05 to 2026-11-18, cloud container)
+## Review-fix loop, rounds T–EI (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7285,6 +7285,71 @@ In the suite: `minera_review_eh1_tests` (hand cases);
 `minera_ocel_csv_tests` and `minera_review_ea1_tests` now read an event
 without a time as NaT (EH1-1). The generators, the sweeps, the comparers
 and the probes are in the project files under `review-harness/round-eh/`.
+
+Round EI re-reviewed EH (Review EI1). EH's CI run 44422565629 on
+b63e6875: the verifier, Python, frontend and macOS jobs green, the Linux
+and Windows ctest steps still running when EI pushed (check them with EI's
+own run); EG's run 44405676226 finished green. EI took NaT and None event
+times through the routes rsw and xsw leave out (`ei/rt/esw.py`: the LLM
+contexts, OCEL conformance, the feature families one at a time, OCPN
+playout) on fresh seeds of EH's banks and on CSV files mixing offsets
+(`ei/csv/cgen4.py`), and spoiled the times of OCEL 2.0 JSON and XML files
+(`ei/o2/ogen.py`, `sfz.py`, `sfz2.py`):
+- the LLM OCEL context is now the description route, so it prints a CSV
+  import's times in its offset and raises on events without relations
+  (EI1-1); the LLM OCEL features raise in the features' order with
+  pm4py's `KeyError` (EI1-2);
+- the OC-DFG description (also without header) and OC-DFG conformance
+  raise the performance's `TypeError` on a time column of None (EI1-3);
+  OTG conformance's `KeyError` keeps its type (EI1-4);
+- the WIP, related-event, related-activity, neighbor and related-object
+  feature families raise as the families they take do (EI1-5);
+- the OCEL 2.0 JSON reader walks the file in pm4py's order, requires the
+  qualifier and raises pm4py's `KeyError`/`AttributeError` (EI1-6); the
+  OCEL 2.0 XML reader raises dateutil's message on an event without a time
+  (EI1-7).
+Imports of the 420 mixed-offset and NaT CSV files, 71 XML and 71 SQLite
+files: 0 differ. After the fixes the new sweep differs only on the
+declared hash-seed WIP order (14 calls); the counts are in Review EI1.
+
+In the suite: `minera_review_ei1_tests` (hand cases);
+`minera_ocel_tests` now gives its OCEL 2.0 JSON relationships a qualifier
+(EI1-6). The full ctest passed 629 of 630 on the first run (that test,
+fixed), the fixture replay gave 2,673 responses unchanged. The generators,
+the sweeps, the comparers and the probes are in the project files under
+`review-harness/round-ei/`.
+
+Next round (EJ) should start by re-reviewing round EI:
+
+- EI's CI run, and the end of EH's Linux and Windows ctest (run
+  44422565629);
+- the LLM OCEL context on the other readers' frames now that it is the
+  description (SQLite and OCEL 2.0 JSON/XML times in UTC, budgets that cut
+  inside the objects), and the description and LLM routes on logs with
+  object changes or O2O links only;
+- the remaining OCEL routes on a time column of None and on NaT times
+  (the OCEL filters with time bounds, splits other than
+  ancestors/descendants, the temporal and statistics routes);
+- the OCEL 2.0 JSON reader's other values (attribute values of the wrong
+  type for their declared type, object attribute times), and the OCEL 2.0
+  XML reader's walk order on missing attributes (EI1-6's JSON order was not
+  checked for XML);
+- the OCEL 1.0 XML vmap entries still refused (EG1-6) and the keyless
+  values (not probed in EI);
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EH's list, taken in EI: EH's CI and EG's ctest, NaT and None times
+through the LLM abstractions, OCEL conformance, the feature families and
+playout, the OCEL 2.0 JSON/XML readers on unreadable times, CSV imports
+with mixed offsets and NaT. Not taken (carried to EJ): the causal-net
+routes on NaT logs, conformance on flattened logs beyond EH's, the XML
+vmap entries and keyless values, the fresh seeds, the XML/JSON day
+offsets, the SQLite leftovers, the new dtypes, the DW1 keys, the declared
+items, the CU list and the open choices.
+
+Previous list for round EI (kept for its older items):
 
 Next round (EI) should start by re-reviewing round EH:
 

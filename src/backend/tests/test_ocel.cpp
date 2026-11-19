@@ -455,8 +455,8 @@ void naive_timestamps_read_as_utc_contract() {
       R"({"objectTypes":[{"name":"order","attributes":[{"name":"p","type":"string"}]}],)"
       R"("eventTypes":[{"name":"A","attributes":[]}],"objects":[{"id":"o1","type":"order","attributes":[)"
       R"({"name":"p","value":"P1","time":"1970-01-01T00:00:00"},{"name":"p","value":"P2","time":"2024-01-05T12:00:00"}]}],)"
-      R"("events":[{"id":"e2","type":"A","time":"2024-01-02T10:30:00.123456","relationships":[{"objectId":"o1"}]},)"
-      R"({"id":"e1","type":"A","time":"2024-01-01T00:00:00","relationships":[{"objectId":"o1"}]}]})");
+      R"("events":[{"id":"e2","type":"A","time":"2024-01-02T10:30:00.123456","relationships":[{"objectId":"o1","qualifier":""}]},)"
+      R"({"id":"e1","type":"A","time":"2024-01-01T00:00:00","relationships":[{"objectId":"o1","qualifier":""}]}]})");
   assert(log.events.size() == 2 && log.events[0].id == "e1");
   assert(log.events[0].timestamp == "2024-01-01T00:00:00Z");
   assert(log.events[1].timestamp == "2024-01-02T10:30:00.123456Z");
@@ -616,10 +616,10 @@ void readers_drop_empty_names_contract() {
   const auto standard = minera::parse_ocel_json(R"json({"objectTypes":[{"name":"o","attributes":[{"name":"","type":"integer"}]},{"name":"","attributes":[]}],
 "eventTypes":[{"name":"a","attributes":[{"name":"x","type":"integer"},{"name":"x","type":"string"},{"name":"y","type":""}]},{"name":"","attributes":[]}],
 "objects":[{"id":"o1","type":"o","attributes":[{"name":"","value":"7"}]},{"id":"o2","type":"","attributes":[]},{"id":"","type":"o","attributes":[]}],
-"events":[{"id":"e1","type":"a","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"},{"name":"y","value":"6"}],"relationships":[{"objectId":"o2"}]},
-{"id":"e2","type":"","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1"}]},
-{"id":"e3","type":"b","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1"}]},
-{"id":"e1","type":"c","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"}],"relationships":[{"objectId":"o1","qualifier":"q"},{"objectId":""}]}]})json");
+"events":[{"id":"e1","type":"a","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"},{"name":"y","value":"6"}],"relationships":[{"objectId":"o2","qualifier":""}]},
+{"id":"e2","type":"","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1","qualifier":""}]},
+{"id":"e3","type":"b","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1","qualifier":""}]},
+{"id":"e1","type":"c","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"}],"relationships":[{"objectId":"o1","qualifier":"q"},{"objectId":"","qualifier":""}]}]})json");
   assert(standard.events.size() == 2 && standard.events[0].id == "e1" &&
          standard.events[0].activity == "c" && standard.events[1].id == "e3");
   assert(standard.objects.size() == 1 && standard.objects[0].id == "o1");
@@ -632,7 +632,7 @@ void readers_drop_empty_names_contract() {
          !standard.event_type_attributes.at("a").contains("y"));
   const auto typed = minera::parse_ocel_json(R"json({"eventTypes":[{"name":"a","attributes":[{"name":"x","type":"integer"},{"name":"x","type":"string"},{"name":"y","type":""}]}],
 "objects":[{"id":"o1","type":"o"}],
-"events":[{"id":"e1","type":"a","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"},{"name":"y","value":"6"}],"relationships":[{"objectId":"o1"}]}]})json");
+"events":[{"id":"e1","type":"a","time":"2024-01-01T00:00:00Z","attributes":[{"name":"x","value":"5"},{"name":"y","value":"6"}],"relationships":[{"objectId":"o1","qualifier":""}]}]})json");
   assert(std::get<std::string>(typed.events[0].attributes[0].value) == "5" &&
          std::get<std::string>(typed.events[0].attributes[1].value) == "6");
   // The classic transport carries the empty attribute name of a catalog.
@@ -901,7 +901,7 @@ int main() {
   const auto duplicate_type = minera::parse_ocel_json(
       R"json({"objectTypes":[{"name":"Order","attributes":[{"name":"n","type":"integer"}]},{"name":"Order"}],)json"
       R"json("eventTypes":[{"name":"A"}],"objects":[{"id":"o1","type":"Order","attributes":[{"name":"n","value":"5"}]}],)json"
-      R"json("events":[{"id":"e1","type":"A","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1"}]}]})json");
+      R"json("events":[{"id":"e1","type":"A","time":"2024-01-01T00:00:00Z","relationships":[{"objectId":"o1","qualifier":""}]}]})json");
   assert(duplicate_type.objects.size() == 1 &&
          std::get<std::string>(duplicate_type.objects[0].attributes.at(0).value) == "5");
 

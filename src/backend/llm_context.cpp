@@ -198,26 +198,19 @@ LlmContextResult build_llm_context(const Ocel& log,const LlmContextOptions& opti
  if(options.variant=="ocel_features"){if(options.object_type.empty())throw std::invalid_argument("choose an object type for OCEL feature context");return exact("ocel_features",options,[&](LlmAbstractionOptions o){o.ocel_lifecycle_paths=options.include_lifecycle_paths;return llm_ocel_features_description(log,options.object_type,o);});}
  Text text(options.max_len);
  if(options.variant=="ocel"){
-  // pm4py.llm.abstract_ocel on read_ocel_json's frame (round BU, observed
-  // black-box): the OCEL JSON readers hold UTC microseconds (offsets convert,
-  // naive times read as UTC, digits past the sixth are cut), printed as
-  // str(Timestamp); the events are ordered by timestamp, activity and id; a
-  // lifecycle lasts end.timestamp() - start.timestamp() seconds; the object
-  // lines are joined without a final newline.
-  const auto instant=[](const std::string& value)->std::optional<ParsedExactTimestamp>{auto parsed=parse_timestamp_exact(value);if(!parsed)return std::nullopt;parsed->nanoseconds-=parsed->nanoseconds%1000;return parsed;};
-  const auto before=[](const ParsedExactTimestamp& a,const ParsedExactTimestamp& b){return a.seconds!=b.seconds?a.seconds<b.seconds:a.nanoseconds<b.nanoseconds;};
-  std::map<std::string,std::vector<std::string>> objects;std::map<std::string,std::vector<ParsedExactTimestamp>> timestamps;std::map<std::string,const OcelEvent*> events;for(const auto& event:log.events)events[event.id]=&event;for(const auto& relation:log.relations){objects[relation.event_id].push_back(relation.object_id);if(auto found=events.find(relation.event_id);found!=events.end())if(auto stamp=instant(found->second->timestamp))timestamps[relation.object_id].push_back(*stamp);}
-  std::vector<std::pair<std::optional<ParsedExactTimestamp>,const OcelEvent*>> listed_events;for(const auto& event:log.events)listed_events.emplace_back(instant(event.timestamp),&event);
-  // Round EG: a NaT time (an OCEL 2.0 SQLite '' or NULL) stays out of the
-  // lifecycles, sorts last and prints "NaT"; an object whose events all have
-  // one raises, also without timestamps (observed black-box).
-  const auto nat=[](const OcelEvent& event){return event.timestamp.empty();};
-  {std::map<std::string,bool> all_nat;for(const auto& relation:log.relations)if(auto found=events.find(relation.event_id);found!=events.end()){auto [entry,added]=all_nat.try_emplace(relation.object_id,true);entry->second=entry->second&&nat(*found->second);}
-   for(const auto& [object,only_nat]:all_nat)if(only_nat)throw std::invalid_argument(ocel_frame::nat_timestamp_error(log));}
-  // The events print sorted by timestamp, activity and event id.
-  std::stable_sort(listed_events.begin(),listed_events.end(),[&](const auto& a,const auto& b){if(nat(*a.second)!=nat(*b.second))return nat(*b.second);if(a.first&&b.first&&(a.first->seconds!=b.first->seconds||a.first->nanoseconds!=b.first->nanoseconds))return before(*a.first,*b.first);if(a.second->activity!=b.second->activity)return a.second->activity<b.second->activity;return a.second->id<b.second->id;});
-  text.value="\n\nevents:\n\n";for(const auto& [stamp_key,listed]:listed_events){(void)stamp_key;const auto& event=*listed;auto related=objects[event.id];std::sort(related.begin(),related.end());std::string line=event.activity+" ( related objects: ";for(std::size_t i=0;i<related.size();++i){if(i)line+=", ";line+=related[i];}line+=" ) ";if(options.include_timestamps){const auto stamp=instant(event.timestamp);line+=" timestamp: "+(stamp?frame_times::utc_text(*stamp):nat(event)?std::string("NaT"):date(event.timestamp));}if(!text.line(line+"\n"))break;}text.value+="\nobjects:\n\n";auto ordered=log.objects;std::sort(ordered.begin(),ordered.end(),[](const auto& a,const auto& b){return a.id<b.id;});
-  bool listed=false;for(const auto& object:ordered){std::string line=object.id+" object type: "+object.type;const auto& samples=timestamps[object.id];if(options.include_timestamps&&!samples.empty()){const auto [start,end]=std::minmax_element(samples.begin(),samples.end(),before);line+=" ( lifecycle start: "+frame_times::utc_text(*start)+" ; lifecycle end: "+frame_times::utc_text(*end)+" ; lifecycle duration: "+python::float_repr(frame_times::epoch_seconds(*end)-frame_times::epoch_seconds(*start))+" )";}if(!text.line(line+"\n"))break;listed=true;}
+  // pm4py.llm.abstract_ocel is the OCEL description (variant 1) with
+  // include_timestamps (round BU), so the lines are the description route's
+  // (describe_ocel_tuples): its event order, NaT and None times, KeyError on
+  // events and objects without relations, and the times printed in the
+  // frame's shared offset of an OCEL CSV import (round EI: this context
+  // printed UTC and listed events without relations, observed black-box).
+  // The budget cuts whole lines, as before.
+  OcelDescriptionOptions described_options;described_options.include_timestamps=options.include_timestamps;
+  const auto described=describe_ocel_tuples(log,described_options);
+  text.value="\n\nevents:\n\n";
+  for(const auto& event:described.events){std::string line=event.activity+" ( related objects: ";for(std::size_t i=0;i<event.related_objects.size();++i){if(i)line+=", ";line+=event.related_objects[i];}line+=" ) ";if(described.includes_timestamps)line+=" timestamp: "+event.timestamp;if(!text.line(line+"\n"))break;}
+  text.value+="\nobjects:\n\n";
+  bool listed=false;for(const auto& object:described.objects){std::string line=object.id+" object type: "+object.type;if(described.includes_timestamps&&object.has_lifecycle)line+=" ( lifecycle start: "+object.lifecycle_start+" ; lifecycle end: "+object.lifecycle_end+" ; lifecycle duration: "+ocel_frame::float_repr(object.lifecycle_seconds)+" )";if(!text.line(line+"\n"))break;listed=true;}
   if(listed&&text.value.ends_with('\n'))text.value.pop_back();
  }
  return text.finish(options.variant);

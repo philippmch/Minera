@@ -4214,7 +4214,9 @@ void handle_ocel_conformance(const httplib::Request& request,
               minera::compare_ocdfg(*real_graph, *graph, options));
         } else {
           minera::OcdfgDiscoveryOptions discovery;
-          discovery.compute_edges_performance = false;
+          // Round EI: a time column of None fails the edge performance pm4py
+          // always measures (see compare_ocdfg).
+          discovery.compute_edges_performance = normative_log().none_event_times;
           discovery.activity_attribute = options.activity_attribute;
           discovery.object_type_attribute = options.object_type_attribute;
           payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
@@ -4228,18 +4230,32 @@ void handle_ocel_conformance(const httplib::Request& request,
             minera::compare_ocdfg(*real_ocel, *graph, options));
       } else {
         minera::OcdfgDiscoveryOptions discovery;
-        discovery.compute_edges_performance = false;
         discovery.activity_attribute = options.activity_attribute;
         discovery.object_type_attribute = options.object_type_attribute;
+        // Round EI: a time column of None fails the edge performance pm4py
+        // always measures (see compare_ocdfg), the real log first.
+        discovery.compute_edges_performance = real_ocel->none_event_times;
+        const auto real_ocdfg = minera::discover_ocdfg_classic_with_options(*real_ocel, discovery);
+        discovery.compute_edges_performance = normative_log().none_event_times;
         payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
-            minera::discover_ocdfg_classic_with_options(*real_ocel,
-                                                        discovery),
+            real_ocdfg,
             minera::discover_ocdfg_classic_with_options(normative_log(),
                                                         discovery),
             options));
       }
     }
     response.set_content(ocel_conformance_response(variant, std::move(payload)),
+                         "application/json");
+  } catch (const minera::OcdfgPerformanceError& error) {
+    // Round EI: the OC-DFG's edge performance errors carry pm4py's type.
+    response.status = 400;
+    response.set_content(error_json(error.type + ": " + error.what()), "application/json");
+  } catch (const std::out_of_range& error) {
+    // Round EI: the OTG discovered from a log with an event without
+    // relations raises pm4py's KeyError here too, as on the discovery route.
+    response.status = 400;
+    const std::string message = error.what();
+    response.set_content(error_json(message.starts_with('\'') ? "KeyError: " + message : message),
                          "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
