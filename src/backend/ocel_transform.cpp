@@ -1,6 +1,7 @@
 #include "minera/ocel_transform.hpp"
 #include "minera/timestamp.hpp"
 #include "ocel_frame_types.hpp"
+#include "pandas_to_datetime.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -15,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -990,6 +992,38 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
   };
   validate_selector(options.event_activity_attribute, "event activity");
   validate_selector(options.event_timestamp_attribute, "event timestamp");
+
+  // Round EL: flattening reads a raw time column (OcelRawTime) of the
+  // type's events with pd.to_datetime, which raises pandas' error on the
+  // first value it cannot read (observed black-box; the values in log
+  // order).
+  if ((options.event_timestamp_attribute.empty() || options.event_timestamp_attribute == "ocel:timestamp") &&
+      ocel_raw_event_times(log)) {
+    namespace ptd = pandas_to_datetime;
+    std::unordered_set<std::string_view> typed;
+    for (const auto& object : log.objects)
+      if (object.type == options.object_type) typed.insert(object.id);
+    std::unordered_set<std::string_view> related;
+    for (const auto& relation : log.relations)
+      if (typed.count(relation.object_id)) related.insert(relation.event_id);
+    std::vector<ptd::Cell> cells;
+    for (const auto& event : log.events) {
+      if (!related.count(event.id)) continue;
+      ptd::Cell cell;
+      try {
+        switch (event.raw_time) {
+          case OcelRawTime::kStr: cell.kind = ptd::Cell::Kind::kText; cell.text = event.timestamp; break;
+          case OcelRawTime::kInt: cell.kind = ptd::Cell::Kind::kInteger; cell.integer = std::stoll(event.timestamp); break;
+          case OcelRawTime::kFloat: cell.kind = ptd::Cell::Kind::kReal; cell.real = std::stod(event.timestamp); break;
+          default: break;
+        }
+      } catch (const std::exception&) {
+        cell = {};
+      }
+      cells.push_back(cell);
+    }
+    (void)ptd::to_datetime_utc_mixed(cells);
+  }
 
   std::map<std::string, const OcelObject*> objects_by_id;
   std::vector<const OcelObject*> selected_objects;

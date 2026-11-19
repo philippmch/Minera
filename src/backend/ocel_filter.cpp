@@ -713,6 +713,11 @@ Ocel filter_ocel_events_timestamp_exact(
   if (timestamp_key == "ocel:timestamp" && !log.naive_event_time_unit.empty())
     throw std::invalid_argument("TypeError: Invalid comparison between dtype=datetime64[" +
                                 log.naive_event_time_unit + "] and datetime");
+  // Round EL: a raw time column (OcelRawTime) compares its first value
+  // (observed black-box).
+  if (timestamp_key == "ocel:timestamp" && !log.events.empty() && log.events.front().raw_time != OcelRawTime::kNone)
+    throw std::invalid_argument(std::string("TypeError: '>=' not supported between instances of '") +
+                                ocel_raw_time_type(log.events.front().raw_time) + "' and 'datetime.datetime'");
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
     const auto value = event_filter_scalar(event, timestamp_key);
@@ -841,6 +846,11 @@ Ocel filter_ocel_events_timestamp(const Ocel& log, std::string_view from,
   if (!log.naive_event_time_unit.empty())
     throw std::invalid_argument("TypeError: Invalid comparison between dtype=datetime64[" +
                                 log.naive_event_time_unit + "] and datetime");
+  // Round EL: a raw time column (OcelRawTime) compares its first value
+  // (observed black-box).
+  if (!log.events.empty() && log.events.front().raw_time != OcelRawTime::kNone)
+    throw std::invalid_argument(std::string("TypeError: '>=' not supported between instances of '") +
+                                ocel_raw_time_type(log.events.front().raw_time) + "' and 'datetime.datetime'");
   // Reversed bounds select no event, so the result is an empty OCEL, as in
   // the reference.
   Ocel filtered = log;

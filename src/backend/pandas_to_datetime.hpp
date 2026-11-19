@@ -72,6 +72,14 @@ std::optional<Result> to_datetime(const std::vector<std::string_view>& texts, in
 std::optional<Result> to_datetime(const std::vector<std::string_view>& texts, Date today);
 // The host's local year and date.
 std::optional<Result> to_datetime(const std::vector<std::string_view>& texts);
+// Round EL: pd.to_datetime(column, errors="coerce"), as
+// pm4py.write_ocel2_sqlite converts the event and change time columns
+// (observed black-box, probe el sw3.py): the same guess from the first
+// text, but a text that does not match the format (or, without one, does
+// not read on its own), a day past the month's end and a value outside the
+// nanosecond range of a nanosecond column are NaT. Mixed zones still raise.
+std::optional<Result> to_datetime_coerce(const std::vector<std::string_view>& texts, Date today);
+std::optional<Result> to_datetime_coerce(const std::vector<std::string_view>& texts);
 
 // dateutil.parser.parse(text, fuzzy=fuzzy) without a default or tzinfos, as
 // pm4py 2.7.22's OCEL 2.0 readers call it on a text fromisoformat refuses

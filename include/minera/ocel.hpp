@@ -24,11 +24,28 @@ struct OcelAttribute {
   OcelValue value;
 };
 
+// Round EL: pm4py's read_ocel2_sqlite keeps a time column as read_sql gave
+// it when pd.to_datetime(utc=True, format="mixed") raises on it (observed
+// black-box): Python str, int and float values and NaN for NULL. Each event
+// or change time of such a column keeps its Python type here (the timestamp
+// text holds the value: the text itself, the integer's digits, the float's
+// repr, empty for NaN), so the routes and writers that meet it raise
+// pm4py's type errors or write the value as pm4py does. kNone is a time of
+// a converted column. The OCEL transport carries the kinds
+// ("minera:rawEventTimes", "minera:rawChangeTimes").
+enum class OcelRawTime : unsigned char { kNone, kStr, kInt, kFloat, kNaN };
+
+// The Python type name of a raw time ("str", "int", "float"; NaN is a float).
+[[nodiscard]] inline const char* ocel_raw_time_type(OcelRawTime kind) {
+  return kind == OcelRawTime::kStr ? "str" : kind == OcelRawTime::kInt ? "int" : "float";
+}
+
 struct OcelEvent {
   std::string id;
   std::string activity;
   std::string timestamp;
   std::vector<OcelAttribute> attributes;
+  OcelRawTime raw_time = OcelRawTime::kNone;
 };
 
 struct OcelObject {
@@ -61,6 +78,7 @@ struct OcelObjectChange {
   std::string timestamp;
   std::string field;
   OcelValue value;
+  OcelRawTime raw_time = OcelRawTime::kNone;  // see OcelEvent
 };
 
 // Declared OCEL type metadata is kept separately from observed records so
@@ -127,6 +145,13 @@ struct Ocel {
 };
 
 using OCEL = Ocel;
+
+// Whether the log's event time column is raw (see OcelRawTime).
+[[nodiscard]] inline bool ocel_raw_event_times(const Ocel& log) {
+  for (const auto& event : log.events)
+    if (event.raw_time != OcelRawTime::kNone) return true;
+  return false;
+}
 
 // One limit for every OCEL route and reader: it equals the server's request
 // payload limit, so any OCEL a server route accepts or produces (an import

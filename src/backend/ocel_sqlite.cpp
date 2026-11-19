@@ -1,6 +1,7 @@
 #include "minera/ocel_sqlite.hpp"
 
 #include "ocel_frame_types.hpp"
+#include "pandas_to_datetime.hpp"
 #include "sqlite_real_text.hpp"
 #include "minera/timestamp.hpp"
 
@@ -32,6 +33,9 @@
 #endif
 
 namespace minera {
+// Defined in ocel.cpp (round EL): the change frame's time column as pm4py's
+// read_ocel2_sqlite reads it.
+void sort_ocel2_sqlite_changes(Ocel& log, const std::vector<OcelSqliteTime>& times);
 namespace {
 
 #if defined(MINERA_HAS_SQLITE)
@@ -652,7 +656,8 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
                              bool validate_references, bool has_base_rows,
                              std::unordered_set<std::string>& first_rows,
                              std::size_t type_rank,
-                             std::vector<std::pair<std::size_t, std::size_t>>& places) {
+                             std::vector<std::pair<std::size_t, std::size_t>>& places,
+                             std::vector<OcelSqliteTime>& times) {
   const auto columns = table_columns(db, table);
   const auto changed = std::find_if(
       columns.begin(), columns.end(), [](const auto& column) {
@@ -674,11 +679,22 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
   const auto changed_index = static_cast<int>(changed - columns.begin());
   const auto timestamp_index = static_cast<int>(timestamp - columns.begin());
   const auto floats = float64_integer_columns(db, table, columns);
+  // Round EL: read_sql's dtype of the table's time column (over every row,
+  // base rows too): int64 when every value is an integer, float64 for
+  // numbers with NULLs or reals, else object.
+  bool integers = true, nulls = true, objects = false;
+  const auto first_time = times.size();
   for (std::size_t position = 0;; ++position) {
     const auto status = sqlite3_step(statement.get());
     if (status == SQLITE_DONE) break;
     if (status != SQLITE_ROW)
       throw std::runtime_error("SQLite object-change query failed");
+    {
+      const auto type = sqlite3_column_type(statement.get(), timestamp_index);
+      if (type != SQLITE_NULL) nulls = false;
+      if (type != SQLITE_INTEGER) integers = false;
+      if (type == SQLITE_TEXT || type == SQLITE_BLOB) objects = true;
+    }
     if (has_base_rows) {
       if (sqlite3_column_type(statement.get(), changed_index) == SQLITE_NULL) continue;
     } else {
@@ -712,7 +728,161 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
     if (floats.contains(field)) floatify_integer(change.value);
     log.object_changes.push_back(std::move(change));
     places.emplace_back(position, type_rank);
+    OcelSqliteTime time;
+    switch (sqlite3_column_type(statement.get(), timestamp_index)) {
+      case SQLITE_INTEGER:
+        time.kind = OcelSqliteTime::Kind::kInteger;
+        time.integer = sqlite3_column_int64(statement.get(), timestamp_index);
+        break;
+      case SQLITE_FLOAT:
+        time.kind = OcelSqliteTime::Kind::kReal;
+        time.real = sqlite3_column_double(statement.get(), timestamp_index);
+        break;
+      case SQLITE_TEXT: time.kind = OcelSqliteTime::Kind::kText; break;
+      case SQLITE_BLOB: time.kind = OcelSqliteTime::Kind::kBlob; break;
+      default: break;
+    }
+    times.push_back(time);
   }
+  // A float64 table holds its integers as floats.
+  if (!objects && !nulls && !integers)
+    for (auto index = first_time; index < times.size(); ++index)
+      if (times[index].kind == OcelSqliteTime::Kind::kInteger) {
+        times[index].kind = OcelSqliteTime::Kind::kReal;
+        times[index].real = static_cast<double>(times[index].integer);
+      }
+}
+
+// Round EL: write_ocel2_sqlite converts the event and the change times of
+// each type table with pd.to_datetime(errors="coerce") (no utc). A datetime64
+// column (every column native reads its times into) comes out as it went
+// in; a column pm4py holds as texts (an OCEL 2.0 SQLite time column with a
+// text pandas could not read, kept as read; native keeps the texts, one of
+// them unreadable: text_time_column) takes, per table, the format pandas
+// guesses from the table's first text, a text that does not match it is
+// NULL, a table of mixed zones raises (observed black-box, probe el
+// sw3.py). One text per time in frame order (nullopt for NULL); nullopt
+// outside the model.
+bool text_time_column(const std::vector<std::string_view>& times) {
+  return std::any_of(times.begin(), times.end(), [](std::string_view text) {
+    if (ocel_frame::pandas_nat_time_text(text)) return false;
+    const auto parsed = parse_timestamp_exact(text);
+    return !parsed || !ocel_frame::civil_timestamp(*parsed).has_value();
+  });
+}
+std::optional<std::vector<std::optional<std::string>>> coerced_time_texts(
+    const std::vector<std::string_view>& times) {
+  namespace ptd = pandas_to_datetime;
+  if (times.empty()) return std::vector<std::optional<std::string>>{};
+  const auto read = ptd::to_datetime_coerce(times);
+  if (!read) return std::nullopt;
+  std::vector<std::optional<std::string>> out;
+  out.reserve(times.size());
+  for (const auto& value : read->values) {
+    if (!value) {
+      out.emplace_back();
+      continue;
+    }
+    // A Python datetime's str(): microseconds when not zero, the column's
+    // zone as an offset.
+    char buffer[64];
+    int length = std::snprintf(buffer, sizeof buffer, "%04d-%02d-%02d %02d:%02d:%02d", value->year,
+                               value->month, value->day, value->hour, value->minute, value->second);
+    std::string text(buffer, static_cast<std::size_t>(length));
+    if (const auto micro = value->nanoseconds / 1000; micro != 0) {
+      length = std::snprintf(buffer, sizeof buffer, ".%06u", micro);
+      text.append(buffer, static_cast<std::size_t>(length));
+    }
+    if (read->offset_minutes) {
+      const int minutes = *read->offset_minutes;
+      const int magnitude = minutes < 0 ? -minutes : minutes;
+      length = std::snprintf(buffer, sizeof buffer, "%c%02d:%02d", minutes < 0 ? '-' : '+', magnitude / 60,
+                             magnitude % 60);
+      text.append(buffer, static_cast<std::size_t>(length));
+    }
+    out.push_back(std::move(text));
+  }
+  return out;
+}
+
+// Round EL: the same conversion of a type table's raw times (OcelRawTime,
+// a column pm4py kept as read_sql gave it), observed black-box (probe el
+// wo.py): pandas reads element by element when the first value is a number
+// (an int or float counts nanoseconds since the epoch, naive), so an aware
+// text there raises; when it is a text, the format guessed from it reads
+// the texts and every number is NaT. NaN is NULL.
+std::vector<std::optional<std::string>> coerced_raw_time_texts(
+    const std::vector<std::pair<OcelRawTime, std::string_view>>& times) {
+  const auto missing = [](const std::pair<OcelRawTime, std::string_view>& time) {
+    return time.first == OcelRawTime::kNaN || time.first == OcelRawTime::kNone ||
+           (time.first == OcelRawTime::kStr && ocel_frame::pandas_nat_time_text(time.second));
+  };
+  const auto first = std::find_if_not(times.begin(), times.end(), missing);
+  std::vector<std::optional<std::string>> out(times.size());
+  if (first == times.end()) return out;
+  if (first->first == OcelRawTime::kStr) {
+    std::vector<std::string_view> texts;
+    for (const auto& [kind, text] : times) texts.push_back(kind == OcelRawTime::kStr ? text : std::string_view{});
+    if (auto coerced = coerced_time_texts(texts)) return std::move(*coerced);
+    return out;
+  }
+  for (const auto& [kind, text] : times) {
+    if (kind != OcelRawTime::kStr || ocel_frame::pandas_nat_time_text(text)) continue;
+    const auto parsed = parse_timestamp_exact(text);
+    if (parsed && parsed->timezone_aware)
+      throw std::invalid_argument(
+          "ValueError: Mixed timezones detected. Pass utc=True in to_datetime or tz='UTC' in DatetimeIndex to "
+          "convert to a common timezone.");
+  }
+  for (std::size_t i = 0; i < times.size(); ++i) {
+    const auto& [kind, text] = times[i];
+    if (kind == OcelRawTime::kInt || kind == OcelRawTime::kFloat) {
+      std::int64_t nanoseconds = 0;
+      if (kind == OcelRawTime::kInt) {
+        nanoseconds = std::stoll(std::string(text));
+      } else {
+        const double value = std::stod(std::string(text));
+        if (!(value > -9.2e18 && value < 9.2e18)) continue;
+        nanoseconds = static_cast<std::int64_t>(value);
+      }
+      std::int64_t seconds = nanoseconds / 1000000000;
+      std::int64_t rest = nanoseconds % 1000000000;
+      if (rest < 0) {
+        rest += 1000000000;
+        --seconds;
+      }
+      std::int64_t days = seconds / 86400, clock = seconds % 86400;
+      if (clock < 0) {
+        clock += 86400;
+        --days;
+      }
+      // Howard Hinnant's civil_from_days.
+      const std::int64_t z = days + 719468;
+      const std::int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+      const std::int64_t doe = z - era * 146097;
+      const std::int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+      const std::int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+      const std::int64_t mp = (5 * doy + 2) / 153;
+      const std::int64_t day = doy - (153 * mp + 2) / 5 + 1;
+      const std::int64_t month = mp < 10 ? mp + 3 : mp - 9;
+      const std::int64_t year = yoe + era * 400 + (month <= 2);
+      char buffer[64];
+      int length = std::snprintf(buffer, sizeof buffer, "%04lld-%02lld-%02lld %02lld:%02lld:%02lld",
+                                 static_cast<long long>(year), static_cast<long long>(month),
+                                 static_cast<long long>(day), static_cast<long long>(clock / 3600),
+                                 static_cast<long long>(clock / 60 % 60), static_cast<long long>(clock % 60));
+      std::string printed(buffer, static_cast<std::size_t>(length));
+      if (const auto micro = rest / 1000; micro != 0) {
+        length = std::snprintf(buffer, sizeof buffer, ".%06lld", static_cast<long long>(micro));
+        printed.append(buffer, static_cast<std::size_t>(length));
+      }
+      out[i] = std::move(printed);
+    } else if (kind == OcelRawTime::kStr && !ocel_frame::pandas_nat_time_text(text)) {
+      if (auto one = coerced_time_texts(std::vector<std::string_view>{text}); one && !one->empty())
+        out[i] = std::move((*one)[0]);
+    }
+  }
+  return out;
 }
 
 // Round EK: the reference reader's structural errors are pandas.read_sql's
@@ -1281,6 +1451,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     std::set<std::string> object_ids;
     std::unordered_set<std::string> first_rows;
     std::vector<std::pair<std::size_t, std::size_t>> places;
+    std::vector<OcelSqliteTime> change_times;
     std::size_t type_rank = 0;
     for (const auto& [id, type] : object_types) object_ids.insert(id);
     for (const auto& type : object_type_names) {
@@ -1288,34 +1459,29 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       if (visited_tables.insert(table).second && table_exists(db, table)) {
         read_type_table_changes(db, table, type, log, object_ids,
                                 options.validate_references.value_or(false), has_base_rows,
-                                first_rows, type_rank, places);
+                                first_rows, type_rank, places, change_times);
       }
       ++type_rank;
     }
     // The reference frame of the changes takes the tables' rows by their
     // place in the table, then the type, and sorts them by time, stably, as
-    // it does the events (round BY, observed black-box). A time it cannot
-    // read keeps the rows by place.
+    // it does the events (round BY, observed black-box); round EL: its time
+    // column reads as the event column does (sort_ocel2_sqlite_changes).
     std::vector<std::size_t> order(log.object_changes.size());
     std::iota(order.begin(), order.end(), std::size_t{0});
     std::stable_sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
       return places[left] < places[right];
     });
-    std::vector<std::pair<std::int64_t, std::int64_t>> instants;
-    bool readable = true;
-    for (const auto& change : log.object_changes) {
-      const auto instant = parse_timestamp_exact(change.timestamp);
-      if (!instant) { readable = false; break; }
-      instants.emplace_back(instant->seconds, instant->nanoseconds);
+    std::vector<OcelObjectChange> placed_changes;
+    std::vector<OcelSqliteTime> placed_times;
+    placed_changes.reserve(order.size());
+    placed_times.reserve(order.size());
+    for (const auto index : order) {
+      placed_changes.push_back(std::move(log.object_changes[index]));
+      placed_times.push_back(change_times[index]);
     }
-    if (readable)
-      std::stable_sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
-        return instants[left] < instants[right];
-      });
-    std::vector<OcelObjectChange> sorted_changes;
-    sorted_changes.reserve(order.size());
-    for (const auto index : order) sorted_changes.push_back(std::move(log.object_changes[index]));
-    log.object_changes = std::move(sorted_changes);
+    log.object_changes = std::move(placed_changes);
+    sort_ocel2_sqlite_changes(log, placed_times);
     // A change takes its object's type (the id's last listing in the object
     // table), not its table's: pm4py types the change rows by the object
     // table (observed black-box).
@@ -1407,13 +1573,59 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
   // time) loses its time column and raises (observed black-box; it has
   // written other tables by then, native writes no file).
   {
+    // Round EL: a raw NaN counts (a raw text does not), and so does an
+    // object type whose written changes all lack a time (observed
+    // black-box, probe el wo.py).
+    const auto nat = [](OcelRawTime kind, const std::string& text) {
+      return kind == OcelRawTime::kNaN || (kind == OcelRawTime::kNone && ocel_frame::nat_time_text(text));
+    };
     std::map<std::string_view, bool> all_nat;
     for (const auto& event : log.events) {
       const auto [entry, added] = all_nat.try_emplace(event.activity, true);
-      entry->second = entry->second && ocel_frame::nat_time_text(event.timestamp);
+      entry->second = entry->second && nat(event.raw_time, event.timestamp);
     }
-    for (const auto& [activity, nat] : all_nat)
-      if (nat) throw std::invalid_argument("KeyError: 'ocel_time'");
+    // Each type table in turn: a raw table raises its conversion's error
+    // (see coerced_raw_time_texts) before a later table's KeyError.
+    const auto raw_check = [](const auto& rows, std::string_view owner, const auto& owner_of) {
+      std::vector<std::pair<OcelRawTime, std::string_view>> table;
+      bool raw = false;
+      for (const auto& row : rows)
+        if (owner_of(row) == owner) {
+          table.emplace_back(row.raw_time, row.timestamp);
+          raw = raw || row.raw_time != OcelRawTime::kNone;
+        }
+      if (raw) (void)coerced_raw_time_texts(table);
+    };
+    for (const auto& [activity, missing] : all_nat) {
+      if (missing) throw std::invalid_argument("KeyError: 'ocel_time'");
+      raw_check(log.events, activity, [](const OcelEvent& event) -> std::string_view { return event.activity; });
+    }
+    std::unordered_map<std::string_view, std::string_view> type_of;
+    for (const auto& object : log.objects) type_of.emplace(object.id, object.type);
+    std::map<std::string, bool> all_nat_changes;
+    for (const auto& change : log.object_changes) {
+      if ((!change.field.empty() && reserved_type_column(change.field)) || change.field == "ocel:activity") continue;
+      std::string type = change.object_type;
+      if (type.empty()) {
+        const auto found = type_of.find(change.object_id);
+        if (found == type_of.end()) continue;
+        type = std::string(found->second);
+      }
+      const auto [entry, added] = all_nat_changes.try_emplace(type, true);
+      entry->second = entry->second && nat(change.raw_time, change.timestamp);
+    }
+    for (const auto& [type, missing] : all_nat_changes) {
+      if (missing) throw std::invalid_argument("KeyError: 'ocel_time'");
+      std::vector<OcelObjectChange> rows;
+      for (const auto& change : log.object_changes) {
+        if ((!change.field.empty() && reserved_type_column(change.field)) || change.field == "ocel:activity") continue;
+        std::string_view owner = change.object_type;
+        if (owner.empty())
+          if (const auto found = type_of.find(change.object_id); found != type_of.end()) owner = found->second;
+        if (owner == type) rows.push_back(change);
+      }
+      raw_check(rows, std::string_view{}, [](const OcelObjectChange&) -> std::string_view { return {}; });
+    }
   }
   std::error_code error;
   std::filesystem::remove(path, error);
@@ -1574,6 +1786,29 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       event_frame.observe_row(event->attributes, log.event_type_attributes, event->activity);
       events_by_activity[event->activity].push_back(event);
     }
+    std::unordered_map<const OcelEvent*, std::optional<std::string>> coerced_event_times;
+    {
+      std::vector<std::string_view> texts;
+      texts.reserve(events.size());
+      for (const auto* event : events) texts.emplace_back(event->timestamp);
+      const bool raw = std::any_of(events.begin(), events.end(),
+                                   [](const OcelEvent* event) { return event->raw_time != OcelRawTime::kNone; });
+      if (raw)
+        for (const auto& [activity, rows] : events_by_activity) {
+          std::vector<std::pair<OcelRawTime, std::string_view>> table;
+          for (const auto* event : rows) table.emplace_back(event->raw_time, event->timestamp);
+          const auto coerced = coerced_raw_time_texts(table);
+          for (std::size_t i = 0; i < rows.size(); ++i) coerced_event_times.emplace(rows[i], coerced[i]);
+        }
+      else if (text_time_column(texts))
+        for (const auto& [activity, rows] : events_by_activity) {
+          std::vector<std::string_view> table;
+          table.reserve(rows.size());
+          for (const auto* event : rows) table.emplace_back(event->timestamp);
+          if (const auto coerced = coerced_time_texts(table))
+            for (std::size_t i = 0; i < rows.size(); ++i) coerced_event_times.emplace(rows[i], (*coerced)[i]);
+        }
+    }
     for (const auto& activity : activities) {
       const auto table = "event_" + type_table_token(activity, options);
       const auto& rows = events_by_activity[activity];
@@ -1591,7 +1826,10 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       for (const auto* event : rows) {
         bind_text(statement.get(), 1, event->id);
         // A NaT time is NULL there, as pandas writes a missing cell.
-        if (ocel_frame::nat_time_text(event->timestamp))
+        if (const auto coerced = coerced_event_times.find(event); coerced != coerced_event_times.end()) {
+          if (coerced->second) bind_text(statement.get(), activity_first ? 3 : 2, *coerced->second);
+          else bind_null(statement.get(), activity_first ? 3 : 2);
+        } else if (ocel_frame::nat_time_text(event->timestamp))
           bind_null(statement.get(), activity_first ? 3 : 2);
         else
           bind_text(statement.get(), activity_first ? 3 : 2,
@@ -1613,7 +1851,10 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
     }
     std::map<std::string, std::vector<const OcelObjectChange*>> changes_by_type;
     for (const auto& change : log.object_changes) {
-      if (reserved_type_column(change.field) || change.field == "ocel:activity") continue;
+      // Round EL: a change of the empty field (an OCEL 2.0 SQLite change row
+      // with '' there) is written too, with no value (observed black-box).
+      if ((!change.field.empty() && reserved_type_column(change.field)) || change.field == "ocel:activity")
+        continue;
       std::string resolved_type = change.object_type;
       if (resolved_type.empty()) {
         const auto object_type = object_id_types.find(change.object_id);
@@ -1621,6 +1862,29 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
         resolved_type = std::string(object_type->second);
       }
       changes_by_type[resolved_type].push_back(&change);
+    }
+    std::unordered_map<const OcelObjectChange*, std::optional<std::string>> coerced_change_times;
+    {
+      std::vector<std::string_view> texts;
+      texts.reserve(log.object_changes.size());
+      for (const auto& change : log.object_changes) texts.emplace_back(change.timestamp);
+      const bool raw = std::any_of(log.object_changes.begin(), log.object_changes.end(),
+                                   [](const OcelObjectChange& change) { return change.raw_time != OcelRawTime::kNone; });
+      if (raw)
+        for (const auto& [type, rows] : changes_by_type) {
+          std::vector<std::pair<OcelRawTime, std::string_view>> table;
+          for (const auto* change : rows) table.emplace_back(change->raw_time, change->timestamp);
+          const auto coerced = coerced_raw_time_texts(table);
+          for (std::size_t i = 0; i < rows.size(); ++i) coerced_change_times.emplace(rows[i], coerced[i]);
+        }
+      else if (text_time_column(texts))
+        for (const auto& [type, rows] : changes_by_type) {
+          std::vector<std::string_view> table;
+          table.reserve(rows.size());
+          for (const auto* change : rows) table.emplace_back(change->timestamp);
+          if (const auto coerced = coerced_time_texts(table))
+            for (std::size_t i = 0; i < rows.size(); ++i) coerced_change_times.emplace(rows[i], (*coerced)[i]);
+        }
     }
     for (const auto& type : object_types) {
       const auto table = "object_" + type_table_token(type, options);
@@ -1665,7 +1929,10 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
         // text left in its change-time column) are written as NULL (observed
         // black-box, probe ek: write_ocel2_sqlite coerces them to NaT).
         const auto parsed = parse_timestamp_exact(change->timestamp);
-        if (!parsed || !ocel_frame::civil_timestamp(*parsed))
+        if (const auto coerced = coerced_change_times.find(change); coerced != coerced_change_times.end()) {
+          if (coerced->second) bind_text(statement.get(), after + 1, *coerced->second);
+          else bind_null(statement.get(), after + 1);
+        } else if (!parsed || !ocel_frame::civil_timestamp(*parsed))
           bind_null(statement.get(), after + 1);
         else
           bind_text(statement.get(), after + 1, pandas_time(change->timestamp));

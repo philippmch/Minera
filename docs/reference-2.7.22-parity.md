@@ -33058,3 +33058,116 @@ Runs: the full ctest passed 632 of 632 on the first run (29 min at -j2).
 The workbench fixture replay gave 2,673 responses unchanged. Python script
 and frontend tests not rerun (scripts and frontend unchanged). The device
 check on the Mac was skipped (the Mac was not linked).
+
+## Review EL1: re-review of round EK, unreadable event and change time columns of OCEL 2.0 SQLite logs through the routes and writers, the SQLite writer's time conversion, change rows without a field (2026-11-19)
+
+Round EL checked EK's CI (run 44464940337 on ae1eb473: all six jobs
+green, the Linux, macOS and Windows ctest included). Observed black-box on pm4py
+2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv, on EK's spoiled
+SQLite bank (`ek/b53`, 300 files) through `ek/rt/rsw3.py` (frames,
+filters, writers, LLM, features, flatten; now untruncated and NaN-aware),
+`ei/h/rt/esw.py` and `ei/eh/rt/xsw.py` (its event-object-graph normalizer
+reads native's raw number texts), with the probes in `el/` (`cp.py`,
+`rp.py`, `rp2.py`, `sw*.py`, `wo.py`, `sxc.py`).
+
+- **EL1-1 Unreadable time columns keep their Python values.**
+  read_ocel2_sqlite reads the change frame's time column as it reads the
+  event column: pd.to_datetime(utc=True, format="mixed") over the change
+  rows (the object tables' base rows play no part), integers and floats as
+  nanoseconds since the epoch, then a stable sort by time with NaT last.
+  When that raises (a text pandas cannot read, numbers next to a
+  nanosecond text out of range), the column stays as read_sql gave it:
+  Python str, int and float values and NaN for NULL, sorted numbers first
+  (by value), then texts by code point, NaN last. Native kept a readable
+  text as a timestamp and sorted changes by its own reading. Each event and
+  change time now carries its Python type (`OcelRawTime`: the text, the
+  integer's digits, the float's repr, empty for NaN), and the OCEL
+  transport carries it (`minera:rawTime` per event and change entry; such a
+  transport keeps its file order).
+- **EL1-2 The routes on such a column.** Each route fails where pm4py
+  first meets a value: the timestamp filter compares the first event's
+  value (`TypeError: '>=' not supported between instances of 'int' and
+  'datetime.datetime'`); the OCEL descriptions and abstract_ocel (with or
+  without times) take timestamp() of the first object's last event; the
+  event features' timestamp columns (and the object features' related
+  events) take the first event's, the object lifecycle durations and work
+  in progress (and abstract_ocel_features) the first object's first
+  event's (`AttributeError: 'str' object has no attribute 'timestamp'`);
+  cobirth and codeath answer. OC-DFG performance, its LLM abstraction, the
+  OC-DFG conformance and the measured edge associations subtract the pair
+  whose events come first in the log (`unsupported operand type(s) for -:
+  'str' and 'int'`, two numbers have no total_seconds()), with business
+  hours the first value's replace() (`str.replace() takes no keyword
+  arguments`, `'int' object has no attribute 'replace'`); edge
+  associations without performance answer. Flattening reads the type's
+  values with pd.to_datetime and raises pandas' error (`DateParseError:
+  Unknown datetime string format, unable to parse: abc`).
+- **EL1-3 The writers on such a column.** write_ocel_json writes each
+  value as it is (a number as a JSON number), NaN left out;
+  write_ocel2_json the same, and `KeyError: 'ocel:timestamp'` on NaN;
+  write_ocel_xml writes a str as `<string key="timestamp">`, leaves NaN
+  out and raises lxml's `TypeError: Argument must be bytes or unicode, got
+  'int'` on a number; write_ocel2_xml raises `AttributeError: 'int' object
+  has no attribute 'isoformat'` at the first event (a raw change time at
+  its change, before the events); the CSV writer writes str() of each
+  value. Raw change times are written the same way.
+- **EL1-4 write_ocel2_sqlite's time conversion.** The event and change
+  times of each type table go through pd.to_datetime(errors="coerce")
+  without utc: a converted column comes out as it went in; a raw column
+  takes the format pandas guesses from the table's first text (a text that
+  does not match it, a day past the month's end and a value outside the
+  nanosecond range are NULL, every number too), but when a number comes
+  first pandas reads element by element (numbers as naive epoch
+  nanoseconds) and an aware text raises `ValueError: Mixed timezones
+  detected. Pass utc=True in to_datetime or tz='UTC' in DatetimeIndex to
+  convert to a common timezone.`; tables in turn, so a type table whose
+  times are all missing (NaN, NULL, NaT; a raw text is not missing) loses
+  its time column and raises `KeyError: 'ocel_time'` at its turn, an
+  object type whose changes all lack a time included. A change of the
+  empty field (`''`) is written (native skipped it). Native wrote the
+  whole column with one format.
+- **EL1-5 write_ocel2_xml's change fields.** A change whose field is no
+  column of the changes frame (no object type's table has it and no change
+  gives it a value: `''`, a field its table lacks) raises `KeyError: ''`
+  at its row, before its time is read. The transport no longer declares a
+  column for a change field without a value.
+
+Harness: rsw3 compared NaN-holding values as different (NaN != NaN; 413
+lines were such) and cut long lines (fixed); the event-object graph
+normalizer now reads native's raw number texts.
+
+After the fixes (`ek/el4`, the final server): imports 0 of 300; rsw3 257
+of 10,101 (EK's rsw2: 586), 250 of them in the 21 files with duplicate
+rows (declared in EK1), four flattened nanosecond times, the raw split
+and s53_0172 (below); esw 72 of 4,144 (EK: 136) and xsw 71 of 3,367 (EK:
+92), all in duplicate-row files.
+
+Declared (outside the model):
+- The ancestors/descendants split of a raw column (pm4py sorts the
+  starts and raises `'<' not supported between instances of 'int' and
+  'str'`; native compares its own reading).
+- Flattened nanosecond times (an integer time read as epoch nanoseconds:
+  native's event logs keep microseconds).
+- Which pair OC-DFG performance measures first is the pair whose events
+  come first in the log (it agrees on the bank; pm4py's own order of edges
+  was not modelled further), and which object a description takes is the
+  first object in the objects frame with events.
+- A JSON change of a field without a value in another reader's log (no
+  column in pm4py's changes frame only when no change gives it a value,
+  null included).
+
+Open (to round EM):
+- The writers' frame column order and pre-drop dtype (g52_0127,
+  g52_0290), the naive change time next to aware ones in write_ocel2_xml
+  (g52_0047, g52_0107, g52_0223), float-declared change texts (g52_0173),
+  and a change text "1" in a SQLite text column that native's OCEL 2.0
+  XML and SQLite downloads type as a number (s53_0172).
+
+Tests:
+- New: `minera_review_el1_tests` (hand cases of EL1-1 to EL1-5 on
+  hand-built SQLite files).
+
+Runs: the full ctest passed 633 of 633 on the first run (24 min at -j2).
+The workbench fixture replay gave 2,673 responses unchanged. Python script
+and frontend tests not rerun (scripts and frontend unchanged). The device
+check on the Mac was skipped (the Mac was not linked).

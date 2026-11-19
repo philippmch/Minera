@@ -1467,7 +1467,16 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
       // Round EG: the reference writes no timestamp for a NaT time (an
       // OCEL 2.0 SQLite '' or NULL), as for any missing cell (observed
       // black-box).
-      if (!ocel_frame::nat_time_text(event.timestamp))
+      // Round EL: a raw time (OcelRawTime) as its Python value: a str as a
+      // string, NaN left out, an int or float raises lxml's TypeError
+      // (observed black-box, probe el wo.py).
+      if (event.raw_time == OcelRawTime::kInt || event.raw_time == OcelRawTime::kFloat)
+        throw std::invalid_argument(std::string("TypeError: Argument must be bytes or unicode, got '") +
+                                    (event.raw_time == OcelRawTime::kInt ? "int" : "float") + "'");
+      if (event.raw_time == OcelRawTime::kStr)
+        out << "      <string key=\"timestamp\" value=\"" << esc(event.timestamp) << "\"/>\n";
+      else if (event.raw_time == OcelRawTime::kNaN) {
+      } else if (!ocel_frame::nat_time_text(event.timestamp))
         out << "      <date key=\"timestamp\" value=\""
             << esc(event_offset ? ocel_frame::offset_timestamp_text(event.timestamp, 'T',
                                                                     event_offset, "Z")
@@ -1544,6 +1553,12 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
   // 'isoformat'", and a missing time is None next to read dates (an object
   // column) or NaN without any (pandas' str dtype), observed black-box (probe
   // ek t/p11.py). Without such a text a missing time prints "NaT" (EJ1-7).
+  // Round EL: a change whose field is no column of the changes frame (no
+  // object type declares it, no object and no other change gives it a
+  // value: an OCEL 2.0 SQLite change of '' or of a field its table lacks)
+  // raises KeyError at its row, before its time is read; a raw change time
+  // (OcelRawTime) raises its Python type's error (observed black-box, probe
+  // el wo.py).
   {
     const auto readable = [](const std::string& text) {
       const auto parsed = minera::parse_timestamp_exact(text);
@@ -1551,17 +1566,26 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
     };
     bool any_date = false, any_text = false;
     for (const auto& change : log.object_changes) {
-      if (ocel_frame::pandas_nat_time_text(change.timestamp)) continue;
+      if (change.raw_time != OcelRawTime::kNone || ocel_frame::pandas_nat_time_text(change.timestamp)) continue;
       (readable(change.timestamp) ? any_date : any_text) = true;
     }
-    if (any_text) {
-      for (const auto& change : log.object_changes) {
-        if (ocel_frame::pandas_nat_time_text(change.timestamp))
-          throw std::invalid_argument(std::string("AttributeError: '") + (any_date ? "NoneType" : "float") +
-                                      "' object has no attribute 'isoformat'");
-        if (!readable(change.timestamp))
-          throw std::invalid_argument("AttributeError: 'str' object has no attribute 'isoformat'");
-      }
+    std::unordered_set<std::string_view> columns;
+    for (const auto& [type, schema] : log.object_type_attributes)
+      for (const auto& [name, declared] : schema) columns.insert(name);
+    for (const auto& object : log.objects)
+      for (const auto& attribute : object.attributes) columns.insert(attribute.key);
+    for (const auto& change : log.object_changes)
+      if (!std::holds_alternative<std::nullptr_t>(change.value)) columns.insert(change.field);
+    const auto type_error = [](const char* type) {
+      throw std::invalid_argument(std::string("AttributeError: '") + type + "' object has no attribute 'isoformat'");
+    };
+    for (const auto& change : log.object_changes) {
+      if (!columns.count(change.field))
+        throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(change.field));
+      if (change.raw_time != OcelRawTime::kNone) type_error(ocel_raw_time_type(change.raw_time));
+      if (!any_text) continue;
+      if (ocel_frame::pandas_nat_time_text(change.timestamp)) type_error(any_date ? "NoneType" : "float");
+      if (!readable(change.timestamp)) type_error("str");
     }
   }
   if (options.include_declaration)
@@ -1632,6 +1656,14 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
   // first event's isoformat (observed black-box).
   if (log.none_event_times && !log.events.empty())
     throw std::invalid_argument("AttributeError: 'NoneType' object has no attribute 'isoformat'");
+  // Round EL: and so does a raw time column (OcelRawTime), with the first
+  // event's Python type (observed black-box).
+  if (!log.events.empty() && log.events.front().raw_time != OcelRawTime::kNone) {
+    const auto kind = log.events.front().raw_time;
+    throw std::invalid_argument(std::string("AttributeError: '") +
+                                (kind == OcelRawTime::kStr ? "str" : kind == OcelRawTime::kInt ? "int" : "float") +
+                                "' object has no attribute 'isoformat'");
+  }
   out << (log.events.empty() ? "  <events/>\n" : "  <events>\n");
   for (const auto& event : log.events) {
     out << "    <event id=\"" << esc(event.id) << "\" type=\""

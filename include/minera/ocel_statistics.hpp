@@ -62,6 +62,10 @@ struct OcelEdgeAssociationOptions {
   // the deterministic Monday-Friday 07:00-17:00 schedule.
   bool use_business_hours = false;
   std::vector<BusinessHourSlot> business_hour_slots;
+  // Round EL: the reference measures the pairs (its edge performance), so a
+  // raw time column (OcelRawTime) raises; otherwise (its associations alone)
+  // such a log answers without performance samples.
+  bool measure_raw_times = false;
 };
 
 [[nodiscard]] OcelActivityAssociations activity_associations(

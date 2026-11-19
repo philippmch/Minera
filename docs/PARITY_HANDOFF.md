@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EK (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EL (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7386,6 +7386,69 @@ The full ctest passed 632 of 632 on the first run, the fixture replay
 gave 2,673 responses unchanged. The generators, the sweeps, the
 comparers and the probes are in the project files under
 `review-harness/round-ek/`.
+
+Round EL re-reviewed EK (Review EL1). EK's CI run 44464940337 on
+ae1eb473: all six jobs green. EL swept the spoiled SQLite bank
+through every route (`ek/run1.sh` with `O=el4`):
+- an event or change time column pandas cannot convert keeps its Python
+  values (`OcelRawTime`: str, int, float, NaN; the transport's
+  `minera:rawTime`), the change frame's column is read and sorted like the
+  event column (EL1-1);
+- the routes raise pm4py's errors on such a column: the timestamp filter,
+  descriptions and abstract_ocel, the feature families, OC-DFG performance
+  and its LLM text and conformance, measured edge associations, flatten
+  (EL1-2), and the writers write or refuse its values as pm4py's do
+  (EL1-3);
+- write_ocel2_sqlite converts each type table's times with errors="coerce"
+  (the first text's format, numbers first raise on an aware text), a type
+  whose times are all missing raises `KeyError: 'ocel_time'` (changes
+  too), and a change of the empty field is written (EL1-4);
+- write_ocel2_xml raises KeyError on a change field that is no column
+  (EL1-5).
+After the fixes (`ek/el4`): imports 0 of 300; rsw3 257 of 10,101 (EK:
+586), 250 of them in the 21 files with duplicate rows (declared), then
+four flattened nanosecond times and the raw split (declared) and one
+file's change value typed as a number in the OCEL 2.0 XML and SQLite
+downloads (s53_0172, open below); esw 72 of 4,144 (EK: 136) and xsw 71
+of 3,367 (EK: 92), all in duplicate-row files.
+
+In the suite: `minera_review_el1_tests` (hand cases of EL1-1 to EL1-5).
+The full ctest passed 633 of 633 on the first run (24 min at -j2), the
+fixture replay gave 2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-el/`.
+
+Next round (EM) should start by re-reviewing round EL:
+
+- EL's CI run;
+- the frame column order and the pre-drop dtype in the writers (file
+  order including dropped rows; an unrelated object's value retypes a
+  column: g52_0127, g52_0290), which need frame hints in the OCEL struct
+  or the transport;
+- a naive change time next to aware ones in write_ocel2_xml (`+00:00`:
+  g52_0047, g52_0107, g52_0223) and float-declared change texts pm4py
+  keeps as text after a round trip (g52_0173), and a change text "1" in a
+  text column that the OCEL 2.0 XML and SQLite downloads type as a number
+  (s53_0172);
+- a fresh spoiled SQLite bank (other seeds of `ek/s/sgen.py`, more raw
+  columns: numbers only, NaN first, raw change columns with numbers) and
+  the raw columns through the routes b53 did not reach (playout, causal
+  nets, the OCPN routes, splits);
+- from EK's list, not taken: the remaining OCEL routes on a time column of
+  None and NaT times, the LLM OCEL context on the other readers' frames,
+  the OCEL 1.0 XML vmap entries and keyless values, causal-net routes on
+  NaT logs;
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EL's list, taken in EL: EK's CI, the spoiled SQLite bank through the
+routes (raw event and change time columns, change rows without a field;
+duplicate rows declared). Not taken (carried to EM): the writers' frame
+column order and pre-drop dtype, the naive change times in
+write_ocel2_xml, g52_0173, and EK's carried items.
+
+Previous list for round EL (kept for its older items):
 
 Next round (EL) should start by re-reviewing round EK:
 

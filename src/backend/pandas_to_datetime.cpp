@@ -377,6 +377,8 @@ std::int64_t sixty_times_fraction(const std::string& fraction) {
 }
 
 thread_local std::int64_t current_year_value = 2026;
+// Round EL: errors="coerce": a value that does not parse is NaT.
+thread_local bool coerce_value = false;
 // Today's date for texts that start with a time (pandas reads them on it).
 thread_local Date today_value{2026, 1, 1};
 
@@ -1719,7 +1721,20 @@ Result with_format(const std::vector<std::string_view>& texts, const std::string
       result.values.emplace_back();
       continue;
     }
-    auto parsed = parse(text, format);
+    Parsed parsed;
+    try {
+      parsed = parse(text, format);
+    } catch (const Error&) {
+      if (!coerce_value) throw;
+      result.values.emplace_back();
+      continue;
+    }
+    if (coerce_value && (std::holds_alternative<Failure>(parsed) ||
+                         (std::get<Fields>(parsed).day > month_days(std::get<Fields>(parsed).year,
+                                                                    std::get<Fields>(parsed).month)))) {
+      result.values.emplace_back();
+      continue;
+    }
     if (const auto* failure = std::get_if<Failure>(&parsed)) {
       if (failure->remains)
         fail("unconverted data remains when parsing with format \"" + format + "\": \"" + failure->rest + "\"");
@@ -1732,6 +1747,10 @@ Result with_format(const std::vector<std::string_view>& texts, const std::string
     fraction.resize(9, '0');
     const Value value{fields.year, fields.month, fields.day, fields.hour, fields.minute, fields.second,
                       static_cast<std::uint32_t>(number(fraction))};
+    if (coerce_value && (fields.fraction.size() > 6 || pass.nanoseconds) && !in_ns_range(value)) {
+      result.values.emplace_back();
+      continue;
+    }
     if (fields.fraction.size() > 6 && !pass.nanoseconds) {
       pass.nanoseconds = true;
       pass.changed = pass.seen;
@@ -1756,7 +1775,20 @@ Result element_by_element(const std::vector<std::string_view>& texts) {
       result.values.emplace_back();
       continue;
     }
-    const auto parsed = element(text);
+    std::optional<Element> coerced;
+    if (coerce_value) {
+      try {
+        coerced = element(text);
+      } catch (const Error&) {
+        result.values.emplace_back();
+        continue;
+      }
+      if ((coerced->nanoseconds || pass.nanoseconds) && !in_ns_range(coerced->value)) {
+        result.values.emplace_back();
+        continue;
+      }
+    }
+    const auto parsed = coerced ? *coerced : element(text);
     const auto& value = parsed.value;
     if (!year_ok(value.year)) throw Outside{};
     if (parsed.nanoseconds) {
@@ -1850,6 +1882,18 @@ std::optional<Result> to_datetime(const std::vector<std::string_view>& texts, Da
 
 std::optional<Result> to_datetime(const std::vector<std::string_view>& texts) {
   return to_datetime_on(texts, local_year(), local_today());
+}
+
+std::optional<Result> to_datetime_coerce(const std::vector<std::string_view>& texts, Date today) {
+  struct Reset {
+    ~Reset() { coerce_value = false; }
+  } reset;
+  coerce_value = true;
+  return to_datetime_on(texts, today.year, today);
+}
+
+std::optional<Result> to_datetime_coerce(const std::vector<std::string_view>& texts) {
+  return to_datetime_coerce(texts, local_today());
 }
 
 namespace {

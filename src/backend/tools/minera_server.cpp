@@ -3964,6 +3964,9 @@ void handle_ocel_statistics(const httplib::Request& request,
       minera::OcelEdgeAssociationOptions edge_options;
       edge_options.use_business_hours = business_hours;
       edge_options.business_hour_slots = business_hour_slots;
+      // Round EL: naming business_hours asks for the reference's edge
+      // performance, which raises on a raw time column.
+      edge_options.measure_raw_times = request.has_param("business_hours");
       response.set_content(
           minera::serialize_ocel_statistics_json(
               minera::edge_associations(log, edge_options)),
@@ -4216,7 +4219,8 @@ void handle_ocel_conformance(const httplib::Request& request,
           minera::OcdfgDiscoveryOptions discovery;
           // Round EI: a time column of None fails the edge performance pm4py
           // always measures (see compare_ocdfg).
-          discovery.compute_edges_performance = normative_log().none_event_times;
+          discovery.compute_edges_performance =
+              normative_log().none_event_times || minera::ocel_raw_event_times(normative_log());
           discovery.activity_attribute = options.activity_attribute;
           discovery.object_type_attribute = options.object_type_attribute;
           payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
@@ -4234,9 +4238,10 @@ void handle_ocel_conformance(const httplib::Request& request,
         discovery.object_type_attribute = options.object_type_attribute;
         // Round EI: a time column of None fails the edge performance pm4py
         // always measures (see compare_ocdfg), the real log first.
-        discovery.compute_edges_performance = real_ocel->none_event_times;
+        discovery.compute_edges_performance = real_ocel->none_event_times || minera::ocel_raw_event_times(*real_ocel);
         const auto real_ocdfg = minera::discover_ocdfg_classic_with_options(*real_ocel, discovery);
-        discovery.compute_edges_performance = normative_log().none_event_times;
+        discovery.compute_edges_performance =
+              normative_log().none_event_times || minera::ocel_raw_event_times(normative_log());
         payload = minera::ocdfg_conformance_json(minera::compare_ocdfg(
             real_ocdfg,
             minera::discover_ocdfg_classic_with_options(normative_log(),

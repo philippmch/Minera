@@ -1311,7 +1311,11 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
   std::vector<std::vector<std::size_t>> event_objects, object_events;
   event_relations(log, event_index, object_index, event_objects, object_events);
   const auto times = event_times(log);
-  if (options.include_timestamp_features) {
+  // Round EL: a raw time column (OcelRawTime) raises under the reference
+  // names as the reference does (below).
+  const bool raw_times = ocel_raw_event_times(log);
+  if (options.include_timestamp_features &&
+      !(raw_times && options.feature_name_style == OcelFeatureNameStyle::kCompatibility)) {
     for (std::size_t event = 0; event < log.events.size(); ++event)
       if (!log.events[event].timestamp.empty() && !times[event])
         throw std::invalid_argument("OCEL feature timestamp is invalid");
@@ -1351,7 +1355,24 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     // columns of an object whose events all have one (NaT times are left out
     // of the others); both families come before the lookups below (observed
     // black-box).
-    const auto nat = [&](std::size_t event) { return ocel_frame::nat_time_text(log.events[event].timestamp); };
+    const auto nat = [&](std::size_t event) {
+      return log.events[event].raw_time == OcelRawTime::kNone && ocel_frame::nat_time_text(log.events[event].timestamp);
+    };
+    // Round EL: a raw time column (OcelRawTime) raises where pm4py first
+    // takes a value's timestamp(): the timestamp columns of the events at
+    // the first event, the lifecycle durations (and work in progress) at the
+    // first object's first event (observed black-box).
+    const auto raw_error = [&](std::size_t event) {
+      return std::invalid_argument(std::string("AttributeError: '") + ocel_raw_time_type(log.events[event].raw_time) +
+                                   "' object has no attribute 'timestamp'");
+    };
+    std::optional<std::size_t> first_object_event;
+    if (raw_times)
+      for (const auto& events : object_events)
+        if (!events.empty()) {
+          first_object_event = events.front();
+          break;
+        }
     const auto nat_error = [&] { return std::invalid_argument(ocel_frame::nat_timestamp_error(log)); };
     // Round EI: the checks follow the reference's order of feature
     // families. The work-in-progress family takes the lifecycle durations,
@@ -1374,11 +1395,13 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
         options.include_event_start_ot_features.value_or(options.include_endpoint_features) ||
         options.include_event_end_ot_features.value_or(options.include_endpoint_features);
     const auto event_family_errors = [&] {
+      if (options.include_timestamp_features && raw_times && !log.events.empty()) throw raw_error(0);
       if (options.include_timestamp_features && nat_event) throw nat_error();
       if (relation_counts && first_event) throw key_error(log.events[*first_event].id);
       if (endpoints && first_object) throw key_error(log.objects[*first_object].id);
     };
     const auto default_object_family_errors = [&] {
+      if (first_object_event) throw raw_error(*first_object_event);
       if (nat_object) throw nat_error();
       if (first_event) throw key_error(log.events[*first_event].id);
     };
@@ -1387,6 +1410,8 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       if (options.include_related_objects_features) default_object_family_errors();
     } else if (variant == OcelFeatureVariant::kObjects) {
       const bool lifecycle = options.include_lifecycle_features.value_or(true);
+      if (lifecycle && options.include_lifecycle_duration_features.value_or(true) && first_object_event)
+        throw raw_error(*first_object_event);
       if (lifecycle && options.include_lifecycle_duration_features.value_or(true) && nat_object) throw nat_error();
       if (first_event) {
         const bool all = options.include_all_object_features.value_or(false);
@@ -1397,6 +1422,8 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
         if (options.include_cobirth_features.value_or(all)) throw key_error(log.events[*first_event].id);
         if (options.include_codeath_features.value_or(all)) throw key_error(log.events[*last_event].id);
       }
+      if (lifecycle && options.include_lifecycle_wip_features.value_or(false) && first_object_event)
+        throw raw_error(*first_object_event);
       if (lifecycle && options.include_lifecycle_wip_features.value_or(false) && nat_object) throw nat_error();
       if (options.include_related_events_features || options.include_related_activities_features)
         event_family_errors();

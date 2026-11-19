@@ -416,7 +416,17 @@ void write_event_table(std::ostream& out, const Ocel& log,
   std::vector<std::string_view> timestamp_texts;
   timestamp_texts.reserve(log.events.size());
   for (const auto& event : log.events) timestamp_texts.emplace_back(event.timestamp);
-  auto timestamps = ocel_frame::pandas_timestamp_column_text(timestamp_texts);
+  // Round EL: a raw time column (OcelRawTime) writes each Python value's
+  // str(), NaN as an empty cell (observed black-box, probe el wo.py).
+  const bool raw_times = std::any_of(log.events.begin(), log.events.end(),
+                                     [](const OcelEvent& event) { return event.raw_time != OcelRawTime::kNone; });
+  std::vector<std::string> timestamps;
+  if (raw_times) {
+    for (const auto& event : log.events)
+      timestamps.push_back(event.raw_time == OcelRawTime::kNaN ? std::string{} : event.timestamp);
+  } else {
+    timestamps = ocel_frame::pandas_timestamp_column_text(timestamp_texts);
+  }
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& event = log.events[index];
     Row row = activity_first ? Row{event.id, event.activity, std::move(timestamps[index])}

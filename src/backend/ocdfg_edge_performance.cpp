@@ -85,6 +85,15 @@ std::vector<double> calculate_ocdfg_edge_performance(const Ocel& log,const std::
   if(options.business_hours)throw OcdfgPerformanceError("AttributeError","'NoneType' object has no attribute 'replace'");
   throw OcdfgPerformanceError("TypeError","unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
  }
+ // Round EL: so does a raw time column (OcelRawTime) on its first pair:
+ // the difference of the two Python values (a str in it raises TypeError,
+ // two numbers have no total_seconds()), or the replace() of the first
+ // value for business hours (observed black-box).
+ if(time_key=="ocel:timestamp"&&!couples.empty()&&ocel_raw_event_times(log)){
+  std::map<std::string_view,OcelRawTime> kinds;for(const auto& event:log.events)kinds.emplace(event.id,event.raw_time);
+  const auto kind=[&](const std::string& id){const auto found=kinds.find(id);if(found==kinds.end())missing(id);return found->second;};
+  throw ocdfg_raw_pair_error(kind(couples.front().first),kind(couples.front().second),options.business_hours);
+ }
  std::vector<OcdfgPerformanceEvent> events;events.reserve(log.events.size());
  for(const auto& source:log.events){OcdfgPerformanceEvent event;event.id=source.id;
   const auto identifier=selected_string(source,id_key);
@@ -101,6 +110,16 @@ std::vector<double> calculate_ocdfg_edge_performance(const Ocel& log,const std::
   events.push_back(std::move(event));
  }
  return calculate_ocdfg_edge_performance(events,couples,options);
+}
+OcdfgPerformanceError ocdfg_raw_pair_error(OcelRawTime from,OcelRawTime to,bool business_hours){
+ const std::string from_type=ocel_raw_time_type(from),to_type=ocel_raw_time_type(to);
+ if(business_hours){
+  if(from==OcelRawTime::kStr)return OcdfgPerformanceError("TypeError","str.replace() takes no keyword arguments");
+  return OcdfgPerformanceError("AttributeError","'"+from_type+"' object has no attribute 'replace'");
+ }
+ if(from==OcelRawTime::kStr||to==OcelRawTime::kStr)
+  return OcdfgPerformanceError("TypeError","unsupported operand type(s) for -: '"+to_type+"' and '"+from_type+"'");
+ return OcdfgPerformanceError("AttributeError",std::string("'")+(from==OcelRawTime::kInt&&to==OcelRawTime::kInt?"int":"float")+"' object has no attribute 'total_seconds'");
 }
 double ocdfg_elapsed_seconds(const ParsedExactTimestamp& a,const ParsedExactTimestamp& b){
  // Floor the nanosecond difference to microseconds, split it into days,

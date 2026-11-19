@@ -503,6 +503,26 @@ OcelEdgeAssociations edge_associations(
       metric.total_objects.emplace_back(source.id, target.id, object_id);
     }
   }
+  // Round EL: a raw time column (OcelRawTime) fails on the first pair the
+  // reference measures, the one whose events come first in the log
+  // (observed black-box).
+  const bool raw_times = ocel_raw_event_times(log);
+  if (raw_times && options.measure_raw_times) {
+    std::unordered_map<std::string_view, std::size_t> position;
+    for (std::size_t i = 0; i < log.events.size(); ++i) position.emplace(log.events[i].id, i);
+    std::optional<std::pair<std::size_t, std::size_t>> first;
+    for (const auto& [type, metrics] : result)
+      for (const auto& [activities, metric] : metrics)
+        for (const auto& [from, to] : metric.event_couples) {
+          const std::pair<std::size_t, std::size_t> key{position.at(from), position.at(to)};
+          if (!first || key < *first) first = key;
+        }
+    if (first) {
+      const auto error = ocdfg_raw_pair_error(log.events[first->first].raw_time, log.events[first->second].raw_time,
+                                              options.use_business_hours);
+      throw std::invalid_argument(error.type + ": " + error.what());
+    }
+  }
   for (auto& [type, metrics] : result) {
     (void)type;
     for (auto& [activities, metric] : metrics) {
@@ -542,6 +562,8 @@ OcelEdgeAssociations edge_associations(
               options.use_business_hours
                   ? "AttributeError: 'NoneType' object has no attribute 'replace'"
                   : "TypeError: unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
+        // Round EL: a raw one (OcelRawTime) is not measured (see above).
+        if (raw_times) return std::nullopt;
         if (ocel_frame::nat_time_text(source_it->second->timestamp) ||
             ocel_frame::nat_time_text(target_it->second->timestamp)) {
           if (options.use_business_hours)

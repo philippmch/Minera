@@ -36,6 +36,11 @@ class OcdfgPerformanceError : public std::invalid_argument {
     const std::vector<OcdfgPerformanceEvent>& events,
     const std::vector<std::pair<std::string, std::string>>& event_couples,
     const OcdfgEdgePerformanceOptions& = {});
+// Round EL: the error pm4py raises when it measures the pair (from, to) of
+// a log whose time column is raw (OcelRawTime): the difference of the two
+// Python values, or the first value's replace() for business hours.
+[[nodiscard]] OcdfgPerformanceError ocdfg_raw_pair_error(OcelRawTime from, OcelRawTime to,
+                                                         bool business_hours);
 [[nodiscard]] std::vector<double> calculate_ocdfg_edge_performance(
     const Ocel&,
     const std::vector<std::pair<std::string, std::string>>& event_couples,
