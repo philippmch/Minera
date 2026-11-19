@@ -362,6 +362,18 @@ void write_event_table(std::ostream& out, const Ocel& log,
       if (known_attributes.insert(attr.key).second) event_attributes.push_back(attr.key);
     }
   }
+  // Round EM: the frame as the reference built it (OcelFrameHint): its
+  // column order, and the columns only the dropped rows held (empty there,
+  // observed black-box).
+  const auto frame = ocel_frame::event_frame(log);
+  if (!log.event_frame_hint.empty()) {
+    for (const auto& key : log.event_frame_hint.columns)
+      if (known_attributes.insert(key).second) event_attributes.push_back(key);
+    std::stable_sort(event_attributes.begin(), event_attributes.end(),
+                     [&](const std::string& left, const std::string& right) {
+                       return frame.position(left) < frame.position(right);
+                     });
+  }
 
   // Every relation row is written, a repeated event-object pair as a
   // repeated list entry, as the reference's get_extended_table aggregates
@@ -411,8 +423,6 @@ void write_event_table(std::ostream& out, const Ocel& log,
   }
   write_row(out, header, options.delimiter);
 
-  ocel_frame::Columns frame;
-  for (const auto& event : log.events) frame.observe_row(event.attributes);
   std::vector<std::string_view> timestamp_texts;
   timestamp_texts.reserve(log.events.size());
   for (const auto& event : log.events) timestamp_texts.emplace_back(event.timestamp);
@@ -473,6 +483,15 @@ void write_object_table(std::ostream& out, const Ocel& log,
       if (known.insert(attr.key).second) attributes.push_back(attr.key);
     }
   }
+  // Round EM: as for the events (OcelFrameHint).
+  const auto frame = ocel_frame::object_frame(log);
+  if (!log.object_frame_hint.empty()) {
+    for (const auto& key : log.object_frame_hint.columns)
+      if (known.insert(key).second) attributes.push_back(key);
+    std::stable_sort(attributes.begin(), attributes.end(), [&](const std::string& left, const std::string& right) {
+      return frame.position(left) < frame.position(right);
+    });
+  }
   Row header{options.object_id_column, options.object_type_column};
   for (const auto& key : attributes) {
     if (key.empty() || key == options.object_id_column || key == options.object_type_column) {
@@ -481,8 +500,6 @@ void write_object_table(std::ostream& out, const Ocel& log,
     header.push_back(key);
   }
   write_row(out, header, options.delimiter);
-  ocel_frame::Columns frame;
-  for (const auto& object : log.objects) frame.observe_row(object.attributes);
   for (const auto& object : log.objects) {
     Row row{object.id, object.type};
     for (const auto& key : attributes) {

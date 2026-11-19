@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EL (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EM (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7417,6 +7417,74 @@ The full ctest passed 633 of 633 on the first run (24 min at -j2), the
 fixture replay gave 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-el/`.
+
+Round EM re-reviewed EL (Review EM1). EL's CI run 44479148273 on
+b964b005: all six jobs green, the Linux, macOS and Windows ctest included. EM swept EJ's JSON bank b52, EK's SQLite banks b51
+and b53 and a new spoiled SQLite bank b54 (`em/s/sgen2.py 54 300`: whole
+time columns of numbers, NULL first, text first, raw change times, change
+cells in other columns) through rsw3, esw and xsw (`ek/runE1.sh`,
+`O=em2`):
+- the writers type and order a frame's columns over every row the frame
+  was built from, rows dropped later included (`OcelFrameHint` per events,
+  objects and changes frame; the transport's `minera:frameHints`), and
+  the filters keep those types (EM1-1);
+- write_ocel2_xml prints a naive change time with "+00:00" (EM1-2);
+- a change row's cells in other fields' columns type those columns (the
+  changes hint), also through the transport (EM1-3);
+- a numeric change-time column (every object table int64, or int64 and
+  float64, by read_sql over all its rows) keeps its numbers, sorted by
+  value (EM1-4);
+- the flatten route prints nanosecond times (EM1-5), and the description
+  of a raw column takes the first object's last event with a time (EM1-6).
+After the fixes (`ek/em2`): imports 0 of 100 (b51), 0 of 300 (b53, b54),
+42 of 300 (b52, the strict JSON refusals as before); rsw3 b52 331 of
+10,062 (EL's server: 404; the rest EK's declared datetime fractions and
+float-declared "inf" texts), b53 255 of 10,101 (EL: 260; 253 in the
+duplicate-row files, the raw split, s53_0172's SQLite download), b51 0
+of 3,900, b54 21 of 10,491 (EM before its b54 fixes: 130; a NULL changed
+field that duplicates an object, the raw split, the OC-DFG pair on a raw
+column); esw b53 76 of 4,144 and xsw 71 of 3,367 (unchanged, duplicate-row
+files), b54 esw 8 of 4,304 and xsw 5 of 3,497 (the same two files).
+
+In the suite: `minera_review_em1_tests` (hand cases of EM1-1 to EM1-4 and
+EM1-6, the SQLite ones checked against pm4py); `minera_review_el1_tests`
+follows EM1-6. The full ctest passed 633 of 634 on the first run (the EL
+test's description error; fixed, then passed), the fixture replay gave
+2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-em/`.
+
+Next round (EN) should start by re-reviewing round EM:
+
+- EM's CI run;
+- s53_0172's SQLite download: pm4py's to_sql types each object type
+  table's object column by that table's values, its change rows' cells in
+  other columns included, which needs the changes hint per object type;
+- the relations frame of a raw event time column holds None for a NULL
+  time of an object-dtype table (the events frame NaN), so OC-DFG's and
+  the LLM abstraction's messages name `NoneType` (s54_0163; pm4py's pair
+  also varies between runs there);
+- the frame hints through the OCEL 2.0 XML and OCEL 1.0 readers (EM fed
+  them from the JSON and SQLite readers and the transport), and the
+  remaining raw-column routes b53 and b54 did not reach (playout, causal
+  nets, the OCPN routes);
+- from EL's list, not taken: the remaining OCEL routes on a time column of
+  None and NaT times, the LLM OCEL context on the other readers' frames,
+  the OCEL 1.0 XML vmap entries and keyless values, causal-net routes on
+  NaT logs;
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EM's list, taken in EM: EL's CI, the writers' frame column order and
+pre-drop dtype, the naive change times in write_ocel2_xml, g52_0173,
+s53_0172 (its OCEL 2.0 XML download; the SQLite download carried), a fresh
+spoiled SQLite bank (b54) with numbers-only, NULL-first and text-first
+columns and raw change columns through the routes rsw3, esw and xsw cover.
+Not taken (carried to EN): playout, causal nets, OCPN and the other
+routes those sweeps do not reach, and EL's carried items.
+
+Previous list for round EM (kept for its older items):
 
 Next round (EM) should start by re-reviewing round EL:
 

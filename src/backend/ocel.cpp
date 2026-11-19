@@ -806,6 +806,51 @@ struct AttributeRows {
   }
 };
 
+// Round EM: a transport's frame hint (OcelFrameHint, "minera:frameHints")
+// types a frame's columns too: the dropped rows' value kinds and their
+// missing cells. The changes frame's hint also holds the cells a change row
+// has in the other fields' columns (no rows of their own), which fill the
+// missing cells of the transport's rows there.
+void apply_transport_frame_hint(const Json* hints, const char* name, AttributeRows& rows, bool changes) {
+  if (hints == nullptr || !hints->is_object()) return;
+  const auto* hint = optional(hints->object(), name);
+  if (hint == nullptr || !hint->is_object()) return;
+  std::size_t dropped_rows = 0;
+  if (const auto* count = optional(hint->object(), "rows"); count != nullptr && count->is_int())
+    dropped_rows = static_cast<std::size_t>(std::max<std::int64_t>(0, std::get<std::int64_t>(count->value)));
+  std::unordered_map<std::string, std::pair<std::int64_t, std::int64_t>> dropped;  // kinds, present
+  if (const auto* list = optional(hint->object(), "dropped"); list != nullptr && list->is_array())
+    for (const auto& item : list->array())
+      if (item.is_array() && item.array().size() == 3 && item.array()[0].is_string() &&
+          item.array()[1].is_int() && item.array()[2].is_int())
+        dropped[item.array()[0].string()] = {std::get<std::int64_t>(item.array()[1].value),
+                                             std::get<std::int64_t>(item.array()[2].value)};
+  for (auto& [key, column] : rows.columns) {
+    const auto found = dropped.find(key);
+    const std::int64_t kinds = found == dropped.end() ? 0 : found->second.first;
+    const std::int64_t present = found == dropped.end() ? 0 : found->second.second;
+    if (kinds & (kOcelHintString | kOcelHintNaiveDate | kOcelHintAwareDate)) column.text = true;
+    if (kinds & kOcelHintBool) column.boolean = true;
+    if (kinds & kOcelHintInt) column.integer = true;
+    if (kinds & kOcelHintFloat) column.real = true;
+    if (!changes) {
+      if (present < static_cast<std::int64_t>(dropped_rows)) column.missing = true;
+      continue;
+    }
+    // A change row lacking the column has a cell there only among the
+    // hint's; its own field's null value stays missing.
+    std::int64_t lacking = 0;
+    bool null_value = false;
+    for (const auto& row : rows.rows) {
+      const auto cell = std::find_if(row.values.begin(), row.values.end(),
+                                     [&](const auto& value) { return value.first == key; });
+      if (cell == row.values.end()) ++lacking;
+      else null_value = null_value || cell->second == nullptr || cell->second->is_null();
+    }
+    column.missing = null_value || lacking + static_cast<std::int64_t>(dropped_rows) > present;
+  }
+}
+
 }  // namespace classic_json
 
 // `lenient_times`: a transport that says it holds event times read_ocel_json
@@ -1092,6 +1137,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
       change_rows.rows.push_back(std::move(row));
     }
     change_rows.finish();
+    apply_transport_frame_hint(optional(root, "minera:frameHints"), "changes", change_rows, true);
     for (const auto* entry : entries) {
       const auto& change = entry->object();
       const auto* raw_id = optional(change, "ocel:oid");
@@ -1153,6 +1199,11 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
   }
   event_rows.finish();
   object_rows.finish();
+  // Round EM: a transport's frame hints (OcelFrameHint, "minera:frameHints")
+  // type its columns too: the dropped rows' value kinds, and their missing
+  // cells (apply_transport_frame_hint).
+  apply_transport_frame_hint(optional(root, "minera:frameHints"), "events", event_rows, false);
+  apply_transport_frame_hint(optional(root, "minera:frameHints"), "objects", object_rows, false);
   const auto nonempty = [](const std::optional<std::string>& text) { return text && !text->empty(); };
   // A frame id: the row's own, or the override (missing drops the row; a
   // value that is no str is refused if its row remains).
@@ -2365,6 +2416,37 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     if (!marker->is_bool()) throw std::invalid_argument("minera:noneEventTimes must be boolean");
     result.none_event_times = std::get<bool>(marker->value);
   }
+  // Round EM: see Ocel::event_frame_hint (written by serialize_ocel_json).
+  if (const auto* marker = optional(r, "minera:frameHints")) {
+    const auto& hints = obj(*marker, "minera:frameHints");
+    const auto count = [](const Json& value, const char* name) -> std::size_t {
+      if (value.is_uint()) return static_cast<std::size_t>(std::get<std::uint64_t>(value.value));
+      if (value.is_int() && std::get<std::int64_t>(value.value) >= 0)
+        return static_cast<std::size_t>(std::get<std::int64_t>(value.value));
+      throw std::invalid_argument(std::string("minera:frameHints ") + name + " must be a count");
+    };
+    const auto read = [&](const char* name, OcelFrameHint& hint) {
+      const auto* raw = optional(hints, name);
+      if (raw == nullptr) return;
+      const auto& entry = obj(*raw, "minera:frameHints");
+      if (const auto* columns = optional(entry, "columns")) hint.columns = string_array(columns, "columns");
+      if (const auto* dropped = optional(entry, "dropped")) {
+        if (!dropped->is_array()) throw std::invalid_argument("minera:frameHints dropped must be array");
+        for (const auto& item : dropped->array()) {
+          if (!item.is_array() || item.array().size() != 3 || !item.array()[0].is_string())
+            throw std::invalid_argument("minera:frameHints dropped entries must be [key, kinds, present]");
+          const auto kinds = count(item.array()[1], "kinds");
+          if (kinds > 63) throw std::invalid_argument("minera:frameHints kinds must be below 64");
+          hint.dropped.push_back({item.array()[0].string(), static_cast<unsigned char>(kinds),
+                                  count(item.array()[2], "present")});
+        }
+      }
+      if (const auto* rows = optional(entry, "rows")) hint.dropped_rows = count(*rows, "rows");
+    };
+    read("events", result.event_frame_hint);
+    read("objects", result.object_frame_hint);
+    read("changes", result.change_frame_hint);
+  }
   return result;
 }
 
@@ -2761,6 +2843,11 @@ void drop_unrelated_ocel_entries(Ocel& log) {
   const auto erase_if = [](auto& rows, auto predicate) {
     rows.erase(std::remove_if(rows.begin(), rows.end(), predicate), rows.end());
   };
+  // Round EM: the frames keep what the dropped rows add (OcelFrameHint).
+  ocel_frame::hint_dropped_rows(
+      log, [&](const OcelEvent& event) { return !related_events.count(event.id); },
+      [&](const OcelObject& object) { return !related_objects.count(object.id); },
+      [&](const OcelObjectChange& change) { return !related_objects.count(change.object_id); });
   erase_if(log.events, [&](const OcelEvent& event) {
     return !related_events.count(event.id);
   });
@@ -2800,6 +2887,11 @@ void drop_empty_ocel_names(Ocel& log) {
   const auto object_gone = [&](const std::string& id) {
     return id.empty() || dropped_objects.count(id) != 0;
   };
+  // Round EM: the frames keep what the dropped rows add (OcelFrameHint).
+  ocel_frame::hint_dropped_rows(
+      log, [&](const OcelEvent& event) { return event_gone(event.id); },
+      [&](const OcelObject& object) { return object_gone(object.id); },
+      [&](const OcelObjectChange& change) { return object_gone(change.object_id); });
   std::erase_if(log.events, [&](const OcelEvent& event) { return event_gone(event.id); });
   std::erase_if(log.objects, [&](const OcelObject& object) { return object_gone(object.id); });
   std::erase_if(log.relations, [&](const OcelRelation& relation) {
@@ -3143,21 +3235,35 @@ void sort_ocel2_sqlite_events(Ocel& log, const std::vector<OcelSqliteTime>& time
 // column pandas leaves as it is sorts its numbers first, then its texts as
 // Python sorts them, NULL last (observed black-box, probe el cp.py). The
 // changes come in the reference frame's order before the sort (each table's
-// rows by place, then type), `times` one per change.
-void sort_ocel2_sqlite_changes(Ocel& log, const std::vector<OcelSqliteTime>& times) {
+// rows by place, then type), `times` one per change. Round EM: a numeric
+// column (`column`: every table read is int64, or int64 and float64, by
+// read_sql's dtype over all of its rows) skips pd.to_datetime and keeps its
+// numbers, sorted by value with NaN last, the ints of a float64 column
+// floats (observed black-box, probe em ct.py).
+void sort_ocel2_sqlite_changes(Ocel& log, const std::vector<OcelSqliteTime>& given_times,
+                               OcelSqliteTimeColumn column) {
   namespace ptd = pandas_to_datetime;
   auto& changes = log.object_changes;
-  if (times.size() != changes.size()) throw std::logic_error("sort_ocel2_sqlite_changes: one time per change");
+  if (given_times.size() != changes.size()) throw std::logic_error("sort_ocel2_sqlite_changes: one time per change");
+  auto times = given_times;
+  if (column == OcelSqliteTimeColumn::kReal)
+    for (auto& time : times)
+      if (time.kind == OcelSqliteTime::Kind::kInteger) {
+        time.kind = OcelSqliteTime::Kind::kReal;
+        time.real = static_cast<double>(time.integer);
+      }
   std::vector<const std::string*> texts;
   texts.reserve(changes.size());
   for (const auto& change : changes) texts.push_back(&change.timestamp);
   const auto cells = sqlite_time_cells(times, texts);
   std::optional<std::vector<std::optional<ptd::UtcInstant>>> instants;
-  bool raised = false;
-  try {
-    instants = ptd::to_datetime_utc_mixed(cells);
-  } catch (const std::invalid_argument&) {
-    raised = true;
+  bool raised = column != OcelSqliteTimeColumn::kObject;
+  if (!raised) {
+    try {
+      instants = ptd::to_datetime_utc_mixed(cells);
+    } catch (const std::invalid_argument&) {
+      raised = true;
+    }
   }
   bool blobs = false;
   for (const auto& time : times) blobs = blobs || time.kind == OcelSqliteTime::Kind::kBlob;
@@ -3621,6 +3727,37 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     out << ",\"minera:naiveEventTimes\":";
     write_string(out, log.naive_event_time_unit);
   };
+  // Round EM: the frames' hints (Ocel::event_frame_hint, OcelFrameHint):
+  // "minera:frameHints": {"events": {"columns": [...], "dropped": [[key,
+  // kinds, present], ...], "rows": n}, "objects": ..., "changes": ...}.
+  const auto write_frame_hints = [&] {
+    if (log.event_frame_hint.empty() && log.object_frame_hint.empty() && log.change_frame_hint.empty()) return;
+    out << ",\"minera:frameHints\":{";
+    bool first = true;
+    const auto write = [&](const char* name, const OcelFrameHint& hint) {
+      if (hint.empty()) return;
+      if (!first) out << ',';
+      first = false;
+      write_string(out, name);
+      out << ":{\"columns\":[";
+      for (std::size_t i = 0; i < hint.columns.size(); ++i) {
+        if (i) out << ',';
+        write_string(out, hint.columns[i]);
+      }
+      out << "],\"dropped\":[";
+      for (std::size_t i = 0; i < hint.dropped.size(); ++i) {
+        if (i) out << ',';
+        out << '[';
+        write_string(out, hint.dropped[i].key);
+        out << ',' << static_cast<unsigned>(hint.dropped[i].kinds) << ',' << hint.dropped[i].present << ']';
+      }
+      out << "],\"rows\":" << hint.dropped_rows << '}';
+    };
+    write("events", log.event_frame_hint);
+    write("objects", log.object_frame_hint);
+    write("changes", log.change_frame_hint);
+    out << '}';
+  };
   // A download spells a naive event time as both reference JSON writers do,
   // the wall clock with "Z" (black-box, round DU), the fraction kept as for
   // an aware time (declared); the transport keeps the text.
@@ -3837,10 +3974,10 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
                                             change.value);
   };
   {
-    for (const auto& event : log.events)
-      event_frame.observe_row(event.attributes, log.event_type_attributes, event.activity);
-    for (const auto& object : log.objects)
-      object_frame.observe_row(object.attributes, log.object_type_attributes, object.type);
+    // Round EM: with the rows the reader or writer dropped (OcelFrameHint).
+    event_frame = ocel_frame::event_frame(log, true);
+    object_frame = ocel_frame::object_frame(log, true);
+    change_frame.seed(log.change_frame_hint);
     for (const auto& change : log.object_changes) {
       change_frame.add_rows(1);
       change_frame.observe(change.field, change.value, change_date(change));
@@ -4037,6 +4174,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     if (transport_markers) {
       write_untyped_relations();
       write_naive_event_times();
+      write_frame_hints();
       write_nanoseconds();
       write_order_markers(true);
     }
@@ -4066,10 +4204,9 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   }
   ocel_frame::Columns classic_event_frame, classic_object_frame;
   if (!transport_markers) {
-    for (const auto& event : log.events)
-      classic_event_frame.observe_row(event.attributes, log.event_type_attributes, event.activity);
-    for (const auto& object : log.objects)
-      classic_object_frame.observe_row(object.attributes, log.object_type_attributes, object.type);
+    // Round EM: with the rows the reader or writer dropped (OcelFrameHint).
+    classic_event_frame = ocel_frame::event_frame(log, true);
+    classic_object_frame = ocel_frame::object_frame(log, true);
   }
 
   out << "{\"ocel:events\":{";
@@ -4157,6 +4294,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   if (transport_markers) {
     write_untyped_relations();
     write_naive_event_times();
+    write_frame_hints();
     write_event_time_offset();
     write_nanoseconds();
     write_order_markers(false);
@@ -5376,12 +5514,19 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
   }
   // Round EL: a raw time column (OcelRawTime) raises at the first object's
   // lifecycle, its last event's timestamp() taken first, with or without
-  // the times in the text (observed black-box).
+  // the times in the text (observed black-box); round EM: its last event
+  // with a time, as groupby's last() skips the missing ones (probe em
+  // s54_0163).
   if (ocel_raw_event_times(log))
     for (const auto& object : log.objects)
       if (const auto found = events_by_object.find(object.id); found != events_by_object.end()) {
-        throw std::invalid_argument(std::string("AttributeError: '") +
-                                    ocel_raw_time_type(events.at(found->second.back())->raw_time) +
+        auto kind = events.at(found->second.back())->raw_time;
+        for (auto id = found->second.rbegin(); id != found->second.rend(); ++id)
+          if (const auto own = events.at(*id)->raw_time; own != OcelRawTime::kNaN) {
+            kind = own;
+            break;
+          }
+        throw std::invalid_argument(std::string("AttributeError: '") + ocel_raw_time_type(kind) +
                                     "' object has no attribute 'timestamp'");
       }
   // Related objects sort by id; a repeated event_object row lists its

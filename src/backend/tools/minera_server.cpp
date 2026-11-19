@@ -96,6 +96,7 @@
 #include "minera/case_arrival.hpp"
 #include "minera/case_statistics.hpp"
 #include "minera/cycle_time.hpp"
+#include "minera/timestamp.hpp"
 #include "minera/correlation_miner.hpp"
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
@@ -3342,10 +3343,20 @@ void handle_ocel_flatten(const httplib::Request& request,
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     const auto log = minera::parse_ocel_json(body);
-    response.set_content(
-        minera::to_xes(minera::flatten_ocel_to_event_log(log, options),
-                       "ocel flatten"),
-        "application/xml");
+    auto flattened = minera::flatten_ocel_to_event_log(log, options);
+    // Round EM: pm4py's flattened frame holds the times as datetime64[ns],
+    // which pm4py.write_xes prints with their nanoseconds (a number read as
+    // nanoseconds since the epoch keeps them; observed black-box).
+    if (options.event_timestamp_attribute.empty())
+      for (auto& trace : flattened.traces)
+        for (auto& event : trace.events)
+          if (!event.timestamp_attribute && !event.timestamp.empty() &&
+              minera::parse_timestamp(event.timestamp)) {
+            minera::EventAttribute time{"time:timestamp", event.timestamp, minera::AttributeKind::kDate};
+            time.typed_value = minera::NativeDate{event.timestamp, minera::NativeDateResolution::kNanosecond};
+            event.timestamp_attribute = std::move(time);
+          }
+    response.set_content(minera::to_xes(flattened, "ocel flatten"), "application/xml");
   } catch (const std::exception& error) {
     response.status = 400;
     response.set_content(error_json(error.what()), "application/json");

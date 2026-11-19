@@ -148,6 +148,24 @@ class Columns {
   }
   void add_rows(std::size_t rows) { rows_ += rows; }
 
+  // Round EM: the frame as the reference built it (see OcelFrameHint): its
+  // column order first, then the dropped rows' values and row count. Call
+  // before observing the kept rows.
+  void seed(const OcelFrameHint& hint) {
+    for (const auto& name : hint.columns) register_name(name);
+    for (const auto& column : hint.dropped) {
+      auto& stats = stats_[register_name(column.key)];
+      stats.has_bool = stats.has_bool || (column.kinds & kOcelHintBool);
+      stats.has_int = stats.has_int || (column.kinds & kOcelHintInt);
+      stats.has_float = stats.has_float || (column.kinds & kOcelHintFloat);
+      stats.has_string = stats.has_string || (column.kinds & kOcelHintString);
+      stats.has_naive_date = stats.has_naive_date || (column.kinds & kOcelHintNaiveDate);
+      stats.has_aware_date = stats.has_aware_date || (column.kinds & kOcelHintAwareDate);
+      stats.present += column.present;
+    }
+    rows_ += hint.dropped_rows;
+  }
+
   [[nodiscard]] const std::vector<std::string>& names() const { return names_; }
   // The column's position in first-appearance order (the end for no column).
   [[nodiscard]] std::size_t position(const std::string& key) const {
@@ -165,11 +183,178 @@ class Columns {
   }
 
  private:
+  std::size_t register_name(const std::string& key) {
+    auto [slot, added] = index_.try_emplace(key, names_.size());
+    if (added) {
+      names_.push_back(key);
+      stats_.emplace_back();
+    }
+    return slot->second;
+  }
+
   std::vector<std::string> names_;
   std::vector<ColumnStats> stats_;
   std::unordered_map<std::string, std::size_t> index_;
   std::size_t rows_ = 0;
 };
+
+// Round EM: a frame of the log's events, objects or changes as the
+// reference holds it: seeded with the rows a reader or writer dropped
+// (OcelFrameHint), then the kept rows. `dated`: date values by the catalog.
+inline Columns event_frame(const Ocel& log, bool dated = false) {
+  Columns frame;
+  frame.seed(log.event_frame_hint);
+  for (const auto& event : log.events) {
+    if (dated) frame.observe_row(event.attributes, log.event_type_attributes, event.activity);
+    else frame.observe_row(event.attributes);
+  }
+  return frame;
+}
+inline Columns object_frame(const Ocel& log, bool dated = false) {
+  Columns frame;
+  frame.seed(log.object_frame_hint);
+  for (const auto& object : log.objects) {
+    if (dated) frame.observe_row(object.attributes, log.object_type_attributes, object.type);
+    else frame.observe_row(object.attributes);
+  }
+  return frame;
+}
+
+// Round EM: rows a native log never held but the reference frames were built
+// from (an OCEL 2.0 SQLite type table's rows that are no event or object of
+// their own: change rows, rows without an id, repeated ids), as an owner and
+// its non-null cells.
+struct HintRow {
+  std::string owner;
+  std::vector<OcelAttribute> cells;
+};
+
+// Round EM: adds `extra_events` and `extra_objects` to the log's event and
+// object frame hints as dropped rows, and `extra_change_values` (the cells of
+// change rows outside their field) to the change frame hint as values
+// without rows (the change rows are the log's own).
+inline void hint_extra_rows(Ocel& log, const std::vector<HintRow>& extra_events,
+                            const std::vector<HintRow>& extra_objects,
+                            const std::vector<HintRow>& extra_change_values) {
+  const auto kinds_of = [](const ColumnStats& stats) {
+    return static_cast<unsigned char>((stats.has_bool ? kOcelHintBool : 0) | (stats.has_int ? kOcelHintInt : 0) |
+                                      (stats.has_float ? kOcelHintFloat : 0) |
+                                      (stats.has_string ? kOcelHintString : 0) |
+                                      (stats.has_naive_date ? kOcelHintNaiveDate : 0) |
+                                      (stats.has_aware_date ? kOcelHintAwareDate : 0));
+  };
+  const auto fold = [&](OcelFrameHint& hint, const OcelTypeCatalog& catalog, const std::vector<HintRow>& extra,
+                        bool rows, const auto& kept_rows) {
+    if (extra.empty()) return;
+    Columns all, dropped;
+    all.seed(hint);
+    dropped.seed(OcelFrameHint{{}, hint.dropped, hint.dropped_rows});
+    kept_rows(all);
+    for (const auto& row : extra) {
+      if (rows) {
+        all.add_rows(1);
+        dropped.add_rows(1);
+      }
+      for (const auto& cell : row.cells) {
+        const bool date = reference_date_value(catalog, row.owner, cell.key, cell.value);
+        all.observe(cell.key, cell.value, date);
+        dropped.observe(cell.key, cell.value, date);
+      }
+    }
+    hint.columns = all.names();
+    hint.dropped.clear();
+    for (const auto& name : dropped.names()) {
+      const auto* stats = dropped.stats(name);
+      if (stats == nullptr || stats->present == 0) continue;
+      hint.dropped.push_back({name, kinds_of(*stats), stats->present});
+    }
+    hint.dropped_rows = dropped.rows();
+  };
+  fold(log.event_frame_hint, log.event_type_attributes, extra_events, true, [&](Columns& all) {
+    for (const auto& event : log.events) all.observe_row(event.attributes);
+  });
+  fold(log.object_frame_hint, log.object_type_attributes, extra_objects, true, [&](Columns& all) {
+    for (const auto& object : log.objects) all.observe_row(object.attributes);
+  });
+  fold(log.change_frame_hint, log.object_type_attributes, extra_change_values, false, [&](Columns& all) {
+    for (const auto& change : log.object_changes) all.observe(change.field, change.value);
+  });
+}
+
+// Round EM: records in the log's frame hints the rows about to be dropped:
+// the events, objects and changes `drop_event`, `drop_object` and
+// `drop_change` name (the frames' column order over every row, then the
+// dropped rows' value kinds; see OcelFrameHint).
+template <class DropEvent, class DropObject, class DropChange>
+void hint_dropped_rows(Ocel& log, DropEvent&& drop_event, DropObject&& drop_object, DropChange&& drop_change) {
+  const auto kinds_of = [](const ColumnStats& stats) {
+    return static_cast<unsigned char>((stats.has_bool ? kOcelHintBool : 0) | (stats.has_int ? kOcelHintInt : 0) |
+                                      (stats.has_float ? kOcelHintFloat : 0) |
+                                      (stats.has_string ? kOcelHintString : 0) |
+                                      (stats.has_naive_date ? kOcelHintNaiveDate : 0) |
+                                      (stats.has_aware_date ? kOcelHintAwareDate : 0));
+  };
+  // all: the frame over every row (its column order); dropped: the hint's
+  // dropped rows and the new ones.
+  const auto record = [&](OcelFrameHint& hint, const Columns& all, Columns& dropped, std::size_t rows) {
+    if (rows == 0) return;
+    hint.columns = all.names();
+    hint.dropped.clear();
+    for (const auto& name : dropped.names()) {
+      const auto* stats = dropped.stats(name);
+      if (stats == nullptr || stats->present == 0) continue;
+      hint.dropped.push_back({name, kinds_of(*stats), stats->present});
+    }
+    hint.dropped_rows = dropped.rows();
+  };
+  {
+    Columns all, dropped;
+    all.seed(log.event_frame_hint);
+    dropped.seed(OcelFrameHint{{}, log.event_frame_hint.dropped, log.event_frame_hint.dropped_rows});
+    std::size_t rows = 0;
+    for (const auto& event : log.events) {
+      all.observe_row(event.attributes, log.event_type_attributes, event.activity);
+      if (!drop_event(event)) continue;
+      ++rows;
+      dropped.observe_row(event.attributes, log.event_type_attributes, event.activity);
+    }
+    record(log.event_frame_hint, all, dropped, rows);
+  }
+  std::unordered_map<std::string_view, std::string_view> type_of;
+  {
+    Columns all, dropped;
+    all.seed(log.object_frame_hint);
+    dropped.seed(OcelFrameHint{{}, log.object_frame_hint.dropped, log.object_frame_hint.dropped_rows});
+    std::size_t rows = 0;
+    for (const auto& object : log.objects) {
+      type_of.emplace(object.id, object.type);
+      all.observe_row(object.attributes, log.object_type_attributes, object.type);
+      if (!drop_object(object)) continue;
+      ++rows;
+      dropped.observe_row(object.attributes, log.object_type_attributes, object.type);
+    }
+    record(log.object_frame_hint, all, dropped, rows);
+  }
+  {
+    Columns all, dropped;
+    all.seed(log.change_frame_hint);
+    dropped.seed(OcelFrameHint{{}, log.change_frame_hint.dropped, log.change_frame_hint.dropped_rows});
+    std::size_t rows = 0;
+    for (const auto& change : log.object_changes) {
+      std::string owner = change.object_type;
+      if (owner.empty())
+        if (const auto found = type_of.find(change.object_id); found != type_of.end()) owner = found->second;
+      const bool date = reference_date_value(log.object_type_attributes, owner, change.field, change.value);
+      all.add_rows(1);
+      all.observe(change.field, change.value, date);
+      if (!drop_change(change)) continue;
+      ++rows;
+      dropped.add_rows(1);
+      dropped.observe(change.field, change.value, date);
+    }
+    record(log.change_frame_hint, all, dropped, rows);
+  }
+}
 
 // Round EK: a row's attributes as the reference writers print a frame row:
 // in the frame's column order (first appearance over the rows), null cells
@@ -223,6 +408,10 @@ inline std::string reference_declared_type(Dtype column, const ColumnStats* owne
 inline void reference_type_declarations(const Ocel& log, TypeDeclarations& object_types,
                                         TypeDeclarations& event_types) {
   Columns object_columns, change_columns, event_columns;
+  // Round EM: the columns as the reference built them (OcelFrameHint).
+  object_columns.seed(log.object_frame_hint);
+  change_columns.seed(log.change_frame_hint);
+  event_columns.seed(log.event_frame_hint);
   // Per owner: the stats of its own rows (objects frame and changes frame).
   std::map<std::string, Columns> object_owner, change_owner, event_owner;
   std::unordered_map<std::string_view, std::string_view> object_type_of;

@@ -1414,9 +1414,9 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
   }
   out << "    <string key=\"version\" value=\"1.0\"/>\n    <string key=\"ordering\" value=\"timestamp\"/>\n  </global>\n";
   const auto relations = index_by(log.relations, [](const OcelRelation& r) -> std::string_view { return r.event_id; });
-  ocel_frame::Columns event_frame, object_frame;
-  for (const auto& event : log.events) event_frame.observe_row(event.attributes);
-  for (const auto& object : log.objects) object_frame.observe_row(object.attributes);
+  // Round EM: with the rows the reader or writer dropped (OcelFrameHint).
+  const auto event_frame = ocel_frame::event_frame(log);
+  const auto object_frame = ocel_frame::object_frame(log);
   const auto write_list = [&](std::string_view key, const auto& body, bool empty) {
     if (empty) {
       out << "      <list key=\"" << key << "\"/>\n";
@@ -1437,8 +1437,9 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
   // events frame and one objects frame, across activities and types).
   // Round EK: naive next to aware datetimes make an object column too.
   const auto mixed_date_keys = [](const auto& entries, const OcelTypeCatalog& catalog,
-                                  const auto& owner_of) {
+                                  const auto& owner_of, const OcelFrameHint& hint) {
     ocel_frame::Columns columns;
+    columns.seed(hint);
     for (const auto& entry : entries) columns.observe_row(entry.attributes, catalog, owner_of(entry));
     std::set<std::string, std::less<>> mixed;
     for (const auto& key : columns.names())
@@ -1448,9 +1449,11 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
     return mixed;
   };
   const auto mixed_event_dates = mixed_date_keys(
-      log.events, log.event_type_attributes, [](const OcelEvent& event) -> const std::string& { return event.activity; });
+      log.events, log.event_type_attributes, [](const OcelEvent& event) -> const std::string& { return event.activity; },
+      log.event_frame_hint);
   const auto mixed_object_dates = mixed_date_keys(
-      log.objects, log.object_type_attributes, [](const OcelObject& object) -> const std::string& { return object.type; });
+      log.objects, log.object_type_attributes, [](const OcelObject& object) -> const std::string& { return object.type; },
+      log.object_frame_hint);
   // A CSV log whose times share an offset is written in that wall clock,
   // labelled "Z" as the reference does (see shared_nonzero_offset).
   const auto event_offset = event_time_offset(log);
@@ -1603,9 +1606,9 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
   const auto relations = index_by(log.relations, [](const OcelRelation& r) -> std::string_view { return r.event_id; });
   // Round EK: a row's values in the frame's column order (observed
   // black-box), see ocel_frame::frame_row.
-  ocel_frame::Columns standard_event_frame, standard_object_frame;
-  for (const auto& event : log.events) standard_event_frame.observe_row(event.attributes);
-  for (const auto& object : log.objects) standard_object_frame.observe_row(object.attributes);
+  // Round EM: with the rows the reader or writer dropped (OcelFrameHint).
+  const auto standard_event_frame = ocel_frame::event_frame(log);
+  const auto standard_object_frame = ocel_frame::object_frame(log);
   out << (log.objects.empty() ? "  <objects/>\n" : "  <objects>\n");
   for (const auto& object : log.objects) {
     out << "    <object id=\"" << esc(object.id) << "\" type=\""
@@ -1626,6 +1629,15 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
     // A NaT change time (the empty text) prints "NaT" (observed black-box).
     // Round EK: a change of a null value prints Python's str of it,
     // "None" (observed black-box).
+    // Round EM: the changes frame's time column that reaches the writer is
+    // a UTC datetime64 column (every reader converts with utc=True; a column
+    // pandas cannot convert raised above), so a naive time prints "+00:00"
+    // too (observed black-box: g52_0107).
+    const auto change_time_text = [](const std::string& text) {
+      auto printed = ocel_frame::utc_timestamp_text(text, 'T', "+00:00");
+      if (ocel_frame::naive_timestamp_text(text)) printed += "+00:00";
+      return printed;
+    };
     for (const auto* change : object_changes)
       write_standard_value(attributes,
                            std::holds_alternative<std::nullptr_t>(change->value) ? OcelValue(std::string("None"))
@@ -1633,7 +1645,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
                            change->field, "        ",
                            ocel_frame::pandas_nat_time_text(change->timestamp)
                                ? std::string("NaT")
-                               : ocel_frame::utc_timestamp_text(change->timestamp, 'T', "+00:00"),
+                               : change_time_text(change->timestamp),
                            object_date(change->field), true);
     const auto text = attributes.str();
     if (text.empty()) out << "      <attributes/>\n";

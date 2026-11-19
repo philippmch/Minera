@@ -181,9 +181,11 @@ void raw_event_column() {
          "edge associations: the first pair: " + edge_error);
   OcelDescriptionOptions without_times;
   without_times.include_timestamps = false;
+  // Round EM: the first object's last event with a time (e3's "abc"; e4's
+  // NaN is skipped), checked against pm4py (probe em dp.py).
   expect(error_of([&] { (void)describe_ocel_tuples(log, without_times); }) ==
-             "AttributeError: 'float' object has no attribute 'timestamp'",
-         "description: the first object's last event (NaN)");
+             "AttributeError: 'str' object has no attribute 'timestamp'",
+         "description: the first object's last event with a time");
 }
 
 void raw_text_writes() {

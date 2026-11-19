@@ -34,8 +34,9 @@
 
 namespace minera {
 // Defined in ocel.cpp (round EL): the change frame's time column as pm4py's
-// read_ocel2_sqlite reads it.
-void sort_ocel2_sqlite_changes(Ocel& log, const std::vector<OcelSqliteTime>& times);
+// read_ocel2_sqlite reads it; round EM: `column` its concatenated dtype.
+void sort_ocel2_sqlite_changes(Ocel& log, const std::vector<OcelSqliteTime>& times,
+                               OcelSqliteTimeColumn column);
 namespace {
 
 #if defined(MINERA_HAS_SQLITE)
@@ -550,15 +551,48 @@ class TypeTableRows {
         if (type != SQLITE_INTEGER) integers = false;
         if (type == SQLITE_TEXT || type == SQLITE_BLOB) objects = true;
       }
-      if (sqlite3_column_type(row, id_index) == SQLITE_NULL) continue;
+      // Round EM: a row that is no event or object of its own still types
+      // the frame's columns (read_sql reads the whole table): its cells go
+      // to the frame hint, a change row's cells outside its field to the
+      // changes frame's (OcelFrameHint).
+      const auto extra = [&](bool change_row) {
+        std::vector<OcelAttribute> cells, change_cells;
+        const std::string field =
+            change_row && changed_index >= 0 && sqlite3_column_type(row, changed_index) != SQLITE_NULL
+                ? column_string(row, changed_index)
+                : std::string();
+        for (std::size_t index = 0; index < columns.size(); ++index) {
+          const auto& column = columns[index];
+          if (column.name == "ocel_id" || column.name == "ocel_time" || column.name == "ocel_changed_field" ||
+              column.name == "@@cumcount" || column.name == "ocel:activity")
+            continue;
+          if (sqlite3_column_type(row, static_cast<int>(index)) == SQLITE_NULL) continue;
+          OcelAttribute cell{column.name,
+                             read_sqlite_cell(row, static_cast<int>(index), column.declared_type)};
+          if (change_row && column.name != field) change_cells.push_back(cell);
+          cells.push_back(std::move(cell));
+        }
+        extra_rows_.push_back(std::move(cells));
+        if (change_row) extra_change_values_.push_back(std::move(change_cells));
+      };
+      if (sqlite3_column_type(row, id_index) == SQLITE_NULL) {
+        extra(false);
+        continue;
+      }
       const bool changed = changed_index >= 0 &&
                            sqlite3_column_type(row, changed_index) != SQLITE_NULL;
-      if (base == TypeTableBase::kNullChangedField && changed) continue;
+      if (base == TypeTableBase::kNullChangedField && changed) {
+        extra(true);
+        continue;
+      }
       // An id with two rows is one event or object here: the first row. (For
       // events and base rows the reference keeps a frame row for each,
       // declared; for kFirstRow the later rows are changes.)
       auto [entry, inserted] = rows_.try_emplace(column_string(row, id_index));
-      if (!inserted) continue;
+      if (!inserted) {
+        extra(base == TypeTableBase::kFirstRow);
+        continue;
+      }
       order_.push_back(entry->first);
       entry->second.position = position;
       // No time column reads as no time (NaT), as the reference reads it.
@@ -593,10 +627,15 @@ class TypeTableRows {
     }
     if (!objects && !nulls)
       time_column_ = integers ? OcelSqliteTimeColumn::kInteger : OcelSqliteTimeColumn::kReal;
-    if (const auto floats = float64_integer_columns(db, table, columns); !floats.empty())
+    if (const auto floats = float64_integer_columns(db, table, columns); !floats.empty()) {
       for (auto& [id, row] : rows_)
         for (auto& attribute : row.attributes)
           if (floats.contains(attribute.key)) floatify_integer(attribute.value);
+      for (auto* extra : {&extra_rows_, &extra_change_values_})
+        for (auto& cells : *extra)
+          for (auto& cell : cells)
+            if (floats.contains(cell.key)) floatify_integer(cell.value);
+    }
   }
 
   bool exists() const { return exists_; }
@@ -611,8 +650,14 @@ class TypeTableRows {
   }
   // The ids in table order.
   const std::vector<std::string>& ids() const { return order_; }
+  // Round EM: the cells of the rows that are no event or object of their
+  // own, and of change rows outside their field (see the constructor).
+  const std::vector<std::vector<OcelAttribute>>& extra_rows() const { return extra_rows_; }
+  const std::vector<std::vector<OcelAttribute>>& extra_change_values() const { return extra_change_values_; }
 
  private:
+  std::vector<std::vector<OcelAttribute>> extra_rows_;
+  std::vector<std::vector<OcelAttribute>> extra_change_values_;
   bool exists_ = false;
   bool has_time_ = false;
   std::size_t row_count_ = 0;
@@ -657,7 +702,8 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
                              std::unordered_set<std::string>& first_rows,
                              std::size_t type_rank,
                              std::vector<std::pair<std::size_t, std::size_t>>& places,
-                             std::vector<OcelSqliteTime>& times) {
+                             std::vector<OcelSqliteTime>& times,
+                             std::vector<OcelSqliteTimeColumn>& table_columns_read) {
   const auto columns = table_columns(db, table);
   const auto changed = std::find_if(
       columns.begin(), columns.end(), [](const auto& column) {
@@ -744,6 +790,12 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
     }
     times.push_back(time);
   }
+  // Round EM: the table's dtype joins the concatenated change frame's
+  // (a table without rows, or of NULLs only, is object; see
+  // sort_ocel2_sqlite_changes).
+  table_columns_read.push_back(objects || nulls ? OcelSqliteTimeColumn::kObject
+                               : integers       ? OcelSqliteTimeColumn::kInteger
+                                                : OcelSqliteTimeColumn::kReal);
   // A float64 table holds its integers as floats.
   if (!objects && !nulls && !integers)
     for (auto index = first_time; index < times.size(); ++index)
@@ -1319,6 +1371,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   std::optional<OcelSqliteTimeColumn> time_column = OcelSqliteTimeColumn::kInteger;
   bool any_rows = false;
   std::vector<PendingEvent> pending_events;
+  // Round EM: the type tables' rows that are no event or object of their
+  // own (see TypeTableRows::extra_rows).
+  std::vector<ocel_frame::HintRow> extra_event_rows, extra_object_rows, extra_change_values;
   {
     std::unordered_set<std::string> read;
     std::size_t type_rank = 0;
@@ -1330,6 +1385,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       const TypeTableRows rows(db, table, TypeTableBase::kEvents);
       if (!rows.exists())
         throw std::invalid_argument("OCEL SQLite event type table is missing: " + table);
+      for (const auto& cells : rows.extra_rows()) extra_event_rows.push_back({type, cells});
       timed = timed || rows.has_time();
       if (rows.row_count() > 0) {
         any_rows = true;
@@ -1396,6 +1452,8 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
                                              : TypeTableBase::kFirstRow);
       if (!rows.exists())
         throw std::invalid_argument("OCEL SQLite object type table is missing: " + table);
+      for (const auto& cells : rows.extra_rows()) extra_object_rows.push_back({type, cells});
+      for (const auto& cells : rows.extra_change_values()) extra_change_values.push_back({type, cells});
       for (const auto& id : rows.ids()) {
         const auto listed = object_types.find(id);
         if (listed == object_types.end() || !read.insert(id).second) continue;
@@ -1452,6 +1510,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     std::unordered_set<std::string> first_rows;
     std::vector<std::pair<std::size_t, std::size_t>> places;
     std::vector<OcelSqliteTime> change_times;
+    std::vector<OcelSqliteTimeColumn> change_columns;
     std::size_t type_rank = 0;
     for (const auto& [id, type] : object_types) object_ids.insert(id);
     for (const auto& type : object_type_names) {
@@ -1459,7 +1518,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       if (visited_tables.insert(table).second && table_exists(db, table)) {
         read_type_table_changes(db, table, type, log, object_ids,
                                 options.validate_references.value_or(false), has_base_rows,
-                                first_rows, type_rank, places, change_times);
+                                first_rows, type_rank, places, change_times, change_columns);
       }
       ++type_rank;
     }
@@ -1481,7 +1540,12 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       placed_times.push_back(change_times[index]);
     }
     log.object_changes = std::move(placed_changes);
-    sort_ocel2_sqlite_changes(log, placed_times);
+    // Round EM: the change frame concatenates every table read, those
+    // without change rows too, so its dtype is numeric only when every one
+    // of them is (observed black-box, probe em ct.py).
+    auto change_column = change_columns.empty() ? OcelSqliteTimeColumn::kObject : OcelSqliteTimeColumn::kInteger;
+    for (const auto column : change_columns) change_column = std::max(change_column, column);
+    sort_ocel2_sqlite_changes(log, placed_times, change_column);
     // A change takes its object's type (the id's last listing in the object
     // table), not its table's: pm4py types the change rows by the object
     // table (observed black-box).
@@ -1504,6 +1568,10 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   }
   if (time_column) sort_ocel2_sqlite_events(log, event_times, *time_column);
   else sort_ocel_events_by_timestamp(log, true);
+  // Round EM: the frames' hints of the rows read but not kept, then of the
+  // drops below.
+  if (!table_exists(db, "event_attributes") && !table_exists(db, "object_attributes"))
+    ocel_frame::hint_extra_rows(log, extra_event_rows, extra_object_rows, extra_change_values);
   // The reference SQLite reader drops what names an empty id or type, then
   // the events and objects without relations. It finds them in the event
   // and object tables, before it reads the type tables: an event whose only
@@ -1518,10 +1586,20 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     related_events.insert(relation.event_id);
     related_objects.insert(relation.object_id);
   }
-  std::erase_if(log.events, [&](const OcelEvent& event) { return !related_events.contains(event.id); });
-  std::erase_if(log.objects, [&](const OcelObject& object) { return !related_objects.contains(object.id); });
   // With no event or no object left, the reference reader keeps neither
   // (observed black-box).
+  const bool keep_none =
+      std::none_of(log.events.begin(), log.events.end(),
+                   [&](const OcelEvent& event) { return related_events.contains(event.id); }) ||
+      std::none_of(log.objects.begin(), log.objects.end(),
+                   [&](const OcelObject& object) { return related_objects.contains(object.id); });
+  // Round EM: the frames keep what the dropped rows add (OcelFrameHint).
+  ocel_frame::hint_dropped_rows(
+      log, [&](const OcelEvent& event) { return keep_none || !related_events.contains(event.id); },
+      [&](const OcelObject& object) { return keep_none || !related_objects.contains(object.id); },
+      [&](const OcelObjectChange& change) { return keep_none || !related_objects.contains(change.object_id); });
+  std::erase_if(log.events, [&](const OcelEvent& event) { return !related_events.contains(event.id); });
+  std::erase_if(log.objects, [&](const OcelObject& object) { return !related_objects.contains(object.id); });
   if (log.events.empty() || log.objects.empty()) {
     log.events.clear();
     log.objects.clear();
@@ -1781,6 +1859,7 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       return ocel_frame::shared_nonzero_offset(texts);
     }();
     ocel_frame::Columns event_frame;
+    event_frame.seed(log.event_frame_hint);  // round EM: see OcelFrameHint
     std::map<std::string, std::vector<const OcelEvent*>> events_by_activity;
     for (const auto* event : events) {
       event_frame.observe_row(event->attributes, log.event_type_attributes, event->activity);
@@ -1843,6 +1922,7 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
     }
     std::unordered_map<std::string_view, std::string_view> object_id_types;
     ocel_frame::Columns object_frame;
+    object_frame.seed(log.object_frame_hint);  // round EM: see OcelFrameHint
     std::map<std::string, std::vector<const OcelObject*>> objects_by_type;
     for (const auto* object : objects) {
       object_id_types.emplace(object->id, object->type);

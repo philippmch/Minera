@@ -149,6 +149,10 @@ Ocel empty_like(const Ocel& log) {
   result.untyped_relations = log.untyped_relations;
   result.naive_event_time_unit = log.naive_event_time_unit;
   result.none_event_times = log.none_event_times;
+  // Round EM: the rows the reader dropped still type the frames.
+  result.event_frame_hint = log.event_frame_hint;
+  result.object_frame_hint = log.object_frame_hint;
+  result.change_frame_hint = log.change_frame_hint;
   return result;
 }
 

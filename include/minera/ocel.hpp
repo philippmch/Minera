@@ -81,6 +81,40 @@ struct OcelObjectChange {
   OcelRawTime raw_time = OcelRawTime::kNone;  // see OcelEvent
 };
 
+// Round EM: pandas types a frame column over every row the frame was built
+// from and keeps its columns in that build's order. The reference readers
+// build their frames from every listed row and drop rows afterwards (events
+// and objects without relations, empty names, the changes of dropped
+// objects), and the writers drop rows from frames typed before (observed
+// black-box: an unrelated object's text keeps a date column an object
+// column). A native log keeps what those rows add per frame: the column
+// order of the build and the dropped rows' value kinds per column, so the
+// writers type and order the columns as pm4py does. The OCEL transport
+// carries it as "minera:frameHints".
+enum OcelFrameHintKind : unsigned char {
+  kOcelHintBool = 1,
+  kOcelHintInt = 2,
+  kOcelHintFloat = 4,
+  kOcelHintString = 8,
+  kOcelHintNaiveDate = 16,
+  kOcelHintAwareDate = 32,
+};
+
+struct OcelFrameHintColumn {
+  std::string key;
+  unsigned char kinds = 0;  // OcelFrameHintKind bits of the dropped values
+  std::size_t present = 0;  // dropped rows holding a value (not null)
+};
+
+struct OcelFrameHint {
+  // The frame's attribute columns in build order (empty: first appearance
+  // over the kept rows).
+  std::vector<std::string> columns;
+  std::vector<OcelFrameHintColumn> dropped;
+  std::size_t dropped_rows = 0;
+  [[nodiscard]] bool empty() const { return columns.empty() && dropped.empty() && dropped_rows == 0; }
+};
+
 // Declared OCEL type metadata is kept separately from observed records so
 // empty types and attributes survive format round-trips.
 using OcelTypeSchema = std::map<std::string, std::string>;
@@ -142,6 +176,10 @@ struct Ocel {
   // and splits keep the flag, and the OCEL transport carries it as
   // "minera:noneEventTimes".
   bool none_event_times = false;
+  // Round EM: the rows the reader or a writer dropped (see OcelFrameHint).
+  OcelFrameHint event_frame_hint;
+  OcelFrameHint object_frame_hint;
+  OcelFrameHint change_frame_hint;
 };
 
 using OCEL = Ocel;
