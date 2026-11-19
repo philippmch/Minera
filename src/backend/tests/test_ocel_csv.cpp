@@ -707,9 +707,16 @@ void round_o_date_and_offset_shapes() {
   auto unmarked = transport;
   unmarked.erase(unmarked.find(",\"minera:eventTimeOffset\":true"), 30);
   assert(minera::parse_ocel_json(unmarked).events[0].timestamp == "2024-01-01T10:00:00+00:00");
-  // A download (CLI JSON output, export) is written without the marker.
+  // A download (CLI JSON output, export) is written without the markers
+  // (round EO: nor the "minera:untypedO2o" one), with the log scope
+  // write_ocel_json computes.
   const auto file = minera::serialize_ocel_json(offset, minera::OcelJsonFormat::kClassic, false);
-  assert(file == unmarked);
+  auto expected_file = unmarked;
+  expected_file.erase(expected_file.find(",\"minera:untypedO2o\":true"), 25);
+  expected_file.replace(expected_file.find("\"ocel:global-log\":{}"), 20,
+                        "\"ocel:global-log\":{\"ocel:object-types\":[\"order\"],\"ocel:attribute-names\":[],"
+                        "\"ocel:version\":\"1.0\",\"ocel:ordering\":\"timestamp\"}");
+  assert(file == expected_file);
 
   // The reference CSV reader keeps the file's column order, and its CSV and
   // OCEL 1.0 XML writers follow it (observed black-box).

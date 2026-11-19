@@ -542,6 +542,7 @@ class TypeTableRows {
     Statement statement(db, "SELECT * FROM " + quote_identifier(table) +
                                 " ORDER BY rowid");
     bool integers = true, nulls = true, objects = false, texts = false, blobs = false, numbers = false;
+    std::vector<bool> valued(columns.size(), false);
     for (std::size_t position = 0;; ++position) {
       const auto status = sqlite3_step(statement.get());
       if (status == SQLITE_DONE) break;
@@ -549,6 +550,8 @@ class TypeTableRows {
         throw std::runtime_error("SQLite type-table attribute query failed");
       auto* row = statement.get();
       ++row_count_;
+      for (std::size_t index = 0; index < columns.size(); ++index)
+        if (!valued[index] && sqlite3_column_type(row, static_cast<int>(index)) != SQLITE_NULL) valued[index] = true;
       // read_sql's dtype of the time column comes from every row.
       if (has_time_) {
         const auto type = sqlite3_column_type(row, time_index);
@@ -558,6 +561,24 @@ class TypeTableRows {
         texts = texts || type == SQLITE_TEXT;
         blobs = blobs || type == SQLITE_BLOB;
         numbers = numbers || type == SQLITE_INTEGER || type == SQLITE_FLOAT;
+      }
+      // Round EO: read_ocel2_sqlite splits the type tables' union by
+      // ocel_changed_field, so a row without a changed field (an object's,
+      // a repeated or id-less one) types the changes frame's columns too
+      // (observed black-box, s53_0000: an int column another table lacks is
+      // float64 there): its cells go to base_rows.
+      if (changed_index < 0 || sqlite3_column_type(row, changed_index) == SQLITE_NULL) {
+        std::vector<OcelAttribute> cells;
+        for (std::size_t index = 0; index < columns.size(); ++index) {
+          const auto& column = columns[index];
+          if (column.name == "ocel_id" || column.name == "ocel_time" || column.name == "ocel_changed_field" ||
+              column.name == "@@cumcount" || column.name == "ocel:activity")
+            continue;
+          if (sqlite3_column_type(row, static_cast<int>(index)) == SQLITE_NULL) continue;
+          cells.push_back({column.name, read_sqlite_cell(row, static_cast<int>(index), column.declared_type)});
+        }
+        base_rows_.push_back(std::move(cells));
+        base_row_ids_.push_back(sqlite3_column_type(row, id_index) != SQLITE_NULL);
       }
       // Round EM: a row that is no event or object of its own still types
       // the frame's columns (read_sql reads the whole table): its cells go
@@ -633,6 +654,17 @@ class TypeTableRows {
                                            column.declared_type)});
       }
     }
+    // Round EO: read_sql reads an all-NULL column as object (None), which
+    // keeps the frames' concatenated column an object one (observed
+    // black-box: s53_0094, ints next to it print as ints).
+    if (row_count_ > 0)
+      for (std::size_t index = 0; index < columns.size(); ++index) {
+        const auto& name = columns[index].name;
+        if (valued[index] || name == "ocel_id" || name == "ocel_time" || name == "ocel_changed_field" ||
+            name == "@@cumcount" || name == "ocel:activity")
+          continue;
+        null_columns_.push_back(name);
+      }
     if (!objects && !nulls)
       time_column_ = integers ? OcelSqliteTimeColumn::kInteger : OcelSqliteTimeColumn::kReal;
     // Round EN: an object column reads its NULLs as None.
@@ -643,7 +675,7 @@ class TypeTableRows {
       for (auto& [id, row] : rows_)
         for (auto& attribute : row.attributes)
           if (floats.contains(attribute.key)) floatify_integer(attribute.value);
-      for (auto* extra : {&extra_rows_, &extra_change_values_})
+      for (auto* extra : {&extra_rows_, &extra_change_values_, &base_rows_})
         for (auto& cells : *extra)
           for (auto& cell : cells)
             if (floats.contains(cell.key)) floatify_integer(cell.value);
@@ -666,6 +698,14 @@ class TypeTableRows {
   // own, and of change rows outside their field (see the constructor).
   const std::vector<std::vector<OcelAttribute>>& extra_rows() const { return extra_rows_; }
   const std::vector<std::vector<OcelAttribute>>& extra_change_values() const { return extra_change_values_; }
+  // Round EO: the cells of the rows without a changed field (see the
+  // constructor).
+  const std::vector<std::vector<OcelAttribute>>& base_rows() const { return base_rows_; }
+  // Whether each of base_rows has an id.
+  const std::vector<bool>& base_row_ids() const { return base_row_ids_; }
+  // Round EO: the attribute columns without a value in any row (see the
+  // constructor).
+  const std::vector<std::string>& null_columns() const { return null_columns_; }
   // Round EN: the table's column names in table order.
   const std::vector<std::string>& column_names() const { return column_names_; }
 
@@ -673,6 +713,9 @@ class TypeTableRows {
   std::vector<std::string> column_names_;
   std::vector<std::vector<OcelAttribute>> extra_rows_;
   std::vector<std::vector<OcelAttribute>> extra_change_values_;
+  std::vector<std::vector<OcelAttribute>> base_rows_;
+  std::vector<bool> base_row_ids_;
+  std::vector<std::string> null_columns_;
   bool exists_ = false;
   bool has_time_ = false;
   std::size_t row_count_ = 0;
@@ -818,7 +861,9 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
       if (floats.contains(column.name)) floatify_integer(cell.value);
       change.cells.push_back(std::move(cell));
     }
-    change.cells.push_back({kOcelCumcountColumn, OcelValue{cumcount}});
+    // Round EO: NaN for a row without an id (see base_rows).
+    if (sqlite3_column_type(statement.get(), id_index) != SQLITE_NULL)
+      change.cells.push_back({kOcelCumcountColumn, OcelValue{cumcount}});
     log.object_changes.push_back(std::move(change));
     places.emplace_back(position, type_rank);
     OcelSqliteTime time;
@@ -1268,11 +1313,15 @@ void read_relations(sqlite3* db, Ocel& log, bool validate_references) {
   if (table_exists(db, "object_object")) {
     Statement statement(db, "SELECT ocel_source_id, ocel_target_id, "
                            "ocel_qualifier FROM object_object ORDER BY rowid");
+    // Round EO: read_sql of a table without rows gives float64 columns
+    // (Ocel::untyped_o2o).
+    log.untyped_o2o = true;
     while (true) {
       const auto status = sqlite3_step(statement.get());
       if (status == SQLITE_DONE) break;
       if (status != SQLITE_ROW)
         throw std::runtime_error("SQLite object-object query failed");
+      log.untyped_o2o = false;
       OcelO2oRelation relation{column_string(statement.get(), 0),
                                column_string(statement.get(), 1),
                                column_string(statement.get(), 2)};
@@ -1352,7 +1401,11 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       // its rows are not read natively (declared).
       event_type_column.add(activity);
       // The reference reader drops an event row without id or type (observed
-      // black-box); validate_references refuses it instead.
+      // black-box); validate_references refuses it instead. Round EO: it
+      // still reads the type table of a row without id (its columns are the
+      // frame's, observed black-box: s53_0007).
+      if (id.empty() && !activity.empty() && !options.validate_references.value_or(false))
+        activities.insert(activity);
       if (id.empty() || activity.empty()) {
         if (!options.validate_references.value_or(false)) continue;
         throw std::invalid_argument("OCEL SQLite event table contains duplicate or empty ids");
@@ -1381,7 +1434,10 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       const auto id = column_string(statement.get(), 0);
       const auto type = column_string(statement.get(), 1);
       object_type_column.add(type);
-      // As for events: a row without id or type is dropped.
+      // As for events: a row without id or type is dropped (its type table
+      // still read, round EO).
+      if (id.empty() && !type.empty() && !options.validate_references.value_or(false))
+        object_type_names.insert(type);
       if (id.empty() || type.empty()) {
         if (!options.validate_references.value_or(false)) continue;
         throw std::invalid_argument("OCEL SQLite object table contains duplicate or empty ids");
@@ -1454,7 +1510,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   std::vector<PendingEvent> pending_events;
   // Round EM: the type tables' rows that are no event or object of their
   // own (see TypeTableRows::extra_rows).
-  std::vector<ocel_frame::HintRow> extra_event_rows, extra_object_rows, extra_change_values;
+  std::vector<ocel_frame::HintRow> extra_event_rows, extra_object_rows, extra_change_values, extra_change_rows;
+  // Round EO: the type tables' all-NULL columns (TypeTableRows::null_columns).
+  std::vector<std::string> null_event_columns, null_object_columns;
   // Round EN: the frames' columns as read_ocel2_sqlite concatenates the type
   // tables with rows, in type order: each new column where its first table
   // has it (an all-NULL column too; tables without rows add none), the
@@ -1479,6 +1537,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       if (!rows.exists())
         throw std::invalid_argument("OCEL SQLite event type table is missing: " + table);
       for (const auto& cells : rows.extra_rows()) extra_event_rows.push_back({type, cells});
+      for (const auto& name : rows.null_columns())
+        if (std::find(null_event_columns.begin(), null_event_columns.end(), name) == null_event_columns.end())
+          null_event_columns.push_back(name);
       if (rows.row_count() > 0)
         for (const auto& name : rows.column_names())
           if (attribute_column(name) && name != "ocel:activity") add_column(event_columns, name);
@@ -1549,6 +1610,18 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       if (!rows.exists())
         throw std::invalid_argument("OCEL SQLite object type table is missing: " + table);
       for (const auto& cells : rows.extra_rows()) extra_object_rows.push_back({type, cells});
+      for (const auto& name : rows.null_columns())
+        if (std::find(null_object_columns.begin(), null_object_columns.end(), name) == null_object_columns.end())
+          null_object_columns.push_back(name);
+      // Round EO: the rows without a changed field, as rows of the changes
+      // frame its split drops ("@@cumcount", counted per id over the union,
+      // is NaN for a row without an id: observed black-box, s53_0050).
+      if (has_base_rows)
+        for (std::size_t index = 0; index < rows.base_rows().size(); ++index) {
+          auto row = rows.base_rows()[index];
+          if (rows.base_row_ids()[index]) row.push_back({kOcelCumcountColumn, OcelValue{std::int64_t{0}}});
+          extra_change_rows.push_back({type, std::move(row)});
+        }
       if (rows.row_count() > 0)
         for (const auto& name : rows.column_names()) {
           if (attribute_column(name)) add_column(object_columns, name);
@@ -1704,8 +1777,13 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   else sort_ocel_events_by_timestamp(log, true);
   // Round EM: the frames' hints of the rows read but not kept, then of the
   // drops below.
-  if (!attribute_tables)
-    ocel_frame::hint_extra_rows(log, extra_event_rows, extra_object_rows, extra_change_values);
+  if (!attribute_tables) {
+    ocel_frame::hint_extra_rows(log, extra_event_rows, extra_object_rows, extra_change_values,
+                                log.object_changes.empty() ? std::vector<ocel_frame::HintRow>{} : extra_change_rows);
+    ocel_frame::hint_none_columns(log.event_frame_hint, null_event_columns);
+    ocel_frame::hint_none_columns(log.object_frame_hint, null_object_columns);
+    if (!log.object_changes.empty()) ocel_frame::hint_none_columns(log.change_frame_hint, null_object_columns);
+  }
   // The reference SQLite reader drops what names an empty id or type, then
   // the events and objects without relations. It finds them in the event
   // and object tables, before it reads the type tables: an event whose only
@@ -1860,12 +1938,23 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
     database.exec(
         "CREATE TABLE event (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
         "CREATE TABLE object (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
-        "CREATE TABLE event_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
-        "CREATE TABLE object_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);"
+        // Round EO: the map of a frame without rows is float64 there, so
+        // write_ocel2_sqlite declares its columns REAL (observed black-box:
+        // c56_0010, a log without relations).
+        + std::string(log.events.empty()
+                          ? "CREATE TABLE event_map_type (ocel_type REAL PRIMARY KEY, ocel_type_map REAL NOT NULL);"
+                          : "CREATE TABLE event_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);") +
+        (log.objects.empty()
+             ? "CREATE TABLE object_map_type (ocel_type REAL PRIMARY KEY, ocel_type_map REAL NOT NULL);"
+             : "CREATE TABLE object_map_type (ocel_type TEXT PRIMARY KEY, ocel_type_map TEXT NOT NULL);") +
         "CREATE TABLE event_type_attributes (ocel_type TEXT, attribute_name TEXT, attribute_type TEXT, PRIMARY KEY(ocel_type, attribute_name));"
         "CREATE TABLE object_type_attributes (ocel_type TEXT, attribute_name TEXT, attribute_type TEXT, PRIMARY KEY(ocel_type, attribute_name));"
-        "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);"
-        "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);"
+        + std::string(log.untyped_relations && log.relations.empty()
+                          ? "CREATE TABLE event_object (ocel_event_id REAL, ocel_object_id REAL, ocel_qualifier REAL);"
+                          : "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);") +
+        (log.untyped_o2o && log.o2o.empty()
+             ? "CREATE TABLE object_object (ocel_source_id REAL, ocel_target_id REAL, ocel_qualifier REAL);"
+             : "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);") +
         "CREATE TABLE event_event (source_event_id TEXT, target_event_id TEXT, qualifier TEXT);"
         "CREATE TABLE event_attributes (ocel_id TEXT, attribute_name TEXT, value_type TEXT, text_value TEXT, integer_value INTEGER, real_value REAL, bool_value INTEGER, ordinal INTEGER);"
         "CREATE TABLE object_attributes (ocel_id TEXT, attribute_name TEXT, value_type TEXT, text_value TEXT, integer_value INTEGER, real_value REAL, bool_value INTEGER, ordinal INTEGER);"

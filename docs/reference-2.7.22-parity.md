@@ -33421,3 +33421,156 @@ numbers and texts (EN1-4: None; updated, then passed). The workbench
 fixture replay gave 2,673 responses unchanged. Python script and frontend
 tests not rerun (scripts and frontend unchanged). The device check on the
 Mac was skipped (the Mac was not linked).
+
+## Review EO1: re-review of round EN, OCEL 2.0 XML dates of both kinds, the OCEL 1.0 readers' frames, pandas' inferred float columns, read_ocel2_sqlite's union of type tables, unreadable change times (2026-11-19)
+
+Round EO checked EN's CI (run 44517323874 on 5af1980c: all six jobs
+green, the Linux, macOS and Windows ctest included).
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the
+reference venv, on EJ's spoiled JSON bank (`ej/b52`), the SQLite banks
+(`ek/b51`, `ek/b53`, `ek/b54`), EN's OCEL 2.0 XML bank (`en/x/b55`) and a
+new spoiled OCEL 1.0 bank (`eo/c1/b56n`: `eo/c1/c1gen.py 56 200`, 200 logs
+written by hand as OCEL 1.0 JSON and XML with events and objects without
+relations, keys only some rows or only dropped rows hold, values of mixed
+kinds and empty ids, types and activities) through rsw3, esw and xsw
+(`ek/runE1.sh`, `en/x/runx.sh`, `eo/c1/runc.sh` with EN's column-order
+sweep `en/o/osw.py`), a new download-content sweep (`eo/d/dsw.py`,
+`eo/d/rund.sh`: every download, OCEL 1.0 and 2.0 JSON and XML, CSV and
+SQLite, against pm4py's writer on pm4py's read, compared whole), a new
+playout sweep on raw and NaT columns (`eo/ps/psw.py`, `eo/ps/runp.sh`:
+OCPN extensive playout, the OC causal-net playout of the converted OCPN,
+OCPN discovery with and without the diagnostics on b53, b54 and b55), and
+the probes in `eo/` (`hc/hc.py`, `hc/hc2.py`, `hc/u7`, `ro/p1.py` to
+`ro/p13.py`, `d/one/one.py`).
+
+- **EO1-1 Aware and naive datetimes in one OCEL 2.0 XML date column.**
+  read_ocel2_xml reads a declared date column with aware and naive values
+  (dateutil reads `"5"` as a naive day of the current month) into one
+  datetime column, so write_ocel2_json and write_ocel2_xml declare it
+  `date` and write every value as a datetime (x52_0046, x52_0190, carried
+  from EN; hc2.py). Native declared such a column `string`;
+  `reference_declared_type` now declares it `date`.
+- **EO1-2 The OCEL 1.0 readers build their frames before they drop rows.**
+  read_ocel_json builds its events and objects frames over every entry of
+  the file and drops the unrelated and id-less rows afterwards, as the
+  other readers do (EM1-1): write_ocel_csv keeps the dropped rows'
+  columns in the file's order, write_ocel_xml and write_ocel_json list
+  them among the log's `attribute-names`, and write_ocel_json writes the
+  `ocel:global-log` it computes (the objects frame's types, the frames'
+  sorted attribute names, version and ordering) whatever the file held;
+  write_ocel_csv also writes a column whose values are all null (bank
+  b56). The classic JSON reader now records the frame hints
+  (`OcelFrameHint`) for the rows it drops, and the downloads list
+  `frame_attribute_names`. read_ocel_xml fails on a file without a
+  relation as read_ocel2_xml does (`'NoneType' object has no attribute
+  'index'`), where native raised its own message.
+- **EO1-3 Untyped O2O frames.** A reader that finds no object link holds
+  a float64 O2O frame (read_ocel2_sqlite on an empty `object_object`,
+  read_ocel2_xml, read_ocel_json, read_ocel_xml and read_ocel_csv without
+  links, read_ocel2_json when the file lists none: one dangling link makes
+  it str), so write_ocel2_sqlite declares the `object_object` columns
+  `REAL` (hc2.py, bank b56). For a log with no events or no objects left,
+  write_ocel2_sqlite declares the map tables `REAL` and write_ocel_json
+  leaves out the empty type catalogs and `ocel:objectChanges` (c56_0010).
+  `Ocel::untyped_o2o` (the transport's `minera:untypedO2o`) carries it.
+- **EO1-4 Columns that are object only through dropped rows.**
+  write_ocel_json, write_ocel2_json and write_ocel_xml run pandas'
+  infer_objects on the events and objects frames, so a column that is
+  object only because a dropped row held a text or a datetime prints its
+  kept ints as floats when a kept row lacks the cell or holds a float,
+  and as ints otherwise (ro/p4.py to p9.py, bank b56: `1.0` against `1`
+  in 24 OCEL 1.0 XML downloads); the type declarations, write_ocel2_xml,
+  write_ocel_csv and the changes frame keep the object column.
+  `Columns::printed_dtype` gives that dtype from the kept rows' cells.
+- **EO1-5 read_ocel2_json's changes frame.** It builds the frame from
+  records of id, type, field, the field's value and time, so the field
+  column stands first and the time after the first change's field
+  (g52_0223: the column order of write_ocel2_sqlite's type tables), and
+  its pd.to_datetime(utc=True) reads a naive epoch change time as UTC
+  (g52_0164). The OCEL 2.0 JSON reader records both in the changes hint.
+- **EO1-6 read_ocel2_sqlite's union of the type tables.** pm4py reads the
+  object tables' union and splits it by `ocel_changed_field`, so the rows
+  without a changed field (the objects' rows) type the changes frame's
+  columns too: an int column another table lacks is float64 there, and
+  the downloads print its changes as floats (s53_0000, hc.py);
+  `@@cumcount`, counted per id over the union, is NaN for a row without an
+  id (s53_0050). read_sql reads an all-NULL column as object (None),
+  which keeps the concatenated column object, so its ints print as ints
+  (s53_0094; the hint kind `kOcelHintNone`). An object listed without an
+  id still brings its type table's columns (s53_0007, s54_0209).
+- **EO1-7 Unreadable change times.** read_ocel2_json and read_ocel2_xml
+  keep a change time they cannot read (a `+25:00` offset) as a str next
+  to the datetimes, and write_ocel2_sqlite's to_datetime(errors="coerce")
+  of that column keeps the datetimes and writes NULL for the str (g52_0020,
+  g52_0105, g52_0224, g52_0296, x52_0020; hc/u7). Native coerced the whole
+  column as texts with the first text's format, so a UTC time of another
+  shape was NULL too; the readers now mark the kept text as a str
+  (`OcelRawTime::kStr`). In that object column a change without a time is
+  None beside datetimes and NaN without them, so write_ocel2_xml raises
+  `'NoneType'` (or `'float'`) `object has no attribute 'isoformat'` there
+  before it reaches the str (g52_0224, hc/u9); the XML writer counts the
+  kept strs as texts.
+- **EO1-8 CSV quoting.** write_ocel_csv's to_csv quotes as Python's csv
+  module does with QUOTE_MINIMAL: a field holding the delimiter, a quote,
+  CR or LF. Native also quoted a value with leading or trailing blanks
+  (x52_0031 and x52_0192's `" 3"`, hc/u8).
+
+Harness: dsw.py types JSON floats (`F:repr`) so `1` and `1.0` differ, and
+orders OCEL 2.0 JSON relations as the file lists them (pm4py's order is a
+set's, declared in EJ). psw.py caps its own address space at 3 GB (an
+unbounded reference playout once took 11.6 GB); the native server of one
+psw run was killed by the container's memory limit next to the full build,
+so b55 was rerun alone.
+
+After the fixes (`ek/eo3`, `en/x/x3`, `eo/c1/c4`, `eo/d/d3` on the final
+server but EO1-8 and the XML message of EO1-7, rechecked after on their
+files; `eo/ps/p2`, `p3` and `eo/xm` on the final server): imports 0 of
+100 (b51), 0 of 300 (b53, b54), 0 of 401 (b55), 0 of 200 each (b56 as
+JSON and as XML) and 42 of 300 (b52: the strict JSON refusals, as
+before); rsw3 b52 328 of 10,062 (EN: 331), b53 252 of 10,101 (the
+duplicate-row files and the raw split, as before), b51 0 of 3,900, b54 21
+of 10,491 (unchanged), b55 265 of 10,530 (EN: 272), b56 0 of 7,800 through
+read_ocel_json and 49 of 7,566 through read_ocel_xml (c56_0038, 0039,
+0071, 0110, declared below); esw b53 76 of 4,144 and xsw 71 of 3,367
+(unchanged), b54 esw 8 of 4,304 and xsw 3 of 3,497 (EN: 5), b55 esw 0 of
+4,320 and xsw 0 of 3,510; the column-order sweep 0 of 1,200 and 0 of 1,164
+on b56. The download-content sweep, first run on an early EO server
+(`eo/d/d1`: b52 1,276 of 1,548, b53 75 of 1,554, b54 20 of 1,614, b55 51
+of 1,620, b56 40 of 1,200 and 16 of 1,164, b51 1 of 600), now gives b51 0
+of 600, b52 18 of 1,548 (float-declared `"inf"` texts in 5 files), b53 38
+of 1,554 (21 duplicate-row files), b54 5 of 1,614 (s54_0118's duplicated
+object), b55 47 of 1,620 (`+25:00` offsets in 6 files, `"inf"` texts in
+6), b56 0 of 1,200 (JSON) and 12 of 1,164 (XML: the four c56 files). The
+OCEL 2.0 XML export's error check (`eo/xm/xm.py`) gives 0 of 258 (b52),
+0 of 259 (b53), 0 of 269 (b54) and 5 of 270 (b55, the `+25:00` offsets).
+The playout sweep gives b53 19 of 1,036 (7 duplicate-row files and
+s53_0266's documented 2,000,000-event playout limit, where pm4py runs out
+of the sweep's memory cap), b54 3 of 1,076 (the same limit) and b55 0 of
+1,080.
+
+Declared (outside the model):
+- A classic OCEL XML attribute column holding `<date>` elements next to
+  `<string>` elements whose texts are dates (c56_0038, 0039, 0071, 0110):
+  pm4py keeps those texts as strs beside the datetimes (write_ocel_csv
+  prints them as written, write_ocel_json declares the column `string`),
+  native reads the column's date texts as dates.
+- As before: EK's declared datetime fractions, `+25:00` offsets and
+  float-declared `"inf"` texts, the duplicate rows (EK1), the
+  ancestors/descendants split of a raw column, which pair OC-DFG measures
+  first on a raw column, the CSV type columns' order of OCEL 2.0 JSON
+  reads (EN1), the safety limits of the causal-net playout.
+
+Tests:
+- New: `minera_review_eo1_tests` (hand cases of EO1-1 to EO1-8 through the
+  direct read and the transport, the SQLite ones on hand-built files
+  checked against pm4py).
+- `minera_ocel_csv_tests` follows EO1-2 (a download computes its log
+  scope) and EO1-3, `minera_review_bz1_tests` EO1-3 (the transport of a
+  log without object links carries `minera:untypedO2o`).
+
+Runs: the full ctest passed 634 of 636 on the first run (28 min at -j2):
+`minera_ocel_csv_tests` and `minera_review_bz1_tests` expected the former
+download and transport (updated, then passed). The workbench fixture
+replay gave 2,673 responses unchanged. Python script and frontend tests
+not rerun (scripts and frontend unchanged). The device check on the Mac
+was skipped (the Mac was not linked).

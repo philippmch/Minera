@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EN (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EO (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7492,6 +7492,80 @@ NaN for a mixed column's NULL; updated, then passed), the fixture replay
 gave 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-en/`.
+
+Round EO re-reviewed EN (Review EO1). EN's CI run 44517323874 on
+5af1980c: all six jobs green, the Linux, macOS and Windows ctest included.
+EO swept the banks b51 to b55 through rsw3, esw and xsw (`ek/runE1.sh`,
+`O=eo3`; `en/x/runx.sh`, `O=x3`), a new spoiled OCEL 1.0 bank b56
+(`eo/c1/c1gen.py 56 200 b56n`: 200 logs written by hand as OCEL 1.0 JSON
+and XML, with unrelated rows, keys only dropped rows hold and mixed value
+kinds; `eo/c1/runc.sh`, `O=c4`: rsw3 and osw through both readers), a new
+download-content sweep of every bank (`eo/d/dsw.py`, `eo/d/rund.sh`,
+`O=d3`: all six downloads against pm4py's writers, compared whole) and a
+new playout sweep (`eo/ps/psw.py`, `eo/ps/runp.sh`, `O=p2`: OCPN
+extensive playout, OC causal-net playout, OCPN discovery on b53, b54 and
+b55):
+- an OCEL 2.0 XML date column of aware and naive datetimes is declared
+  `date` (EO1-1);
+- read_ocel_json's frames keep the dropped rows' columns (CSV columns,
+  `attribute-names`, the computed `ocel:global-log`), write_ocel_csv
+  keeps all-null columns, read_ocel_xml fails without relations as
+  read_ocel2_xml (EO1-2);
+- O2O frames without links are float64, so the SQLite `object_object`
+  (and an empty log's map tables) are `REAL`; write_ocel_json leaves out
+  empty catalogs and `ocel:objectChanges` (EO1-3);
+- infer_objects prints ints as floats in columns that are object only
+  through dropped rows (`Columns::printed_dtype`, EO1-4);
+- read_ocel2_json's changes frame order and naive epoch change times
+  (EO1-5); read_ocel2_sqlite's union of the type tables types the changes
+  frame, `@@cumcount` NaN for id-less rows, all-NULL columns object
+  (`kOcelHintNone`), id-less listings keep their tables (EO1-6);
+- change times the OCEL 2.0 readers cannot read stay strs (SQLite NULL,
+  write_ocel2_xml's None/NaN message first) (EO1-7); CSV quoting as
+  Python's csv module (EO1-8).
+After the fixes: imports 0 of 100 (b51), 0 of 300 (b53, b54), 0 of 401
+(b55), 0 of 400 (b56), 42 of 300 (b52, the strict JSON refusals as
+before); rsw3 b52 328 of 10,062 (EN: 331), b53 252 of 10,101, b51 0 of
+3,900, b54 21 of 10,491, b55 265 of 10,530 (EN: 272), b56 0 of 7,800
+(JSON) and 49 of 7,566 (XML, the declared c56 files); esw/xsw unchanged on
+b53, b54 xsw 3 (EN: 5), 0 on b55; osw 0 on b56; dsw 0 (b51), 18 (b52,
+"inf" texts), 38 (b53, duplicate-row files), 5 (b54, s54_0118), 47 (b55,
++25:00 and "inf"), 0 and 12 (b56 JSON and XML, declared); psw b53 19
+(duplicate rows and the documented playout limit), b54 3 (the limit), b55
+0.
+
+In the suite: `minera_review_eo1_tests` (hand cases of EO1-1 to EO1-8,
+the SQLite ones checked against pm4py); `minera_ocel_csv_tests` and
+`minera_review_bz1_tests` follow EO1-2 and EO1-3. The full ctest passed
+634 of 636 on the first run (28 min at -j2; those two expected a download
+without the computed log scope and a transport without
+`minera:untypedO2o`; updated, then passed), the fixture replay gave 2,673
+responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-eo/`.
+
+Next round (EP) should start by re-reviewing round EO:
+
+- EO's CI run;
+- the OCEL 1.0 bank b56 through esw and xsw (EO ran rsw3, osw and dsw on
+  it), and an OCEL CSV bank through dsw (read_ocel_csv's frames with
+  dropped rows were not swept);
+- the LLM OCEL abstraction and context on the OCEL 1.0 readers' frames and
+  on raw/NaT columns (psw covers playout and OCPN discovery only);
+- from EN's list, not taken: the remaining OCEL routes on a time column
+  of None and NaT times, the OCEL 1.0 XML vmap entries and keyless values,
+  causal-net routes on NaT logs;
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EO's list, taken in EO: EN's CI, x52_0046/x52_0190's dates, the
+frame hints through the OCEL 1.0 readers (bank b56), playout, causal-net
+playout and OCPN discovery on raw columns (psw), plus a download-content
+sweep of every bank (dsw). Not taken (carried to EP): the LLM abstraction
+on raw columns and the OCEL 1.0 frames, and EN's carried items.
+
+Previous list for round EO (kept for its older items):
 
 Next round (EO) should start by re-reviewing round EN:
 

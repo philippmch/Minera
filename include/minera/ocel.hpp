@@ -123,6 +123,9 @@ enum OcelFrameHintKind : unsigned char {
   kOcelHintString = 8,
   kOcelHintNaiveDate = 16,
   kOcelHintAwareDate = 32,
+  // Round EO: a type table's all-NULL column (read_sql's object None, which
+  // keeps the concatenated column an object one; no value of its own).
+  kOcelHintNone = 64,
 };
 
 struct OcelFrameHintColumn {
@@ -193,6 +196,15 @@ struct Ocel {
   // leaves this false; the OCEL transport carries it as
   // "minera:untypedRelations".
   bool untyped_relations = false;
+  // The reference O2O frame is float64 when its reader found no link (round
+  // EO, observed black-box): read_ocel2_sqlite on an empty object_object
+  // table, read_ocel2_xml, read_ocel_json, read_ocel_xml and read_ocel_csv
+  // without links, and read_ocel2_json when the file lists no link (one
+  // dangling link makes it str); a frame whose links a filter removed keeps
+  // its type. write_ocel2_sqlite then declares the
+  // object_object columns REAL. The OCEL transport carries it as
+  // "minera:untypedO2o" while the log has no link.
+  bool untyped_o2o = false;
   // The resolution of a naive reference events frame (round DU), empty for
   // an aware one: an OCEL CSV file whose times carry no offset reads as
   // datetime64[us] (ns when a time has more than six fraction digits, s

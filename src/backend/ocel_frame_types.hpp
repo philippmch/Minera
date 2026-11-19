@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <map>
+#include <set>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -47,6 +48,9 @@ struct ColumnStats {
   // datetime), naive and aware apart.
   bool has_naive_date = false;
   bool has_aware_date = false;
+  // Round EO: an all-NULL type table column was concatenated in (an object
+  // column then, see kOcelHintNone).
+  bool has_none = false;
   std::size_t present = 0;
 
   void observe(const OcelValue& value) { observe(value, false); }
@@ -67,12 +71,14 @@ struct ColumnStats {
     has_string = has_string || other.has_string;
     has_naive_date = has_naive_date || other.has_naive_date;
     has_aware_date = has_aware_date || other.has_aware_date;
+    has_none = has_none || other.has_none;
     present += other.present;
   }
   [[nodiscard]] bool has_date() const { return has_naive_date || has_aware_date; }
 
   [[nodiscard]] Dtype dtype(std::size_t rows) const {
     if (present == 0) return Dtype::kEmpty;
+    if (has_none) return Dtype::kObject;
     const bool missing = present < rows;
     if (has_date())
       return has_string || has_bool || has_int || has_float || (has_naive_date && has_aware_date)
@@ -119,20 +125,14 @@ inline bool reference_date_value(const OcelTypeCatalog& catalog, const std::stri
 class Columns {
  public:
   void observe(const std::string& key, const OcelValue& value) {
-    auto [slot, added] = index_.try_emplace(key, names_.size());
-    if (added) {
-      names_.push_back(key);
-      stats_.emplace_back();
-    }
-    stats_[slot->second].observe(value);
+    const auto slot = register_name(key);
+    stats_[slot].observe(value);
+    kept_[slot].observe(value);
   }
   void observe(const std::string& key, const OcelValue& value, bool date) {
-    auto [slot, added] = index_.try_emplace(key, names_.size());
-    if (added) {
-      names_.push_back(key);
-      stats_.emplace_back();
-    }
-    stats_[slot->second].observe(value, date);
+    const auto slot = register_name(key);
+    stats_[slot].observe(value, date);
+    kept_[slot].observe(value, date);
   }
   void observe_row(const std::vector<OcelAttribute>& attributes) {
     ++rows_;
@@ -172,9 +172,11 @@ class Columns {
       stats.has_string = stats.has_string || (column.kinds & kOcelHintString);
       stats.has_naive_date = stats.has_naive_date || (column.kinds & kOcelHintNaiveDate);
       stats.has_aware_date = stats.has_aware_date || (column.kinds & kOcelHintAwareDate);
+      stats.has_none = stats.has_none || (column.kinds & kOcelHintNone);
       stats.present += column.present;
     }
     rows_ += hint.dropped_rows;
+    seeded_rows_ += hint.dropped_rows;
   }
 
   [[nodiscard]] const std::vector<std::string>& names() const { return names_; }
@@ -192,6 +194,24 @@ class Columns {
     const auto* found = stats(key);
     return found == nullptr ? Dtype::kEmpty : found->dtype(rows_);
   }
+  // Round EO: the dtype write_ocel_json, write_ocel2_json and write_ocel_xml
+  // print an events or objects frame column's cells as: an object column
+  // whose observed cells (not the seeded dropped rows) are numbers alone,
+  // ints and floats without a boolean, prints as float64 when one of those
+  // rows lacks a cell or holds a float, as int64 otherwise (pandas'
+  // infer_objects; observed black-box: such a column is object only through
+  // rows the reader dropped, a text or datetime there). The type
+  // declarations, write_ocel2_xml, write_ocel_csv and the changes frame keep
+  // the object column.
+  [[nodiscard]] Dtype printed_dtype(const std::string& key) const {
+    const auto found = index_.find(key);
+    if (found == index_.end()) return Dtype::kEmpty;
+    const auto column = stats_[found->second].dtype(rows_);
+    const auto& kept = kept_[found->second];
+    if (column != Dtype::kObject || kept.present == 0 || kept.has_bool || kept.has_string || kept.has_date())
+      return column;
+    return kept.has_float || kept.present < rows_ - seeded_rows_ ? Dtype::kFloat64 : Dtype::kInt64;
+  }
 
  private:
   std::size_t register_name(const std::string& key) {
@@ -199,14 +219,18 @@ class Columns {
     if (added) {
       names_.push_back(key);
       stats_.emplace_back();
+      kept_.emplace_back();
     }
     return slot->second;
   }
 
   std::vector<std::string> names_;
   std::vector<ColumnStats> stats_;
+  // The observed cells alone (printed_dtype).
+  std::vector<ColumnStats> kept_;
   std::unordered_map<std::string, std::size_t> index_;
   std::size_t rows_ = 0;
+  std::size_t seeded_rows_ = 0;
 };
 
 // Round EN: the changes frame's column order with its "ocel:field" and
@@ -278,6 +302,20 @@ inline Columns object_frame(const Ocel& log, bool dated = false) {
   return frame;
 }
 
+// Round EO: the names write_ocel_xml and write_ocel_json list as the log's
+// "attribute-names": the events and objects frames' columns (the hints'
+// dropped rows included), without the "ocel:" ones, sorted.
+inline std::set<std::string> frame_attribute_names(const Ocel& log) {
+  std::set<std::string> names;
+  const auto events = event_frame(log);
+  const auto objects = object_frame(log);
+  for (const auto& name : events.names())
+    if (!name.starts_with("ocel:")) names.insert(name);
+  for (const auto& name : objects.names())
+    if (!name.starts_with("ocel:")) names.insert(name);
+  return names;
+}
+
 // Round EM: rows a native log never held but the reference frames were built
 // from (an OCEL 2.0 SQLite type table's rows that are no event or object of
 // their own: change rows, rows without an id, repeated ids), as an owner and
@@ -291,15 +329,19 @@ struct HintRow {
 // object frame hints as dropped rows, and `extra_change_values` (the cells of
 // change rows outside their field) to the change frame hint as values
 // without rows (the change rows are the log's own).
+// Round EO: `extra_change_rows` are rows of the changes frame the reader
+// dropped (an OCEL 2.0 SQLite type table's rows without a changed field).
 inline void hint_extra_rows(Ocel& log, const std::vector<HintRow>& extra_events,
                             const std::vector<HintRow>& extra_objects,
-                            const std::vector<HintRow>& extra_change_values) {
+                            const std::vector<HintRow>& extra_change_values,
+                            const std::vector<HintRow>& extra_change_rows = {}) {
   const auto kinds_of = [](const ColumnStats& stats) {
     return static_cast<unsigned char>((stats.has_bool ? kOcelHintBool : 0) | (stats.has_int ? kOcelHintInt : 0) |
                                       (stats.has_float ? kOcelHintFloat : 0) |
                                       (stats.has_string ? kOcelHintString : 0) |
                                       (stats.has_naive_date ? kOcelHintNaiveDate : 0) |
-                                      (stats.has_aware_date ? kOcelHintAwareDate : 0));
+                                      (stats.has_aware_date ? kOcelHintAwareDate : 0) |
+                                      (stats.has_none ? kOcelHintNone : 0));
   };
   const auto fold = [&](OcelFrameHint& hint, const OcelTypeCatalog& catalog, const std::vector<HintRow>& extra,
                         bool rows, const auto& kept_rows) {
@@ -323,7 +365,7 @@ inline void hint_extra_rows(Ocel& log, const std::vector<HintRow>& extra_events,
     hint.dropped.clear();
     for (const auto& name : dropped.names()) {
       const auto* stats = dropped.stats(name);
-      if (stats == nullptr || stats->present == 0) continue;
+      if (stats == nullptr || (stats->present == 0 && !stats->has_none)) continue;
       hint.dropped.push_back({name, kinds_of(*stats), stats->present});
     }
     hint.dropped_rows = dropped.rows();
@@ -337,6 +379,20 @@ inline void hint_extra_rows(Ocel& log, const std::vector<HintRow>& extra_events,
   fold(log.change_frame_hint, log.object_type_attributes, extra_change_values, false, [&](Columns& all) {
     for (const auto& change : log.object_changes) all.observe_change(change);
   });
+  fold(log.change_frame_hint, log.object_type_attributes, extra_change_rows, true, [&](Columns& all) {
+    for (const auto& change : log.object_changes) all.observe_change(change);
+  });
+}
+
+// Round EO: marks `keys` in `hint` as columns a type table holds only NULLs
+// in (kOcelHintNone).
+inline void hint_none_columns(OcelFrameHint& hint, const std::vector<std::string>& keys) {
+  for (const auto& key : keys) {
+    const auto found = std::find_if(hint.dropped.begin(), hint.dropped.end(),
+                                    [&](const OcelFrameHintColumn& column) { return column.key == key; });
+    if (found != hint.dropped.end()) found->kinds = static_cast<unsigned char>(found->kinds | kOcelHintNone);
+    else hint.dropped.push_back({key, kOcelHintNone, 0});
+  }
 }
 
 // Round EM: records in the log's frame hints the rows about to be dropped:
@@ -350,7 +406,8 @@ void hint_dropped_rows(Ocel& log, DropEvent&& drop_event, DropObject&& drop_obje
                                       (stats.has_float ? kOcelHintFloat : 0) |
                                       (stats.has_string ? kOcelHintString : 0) |
                                       (stats.has_naive_date ? kOcelHintNaiveDate : 0) |
-                                      (stats.has_aware_date ? kOcelHintAwareDate : 0));
+                                      (stats.has_aware_date ? kOcelHintAwareDate : 0) |
+                                      (stats.has_none ? kOcelHintNone : 0));
   };
   // all: the frame over every row (its column order); dropped: the hint's
   // dropped rows and the new ones.
@@ -360,7 +417,7 @@ void hint_dropped_rows(Ocel& log, DropEvent&& drop_event, DropObject&& drop_obje
     hint.dropped.clear();
     for (const auto& name : dropped.names()) {
       const auto* stats = dropped.stats(name);
-      if (stats == nullptr || stats->present == 0) continue;
+      if (stats == nullptr || (stats->present == 0 && !stats->has_none)) continue;
       hint.dropped.push_back({name, kinds_of(*stats), stats->present});
     }
     hint.dropped_rows = dropped.rows();
@@ -444,8 +501,9 @@ using TypeDeclarations =
 // (observed black-box, round EK): "float" for a float64 frame column (an
 // integer column with a missing cell is one), "date" for a datetime64 one;
 // in an object column, by the type's own values: "date" when all are
-// datetimes, "float" when floats with no text or datetime (ints and booleans
-// next to them), otherwise "string" (also integer and boolean columns). Each
+// datetimes (naive next to aware too: round EO, x52_0046), "float" when
+// floats with no text or datetime (ints and booleans next to them),
+// otherwise "string" (also integer and boolean columns). Each
 // type lists its attributes with a value in global column order (changed
 // fields after the static ones, typed by the changes frame when the type
 // holds no static value); declared-only catalog entries follow with their
@@ -455,10 +513,7 @@ inline std::string reference_declared_type(Dtype column, const ColumnStats* owne
   if (column == Dtype::kDatetime) return "date";
   if (column != Dtype::kObject || owner == nullptr) return "string";
   if (owner->has_string) return "string";
-  if (owner->has_date())
-    return owner->has_bool || owner->has_int || owner->has_float || (owner->has_naive_date && owner->has_aware_date)
-               ? "string"
-               : "date";
+  if (owner->has_date()) return owner->has_bool || owner->has_int || owner->has_float ? "string" : "date";
   return owner->has_float ? "float" : "string";
 }
 

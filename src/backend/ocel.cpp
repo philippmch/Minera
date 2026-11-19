@@ -829,7 +829,7 @@ void apply_transport_frame_hint(const Json* hints, const char* name, AttributeRo
     const auto found = dropped.find(key);
     const std::int64_t kinds = found == dropped.end() ? 0 : found->second.first;
     const std::int64_t present = found == dropped.end() ? 0 : found->second.second;
-    if (kinds & (kOcelHintString | kOcelHintNaiveDate | kOcelHintAwareDate)) column.text = true;
+    if (kinds & (kOcelHintString | kOcelHintNaiveDate | kOcelHintAwareDate | kOcelHintNone)) column.text = true;
     if (kinds & kOcelHintBool) column.boolean = true;
     if (kinds & kOcelHintInt) column.integer = true;
     if (kinds & kOcelHintFloat) column.real = true;
@@ -873,6 +873,7 @@ void apply_transport_frame_hint(const Json* hints, const char* name, AttributeRo
 // is refused when it remains.
 struct ClassicListing {
   bool objects = false, relations = false;  // the file lists any (before the filtering)
+  bool o2o = false;                         // round EO: any object link (Ocel::untyped_o2o)
 };
 
 // Round EL: a transport's "minera:rawTime" of an event or change (see
@@ -1350,6 +1351,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
 
   // Object links: the target column reads as str (an int target 1 names
   // object "1"); a link to an object the frames do not keep is dropped.
+  listing.o2o = !links.empty();
   Column targets;
   for (const auto& link : links) targets.observe(&link.target);
   for (const auto& link : links) {
@@ -1390,6 +1392,27 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
         continue;
       log.e2e.push_back({source->string(), target->string(), qualifier == nullptr ? std::string{} : qualifier->string()});
     }
+  }
+  // Round EO: read_ocel_json builds its events and objects frames over every
+  // entry of the file and drops rows afterwards (observed black-box), so the
+  // frames keep the dropped rows' columns, in the file's order, and their
+  // values' kinds: the frame hints (OcelFrameHint), as the other readers
+  // record them. A transport brings its own.
+  if (!keep_unrelated && optional(root, "minera:frameHints") == nullptr) {
+    std::vector<ocel_frame::HintRow> extra_events, extra_objects;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+      if (event_kept[i]) continue;
+      std::string bad;
+      extra_events.push_back({event_activity[i].value_or(std::string{}), event_rows.attributes(i, bad)});
+    }
+    for (std::size_t i = 0; i < objects.size(); ++i) {
+      if (object_kept[i]) continue;
+      std::string bad;
+      extra_objects.push_back({object_type[i].value_or(std::string{}), object_rows.attributes(i, bad)});
+    }
+    ocel_frame::hint_extra_rows(log, extra_events, extra_objects, {});
+    if (!extra_events.empty()) log.event_frame_hint.columns = event_rows.names;
+    if (!extra_objects.empty()) log.object_frame_hint.columns = object_rows.names;
   }
   return log;
 }
@@ -1694,6 +1717,10 @@ Ocel parse_standard(const Json::Object& root) {
       log.globals[key] = scalar(value, key);
     }
   }
+  // Round EO: read_ocel2_json's O2O frame is float64 when the file lists no
+  // object link at all, str once it lists one, dangling or not (observed
+  // black-box; see Ocel::untyped_o2o).
+  log.untyped_o2o = log.o2o.empty();
   // The reference readers drop an object link to an unlisted object.
   std::erase_if(log.o2o, [&](const OcelO2oRelation& r) { return !types.count(r.target_id); });
   // Round EJ: read_ocel2_json builds its events, objects and changes frames
@@ -1733,6 +1760,18 @@ Ocel parse_standard(const Json::Object& root) {
     floatify(log.object_changes.size(), columns, [&](auto&& visit) {
       for (auto& change : log.object_changes) visit(change.field, change.value);
     });
+  }
+  // Round EO: read_ocel2_json builds its changes frame from records of an
+  // object id, type, "ocel:field", the field's value and "ocel:timestamp",
+  // so its field column stands first and its time column after the first
+  // change's field (observed black-box, g52_0223): write_ocel2_sqlite's type
+  // tables show it for a field without a static value (OcelFrameHint).
+  if (!log.object_changes.empty()) {
+    ocel_frame::Columns columns;
+    for (const auto& change : log.object_changes) columns.observe_change(change);
+    log.change_frame_hint.columns = columns.names();
+    log.change_frame_hint.field_at = 0;
+    log.change_frame_hint.time_at = 2;
   }
   return log;
 }
@@ -2015,6 +2054,31 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
   std::unordered_map<std::string_view, std::string_view> object_type_of;
   if (!transport_markers)
     for (const auto& object : log.objects) object_type_of.emplace(object.id, object.type);
+  const auto owner_of = [&](const OcelObjectChange& change) {
+    std::string owner = change.object_type;
+    if (owner.empty())
+      if (const auto found = object_type_of.find(change.object_id); found != object_type_of.end())
+        owner = std::string(found->second);
+    return owner;
+  };
+  // Round EO: a download prints an int of a float64 changes frame column as
+  // a float (observed black-box: read_ocel2_sqlite's union of the type
+  // tables, see OcelFrameHint); the transport keeps the value.
+  ocel_frame::Columns change_frame;
+  if (!transport_markers) {
+    change_frame.seed(log.change_frame_hint);
+    for (const auto* change : changes) {
+      change_frame.add_rows(1);
+      change_frame.observe_change(*change, log.object_type_attributes, owner_of(*change));
+    }
+  }
+  const auto write_cell = [&](const std::string& key, const OcelValue& value) {
+    if (const auto* integer = std::get_if<std::int64_t>(&value);
+        integer != nullptr && !transport_markers && change_frame.dtype(key) == ocel_frame::Dtype::kFloat64)
+      write_value(out, OcelValue(static_cast<double>(*integer)));
+    else
+      write_value(out, value);
+  };
   out << '[';
   bool first = true;
   for (const auto* change : changes) {
@@ -2035,10 +2099,7 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
     // Round EK: a download writes a change as write_ocel_json does (observed
     // black-box): a datetime value and the time as their isoformat, the time
     // after the value, no value key for a null value.
-    std::string owner = change->object_type;
-    if (owner.empty())
-      if (const auto found = object_type_of.find(change->object_id); found != object_type_of.end())
-        owner = std::string(found->second);
+    const std::string owner = owner_of(*change);
     if (transport_markers || !std::holds_alternative<std::nullptr_t>(change->value)) {
       out << ',';
       write_string(out, change->field);
@@ -2047,7 +2108,7 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
           ocel_frame::reference_date_value(log.object_type_attributes, owner, change->field, change->value))
         write_string(out, ocel_frame::object_datetime_text(std::get<std::string>(change->value)));
       else
-        write_value(out, change->value);
+        write_cell(change->field, change->value);
     }
     if (!transport_markers && change->raw_time != OcelRawTime::kNone) {
       if (!ocel_raw_time_missing(change->raw_time)) {
@@ -2070,7 +2131,7 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
           ocel_frame::reference_date_value(log.object_type_attributes, owner, cell.key, cell.value))
         write_string(out, ocel_frame::object_datetime_text(std::get<std::string>(cell.value)));
       else
-        write_value(out, cell.value);
+        write_cell(cell.key, cell.value);
     }
     out << '}';
   }
@@ -2080,7 +2141,8 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
 // Round EK: a download's vmap or ovmap, as write_ocel_json prints its frame
 // cells: a datetime as its column holds it (write_frame_value).
 // In the frame's column order, null cells left out (round EK, observed
-// black-box).
+// black-box). Round EO: an int as a float where the column prints as float64
+// (Columns::printed_dtype).
 void write_frame_attrs(std::ostringstream& out, const std::vector<OcelAttribute>& attrs,
                        const ocel_frame::Columns& frame, const OcelTypeCatalog& catalog,
                        const std::string& owner) {
@@ -2099,6 +2161,9 @@ void write_frame_attrs(std::ostringstream& out, const std::vector<OcelAttribute>
       const auto& text = std::get<std::string>(*v);
       write_string(out, frame.dtype(key) == ocel_frame::Dtype::kDatetime ? ocel_frame::datetime64_json_text(text)
                                                                          : ocel_frame::object_datetime_text(text));
+    } else if (const auto* integer = std::get_if<std::int64_t>(v);
+               integer != nullptr && frame.printed_dtype(key) == ocel_frame::Dtype::kFloat64) {
+      write_value(out, OcelValue(static_cast<double>(*integer)));
     } else {
       write_value(out, *v);
     }
@@ -2443,6 +2508,15 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   result.untyped_relations =
       untyped_marker ? std::get<bool>(untyped_marker->value)
                      : reference_read && (classic_reference ? !listing.relations : result.relations.empty());
+  // Round EO: the O2O frame of read_ocel_json and read_ocel2_json is float64
+  // when the file lists no object link (see Ocel::untyped_o2o).
+  if (const auto* marker = optional(r, "minera:untypedO2o")) {
+    if (!marker->is_bool()) throw std::invalid_argument("minera:untypedO2o must be boolean");
+    result.untyped_o2o = std::get<bool>(marker->value);
+  } else {
+    result.untyped_o2o = !keep_unrelated && !literal_names &&
+                         (classic_reference ? !listing.o2o : standard && result.untyped_o2o);
+  }
   result.naive_event_time_unit = std::move(naive_unit);
   if (const auto* marker = optional(r, "minera:noneEventTimes")) {
     if (!marker->is_bool()) throw std::invalid_argument("minera:noneEventTimes must be boolean");
@@ -2468,7 +2542,7 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
           if (!item.is_array() || item.array().size() != 3 || !item.array()[0].is_string())
             throw std::invalid_argument("minera:frameHints dropped entries must be [key, kinds, present]");
           const auto kinds = count(item.array()[1], "kinds");
-          if (kinds > 63) throw std::invalid_argument("minera:frameHints kinds must be below 64");
+          if (kinds > 127) throw std::invalid_argument("minera:frameHints kinds must be below 128");
           hint.dropped.push_back({item.array()[0].string(), static_cast<unsigned char>(kinds),
                                   count(item.array()[2], "present")});
         }
@@ -3540,18 +3614,39 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
   // probes en xt.py, jt.py). The routes and writers see the strs.
   const bool standard = reader == OcelTimestampReader::kDateutil || reader == OcelTimestampReader::kIsoFormat;
   bool kept_texts = reader == OcelTimestampReader::kDateutil;
+  // Round EO: a text the reader cannot take at all (a "+25:00" offset)
+  // keeps the column object too, and stays a str there next to the
+  // datetimes (observed black-box, g52_0020: write_ocel2_sqlite then writes
+  // the datetimes and NULL for the str).
+  const auto unreadable_change_time = [](const std::string& text) {
+    if (ocel_frame::pandas_nat_time_text(text)) return false;
+    try {
+      (void)iso_wall_microseconds(text);
+      return false;
+    } catch (const std::invalid_argument&) {
+      return true;
+    }
+  };
   if (reader == OcelTimestampReader::kIsoFormat)
     for (const auto& change : log.object_changes)
       if (change.raw_time == OcelRawTime::kNone &&
           (change.timestamp == "0" ||
-           (change.timestamp.starts_with("1970-01-01T00:00:00") && !parse_timestamp_exact(change.timestamp))))
+           (change.timestamp.starts_with("1970-01-01T00:00:00") && !parse_timestamp_exact(change.timestamp)) ||
+           unreadable_change_time(change.timestamp)))
         kept_texts = true;
   for (auto& change : log.object_changes) {
     const auto& text = change.timestamp;
     if (change.raw_time != OcelRawTime::kNone) continue;  // round EL: kept as read
     if (text.starts_with("1970-01-01T00:00:00") || (standard && text == "0")) {
       if (kept_texts) change.raw_time = OcelRawTime::kStr;
-      continue;
+      // Round EO: read_ocel2_json's pd.to_datetime(utc=True) of a datetime
+      // column reads a naive one as UTC, as its other naive change times
+      // (observed black-box, g52_0164); an aware one stays for the writers'
+      // UTC instant.
+      const auto exact = reader == OcelTimestampReader::kIsoFormat && !kept_texts
+                             ? parse_timestamp_exact(text)
+                             : std::nullopt;
+      if (!exact || exact->timezone_aware) continue;
     }
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
       const auto instant = parse_timestamp_exact(text);
@@ -3581,6 +3676,8 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
         }
       }
     }
+    if (!microseconds && standard && kept_texts && !ocel_frame::pandas_nat_time_text(text))
+      change.raw_time = OcelRawTime::kStr;
     if (microseconds && !natively_stored(text, *microseconds, aware, truncates))
       change.timestamp = stored_timestamp_text(text, *microseconds, false, aware);
   }
@@ -3794,6 +3891,8 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   const auto write_untyped_relations = [&] {
     if (log.relations.empty())
       out << ",\"minera:untypedRelations\":" << (log.untyped_relations ? "true" : "false");
+    // Round EO: see Ocel::untyped_o2o.
+    if (log.o2o.empty()) out << ",\"minera:untypedO2o\":" << (log.untyped_o2o ? "true" : "false");
   };
   // Round DU: a log whose reference events frame is naive travels with its
   // resolution and its texts (see Ocel::naive_event_time_unit).
@@ -4088,7 +4187,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << "{\"name\":";
       write_string(out, attribute->key);
       out << ",\"value\":";
-      write_frame_value(out, attribute->value, event_frame.dtype(attribute->key),
+      write_frame_value(out, attribute->value, event_frame.printed_dtype(attribute->key),
                         ocel_frame::reference_date_value(log.event_type_attributes, owner, attribute->key,
                                                          attribute->value));
       out << '}';
@@ -4186,7 +4285,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         write_string(out, attribute->key);
         out << ",\"time\":\"1970-01-01T00:00:00Z\"";
         out << ",\"value\":";
-        write_frame_value(out, attribute->value, object_frame.dtype(attribute->key),
+        write_frame_value(out, attribute->value, object_frame.printed_dtype(attribute->key),
                           ocel_frame::reference_date_value(log.object_type_attributes, object->type,
                                                            attribute->key, attribute->value));
         out << '}';
@@ -4337,10 +4436,17 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     else write_frame_attrs(out, event->attributes, classic_event_frame, log.event_type_attributes, event->activity);
     out << '}';
   }
-  out << "},\"ocel:eventTypes\":";
-  write_classic_type_catalog(out, classic_event_types);
-  out << ",\"ocel:objectTypes\":";
-  write_classic_type_catalog(out, classic_object_types);
+  out << '}';
+  // Round EO: write_ocel_json leaves out an empty type catalog (no events or
+  // no objects left, observed black-box: c56_0010); the transport keeps it.
+  if (transport_markers || !classic_event_types.empty()) {
+    out << ",\"ocel:eventTypes\":";
+    write_classic_type_catalog(out, classic_event_types);
+  }
+  if (transport_markers || !classic_object_types.empty()) {
+    out << ",\"ocel:objectTypes\":";
+    write_classic_type_catalog(out, classic_object_types);
+  }
   if (!log.e2e.empty()) {
     out << ",\"ocel:e2e\":";
     write_e2e(out, log, false);
@@ -4360,10 +4466,39 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     write_o2o(out, source_o2o(object->id));
     out << '}';
   }
-  out << "},\"ocel:objectChanges\":";
-  write_object_changes(out, log, transport_markers);
+  out << '}';
+  // Round EO: write_ocel_json writes no "ocel:objectChanges" for a log
+  // without objects (observed black-box: c56_0010); the transport keeps it.
+  if (transport_markers || !objects.empty()) {
+    out << ",\"ocel:objectChanges\":";
+    write_object_changes(out, log, transport_markers);
+  }
   out << ",\"ocel:global-log\":";
-  write_global_category(out, log, "ocel:global-log");
+  if (transport_markers) {
+    write_global_category(out, log, "ocel:global-log");
+  } else {
+    // Round EO: write_ocel_json writes the log scope it computes, whatever
+    // the log read: the objects frame's types in order, the frames' sorted
+    // attribute names (as write_ocel_xml lists them), version and ordering
+    // (observed black-box).
+    out << "{\"ocel:object-types\":[";
+    std::unordered_set<std::string_view> seen_types;
+    bool first_type = true;
+    for (const auto* object : objects) {
+      if (!seen_types.insert(object->type).second) continue;
+      if (!first_type) out << ',';
+      first_type = false;
+      write_string(out, object->type);
+    }
+    out << "],\"ocel:attribute-names\":[";
+    bool first_name = true;
+    for (const auto& name : ocel_frame::frame_attribute_names(log)) {
+      if (!first_name) out << ',';
+      first_name = false;
+      write_string(out, name);
+    }
+    out << "],\"ocel:version\":\"1.0\",\"ocel:ordering\":\"timestamp\"}";
+  }
   out << ",\"ocel:global-event\":";
   write_global_category(out, log, "ocel:global-event");
   out << ",\"ocel:global-object\":";

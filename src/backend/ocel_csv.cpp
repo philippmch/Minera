@@ -232,17 +232,13 @@ std::string csv_attribute_text(const OcelAttribute& attribute, const OcelTypeCat
   return value_text(attribute.value, dtype == ocel_frame::Dtype::kFloat64);
 }
 
+// Round EO: write_ocel_csv's to_csv quotes as Python's csv module does
+// with QUOTE_MINIMAL: a field holding the delimiter, a quote, CR or LF, not
+// one with leading or trailing blanks (observed black-box: x52_0031's
+// " 3").
 std::string escape_csv(std::string_view value, char delimiter) {
-  bool quote = false;
-  if (value.find_first_of(std::string("\"\r\n") + delimiter) !=
-      std::string_view::npos) {
-    quote = true;
-  }
-  if (!value.empty() && (value.front() == ' ' || value.front() == '\t' ||
-                         value.back() == ' ' || value.back() == '\t')) {
-    quote = true;
-  }
-  if (!quote) return std::string(value);
+  if (value.find_first_of(std::string("\"\r\n") + delimiter) == std::string_view::npos)
+    return std::string(value);
   std::string out;
   out.reserve(value.size() + 2);
   out.push_back('"');
@@ -358,7 +354,8 @@ void write_event_table(std::ostream& out, const Ocel& log,
       if (!seen.insert(attr.key).second) {
         throw std::invalid_argument("duplicate event attribute: " + attr.key);
       }
-      if (std::holds_alternative<std::nullptr_t>(attr.value)) continue;
+      // Round EO: a key whose values are all null is a frame column of NaN,
+      // which write_ocel_csv writes (observed black-box, bank b56).
       if (known_attributes.insert(attr.key).second) event_attributes.push_back(attr.key);
     }
   }
@@ -479,8 +476,7 @@ void write_object_table(std::ostream& out, const Ocel& log,
       if (!seen.insert(attr.key).second) {
         throw std::invalid_argument("duplicate object attribute: " + attr.key);
       }
-      if (std::holds_alternative<std::nullptr_t>(attr.value)) continue;
-      if (known.insert(attr.key).second) attributes.push_back(attr.key);
+      if (known.insert(attr.key).second) attributes.push_back(attr.key);  // nulls too (round EO)
     }
   }
   // Round EM: as for the events (OcelFrameHint).
@@ -1091,6 +1087,8 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   // every later function raises KeyError (black-box; see
   // ocel_relations_frame_degenerate). An object table changes nothing.
   if (elements.empty()) mark_ocel_relation_free_frames(log, false);
+  // Round EO: read_ocel_csv's O2O frame is float64 (Ocel::untyped_o2o).
+  log.untyped_o2o = log.o2o.empty();
   return log;
 }
 

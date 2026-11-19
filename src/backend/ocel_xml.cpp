@@ -1168,7 +1168,7 @@ void write_standard_value(std::ostream& out, const OcelValue& v, std::string_vie
 // <string> of its isoformat ("2024-02-01T08:30:00+00:00"), observed black-box.
 void write_classic_value(std::ostream& out, const OcelValue& v, std::string_view key,
                          std::string_view indent, bool float_column = false,
-                         bool date = false, bool mixed_dates = false) {
+                         bool date = false, bool mixed_dates = false, bool printed_float = false) {
   if (std::holds_alternative<std::nullptr_t>(v)) return;
   if (const auto* text = date ? ocel_frame::date_value_text(v) : nullptr) {
     if (mixed_dates) {
@@ -1188,6 +1188,13 @@ void write_classic_value(std::ostream& out, const OcelValue& v, std::string_view
     if (!std::isfinite(number)) return;
     out << indent << "<float key=\"" << esc(key) << "\" value=\""
         << ocel_frame::float_repr(number) << "\"/>\n";
+    return;
+  }
+  // Round EO: an int of an object column that prints as float64
+  // (Columns::printed_dtype) is the <string> of its float repr.
+  if (integer != nullptr && printed_float) {
+    out << indent << "<string key=\"" << esc(key) << "\" value=\""
+        << ocel_frame::float_repr(static_cast<double>(*integer)) << "\"/>\n";
     return;
   }
   out << indent << "<string key=\"" << esc(key) << "\" value=\""
@@ -1238,6 +1245,9 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   }
   // Both reference XML readers build the events frame activity first.
   log.event_activity_first = true;
+  // Round EO: read_ocel_xml has no O2O frame of links (float64), nor has
+  // read_ocel2_xml without one (Ocel::untyped_o2o).
+  log.untyped_o2o = !standard || log.o2o.empty();
   // read_ocel2_xml also drops an object link to an unlisted object (the
   // classic reader raises on a relation to one).
   if (standard) {
@@ -1251,10 +1261,8 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   // Both reference XML readers fail on a file without an event-object
   // relation to a listed object (observed black-box: AttributeError).
   // Round EJ: read_ocel2_xml says "'NoneType' object has no attribute
-  // 'index'" (observed black-box).
-  if (log.relations.empty())
-    throw std::invalid_argument(standard ? "'NoneType' object has no attribute 'index'"
-                                         : "OCEL XML file has no event-object relation");
+  // 'index'" (observed black-box); round EO: read_ocel_xml too (bank b56).
+  if (log.relations.empty()) throw std::invalid_argument("'NoneType' object has no attribute 'index'");
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   if (standard) sort_ocel_events_by_timestamp(log, OcelTimestampReader::kDateutil);
   else sort_ocel_xml_events(log, classic_times);
@@ -1384,13 +1392,9 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
     if (text.empty()) out << "  <global scope=\"" << scope << "\"/>\n";
     else out << "  <global scope=\"" << scope << "\">\n" << text << "  </global>\n";
   }
-  std::set<std::string> attribute_names;
-  for (const auto& event : log.events)
-    for (const auto& attribute : event.attributes)
-      if (!reserved_name(attribute.key)) attribute_names.insert(attribute.key);
-  for (const auto& object : log.objects)
-    for (const auto& attribute : object.attributes)
-      if (!reserved_name(attribute.key)) attribute_names.insert(attribute.key);
+  // Round EO: the attribute names are the frames' columns, those the dropped
+  // rows add included (OcelFrameHint), observed black-box.
+  const auto attribute_names = ocel_frame::frame_attribute_names(log);
   std::vector<std::string> object_types;
   std::unordered_set<std::string> seen_types;
   for (const auto& object : log.objects)
@@ -1506,7 +1510,8 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
                                 event_frame.dtype(attribute->key) == ocel_frame::Dtype::kFloat64,
                                 ocel_frame::declared_date(log.event_type_attributes,
                                                           event.activity, attribute->key),
-                                mixed_event_dates.contains(attribute->key));
+                                mixed_event_dates.contains(attribute->key),
+                                event_frame.printed_dtype(attribute->key) == ocel_frame::Dtype::kFloat64);
       }, !has_value(event.attributes));
       out << "    </event>\n";
     }
@@ -1526,7 +1531,8 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
                                 object_frame.dtype(attribute->key) == ocel_frame::Dtype::kFloat64,
                                 ocel_frame::declared_date(log.object_type_attributes,
                                                           object.type, attribute->key),
-                                mixed_object_dates.contains(attribute->key));
+                                mixed_object_dates.contains(attribute->key),
+                                object_frame.printed_dtype(attribute->key) == ocel_frame::Dtype::kFloat64);
       }, !has_value(object.attributes));
       out << "    </object>\n";
     }
@@ -1569,6 +1575,11 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
     };
     bool any_date = false, any_text = false;
     for (const auto& change : log.object_changes) {
+      // Round EO: a text an OCEL 2.0 reader kept (OcelRawTime::kStr) keeps
+      // the column object too, so a NaT there is None (observed black-box,
+      // g52_0224).
+      if (change.raw_time == OcelRawTime::kStr && !ocel_frame::pandas_nat_time_text(change.timestamp))
+        any_text = true;
       if (change.raw_time != OcelRawTime::kNone || ocel_frame::pandas_nat_time_text(change.timestamp)) continue;
       (readable(change.timestamp) ? any_date : any_text) = true;
     }
@@ -1609,6 +1620,12 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
   // Round EM: with the rows the reader or writer dropped (OcelFrameHint).
   const auto standard_event_frame = ocel_frame::event_frame(log);
   const auto standard_object_frame = ocel_frame::object_frame(log);
+  ocel_frame::Columns standard_change_frame;
+  standard_change_frame.seed(log.change_frame_hint);
+  for (const auto& change : log.object_changes) {
+    standard_change_frame.add_rows(1);
+    standard_change_frame.observe_change(change);
+  }
   out << (log.objects.empty() ? "  <objects/>\n" : "  <objects>\n");
   for (const auto& object : log.objects) {
     out << "    <object id=\"" << esc(object.id) << "\" type=\""
@@ -1638,10 +1655,17 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
       if (ocel_frame::naive_timestamp_text(text)) printed += "+00:00";
       return printed;
     };
+    // Round EO: an int of a float64 changes frame column prints as a float
+    // (observed black-box: read_ocel2_sqlite's union of the type tables).
+    const auto change_value = [&](const OcelObjectChange& change) -> OcelValue {
+      if (std::holds_alternative<std::nullptr_t>(change.value)) return std::string("None");
+      if (const auto* integer = std::get_if<std::int64_t>(&change.value);
+          integer != nullptr && standard_change_frame.dtype(change.field) == ocel_frame::Dtype::kFloat64)
+        return static_cast<double>(*integer);
+      return change.value;
+    };
     for (const auto* change : object_changes)
-      write_standard_value(attributes,
-                           std::holds_alternative<std::nullptr_t>(change->value) ? OcelValue(std::string("None"))
-                                                                                  : change->value,
+      write_standard_value(attributes, change_value(*change),
                            change->field, "        ",
                            ocel_frame::pandas_nat_time_text(change->timestamp)
                                ? std::string("NaT")

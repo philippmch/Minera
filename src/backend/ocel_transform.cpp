@@ -147,6 +147,7 @@ Ocel empty_like(const Ocel& log) {
   result.table_columns = log.table_columns;
   result.event_activity_first = log.event_activity_first;
   result.untyped_relations = log.untyped_relations;
+  result.untyped_o2o = log.untyped_o2o;
   result.naive_event_time_unit = log.naive_event_time_unit;
   result.none_event_times = log.none_event_times;
   // Round EM: the rows the reader dropped still type the frames.
