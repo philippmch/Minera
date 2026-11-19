@@ -879,13 +879,14 @@ struct ClassicListing {
 // OcelRawTime): "str", "int", "float" or "nan".
 OcelRawTime transport_raw_time(const Json* marker) {
   if (marker == nullptr) return OcelRawTime::kNone;
-  if (!marker->is_string()) throw std::invalid_argument("minera:rawTime must be str, int, float or nan");
+  if (!marker->is_string()) throw std::invalid_argument("minera:rawTime must be str, int, float, nan or none");
   const auto& kind = marker->string();
   if (kind == "str") return OcelRawTime::kStr;
   if (kind == "int") return OcelRawTime::kInt;
   if (kind == "float") return OcelRawTime::kFloat;
   if (kind == "nan") return OcelRawTime::kNaN;
-  throw std::invalid_argument("minera:rawTime must be str, int, float or nan");
+  if (kind == "none") return OcelRawTime::kNull;  // round EN
+  throw std::invalid_argument("minera:rawTime must be str, int, float, nan or none");
 }
 
 Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, bool lenient_times,
@@ -1064,6 +1065,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
     OcelValue value;
     std::string refusal;  // why a native OCEL cannot hold it, if it remains
     OcelRawTime raw_time = OcelRawTime::kNone;
+    std::vector<OcelAttribute> cells;  // round EN: see OcelObjectChange::cells
   };
   std::vector<RawChange> changes;
   if (const auto* raw_changes = optional(root, "ocel:objectChanges"); raw_changes && !raw_changes->is_null()) {
@@ -1184,6 +1186,19 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
           if (!value.unrepresentable.empty()) refuse("value '" + raw.field + "' " + value.unrepresentable);
           else raw.value = std::move(value.value);
         }
+      }
+      // Round EN: the entry's other non-null keys are the row's other cells
+      // (OcelObjectChange::cells); one native cannot hold stays a column
+      // type only, as before.
+      for (const auto& key : entry->keys) {
+        if (key == "ocel:oid" || key == "ocel:type" || key == "ocel:timestamp" || key == "ocel:field" ||
+            key == raw.field || key.starts_with("minera:"))
+          continue;
+        const auto& cell_json = change.at(key);
+        if (missing_value(cell_json)) continue;
+        auto value = change_rows.cell(key, cell_json);
+        if (!value.unrepresentable.empty() || std::holds_alternative<std::nullptr_t>(value.value)) continue;
+        raw.cells.push_back({key, std::move(value.value)});
       }
       changes.push_back(std::move(raw));
     }
@@ -1357,7 +1372,8 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
       raise("OCEL JSON object change of " + objects[change.object].id + ": pm4py gives it the object type " +
             repr(*type) + " as the file has it (no str), which a native OCEL cannot hold");
     log.object_changes.push_back({objects[change.object].id, *object_type[change.object], std::move(change.time),
-                                  std::move(change.field), std::move(change.value), change.raw_time});
+                                  std::move(change.field), std::move(change.value), change.raw_time,
+                                  std::move(change.cells)});
   }
 
   // Native extensions the reference ignores: event links (an entry native
@@ -1858,8 +1874,8 @@ bool reference_drops_attribute(std::string_view key) { return key.starts_with("o
 using StandardTypeTable = ocel_frame::TypeDeclarations;
 
 void collect_standard_types(const Ocel& log, StandardTypeTable& object_types,
-                            StandardTypeTable& event_types) {
-  ocel_frame::reference_type_declarations(log, object_types, event_types);
+                            StandardTypeTable& event_types, bool with_catalog = false) {
+  ocel_frame::reference_type_declarations(log, object_types, event_types, with_catalog);
 }
 
 void write_standard_type_table(std::ostringstream& out,
@@ -1973,6 +1989,7 @@ const char* raw_time_name(OcelRawTime kind) {
     case OcelRawTime::kInt: return "int";
     case OcelRawTime::kFloat: return "float";
     case OcelRawTime::kNaN: return "nan";
+    case OcelRawTime::kNull: return "none";
     default: return "";
   }
 }
@@ -1983,6 +2000,7 @@ const char* raw_time_name(OcelRawTime kind) {
 void write_raw_time(std::ostringstream& out, OcelRawTime kind, const std::string& text) {
   if (kind == OcelRawTime::kStr) write_string(out, text);
   else if (kind == OcelRawTime::kNaN) out << "NaN";
+  else if (kind == OcelRawTime::kNull) out << "null";
   else if (text == "inf") out << "Infinity";
   else if (text == "-inf") out << "-Infinity";
   else out << text;
@@ -2032,13 +2050,27 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
         write_value(out, change->value);
     }
     if (!transport_markers && change->raw_time != OcelRawTime::kNone) {
-      if (change->raw_time != OcelRawTime::kNaN) {
+      if (!ocel_raw_time_missing(change->raw_time)) {
         out << ",\"ocel:timestamp\":";
         write_raw_time(out, change->raw_time, change->timestamp);
       }
     } else if (!transport_markers && !nat_change_time(change->timestamp)) {
       out << ",\"ocel:timestamp\":";
       write_string(out, ocel_frame::utc_timestamp_text(change->timestamp, 'T', "+00:00"));
+    }
+    // Round EN: the row's other non-null cells, read_ocel2_sqlite's
+    // "@@cumcount" last (write_ocel_json prints every non-null cell of the
+    // changes frame row, observed black-box); the transport keeps them so.
+    for (const auto& cell : change->cells) {
+      if (std::holds_alternative<std::nullptr_t>(cell.value)) continue;
+      out << ',';
+      write_string(out, cell.key);
+      out << ':';
+      if (!transport_markers &&
+          ocel_frame::reference_date_value(log.object_type_attributes, owner, cell.key, cell.value))
+        write_string(out, ocel_frame::object_datetime_text(std::get<std::string>(cell.value)));
+      else
+        write_value(out, cell.value);
     }
     out << '}';
   }
@@ -2442,6 +2474,18 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
         }
       }
       if (const auto* rows = optional(entry, "rows")) hint.dropped_rows = count(*rows, "rows");
+      // Round EN: the changes frame's field and time places (both or none).
+      const auto* field = optional(entry, "field");
+      const auto* time = optional(entry, "time");
+      if ((field == nullptr) != (time == nullptr))
+        throw std::invalid_argument("minera:frameHints field and time come together");
+      if (field != nullptr) {
+        hint.field_at = count(*field, "field");
+        hint.time_at = count(*time, "time");
+        if (*hint.field_at == *hint.time_at || *hint.field_at > hint.columns.size() + 1 ||
+            *hint.time_at > hint.columns.size() + 1)
+          throw std::invalid_argument("minera:frameHints field and time must be distinct places");
+      }
     };
     read("events", result.event_frame_hint);
     read("objects", result.object_frame_hint);
@@ -3130,7 +3174,7 @@ OcelRawTime raw_sqlite_time(const OcelSqliteTime& time, std::string& text) {
       text = python::float_repr(time.real);
       return OcelRawTime::kFloat;
     case OcelSqliteTime::Kind::kText: return OcelRawTime::kStr;
-    default: text.clear(); return OcelRawTime::kNaN;
+    default: text.clear(); return time.none ? OcelRawTime::kNull : OcelRawTime::kNaN;
   }
 }
 
@@ -3468,15 +3512,47 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
     }
   }
   for (auto& [index, text] : rewrites) log.events[index].timestamp = std::move(text);
+  // Round EN: the reference builds the events frame in file order and sorts
+  // it after, so its columns keep the file's first appearance (observed
+  // black-box, read_ocel2_json): the frame hint keeps that order when the
+  // sorted events would give another.
+  std::vector<std::string> file_columns;
+  {
+    ocel_frame::Columns frame;
+    frame.seed(log.event_frame_hint);
+    for (const auto& event : log.events) frame.observe_row(event.attributes);
+    file_columns = frame.names();
+  }
+  const auto keep_file_columns = [&] {
+    ocel_frame::Columns frame;
+    frame.seed(log.event_frame_hint);
+    for (const auto& event : log.events) frame.observe_row(event.attributes);
+    if (frame.names() != file_columns) log.event_frame_hint.columns = file_columns;
+  };
   // Object changes take the same reading as events, so a change keeps its
   // value through every export format. A text the reader cannot take, and a
   // 1970-01-01T00:00:00 base entry (kept raw by the reference), stays as is.
+  // read_ocel2_xml and read_ocel2_json keep a change time of "0" as its text
+  // too. Round EN: read_ocel2_xml's kept texts are strs in its frame (next
+  // to the datetimes an object column); read_ocel2_json converts the column
+  // with pd.to_datetime(utc=True) after, so they are strs only when a text
+  // pandas cannot read ("0") keeps the column object (observed black-box,
+  // probes en xt.py, jt.py). The routes and writers see the strs.
+  const bool standard = reader == OcelTimestampReader::kDateutil || reader == OcelTimestampReader::kIsoFormat;
+  bool kept_texts = reader == OcelTimestampReader::kDateutil;
+  if (reader == OcelTimestampReader::kIsoFormat)
+    for (const auto& change : log.object_changes)
+      if (change.raw_time == OcelRawTime::kNone &&
+          (change.timestamp == "0" ||
+           (change.timestamp.starts_with("1970-01-01T00:00:00") && !parse_timestamp_exact(change.timestamp))))
+        kept_texts = true;
   for (auto& change : log.object_changes) {
     const auto& text = change.timestamp;
     if (change.raw_time != OcelRawTime::kNone) continue;  // round EL: kept as read
-    if (text.starts_with("1970-01-01T00:00:00")) continue;
-    // read_ocel2_xml keeps a change time of "0" as its text too.
-    if (reader == OcelTimestampReader::kDateutil && text == "0") continue;
+    if (text.starts_with("1970-01-01T00:00:00") || (standard && text == "0")) {
+      if (kept_texts) change.raw_time = OcelRawTime::kStr;
+      continue;
+    }
     if (reader == OcelTimestampReader::kInstantNanoseconds) {
       const auto instant = parse_timestamp_exact(text);
       if (instant && (!instant->timezone_aware || instant->offset_minutes != 0))
@@ -3522,6 +3598,7 @@ static void sort_ocel_events(Ocel& log, OcelTimestampReader reader, bool keep_na
   for (const auto& key : keys) events.push_back(std::move(log.events[std::get<2>(key)]));
   for (const auto index : undated) events.push_back(std::move(log.events[index]));
   log.events = std::move(events);
+  keep_file_columns();
   // Relations sort by their event's time, stably: events at one instant keep
   // their relations' order, which is the event order in the JSON, XML and
   // CSV files (relations nested in events) but the event_object row order
@@ -3751,7 +3828,9 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         write_string(out, hint.dropped[i].key);
         out << ',' << static_cast<unsigned>(hint.dropped[i].kinds) << ',' << hint.dropped[i].present << ']';
       }
-      out << "],\"rows\":" << hint.dropped_rows << '}';
+      out << "],\"rows\":" << hint.dropped_rows;
+      if (hint.field_at && hint.time_at) out << ",\"field\":" << *hint.field_at << ",\"time\":" << *hint.time_at;
+      out << '}';
     };
     write("events", log.event_frame_hint);
     write("objects", log.object_frame_hint);
@@ -3980,7 +4059,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     change_frame.seed(log.change_frame_hint);
     for (const auto& change : log.object_changes) {
       change_frame.add_rows(1);
-      change_frame.observe(change.field, change.value, change_date(change));
+      change_frame.observe_change(change, log.object_type_attributes, change_owner(change));
     }
   }
   // Round EK: a download prints an object change's time as the reference
@@ -4040,19 +4119,19 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     // open source view of a route keeps the empty time.
     if (!transport_markers)
       for (const auto* event : events)
-        if (event->raw_time == OcelRawTime::kNaN ||
+        if (ocel_raw_time_missing(event->raw_time) ||
             (event->raw_time == OcelRawTime::kNone && ocel_frame::nat_time_text(event->timestamp)))
           throw std::invalid_argument("KeyError: 'ocel:timestamp'");
     // Round EJ: and on a NaT change time (an OCEL 2.0 JSON change without a
     // time; observed black-box).
     if (!transport_markers)
       for (const auto& change : log.object_changes)
-        if (change.raw_time == OcelRawTime::kNaN ||
+        if (ocel_raw_time_missing(change.raw_time) ||
             (change.raw_time == OcelRawTime::kNone && nat_change_time(change.timestamp)))
           throw std::invalid_argument("KeyError: 'ocel:timestamp'");
     StandardTypeTable object_types;
     StandardTypeTable event_types;
-    collect_standard_types(log, object_types, event_types);
+    collect_standard_types(log, object_types, event_types, transport_markers);
     out << "{\"ocelVersion\":\"2.0\",\"objectTypes\":";
     write_standard_type_table(out, object_types);
     out << ",\"eventTypes\":";
@@ -4226,7 +4305,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     } else if (event->raw_time != OcelRawTime::kNone) {
       // Round EL: write_ocel_json writes a raw time as its Python value, a
       // number as a JSON number, and leaves NaN out (observed black-box).
-      if (event->raw_time != OcelRawTime::kNaN) {
+      if (!ocel_raw_time_missing(event->raw_time)) {
         out << ",\"ocel:timestamp\":";
         write_raw_time(out, event->raw_time, event->timestamp);
       }
@@ -5522,7 +5601,7 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
       if (const auto found = events_by_object.find(object.id); found != events_by_object.end()) {
         auto kind = events.at(found->second.back())->raw_time;
         for (auto id = found->second.rbegin(); id != found->second.rend(); ++id)
-          if (const auto own = events.at(*id)->raw_time; own != OcelRawTime::kNaN) {
+          if (const auto own = events.at(*id)->raw_time; !ocel_raw_time_missing(own)) {
             kind = own;
             break;
           }

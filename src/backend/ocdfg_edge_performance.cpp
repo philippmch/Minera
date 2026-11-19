@@ -117,7 +117,8 @@ OcdfgPerformanceError ocdfg_raw_pair_error(OcelRawTime from,OcelRawTime to,bool 
   if(from==OcelRawTime::kStr)return OcdfgPerformanceError("TypeError","str.replace() takes no keyword arguments");
   return OcdfgPerformanceError("AttributeError","'"+from_type+"' object has no attribute 'replace'");
  }
- if(from==OcelRawTime::kStr||to==OcelRawTime::kStr)
+ // Round EN: None (OcelRawTime::kNull) raises as a str does.
+ if(from==OcelRawTime::kStr||to==OcelRawTime::kStr||from==OcelRawTime::kNull||to==OcelRawTime::kNull)
   return OcdfgPerformanceError("TypeError","unsupported operand type(s) for -: '"+to_type+"' and '"+from_type+"'");
  return OcdfgPerformanceError("AttributeError",std::string("'")+(from==OcelRawTime::kInt&&to==OcelRawTime::kInt?"int":"float")+"' object has no attribute 'total_seconds'");
 }

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EM (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EN (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7453,6 +7453,73 @@ test's description error; fixed, then passed), the fixture replay gave
 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-em/`.
+
+Round EN re-reviewed EM (Review EN1). EM's CI run 44495021150 on
+ab04399f: all six jobs green, the Linux, macOS and Windows ctest included.
+EN swept EJ's JSON bank b52, the SQLite banks b51, b53 and b54 through
+rsw3, esw and xsw (`ek/runE1.sh`, `O=en2`), a new spoiled OCEL 2.0 XML
+bank b55 (`en/x/x2gen.py`: o2gen logs written as OCEL 2.0 XML keeping
+unrelated events and objects, with value texts of other kinds;
+`en/x/runx.sh`, `O=x2`) and a column-order sweep of every download
+(`en/o/osw.py`, `en/o/runo.sh` on b51 as SQLite and as OCEL 2.0 JSON):
+- read_ocel2_sqlite keeps a change row's other cells and a `@@cumcount`
+  column, which every writer prints or declares (EN1-1);
+- write_ocel2_sqlite writes each type's table from its object rows and
+  change rows, concatenated, typed per table, only for the types with
+  rows (EN1-2; s53_0172's download);
+- the frames take their column order from the files (SQLite type tables
+  with rows in type order, the OCEL 2.0 JSON file order before the sort),
+  and the downloads declare only the used types (EN1-3);
+- a NULL time of an object column reads as None (`OcelRawTime::kNull`,
+  rawTime `"none"`), which OC-DFG names `NoneType` (EN1-4);
+- read_ocel2_xml keeps epoch change texts as str, read_ocel2_json only
+  when an unreadable text keeps the column object; write_ocel2_sqlite's
+  coercion of such a column raises on a naive text (EN1-5).
+After the fixes: imports 0 of 100 (b51), 0 of 300 (b53, b54), 0 of 400
+(b55), 42 of 300 (b52, the strict JSON refusals as before); rsw3 b52 331
+of 10,062 (unchanged), b53 251 of 10,101 (EM's server: 252), b51 0 of
+3,900, b54 21 of 10,491 (unchanged; s54_0163's OC-DFG pair follows the
+hash seed in pm4py), b55 272 of 10,530 (EM's server: 447; the declared
+fractions, "inf" texts and +25:00 offsets, and 4 open lines); esw and xsw
+unchanged on b53 and b54, 0 on b55; column order 0 of 600 (SQLite-read;
+EM's server: 41 in 30 files) and 10 of 600 (OCEL 2.0 JSON-read: the CSV
+type columns, hash-seed dependent in pm4py, declared).
+
+In the suite: `minera_review_en1_tests` (hand cases of EN1-1 to EN1-5, the
+SQLite ones checked against pm4py); `minera_review_el1_tests` follows
+EN1-4. The full ctest passed 634 of 635 on the first run (the EL test's
+NaN for a mixed column's NULL; updated, then passed), the fixture replay
+gave 2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-en/`.
+
+Next round (EO) should start by re-reviewing round EN:
+
+- EN's CI run;
+- the OCEL 2.0 XML date attribute column mixing aware and naive datetimes
+  (x52_0046, x52_0190: pm4py writes the values as datetimes, native as
+  strings);
+- the raw-column routes no sweep reaches yet (playout, causal nets, the
+  OCPN routes, the LLM abstraction) on b53, b54 and b55;
+- the frame hints through the OCEL 1.0 XML and JSON readers (b55 found no
+  frame type or order difference through the OCEL 2.0 XML reader, on EM's
+  server either);
+- from EM's list, not taken: the remaining OCEL routes on a time column of
+  None and NaT times, the LLM OCEL context on the other readers' frames,
+  the OCEL 1.0 XML vmap entries and keyless values, causal-net routes on
+  NaT logs;
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EN's list, taken in EN: EM's CI, s53_0172's SQLite download, None
+for NULL times of object columns (OC-DFG's NoneType), the frame hints
+through the OCEL 2.0 XML reader (bank b55), the frames' column order of
+every download (osw), the SQLite change cells. Not taken (carried to EO):
+playout, causal nets, OCPN and the other routes the sweeps do not reach,
+the OCEL 1.0 readers' frame hints, and EM's carried items.
+
+Previous list for round EN (kept for its older items):
 
 Next round (EN) should start by re-reviewing round EM:
 

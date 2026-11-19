@@ -33,11 +33,24 @@ struct OcelAttribute {
 // pm4py's type errors or write the value as pm4py does. kNone is a time of
 // a converted column. The OCEL transport carries the kinds
 // ("minera:rawEventTimes", "minera:rawChangeTimes").
-enum class OcelRawTime : unsigned char { kNone, kStr, kInt, kFloat, kNaN };
+// Round EN: a NULL time of a type table whose read_sql column is object
+// (texts or blobs next to numbers, or NULLs only) is Python's None there, a
+// NULL of a numeric or text-only table NaN (observed black-box: OC-DFG then
+// names `NoneType`); kNull is such a None.
+enum class OcelRawTime : unsigned char { kNone, kStr, kInt, kFloat, kNaN, kNull };
 
-// The Python type name of a raw time ("str", "int", "float"; NaN is a float).
+// The Python type name of a raw time ("str", "int", "float"; NaN is a float,
+// None a NoneType).
 [[nodiscard]] inline const char* ocel_raw_time_type(OcelRawTime kind) {
-  return kind == OcelRawTime::kStr ? "str" : kind == OcelRawTime::kInt ? "int" : "float";
+  return kind == OcelRawTime::kStr     ? "str"
+         : kind == OcelRawTime::kInt   ? "int"
+         : kind == OcelRawTime::kNull  ? "NoneType"
+                                       : "float";
+}
+
+// Round EN: whether a raw time is missing for pandas (NaN or None).
+[[nodiscard]] inline bool ocel_raw_time_missing(OcelRawTime kind) {
+  return kind == OcelRawTime::kNaN || kind == OcelRawTime::kNull;
 }
 
 struct OcelEvent {
@@ -79,7 +92,19 @@ struct OcelObjectChange {
   std::string field;
   OcelValue value;
   OcelRawTime raw_time = OcelRawTime::kNone;  // see OcelEvent
+  // Round EN: the change row's other cells as pm4py's changes frame holds
+  // them (observed black-box): an OCEL 2.0 SQLite change row's non-null
+  // cells in other fields' columns, in table column order, then
+  // read_ocel2_sqlite's "@@cumcount" (the row's place among its object's
+  // rows over the object tables in type order). The writers that print
+  // whole change rows print them (write_ocel2_sqlite, write_ocel_json), and
+  // they type the changes frame's columns. The OCEL transport carries them
+  // ("minera:cells").
+  std::vector<OcelAttribute> cells;
 };
+
+// Round EN: read_ocel2_sqlite's row counter column of the changes frame.
+inline constexpr const char* kOcelCumcountColumn = "@@cumcount";
 
 // Round EM: pandas types a frame column over every row the frame was built
 // from and keeps its columns in that build's order. The reference readers
@@ -112,7 +137,16 @@ struct OcelFrameHint {
   std::vector<std::string> columns;
   std::vector<OcelFrameHintColumn> dropped;
   std::size_t dropped_rows = 0;
-  [[nodiscard]] bool empty() const { return columns.empty() && dropped.empty() && dropped_rows == 0; }
+  // Round EN (changes frame only): its "ocel:field" and "ocel:timestamp"
+  // columns stand before the attribute column columns[field_at]
+  // (columns[time_at]); unset, after every attribute column. pm4py's
+  // write_ocel2_sqlite orders a type table's change-only columns so
+  // (observed black-box).
+  std::optional<std::size_t> field_at;
+  std::optional<std::size_t> time_at;
+  [[nodiscard]] bool empty() const {
+    return columns.empty() && dropped.empty() && dropped_rows == 0 && !field_at && !time_at;
+  }
 };
 
 // Declared OCEL type metadata is kept separately from observed records so
@@ -277,6 +311,9 @@ struct OcelSqliteTime {
   Kind kind = Kind::kNull;
   std::int64_t integer = 0;
   double real = 0;
+  // Round EN: a NULL read_sql reads as None (its table's column is object:
+  // texts or blobs next to numbers, blobs, or NULLs only), not NaN.
+  bool none = false;
 };
 // pandas' dtype of the concatenated column.
 enum class OcelSqliteTimeColumn { kInteger, kReal, kObject };

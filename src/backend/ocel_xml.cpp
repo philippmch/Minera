@@ -1478,7 +1478,7 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
                                     (event.raw_time == OcelRawTime::kInt ? "int" : "float") + "'");
       if (event.raw_time == OcelRawTime::kStr)
         out << "      <string key=\"timestamp\" value=\"" << esc(event.timestamp) << "\"/>\n";
-      else if (event.raw_time == OcelRawTime::kNaN) {
+      else if (ocel_raw_time_missing(event.raw_time)) {
       } else if (!ocel_frame::nat_time_text(event.timestamp))
         out << "      <date key=\"timestamp\" value=\""
             << esc(event_offset ? ocel_frame::offset_timestamp_text(event.timestamp, 'T',
@@ -1673,7 +1673,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
   if (!log.events.empty() && log.events.front().raw_time != OcelRawTime::kNone) {
     const auto kind = log.events.front().raw_time;
     throw std::invalid_argument(std::string("AttributeError: '") +
-                                (kind == OcelRawTime::kStr ? "str" : kind == OcelRawTime::kInt ? "int" : "float") +
+                                ocel_raw_time_type(kind) +
                                 "' object has no attribute 'isoformat'");
   }
   out << (log.events.empty() ? "  <events/>\n" : "  <events>\n");

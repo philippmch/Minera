@@ -136,12 +136,14 @@ void raw_event_column() {
   expect(log.events[0].raw_time == OcelRawTime::kInt && log.events[0].timestamp == "1707127200", "int kept");
   expect(log.events[1].raw_time == OcelRawTime::kStr && log.events[1].timestamp == "2024-01-03 10:00:00+00:00",
          "text kept as read");
-  expect(log.events[3].raw_time == OcelRawTime::kNaN && log.events[3].timestamp.empty(), "NULL is NaN");
+  // Round EN (EN1-4): read_sql reads a NULL of this object column (numbers
+  // next to texts) as None, not NaN.
+  expect(log.events[3].raw_time == OcelRawTime::kNull && log.events[3].timestamp.empty(), "NULL is None");
 
   // The transport keeps the kinds and the order.
   const auto back = parse_ocel_json(serialize_ocel_json(log));
   expect(back.events.size() == 4 && back.events[0].id == "e2" && back.events[0].raw_time == OcelRawTime::kInt &&
-             back.events[3].raw_time == OcelRawTime::kNaN,
+             back.events[3].raw_time == OcelRawTime::kNull,
          "transport keeps the raw kinds");
 
   // write_ocel_json: numbers as numbers, NaN left out.

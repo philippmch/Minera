@@ -433,7 +433,7 @@ void write_event_table(std::ostream& out, const Ocel& log,
   std::vector<std::string> timestamps;
   if (raw_times) {
     for (const auto& event : log.events)
-      timestamps.push_back(event.raw_time == OcelRawTime::kNaN ? std::string{} : event.timestamp);
+      timestamps.push_back(ocel_raw_time_missing(event.raw_time) ? std::string{} : event.timestamp);
   } else {
     timestamps = ocel_frame::pandas_timestamp_column_text(timestamp_texts);
   }

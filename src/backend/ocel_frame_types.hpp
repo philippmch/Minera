@@ -147,6 +147,17 @@ class Columns {
               reference_date_value(catalog, owner, attribute.key, attribute.value));
   }
   void add_rows(std::size_t rows) { rows_ += rows; }
+  // Round EN: a change row of `owner` (counts no row): its field's value and
+  // its other cells (OcelObjectChange::cells), date values by the catalog.
+  void observe_change(const OcelObjectChange& change, const OcelTypeCatalog& catalog, const std::string& owner) {
+    observe(change.field, change.value, reference_date_value(catalog, owner, change.field, change.value));
+    for (const auto& cell : change.cells)
+      observe(cell.key, cell.value, reference_date_value(catalog, owner, cell.key, cell.value));
+  }
+  void observe_change(const OcelObjectChange& change) {
+    observe(change.field, change.value);
+    for (const auto& cell : change.cells) observe(cell.key, cell.value);
+  }
 
   // Round EM: the frame as the reference built it (see OcelFrameHint): its
   // column order first, then the dropped rows' values and row count. Call
@@ -197,6 +208,53 @@ class Columns {
   std::unordered_map<std::string, std::size_t> index_;
   std::size_t rows_ = 0;
 };
+
+// Round EN: the changes frame's column order with its "ocel:field" and
+// "ocel:timestamp" columns placed among `names` (the frame's attribute
+// columns, seeded from `hint`): where the hint puts them
+// (OcelFrameHint::field_at, time_at), else after the attribute columns,
+// before "@@cumcount" (pm4py's JSON and XML readers: write_ocel2_sqlite
+// writes them after the other columns, observed black-box).
+inline constexpr const char* kChangeFieldColumn = "ocel:field";
+inline constexpr const char* kChangeTimeColumn = "ocel:timestamp";
+inline std::vector<std::string> change_frame_order(const OcelFrameHint& hint,
+                                                   const std::vector<std::string>& names) {
+  const std::size_t total = names.size() + 2;
+  std::vector<std::string> order;
+  order.reserve(total);
+  if (hint.field_at && hint.time_at && *hint.field_at < total && *hint.time_at < total &&
+      *hint.field_at != *hint.time_at) {
+    std::size_t next = 0;
+    for (std::size_t at = 0; at < total; ++at) {
+      if (at == *hint.field_at) order.emplace_back(kChangeFieldColumn);
+      else if (at == *hint.time_at) order.emplace_back(kChangeTimeColumn);
+      else order.push_back(names[next++]);
+    }
+    return order;
+  }
+  bool placed = false;
+  for (const auto& name : names) {
+    if (!placed && name == kOcelCumcountColumn) {
+      order.emplace_back(kChangeFieldColumn);
+      order.emplace_back(kChangeTimeColumn);
+      placed = true;
+    }
+    order.push_back(name);
+  }
+  if (!placed) {
+    order.emplace_back(kChangeFieldColumn);
+    order.emplace_back(kChangeTimeColumn);
+  }
+  return order;
+}
+
+// Round EN: a frame hint's build order `columns` is redundant when the
+// frame's first appearance over the kept rows gives it: no dropped rows, no
+// field or time places, and the same names in the same order.
+inline void trim_frame_hint(OcelFrameHint& hint, const std::vector<std::string>& natural) {
+  if (!hint.dropped.empty() || hint.dropped_rows != 0 || hint.field_at || hint.time_at) return;
+  if (hint.columns == natural) hint.columns.clear();
+}
 
 // Round EM: a frame of the log's events, objects or changes as the
 // reference holds it: seeded with the rows a reader or writer dropped
@@ -277,7 +335,7 @@ inline void hint_extra_rows(Ocel& log, const std::vector<HintRow>& extra_events,
     for (const auto& object : log.objects) all.observe_row(object.attributes);
   });
   fold(log.change_frame_hint, log.object_type_attributes, extra_change_values, false, [&](Columns& all) {
-    for (const auto& change : log.object_changes) all.observe(change.field, change.value);
+    for (const auto& change : log.object_changes) all.observe_change(change);
   });
 }
 
@@ -344,13 +402,12 @@ void hint_dropped_rows(Ocel& log, DropEvent&& drop_event, DropObject&& drop_obje
       std::string owner = change.object_type;
       if (owner.empty())
         if (const auto found = type_of.find(change.object_id); found != type_of.end()) owner = found->second;
-      const bool date = reference_date_value(log.object_type_attributes, owner, change.field, change.value);
       all.add_rows(1);
-      all.observe(change.field, change.value, date);
+      all.observe_change(change, log.object_type_attributes, owner);
       if (!drop_change(change)) continue;
       ++rows;
       dropped.add_rows(1);
-      dropped.observe(change.field, change.value, date);
+      dropped.observe_change(change, log.object_type_attributes, owner);
     }
     record(log.change_frame_hint, all, dropped, rows);
   }
@@ -405,8 +462,11 @@ inline std::string reference_declared_type(Dtype column, const ColumnStats* owne
   return owner->has_float ? "float" : "string";
 }
 
+// Round EN: `with_catalog` adds the declared types and attributes without
+// rows or values (the transport keeps them); pm4py's writers declare only
+// what the frames hold (observed black-box, probe en o/osw.py).
 inline void reference_type_declarations(const Ocel& log, TypeDeclarations& object_types,
-                                        TypeDeclarations& event_types) {
+                                        TypeDeclarations& event_types, bool with_catalog = false) {
   Columns object_columns, change_columns, event_columns;
   // Round EM: the columns as the reference built them (OcelFrameHint).
   object_columns.seed(log.object_frame_hint);
@@ -425,12 +485,11 @@ inline void reference_type_declarations(const Ocel& log, TypeDeclarations& objec
     if (owner.empty())
       if (const auto found = object_type_of.find(change.object_id); found != object_type_of.end())
         owner = std::string(found->second);
-    const bool date = reference_date_value(log.object_type_attributes, owner, change.field, change.value);
     change_columns.add_rows(1);
-    change_columns.observe(change.field, change.value, date);
+    change_columns.observe_change(change, log.object_type_attributes, owner);
     auto& own = change_owner[owner];
     own.add_rows(1);
-    own.observe(change.field, change.value, date);
+    own.observe_change(change, log.object_type_attributes, owner);
   }
   for (const auto& event : log.events) {
     event_columns.observe_row(event.attributes, log.event_type_attributes, event.activity);
@@ -467,6 +526,7 @@ inline void reference_type_declarations(const Ocel& log, TypeDeclarations& objec
           declarations.emplace_back(name, reference_declared_type(dtype, own));
         }
     }
+    if (!with_catalog) return;
     for (const auto& [owner, schema] : catalog) {
       auto& declarations = table[owner];
       for (const auto& [name, type] : schema) {
@@ -481,9 +541,14 @@ inline void reference_type_declarations(const Ocel& log, TypeDeclarations& objec
     for (const auto& attribute : object.attributes)
       if (!std::holds_alternative<std::nullptr_t>(attribute.value))
         object_present[object.type].insert(attribute.key);
-  for (const auto& change : log.object_changes)
+  for (const auto& change : log.object_changes) {
     if (!std::holds_alternative<std::nullptr_t>(change.value))
       object_present[change.object_type].insert(change.field);
+    // Round EN: a change row's other cells too (read_ocel2_sqlite's
+    // "@@cumcount" is declared a string attribute, observed black-box).
+    for (const auto& cell : change.cells)
+      if (!std::holds_alternative<std::nullptr_t>(cell.value)) object_present[change.object_type].insert(cell.key);
+  }
   for (const auto& event : log.events)
     for (const auto& attribute : event.attributes)
       if (!std::holds_alternative<std::nullptr_t>(attribute.value))

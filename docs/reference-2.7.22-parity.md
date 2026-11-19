@@ -33284,3 +33284,140 @@ fixed, then passed). The workbench fixture replay gave 2,673 responses
 unchanged. Python script and frontend tests not rerun (scripts and
 frontend unchanged). The device check on the Mac was skipped (the Mac was
 not linked).
+
+## Review EN1: re-review of round EM, OCEL 2.0 SQLite change cells and per-type tables, the frames' column order from the files, None times, epoch change texts (2026-11-19)
+
+Round EN checked EM's CI (run 44495021150 on ab04399f: all six jobs
+green, the Linux, macOS and Windows ctest included).
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the
+reference venv, on EJ's spoiled JSON bank (`ej/b52`), EK's and EM's
+SQLite banks (`ek/b51`, `ek/b53`, `ek/b54`) and a new spoiled OCEL 2.0 XML
+bank (`en/x/b55`: `en/x/x2gen.py`, o2gen logs written as OCEL 2.0 XML by
+hand, keeping events and objects without relations, with value texts of
+other kinds for their declared types) through `ek/rt/rsw3.py`,
+`ei/h/rt/esw.py` and `ei/eh/rt/xsw.py` (`ek/runE1.sh`, `en/x/runx.sh`), a
+column-order sweep of every download against pm4py's writers
+(`en/o/osw.py`: CSV headers, SQLite type-table columns, OCEL 1.0 and 2.0
+JSON and XML attribute order), and the probes in `en/` (`hc/hc.py`,
+`hc/nn2.py`, `cc/cc.py`, `fh/fh.py`, `jp/jt.py`, `xp/xt.py`, `p/`).
+
+- **EN1-1 Change-row cells and `@@cumcount`.** read_ocel2_sqlite reads
+  every object table with read_sql and keeps a change row's other non-null
+  cells (values in other fields' columns) in its changes frame, next to a
+  `@@cumcount` column: the row's place among its object's rows over the
+  object tables in type order (cc.py and cc2.py, 8 cases). write_ocel_json prints
+  both in the change entries, write_ocel2_json and write_ocel2_xml declare
+  `@@cumcount` a `string` attribute of the type, and write_ocel2_sqlite
+  writes them back. Native kept only the changed field's value; a change
+  now keeps its other cells and `@@cumcount` (`OcelObjectChange::cells`,
+  through the transport too).
+- **EN1-2 write_ocel2_sqlite's object type tables.** pm4py writes a type's
+  table from the type's object rows and its change rows, each with its
+  all-empty columns dropped, concatenated: the object columns in the
+  objects frame's order, then the columns only the change rows fill in the
+  changes frame's order (the changed field and time where the changes
+  frame has them), each column typed by the concatenation's dtype (an
+  object column, `TEXT`, when a change row's text meets numbers:
+  s53_0172's `o1`, carried from EM). Only types with rows get a map row
+  and a table. Native wrote one layout for every type and typed each
+  column over all types' values; the writer now builds each type's table
+  as pandas does (`bind_type_value`, the change frame's order from
+  `change_frame_order`).
+- **EN1-3 The frames' column order from the files.** read_ocel2_sqlite's
+  events and objects frames take their columns from the type tables with
+  rows, in type order (a column of NULLs only included; a table without
+  rows adds none), the changes frame its columns from all object tables
+  with the changed field and time where the first table has them;
+  read_ocel2_json builds its events frame in file order and sorts after,
+  so the columns follow the file, not the sorted events (fh.py and the
+  column-order sweep).
+  pm4py's writers declare only the types with rows and the attributes with
+  values. Native ordered the columns by the kept, sorted rows and declared
+  the catalog's types; the SQLite and JSON readers now record the files'
+  order in the frame hints (EM1-1; the changes hint also records the
+  field and time positions, the transport's `"field"`/`"time"`), and the
+  downloads declare only the used types (`reference_type_declarations`
+  keeps the catalog only for the transport). The column-order sweep of b51
+  (100 files, six downloads each) went from 41 differences in 30 files
+  on EM's server to 0 of 600 for the SQLite-read logs, and to 10 of 600
+  for the OCEL 2.0 JSON-read ones (170 before the declarations followed
+  the used types; the 10 are the CSV type columns' order, declared).
+- **EN1-4 None for NULL times of object columns.** read_sql reads a NULL
+  of a column that pandas types object (texts next to numbers, blobs, or
+  NULLs only) as None, else as NaN; the events and relations frames both
+  hold it. So OC-DFG's pair of a number and a NULL names `NoneType`
+  (`unsupported operand type(s) for -: 'NoneType' and 'int'`, nn2.py;
+  s54_0163, carried from EM). Native's raw times gained a None kind
+  (`OcelRawTime::kNull`, the transport's rawTime `"none"`), missing like
+  NaN everywhere else.
+- **EN1-5 Epoch change texts.** read_ocel2_xml keeps a change time
+  `"0"` or `"1970-01-01T00:00:00..."` as a str in an object column of UTC
+  datetimes (xt.py), so write_ocel2_xml raises `AttributeError: 'str'
+  object has no attribute 'isoformat'`, write_ocel_json prints the text
+  and write_ocel2_sqlite's to_datetime(errors="coerce") on the mixed
+  column raises "Mixed timezones detected" for a naive or other-offset
+  text (a UTC text converts, an unreadable one becomes NaT).
+  read_ocel2_json converts its change times with to_datetime(utc=True), so
+  an epoch text becomes a datetime, unless an unreadable text such as
+  `"0"` keeps the column object (jt.py). Native converted the epoch texts
+  in both readers.
+
+Harness: rsw3 did not know the transport's rawTime `"none"` (now NaT, as
+`"nan"`).
+
+After the fixes (`ek/en2`, `en/x/x2`, the final server; `ek/en0` and
+`en/x/x0` are EM's server on the same banks): imports 0 of 100 (b51), 0
+of 300 (b53, b54), 0 of 400 (b55) and 42 of 300 (b52: the strict JSON
+refusals, as before); rsw3 b52 331 of 10,062 (unchanged: EK's declared
+datetime fractions and float-declared `"inf"` texts), b53 251 of 10,101
+(EM's server: 252; s53_0172's SQLite download now equal, the rest in the
+duplicate-row files and the raw split), b51 0 of 3,900, b54 21 of 10,491
+(unchanged: s54_0118's duplicated object, the raw split of s54_0163 and
+s54_0171, and s54_0163's OC-DFG pair, which pm4py picks by the hash seed:
+`'NoneType' and 'NoneType'`, `'NoneType' and 'str'`, `'str' and 'int'`
+or `'str' and 'str'` over seeds 0 to 9); esw b53 72 of 4,144 and xsw 71
+of 3,367, b54 esw 8 of 4,304 and xsw 5 of 3,497 (unchanged); b55 rsw3
+272 of 10,530 (EM's server: 447, the 175 lines gone are EN1-5's change
+times in 20 files; no frame type or order difference on either server;
+153 lines in 52 files are EK's declared
+datetime fractions, 67 in 6 files float-declared `"inf"` texts, 48 in 6
+files `+25:00` offsets, 4 in x52_0046 and x52_0190 open, below), esw 0
+of 4,320 and xsw 0 of 3,510.
+
+Declared (outside the model):
+- The CSV writer's `ocel:type:X` column order of OCEL 2.0 JSON-read logs:
+  pm4py's order there follows the hash seed (a set), native writes the
+  types' order.
+- write_ocel_json's key order of a change entry with cells (pm4py's order
+  follows the merged row; native prints the field, time, cells,
+  `@@cumcount`).
+- The OCEL 2.0 JSON and XML positions of the field and time among a type's
+  change-only attributes.
+- Native's extended SQLite format (the native-only `object_changes` table)
+  keeps no change cells.
+- As before: EK's declared datetime fractions, `+25:00` offsets and
+  float-declared `"inf"` texts, the duplicate rows (EK1, s54_0118), the
+  ancestors/descendants split of a raw column and which pair OC-DFG
+  measures first on a raw column (EL1, EM1).
+
+Open (to round EO):
+- An OCEL 2.0 XML date attribute column that mixes aware and naive
+  datetimes (dateutil reads a value `"5"` as the 5th of the current month,
+  naive): pm4py's OCEL 2.0 JSON and XML writers write each value as a
+  datetime, native writes the column's values as strings (x52_0046,
+  x52_0190, 4 lines).
+
+Tests:
+- New: `minera_review_en1_tests` (hand cases of EN1-1 to EN1-5: the JSON2
+  file order, the epoch change texts through XML and JSON2, the change
+  cells and `@@cumcount` through every writer, the SQLite tables' column
+  order and types, None times and OC-DFG's message; the SQLite ones on
+  hand-built files checked against pm4py); `minera_review_el1_tests`
+  follows EN1-4.
+
+Runs: the full ctest passed 634 of 635 on the first run (38 min at -j2):
+`minera_review_el1_tests` expected NaN for the NULL of a time column of
+numbers and texts (EN1-4: None; updated, then passed). The workbench
+fixture replay gave 2,673 responses unchanged. Python script and frontend
+tests not rerun (scripts and frontend unchanged). The device check on the
+Mac was skipped (the Mac was not linked).
