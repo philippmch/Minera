@@ -172,6 +172,38 @@ std::string quote_identifier(std::string_view identifier) {
   return result;
 }
 
+// Creates `table` with the columns `bound` (name, SQL type) in `order`
+// (their names; empty: bound's order) and returns the INSERT that binds
+// them in bound's order.
+std::string create_table_sql(Database& database, const std::string& table,
+                             const std::vector<std::pair<std::string, std::string>>& bound,
+                             const std::vector<std::string>& order) {
+  std::string schema = "CREATE TABLE " + quote_identifier(table) + " (";
+  std::string names, values;
+  for (std::size_t index = 0; index < bound.size(); ++index) {
+    if (index != 0) {
+      names += ", ";
+      values += ",";
+    }
+    names += quote_identifier(bound[index].first);
+    values += "?" + std::to_string(index + 1);
+  }
+  if (order.empty()) {
+    for (std::size_t index = 0; index < bound.size(); ++index)
+      schema += (index != 0 ? ", " : "") + quote_identifier(bound[index].first) + " " + bound[index].second;
+  } else {
+    if (order.size() != bound.size()) throw std::logic_error("SQLite table order does not cover its columns");
+    for (std::size_t index = 0; index < order.size(); ++index) {
+      const auto found = std::find_if(bound.begin(), bound.end(),
+                                      [&](const auto& column) { return column.first == order[index]; });
+      if (found == bound.end()) throw std::logic_error("SQLite table order names an unknown column");
+      schema += (index != 0 ? ", " : "") + quote_identifier(found->first) + " " + found->second;
+    }
+  }
+  database.exec(schema + ");");
+  return "INSERT INTO " + quote_identifier(table) + " (" + names + ") VALUES(" + values + ")";
+}
+
 bool table_exists(sqlite3* db, std::string_view table) {
   Statement statement(
       // SQLite resolves identifiers without regard to ASCII case (round EK).
@@ -1519,6 +1551,13 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   // changes frame over every object table, its field and time columns
   // included (observed black-box, probe en fh.py).
   std::vector<std::string> event_columns, object_columns, change_columns_order;
+  // Round EP: the same with the frames' own columns (OcelFrameHint::reserved).
+  std::vector<std::string> event_order, object_order;
+  const auto own_name = [](const std::string& name, bool events) -> std::string {
+    if (name == "ocel_id") return events ? "ocel:eid" : "ocel:oid";
+    if (name == "ocel_time" && events) return "ocel:timestamp";
+    return name;
+  };
   const auto add_column = [](std::vector<std::string>& order, const std::string& name) {
     if (std::find(order.begin(), order.end(), name) == order.end()) order.push_back(name);
   };
@@ -1541,8 +1580,10 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         if (std::find(null_event_columns.begin(), null_event_columns.end(), name) == null_event_columns.end())
           null_event_columns.push_back(name);
       if (rows.row_count() > 0)
-        for (const auto& name : rows.column_names())
+        for (const auto& name : rows.column_names()) {
           if (attribute_column(name) && name != "ocel:activity") add_column(event_columns, name);
+          if (name != "ocel_changed_field" && name != "@@cumcount") add_column(event_order, own_name(name, true));
+        }
       timed = timed || rows.has_time();
       if (rows.row_count() > 0) {
         any_rows = true;
@@ -1626,6 +1667,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         for (const auto& name : rows.column_names()) {
           if (attribute_column(name)) add_column(object_columns, name);
           if (name != "ocel_id") add_column(change_columns_order, name);
+          if (attribute_column(name) || name == "ocel_id") add_column(object_order, own_name(name, false));
         }
       // Round EN: a change row's other cells stay with its change
       // (OcelObjectChange::cells), so the change hint no longer holds them.
@@ -1841,6 +1883,22 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     ocel_frame::trim_frame_hint(log.event_frame_hint, events.names());
     ocel_frame::trim_frame_hint(log.object_frame_hint, objects.names());
     ocel_frame::trim_frame_hint(log.change_frame_hint, changes.names());
+    // Round EP: read_ocel2_sqlite's frames hold the type tables' columns in
+    // that union order, ocel_id and ocel_time renamed, "ocel:activity" last
+    // when no table has it, and ocel:type last in the objects frame;
+    // write_ocel_csv and the SQLite writer's type tables follow it
+    // (observed black-box, bank b53, probe ep hc/sq.py). A native file's
+    // type tables hold its frames' order too.
+    {
+      ocel_frame::hint_reserved_order(
+          log.event_frame_hint, event_order, {"ocel:eid", "ocel:activity", "ocel:timestamp"},
+          log.event_activity_first
+              ? std::vector<std::string>{"ocel:eid", "ocel:activity", "ocel:timestamp"}
+              : std::vector<std::string>{"ocel:eid", "ocel:timestamp", "ocel:activity"},
+          events.names());
+      ocel_frame::hint_reserved_order(log.object_frame_hint, object_order, {"ocel:oid", "ocel:type"},
+                                      {"ocel:oid", "ocel:type"}, objects.names());
+    }
   }
   return log;
 #endif
@@ -2055,23 +2113,18 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       }
       return columns;
     };
+    // The INSERT binds leading, columns, trailing in that order; the table
+    // holds them in `order` (their names; empty: the same order).
     const auto create_table = [&](const std::string& table,
                                   const std::vector<std::string>& leading,
                                   const TypeColumns& columns,
-                                  const std::vector<std::string>& trailing) {
-      std::string schema = "CREATE TABLE " + quote_identifier(table) + " (";
-      std::string insert = "INSERT INTO " + quote_identifier(table) + " VALUES(";
-      std::size_t count = 0;
-      const auto add = [&](const std::string& name, const std::string& type) {
-        if (count != 0) { schema += ", "; insert += ","; }
-        schema += quote_identifier(name) + " " + type;
-        insert += "?" + std::to_string(++count);
-      };
-      for (const auto& name : leading) add(name, name == "ocel_time" ? "TIMESTAMP" : "TEXT");
-      for (const auto& [name, type] : columns) add(name, type);
-      for (const auto& name : trailing) add(name, name == "ocel_time" ? "TIMESTAMP" : "TEXT");
-      database.exec(schema + ");");
-      return insert + ")";
+                                  const std::vector<std::string>& trailing,
+                                  const std::vector<std::string>& order = {}) {
+      std::vector<std::pair<std::string, std::string>> bound;
+      for (const auto& name : leading) bound.emplace_back(name, name == "ocel_time" ? "TIMESTAMP" : "TEXT");
+      for (const auto& [name, type] : columns) bound.emplace_back(name, type);
+      for (const auto& name : trailing) bound.emplace_back(name, name == "ocel_time" ? "TIMESTAMP" : "TEXT");
+      return create_table_sql(database, table, bound, order);
     };
     // pm4py.write_ocel2_sqlite writes each time through a Python datetime:
     // nanosecond digits are cut to the microsecond (round BW, observed
@@ -2124,13 +2177,26 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       for (const auto* event : rows) table_values.observe_row(event->attributes, log.event_type_attributes, activity);
       const auto columns =
           table_columns_for(event_frame, table_values, log.event_type_attributes, activity);
-      // The reference frame's column order (activity first after XML).
+      // The reference frame's column order (activity first after XML;
+      // round EP: the frame's own columns where OcelFrameHint::reserved
+      // places them, observed black-box).
       const bool activity_first = log.event_activity_first;
+      std::vector<std::string> order;
+      if (!log.event_frame_hint.reserved.empty()) {
+        std::vector<std::string> names;
+        for (const auto& column : columns) names.push_back(column.first);
+        for (auto& name : ocel_frame::frame_column_order(
+                 log.event_frame_hint,
+                 activity_first ? std::vector<std::string>{"ocel:eid", "ocel:activity", "ocel:timestamp"}
+                                : std::vector<std::string>{"ocel:eid", "ocel:timestamp", "ocel:activity"},
+                 names))
+          order.push_back(name == "ocel:eid" ? "ocel_id" : name == "ocel:timestamp" ? "ocel_time" : name);
+      }
       Statement statement(db, create_table(table,
                                            activity_first
                                                ? std::vector<std::string>{"ocel_id", "ocel:activity", "ocel_time"}
                                                : std::vector<std::string>{"ocel_id", "ocel_time", "ocel:activity"},
-                                           columns, {}));
+                                           columns, {}, order));
       for (const auto* event : rows) {
         bind_text(statement.get(), 1, event->id);
         // A NaT time is NULL there, as pandas writes a missing cell.
@@ -2255,10 +2321,12 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
         layout.emplace_back(name, ocel_frame::sql_type(dtype, values, rows.size() + changes.size()));
       };
       std::unordered_set<std::string> placed;
+      std::vector<std::string> placed_order;
       for (const auto& name : object_frame.names()) {
         if (reserved_type_column(name) || name == "ocel:activity" || !present(object_part, name)) continue;
         add_attribute(name);
         placed.insert(name);
+        placed_order.push_back(name);
       }
       if (has_changes)
         for (const auto& name : change_order) {
@@ -2268,18 +2336,24 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
                    (name == kOcelCumcountColumn || (!reserved_type_column(name) && name != "ocel:activity")))
             add_attribute(name);
         }
-      std::string schema = "CREATE TABLE " + quote_identifier(table) + " (" + quote_identifier("ocel_id") + " TEXT";
-      std::string insert = "INSERT INTO " + quote_identifier(table) + " VALUES(?1";
-      for (std::size_t index = 0; index < layout.size(); ++index) {
-        const auto& [name, type_name] = layout[index];
-        schema += ", " + quote_identifier(name) + " " +
-                  (name == "ocel_time" && type_name.empty() ? std::string("TIMESTAMP")
-                   : type_name.empty()                     ? std::string("TEXT")
-                                                           : type_name);
-        insert += ",?" + std::to_string(index + 2);
+      std::vector<std::pair<std::string, std::string>> bound{{"ocel_id", "TEXT"}};
+      for (const auto& [name, type_name] : layout)
+        bound.emplace_back(name, name == "ocel_time" && type_name.empty() ? std::string("TIMESTAMP")
+                                 : type_name.empty()                     ? std::string("TEXT")
+                                                                         : type_name);
+      // Round EP: ocel_id where the objects frame holds ocel:oid among the
+      // object rows' columns (OcelFrameHint::reserved; ocel:type is not
+      // written), observed black-box.
+      std::vector<std::string> order;
+      if (!log.object_frame_hint.reserved.empty()) {
+        std::vector<std::string> names;
+        for (const auto& name : placed_order) names.push_back(name);
+        for (auto& name : ocel_frame::frame_column_order(log.object_frame_hint, {"ocel:oid", "ocel:type"}, names))
+          if (name != "ocel:type") order.push_back(name == "ocel:oid" ? "ocel_id" : name);
+        for (std::size_t index = placed_order.size(); index < layout.size(); ++index)
+          order.push_back(layout[index].first);
       }
-      database.exec(schema + ");");
-      Statement statement(db, insert + ")");
+      Statement statement(db, create_table_sql(database, table, bound, order));
       const auto bind_row = [&](const std::string& id, const std::vector<OcelAttribute>& cells,
                                 const OcelObjectChange* change) {
         std::unordered_map<std::string_view, const OcelValue*> values;

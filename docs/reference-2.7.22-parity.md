@@ -10338,8 +10338,10 @@ Reference behavior found and now implemented natively:
   type's log is still flattened from the objects whose canonical type equals
   the label. With labels that never match, every net is a single silent step
   and SAW weights are empty.
-- **Errors:** OCPN raises (`KeyError`; natively `std::invalid_argument`) when
-  an object type has no object related to an event; SAW keeps such types. IMd
+- **Errors:** OCPN raises (`KeyError` naming such a type, which one
+  following the hash seed; natively the same message, naming the first by
+  name, since round EP) when an object type has no object related to an
+  event; SAW keeps such types. IMd
   raises (`IndexError`; natively `std::out_of_range`) when a single-activity
   sub-graph without a self-loop has no start activity.
 - **Merged SAW net:** per-type places and silent transitions stay separate,
@@ -18132,9 +18134,9 @@ against black-box PM4Py 2.7.22 (pandas 3.0.5) calls.
   CSV `2024-01-01 10:00:00+02:00`. Native XML and SQLite writers wrote UTC;
   when every event time shares one non-zero offset they now write that wall
   clock (CSV already did). Times that do not share an offset stay UTC.
-  Declared, unchanged: the JSON writers write the stored text
-  (`2024-01-01 10:00:00+02:00` where the reference writes
-  `2024-01-01T10:00:00Z`). The classic OCEL JSON that routes pass between
+  The JSON writers wrote the stored text (`2024-01-01 10:00:00+02:00`
+  where the reference writes `2024-01-01T10:00:00Z`; declared until round
+  EP, now the wall clock with `Z`, see Review EP1). The classic OCEL JSON that routes pass between
   them (the `log` member of an `/api/ocel/io` import, posted back to an
   export) marks such a log `"minera:eventTimeOffset": true`, and the JSON
   reader keeps its event times as written when it sees the marker (without
@@ -30996,8 +30998,8 @@ device check on the Mac was skipped (the Mac was not linked).
     relation-free file (AO1-7; pm4py raises `AttributeError: 'NoneType'
     object has no attribute 'index'`, native keeps its message);
   - `filter_ocel_objects` with a level above 1 looks every requested id up
-    in its interaction graph (the related objects): another id raises
-    `KeyError: '<id>'` (native ignored it).
+    in its interaction graph (the listed objects, round EP1-7): another id
+    raises `KeyError: '<id>'` (native ignored it).
   Probes `dt/nb/ocdeg.py`, `ocdeg2.py`, `ocdeg3.py` (pm4py functions on
   relation-free and object-free logs), `dt/oc/rd.py` and `sq.py` (every
   reader on degenerate files), `typed.py` (in-memory empty logs) and
@@ -33574,3 +33576,205 @@ download and transport (updated, then passed). The workbench fixture
 replay gave 2,673 responses unchanged. Python script and frontend tests
 not rerun (scripts and frontend unchanged). The device check on the Mac
 was skipped (the Mac was not linked).
+
+
+## Review EP1: re-review of round EO, read_ocel_xml's unknown objects, read_ocel_csv's frames, the frames' own columns, offset event times in the JSON writers, deeper object filters (2026-11-19)
+
+Round EP checked EO's CI (run 44562956275 on d6411df5: five jobs green,
+the Linux and Windows ctest included; the macOS job got no runner and was
+cancelled after 15 minutes without running a step). Observed black-box on
+pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv, on EO's
+OCEL 1.0 bank (`eo/c1/b56n`) through esw and xsw, the banks b51 to b55
+through rsw3, esw, xsw and dsw again, a structural fuzz of b56's OCEL 1.0
+XML files (`ep/x1/x1fz.py`: value elements without key or value, other
+tags, nested lists, duplicate keys, values moved out of their map, omap
+entries with other keys, attributes dropped or set to garbage, elements
+dropped; 700 files), a new hand-written OCEL CSV bank (`ep/csv/q1gen.py 57
+200 b57`: an events file and most of the time an objects file per log,
+with rows read_ocel_csv drops, attribute columns only dropped rows fill,
+values of mixed kinds, relation cells as list literals, empty lists, bare
+ids and lists with an empty item, objects related but not listed and
+listed but not related, NaT times, offsets, shuffled rows and columns, the
+time column first and the objects' type first), one CSV bank per generator
+feature (`ep/csv/runf.sh`, 17 banks of 40 logs), a fresh bank without the
+declared features (`b58`), and the probes in `ep/` (`x1/p/p1.py`, `p2.py`,
+`hc/hc.py`, `hc/sq.py`, `ord/ord.py`). The sweeps read CSV logs through
+`rt/csvpair.py` (read_ocel_csv with the objects file next to the events
+file); dsw also compares write_ocel_csv's objects file (`csvo`), and
+`rt/fsw.py` is rsw3 with more filter variants (object types and objects
+negated and at level 2, events negated, the connected components of an
+object type or an activity, the activity-type matching, a timestamp
+window, typed object and event attribute values, kept and dropped).
+
+- **EP1-1 read_ocel_xml on a relation to an unknown object.** pm4py looks
+  each omap entry up in its object map, so the first entry in document
+  order (events in file order, an event the reader then drops included)
+  that names no listed object raises that lookup's KeyError: the value's
+  repr (`KeyError: 'x1'`, `KeyError: ''`, `KeyError: '7'` for an `<int>`)
+  or `KeyError: None` for an entry without a value (a nested list too).
+  Native raised `OCEL XML relation references unknown object` (94 of 300
+  fuzzed files differed, the hand probes p1.py and p2.py). The remaining
+  fuzz differences are the declared keyless values (EO, the NaN column).
+- **EP1-2 read_ocel_csv's frames.** pandas' frames keep the files'
+  columns in file order, a column empty everywhere and one only a dropped
+  row fills (an event row without id or activity, an object row without
+  id or type) included: write_ocel_csv prints them, the JSON and XML
+  writers list them among the attribute names, and the frames' dtypes see
+  the dropped rows' cells. The CSV reader now records the frame hints
+  (`OcelFrameHint`: columns, dropped rows).
+- **EP1-3 The frames' own columns.** pandas holds `ocel:eid`,
+  `ocel:timestamp` and `ocel:activity` (events) and `ocel:oid` and
+  `ocel:type` (objects) where the reader put them, and write_ocel_csv
+  writes the events frame with `ocel:eid` first and then the frame's
+  order, the objects frame as it stands, while write_ocel2_sqlite writes
+  each type table in frame order (`ocel_id`, `ocel_time` renamed,
+  `ocel:type` left out of an object table): read_ocel_csv keeps the
+  files' order (a time column first, an object table with the type first
+  or the id after an attribute) and builds the objects frame without an
+  object table as (`ocel:type`, `ocel:oid`); read_ocel2_sqlite takes the
+  union of the type tables' columns in table order, `ocel:activity` last
+  when no table holds it, `ocel:type` last in the objects frame (b51,
+  b53, b54: every CSV objects file of a SQLite read; hc.py, sq.py). Native
+  wrote id, type and id, time, activity first everywhere.
+  `OcelFrameHint::reserved` holds those places (the transport's
+  `minera:frameHints` entry `"reserved"`), and the CSV writers and the
+  SQLite writer's type tables follow them.
+- **EP1-4 Offset event times in the JSON writers.** write_ocel_json and
+  write_ocel2_json print an event time column that holds one non-zero
+  offset (a CSV read, `datetime64[us, UTC+02:00]`) as its wall clock with
+  `Z` (`2024-02-01 14:00:00+02:00` is `2024-02-01T14:00:00Z`), formerly
+  declared (see "OCEL CSV times with an offset"); native wrote the stored
+  text.
+- **EP1-5 Objects listed but not related.** An OCEL CSV's object table
+  keeps objects no relation names (the reader keeps them,
+  `minera:keepUnrelated`), and pm4py's object features take them as
+  objects whose lifecycle starts and ends at 0 (the epoch): the work in
+  progress sorts them with the others by that start and end, so such an
+  object counts the later ones that start at 0 or before (wip/w1.py: 84
+  of 200 b58 files). Native gave them 1 and left them out of the counts.
+  The events' endpoint columns look the objects up type by type, the
+  types sorted and each type's objects in table order, and raise
+  KeyError on the first one without events (k1.py); native took the first
+  in table order. OCPN discovery and its playout raise `KeyError: 'u'` on
+  a type whose objects take part in no relation, where native raised its
+  own message (k3.py; which such type pm4py names follows the hash seed,
+  declared: native names the first by name).
+- **EP1-6 A relations frame without ids.** A CSV whose rows name no object
+  has a relations frame with only `ocel:qualifier` (round DV), where pm4py
+  fails in the first feature family that reads it, in its order of
+  families: events: the timestamps (a NaT time raises
+  `NaTType does not support timestamp` there), the relation counts
+  (`ocel:eid`), the endpoints (`ocel:oid`), the new interactions
+  (`ocel:eid`); objects: the lifecycle length, unique activities and
+  duration (`ocel:oid`), the graphs and the degree centrality
+  (`ocel:eid`), the lifecycle activities (`ocel:oid`), the interaction
+  graph by type (`ocel:eid`), the work in progress (`ocel:oid`), the
+  related events and activities (as the event families), the paths and
+  `obj_con_in_graph` (`ocel:oid`); families that read no relation (the
+  activities, timestamps and attributes) answer (rf.py, rf2.py: 3 of 200
+  b58 files). Native raised on the event id (events) or the object id
+  (objects) whatever the families. The event/object graph raises
+  `KeyError: "['ocel:eid', 'ocel:oid'] not in index"` there (the two names
+  in a set's order: declared), where native drew the graph.
+
+- **EP1-7 Object filters at a deeper level.** filter_ocel_objects and
+  filter_ocel_object_types with a level above 1 build an interaction graph
+  with a node for every object the objects table lists, related or not,
+  and add its edges event by event in event id order, each event's objects
+  in relation order: an object the table does not list raises KeyError
+  there once it shares an event with another object (the first such in
+  that order), whatever was selected, an empty selection included (only
+  read_ocel_csv keeps such relations, the other readers drop them, and
+  native's CSV reader lists those objects, declared); a requested id the
+  table does not list then raises as in round DT. An unrelated listed
+  object is a node of its own, so the filters keep it (q58_0000: the type
+  `t` at level 2 keeps the unrelated `t0`; s53_0250, s54_0105; lv/lv.py to
+  lv4.py). Native's graph held only the related objects, so it raised
+  KeyError on an unrelated object of the type or id (158 b58 diffs in 115
+  files, one each in s53_0250 and s54_0105), and it skipped the graph for
+  an empty selection.
+- **EP1-8 The activity-type matching on a relation-free JSON read.**
+  read_ocel_json and read_ocel2_json read a file without relations as
+  float64 relation columns (round DT), and
+  filter_ocel_object_types_allowed_activities adds its separator text to
+  the activity column there, raising numpy's `UFuncTypeError: ufunc 'add'
+  did not contain a loop with signature matching types (dtype('float64'),
+  dtype('<U4')) -> None` (the module's separator parameter gives its length
+  in code points, at least 1), after a missing activity key and before a
+  missing type key (the six relation-free c56 JSON files; lv/aa.py,
+  ac.py, ad.py, ae.py). Native kept no relation and answered. The module
+  variant also read the type key before the activity key, where pm4py
+  reads the activity key first.
+
+Harness: `rt/csvpair.py` reads an OCEL CSV with its objects file for every
+sweep (rsw3, esw, xsw, osw, dsw, fsw); dsw compares the CSV objects file
+too (`csvo`); `x1/x1fz.py` (`MODE=vmap` for the value mutations alone)
+compares pm4py's read_ocel_xml with the server's import outcome, message
+and frames.
+
+After the fixes (`ep/fs2` on the final server; `ep/v1`, `ep/csv/f4` and
+`ep/csv/q3` on it but EP1-7 and EP1-8, which only the filter variants of
+fsw reach, and but EP1-5 and EP1-6 for `v1` and `f4`, which hold no such
+object or frame; `ek/ep1`, `en/x/x4`, `eo/c1/c5` and `ep/d4` on EO's
+server and an early EP server, whose JSON and XML reads EP did not
+change): imports 0 of 100 (b51), 0 of 300 (b53, b54), 0 of 400 (b55), 0 of
+200 each (b56 as JSON and XML), 0 of 200 (b58), 0 of 40 in each feature
+bank, and 42 of 300 (b52, the strict JSON refusals as before); rsw3 b51 0
+of 3,900, b52 327 of 10,062 (EO: 328), b53 252 of 10,101, b54 21 of
+10,491, b55 265 of 10,530, b56 0 of 7,800 (JSON) and 49 of 7,566 (XML, the
+declared c56 files), b58 12 of 7,800; esw b53 72 of 4,144 (EO: 76), b54 8
+of 4,304, b55 0 of 4,320, b56 0 of 3,200 (JSON) and 0 of 3,104 (XML), b58
+13 of 3,200 (before EP1-5 and EP1-6: 150); xsw b53 71 of 3,367, b54 5 of
+3,497 (EO: 3; the declared pair OC-DFG measures first on s54_0163's raw
+column), b55 0 of 3,510, b56 0 of 2,600 and 0 of 2,522, b58 0 of 2,600
+(before: 42); osw b51 0 of 600, b53 17 of 1,554 (duplicate-row files), b54
+4 of 1,614 (s54_0118), b56 0 of 1,200 and 0 of 1,164, b58 0 of 1,200; dsw
+(now seven downloads with the CSV objects file) b51 0 of 700, b52 18 of
+1,806 (`"inf"` texts), b53 46 of 1,813 (the 21 duplicate-row files), b54 6
+of 1,883 (s54_0118), b55 49 of 1,890 (`+25:00` and `"inf"`), b56 0 of
+1,400 and 12 of 1,358 (the c56 files), b58 210 of 1,400; fsw (`ep/fs2`)
+b51 0 of 1,310, b52 36 of 3,356 (`"inf"` texts), b53 168 of 3,402 (the 21
+duplicate-row files), b54 9 of 3,534 (s54_0118), b55 102 of 3,520
+(`+25:00` and `"inf"`), b56 0 of 2,738 (JSON) and 38 of 2,676 (XML, the
+c56 files), b58 0 of 2,470 (before EP1-7 and EP1-8: b58 158, b56 6 (JSON),
+b53 169, b54 10). Every remaining b58 difference is in one of the 48 logs
+without an objects file (the declared hash-seed object order). The feature
+banks give 0 of 280 downloads each but for the declared features
+(duplicate event ids, objects named but not listed, object rows without id
+or type: 70, 133 and 98 of 280; files without an objects file: 36 of 280,
+the hash-seed order), where EO's server gave 47 to 177 of 280 per bank
+(the clean bank 96). On EO's server b57 (all features) gave imports 37 of
+200, dsw 799 of 1,141, esw 783 of 2,608, xsw 586 of 2,119 and osw 450 of
+978. The XML fuzz gave 94 of 300 before EP1-1 and 19 of 300 and 23 of 400
+(value mutations) after, all keyless values (declared in EO).
+
+Declared (outside the model):
+- Which object type pm4py's OCPN discovery and playout name in the KeyError
+  of EP1-5, and the order of the two names in the event/object graph's
+  KeyError of EP1-6 (both a set's order, following the hash seed).
+- As before: the hash-seed object order of a CSV without an objects file
+  (now also in the CSV objects file and the LLM feature text), duplicate
+  CSV event ids, objects the events name that the objects file lacks or
+  drops, keyless OCEL 1.0 XML values, EK's datetime fractions, `+25:00`
+  offsets and float-declared `"inf"` texts, the duplicate SQLite rows
+  (EK1), the c56 files (EO), which pair OC-DFG measures first on a raw
+  column.
+
+Tests:
+- New: `minera_review_ep1_tests` (hand cases of EP1-1 to EP1-8 through the
+  direct read and the transport, checked against pm4py; the SQLite ones on
+  hand-built files and on native files read back).
+- `minera_review_ed1_tests` follows EP1-1 (`KeyError: 'o1'`), and its bank
+  `docs/ocel-xml-reference-ed-bank.tsv.gz` holds pm4py's KeyError for its
+  101 files with a relation to an unknown object (recomputed with
+  pm4py's read_ocel_xml, `ep/edb/fix.py`; native matches all 1,336
+  files).
+- `minera_ocel_csv_tests` follows EP1-3 and EP1-4 (a download without the
+  frame hints, offset times as wall clock with `Z`).
+
+The full ctest passed 635 of 637 on the first run (24 min at -j2; those
+two expected the old XML message in the ED bank and the old JSON
+download; updated, then passed), the fixture replay gave 2,673 responses
+unchanged. Python script and frontend tests not rerun (scripts and
+frontend unchanged). The device check on the Mac was skipped (the Mac was
+not linked).

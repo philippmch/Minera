@@ -2560,6 +2560,21 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
             *hint.time_at > hint.columns.size() + 1)
           throw std::invalid_argument("minera:frameHints field and time must be distinct places");
       }
+      // Round EP: the frame's own columns among the attributes
+      // (OcelFrameHint::reserved; -1 after every attribute column).
+      if (const auto* reserved = optional(entry, "reserved")) {
+        if (!reserved->is_array()) throw std::invalid_argument("minera:frameHints reserved must be array");
+        for (const auto& item : reserved->array()) {
+          if (!item.is_array() || item.array().size() != 2 || !item.array()[0].is_string())
+            throw std::invalid_argument("minera:frameHints reserved entries must be [column, place]");
+          const auto& place = item.array()[1];
+          const bool end = place.is_int() && std::get<std::int64_t>(place.value) == -1;
+          const std::size_t at = end ? kOcelHintEnd : count(place, "reserved place");
+          if (!end && at > hint.columns.size())
+            throw std::invalid_argument("minera:frameHints reserved place is past the columns");
+          hint.reserved.emplace_back(item.array()[0].string(), at);
+        }
+      }
     };
     read("events", result.event_frame_hint);
     read("objects", result.object_frame_hint);
@@ -3929,6 +3944,19 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       }
       out << "],\"rows\":" << hint.dropped_rows;
       if (hint.field_at && hint.time_at) out << ",\"field\":" << *hint.field_at << ",\"time\":" << *hint.time_at;
+      if (!hint.reserved.empty()) {
+        out << ",\"reserved\":[";
+        for (std::size_t i = 0; i < hint.reserved.size(); ++i) {
+          if (i != 0) out << ',';
+          out << '[';
+          write_string(out, hint.reserved[i].first);
+          out << ',';
+          if (hint.reserved[i].second == kOcelHintEnd) out << "-1";
+          else out << hint.reserved[i].second;
+          out << ']';
+        }
+        out << ']';
+      }
       out << '}';
     };
     write("events", log.event_frame_hint);
@@ -3939,10 +3967,26 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   // A download spells a naive event time as both reference JSON writers do,
   // the wall clock with "Z" (black-box, round DU), the fraction kept as for
   // an aware time (declared); the transport keeps the text.
+  // Round EP: so does a time of a log whose event times share one non-zero
+  // offset (an OCEL CSV read, datetime64[us, UTC+02:00]): both writers
+  // print its wall clock with "Z" (black-box, bank b57: `14:00:00+02:00`
+  // is `2024-02-01T14:00:00Z`), formerly declared.
+  const auto shared_event_offset = [&]() -> std::optional<std::int32_t> {
+    if (transport_markers) return std::nullopt;
+    std::vector<std::string_view> texts;
+    texts.reserve(log.events.size());
+    for (const auto& event : log.events)
+      if (event.raw_time == OcelRawTime::kNone) texts.emplace_back(event.timestamp);
+    return ocel_frame::shared_nonzero_offset(texts);
+  }();
   const auto event_time = [&](const std::string& text) -> std::string {
     if (transport_markers) return text;
     const auto exact = parse_timestamp_exact(text);
-    if (!exact || exact->timezone_aware) return text;
+    if (!exact) return text;
+    if (exact->timezone_aware) {
+      if (!shared_event_offset) return text;
+      return ocel_frame::offset_timestamp_text(text, 'T', shared_event_offset, std::string_view("Z"));
+    }
     return utc_timestamp_text(exact->seconds, exact->nanoseconds, "Z");
   };
   const auto write_keep_unrelated = [&] {
@@ -5265,9 +5309,14 @@ OcpnGraph discover_ocpn(const Ocel& log, const OcpnDiscoveryOptions& options) {
       if (type_it != object_type.end() && event_by_id.contains(relation.event_id))
         related.insert(type_it->second);
     }
-    for (const auto& type : result.object_types)
+    // Round EP: pm4py's KeyError on such a type (observed black-box, probe
+    // ep wip/k3.py: an OCEL CSV's type whose objects are listed but not
+    // related); pm4py's types come in a set's order, so which type follows
+    // the hash seed (declared): native names the first by name.
+    const std::set<std::string> types(result.object_types.begin(), result.object_types.end());
+    for (const auto& type : types)
       if (!related.contains(type))
-        throw std::invalid_argument("OCPN object type '" + type + "' has no object related to an event");
+        throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(type));
   }
   // Each type's log is flattened from the objects whose original type equals
   // the type label: with an object-type selector the selected labels name

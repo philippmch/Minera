@@ -9,6 +9,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace {
 
@@ -708,11 +709,18 @@ void round_o_date_and_offset_shapes() {
   unmarked.erase(unmarked.find(",\"minera:eventTimeOffset\":true"), 30);
   assert(minera::parse_ocel_json(unmarked).events[0].timestamp == "2024-01-01T10:00:00+00:00");
   // A download (CLI JSON output, export) is written without the markers
-  // (round EO: nor the "minera:untypedO2o" one), with the log scope
-  // write_ocel_json computes.
+  // (round EO: nor the "minera:untypedO2o" one; round EP: nor the frame
+  // hints), with the log scope write_ocel_json computes, and (round EP) the
+  // times of one shared non-zero offset as their wall clock with "Z".
   const auto file = minera::serialize_ocel_json(offset, minera::OcelJsonFormat::kClassic, false);
   auto expected_file = unmarked;
   expected_file.erase(expected_file.find(",\"minera:untypedO2o\":true"), 25);
+  const auto hints = expected_file.find(",\"minera:frameHints\":");
+  assert(hints != std::string::npos);
+  expected_file.erase(hints, expected_file.find("}}", expected_file.find("\"reserved\"", hints)) + 2 - hints);
+  for (const auto& [stored, printed] : {std::pair<std::string, std::string>{"2024-01-01 10:00:00+02:00", "2024-01-01T10:00:00Z"},
+                                        {"2024-01-01 11:30:00+02:00", "2024-01-01T11:30:00Z"}})
+    expected_file.replace(expected_file.find(stored), stored.size(), printed);
   expected_file.replace(expected_file.find("\"ocel:global-log\":{}"), 20,
                         "\"ocel:global-log\":{\"ocel:object-types\":[\"order\"],\"ocel:attribute-names\":[],"
                         "\"ocel:version\":\"1.0\",\"ocel:ordering\":\"timestamp\"}");

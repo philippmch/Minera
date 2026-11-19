@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EO (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–EP (2026-11-05 to 2026-11-19, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7543,6 +7543,85 @@ without the computed log scope and a transport without
 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-eo/`.
+
+
+Round EP re-reviewed EO (Review EP1). EO's CI run 44562956275 on d6411df5:
+five jobs green, the Linux and Windows ctest included; the macOS job got
+no runner and was cancelled after 15 minutes without running a step. EP
+ran b56 through esw and xsw, the banks b51 to b55 through rsw3, esw, xsw
+and dsw again (`ek/ep1`, `en/x/x4`, `eo/c1/c5`, `ep/d4`), a structural
+fuzz of b56's OCEL 1.0 XML files (`ep/x1/x1fz.py`), a new hand-written
+OCEL CSV bank with its objects files (`ep/csv/q1gen.py 57 200 b57`;
+`FEAT=` picks the mutations: one bank per feature through
+`ep/csv/runf.sh`, and `b58` without the declared ones through
+`ep/runq.sh`: imports, rsw3, esw, xsw, osw, dsw), the SQLite banks on the
+final server (`ep/runv.sh`) and a new filter-variant sweep of every bank
+(`ep/rt/fsw.py`, `ep/runfs.sh`):
+- read_ocel_xml raises the object map's KeyError on the first relation to
+  an unknown object (EP1-1);
+- read_ocel_csv's frames keep the files' columns (all-empty ones, ones only
+  dropped rows fill) and the dropped rows (EP1-2);
+- the frames' own columns stand where read_ocel_csv and read_ocel2_sqlite
+  put them (`OcelFrameHint::reserved`, transport `"reserved"`), which
+  write_ocel_csv and the SQLite writer's type tables follow (EP1-3);
+- the JSON writers print a shared non-zero offset's wall clock with `Z`
+  (EP1-4, formerly declared);
+- objects listed but not related: work in progress from lifecycle 0, the
+  endpoint KeyError by sorted type, OCPN's KeyError (EP1-5);
+- relation-free CSV logs: each feature family raises where pm4py's does,
+  the event/object graph raises (EP1-6);
+- the object filters at a deeper level keep unrelated listed objects and
+  raise KeyError on an unlisted object that shares an event (EP1-7);
+- the activity-type matching raises numpy's UFuncTypeError on a
+  relation-free JSON read and reads the activity key first (EP1-8).
+After the fixes: imports 0 of 100 (b51), 0 of 300 (b53, b54), 0 of 400
+(b55), 0 of 400 (b56), 0 of 200 (b58), 0 of 40 per feature bank, 42 of 300
+(b52, as before); rsw3 b52 327 of 10,062 (EO: 328), b56 0 and 49 (XML,
+c56), b58 12 of 7,800; esw b53 72 (EO: 76), b56 0, b58 13 of 3,200; xsw
+b54 5 (s54_0163's raw pair), b56 0, b58 0; osw b58 0; dsw b58 210 of 1,400;
+fsw b51 0, b52 36 ("inf" texts), b53 168 (the 21 duplicate-row files), b54
+9 (s54_0118), b55 102 (+25:00 and "inf"), b56 0 (JSON) and 38 (XML, c56),
+b58 0 of 2,470. Every remaining b58 difference is in a log without an
+objects file (the declared hash-seed object order); the feature banks
+differ only in the declared features; the XML fuzz only in keyless values.
+
+In the suite: `minera_review_ep1_tests` (hand cases of EP1-1 to EP1-8);
+`minera_review_ed1_tests` (and its ED bank, recomputed with pm4py) follows
+EP1-1, `minera_ocel_csv_tests` EP1-3 and EP1-4. The full ctest passed 635
+of 637 on the first run (24 min at -j2; those two expected the old XML
+message and the old JSON download; updated, then passed), the fixture
+replay gave 2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-ep/`.
+
+Next round (EQ) should start by re-reviewing round EP:
+
+- EP's CI run;
+- the feature routes (esw) on the CSV feature banks of `ep/csv/runf.sh`
+  (EP ran only imports and downloads there) and on objects listed but not
+  related next to NaT times (EP1-5 with EG's NaT rules);
+- a fresh OCEL 1.0 XML/JSON bank with objects that relations do not name
+  through the features (the classic readers drop them; check the drop
+  order matches);
+- the routes on a SQLite log read back from a CSV with its time column
+  first (EP1-3 through rsw3, esw, xsw);
+- causal-net routes on NaT logs (psw on b58);
+- the deeper object filters (EP1-7) on CSV banks with objects named but
+  not listed (`FEAT=notlisted`), which native's CSV reader declares, and
+  the other filters of `rt/fsw.py` on the OCEL 1.0 banks at levels 3 and
+  above;
+- the carried items below (fresh seeds of the table, sequence and pandas
+  domains, the XML/JSON day offsets, the SQLite leftovers, the new Polars
+  dtypes, DW1, the declared items, the CU list and the open choices).
+
+Round EP's list, taken in EP: EO's CI, b56 through esw and xsw, an OCEL
+CSV bank through dsw (and every sweep), the LLM abstraction and context on
+the OCEL 1.0 frames and raw/NaT columns (esw on b53 to b56 and b58), the
+OCEL 1.0 XML vmap entries and keyless values (the fuzz), the None/NaT time
+routes on CSV (b57, b58). Not taken (carried to EQ): causal-net routes on
+NaT logs beyond EO's psw, and EO's carried items.
+
+Previous list for round EP (kept for its older items):
 
 Next round (EP) should start by re-reviewing round EO:
 

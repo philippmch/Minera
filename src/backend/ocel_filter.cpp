@@ -430,22 +430,37 @@ std::vector<IdSet> object_interaction_components(const Ocel& log) {
 }
 
 IdSet expand_object_ids(const Ocel& log, IdSet selected, std::size_t level) {
-  if (level <= 1 || selected.empty()) return selected;
+  if (level <= 1) return selected;
   const auto object_types = object_types_by_id(log);
-  const auto related = objects_by_event(log, object_types);
+  // Round EP: the reference's interaction graph has a node for every listed
+  // object, related or not, and adds the edges event by event in event id
+  // order, each event's objects in relation order. An object the objects
+  // table does not list raises KeyError there once it shares an event with
+  // another object, whatever was selected (observed black-box).
+  std::map<std::string, std::vector<std::string>> by_event;
+  for (const auto& relation : log.relations) {
+    auto& objects = by_event[relation.event_id];
+    if (std::find(objects.begin(), objects.end(), relation.object_id) == objects.end())
+      objects.push_back(relation.object_id);
+  }
   std::map<std::string, std::set<std::string>> adjacency;
-  for (const auto& [event_id, objects] : related) {
+  for (const auto& entry : object_types) adjacency[entry.first];
+  for (const auto& [event_id, objects] : by_event) {
     (void)event_id;
+    if (objects.size() < 2) continue;
+    for (const auto& object_id : objects)
+      if (!object_types.contains(object_id))
+        throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(object_id));
     for (const auto& left : objects) {
       auto& neighbours = adjacency[left];
       neighbours.insert(objects.begin(), objects.end());
       neighbours.erase(left);
     }
   }
-  // Round DT: the reference looks every requested id up in its interaction
-  // graph, whose nodes are the related objects, so another id raises
-  // KeyError (several such ids: the first in its set order, which varies
-  // with the hash seed; native names the smallest).
+  // Round DT: every requested id is then looked up in that graph, so an id
+  // the objects table does not list raises KeyError (several such ids: the
+  // first in its set order, which varies with the hash seed; native names
+  // the smallest).
   for (const auto& object_id : selected)
     if (!adjacency.contains(object_id))
       throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(object_id));
@@ -866,6 +881,13 @@ Ocel filter_ocel_activity_type_matching(
     const std::map<std::string, std::vector<std::string>>& allowed) {
   // Round DV: a degenerate relations frame (see ocel_relations_frame_degenerate).
   require_ocel_relation_column(log, "ocel:activity");
+  // Round EP: a reference read without relations has float64 relation
+  // columns (Ocel::untyped_relations), and the filter adds its separator
+  // text to the activity column (black-box).
+  if (log.relations.empty() && log.untyped_relations)
+    throw std::invalid_argument(
+        "UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('float64'), "
+        "dtype('<U4')) -> None");
   std::unordered_map<std::string, std::string> event_activities;
   for (const auto& event : log.events) {
     event_activities.emplace(event.id, event.activity);

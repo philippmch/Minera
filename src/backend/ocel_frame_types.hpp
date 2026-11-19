@@ -276,8 +276,89 @@ inline std::vector<std::string> change_frame_order(const OcelFrameHint& hint,
 // frame's first appearance over the kept rows gives it: no dropped rows, no
 // field or time places, and the same names in the same order.
 inline void trim_frame_hint(OcelFrameHint& hint, const std::vector<std::string>& natural) {
-  if (!hint.dropped.empty() || hint.dropped_rows != 0 || hint.field_at || hint.time_at) return;
+  if (!hint.dropped.empty() || hint.dropped_rows != 0 || hint.field_at || hint.time_at ||
+      !hint.reserved.empty())
+    return;
   if (hint.columns == natural) hint.columns.clear();
+}
+
+// Round EP: a frame's columns in pandas' order (OcelFrameHint::reserved):
+// the attribute columns `attributes` in the writer's order with the frame's
+// own columns among them where the hint places them; `defaults` (those
+// columns in their default order) the hint does not place go first.
+inline std::vector<std::string> frame_column_order(const OcelFrameHint& hint,
+                                                   const std::vector<std::string>& defaults,
+                                                   const std::vector<std::string>& attributes) {
+  std::vector<std::string> order;
+  const auto placed = [&](const std::string& name) {
+    return std::any_of(hint.reserved.begin(), hint.reserved.end(),
+                       [&](const auto& entry) { return entry.first == name; });
+  };
+  for (const auto& name : defaults)
+    if (!placed(name)) order.push_back(name);
+  if (hint.reserved.empty()) {
+    order.insert(order.end(), attributes.begin(), attributes.end());
+    return order;
+  }
+  std::unordered_map<std::string_view, std::size_t> position;
+  for (std::size_t i = 0; i < attributes.size(); ++i) position.emplace(attributes[i], i);
+  // Each placed column's anchor: the writer's attribute it stands before
+  // (attributes.size(): after every one).
+  std::vector<std::size_t> anchors;
+  for (const auto& [name, at] : hint.reserved) {
+    std::size_t anchor = attributes.size();
+    if (at == 0) {
+      anchor = 0;
+    } else if (at != kOcelHintEnd) {
+      for (std::size_t k = at; k < hint.columns.size(); ++k)
+        if (const auto found = position.find(hint.columns[k]); found != position.end()) {
+          anchor = found->second;
+          break;
+        }
+    }
+    anchors.push_back(anchor);
+  }
+  for (std::size_t i = 0; i <= attributes.size(); ++i) {
+    for (std::size_t r = 0; r < hint.reserved.size(); ++r)
+      if (anchors[r] == i) order.push_back(hint.reserved[r].first);
+    if (i < attributes.size()) order.push_back(attributes[i]);
+  }
+  return order;
+}
+
+// Round EP: the hint's `reserved` for a frame whose columns stand in
+// `order` (its own columns `own` among the attribute columns; an own column
+// `order` lacks is last), none when the own columns lead in `defaults`
+// order. Places count in the frame's attribute columns (hint.columns, or
+// `natural` when the hint has none: then they become hint.columns).
+inline void hint_reserved_order(OcelFrameHint& hint, const std::vector<std::string>& order,
+                                const std::vector<std::string>& own,
+                                const std::vector<std::string>& defaults,
+                                const std::vector<std::string>& natural) {
+  const auto& columns = hint.columns.empty() ? natural : hint.columns;
+  const auto is_own = [&](const std::string& name) { return std::find(own.begin(), own.end(), name) != own.end(); };
+  std::vector<std::pair<std::string, std::size_t>> reserved;
+  for (std::size_t i = 0; i < order.size(); ++i) {
+    if (!is_own(order[i])) continue;
+    std::size_t at = kOcelHintEnd;
+    for (std::size_t k = i + 1; k < order.size() && at == kOcelHintEnd; ++k) {
+      if (is_own(order[k])) continue;
+      if (const auto found = std::find(columns.begin(), columns.end(), order[k]); found != columns.end())
+        at = static_cast<std::size_t>(found - columns.begin());
+    }
+    reserved.emplace_back(order[i], at);
+  }
+  for (const auto& name : own)
+    if (std::none_of(reserved.begin(), reserved.end(), [&](const auto& entry) { return entry.first == name; }))
+      reserved.emplace_back(name, kOcelHintEnd);
+  bool leading = reserved.size() == defaults.size();
+  for (std::size_t i = 0; leading && i < reserved.size(); ++i)
+    leading = reserved[i].first == defaults[i] && (reserved[i].second == 0 || columns.empty());
+  if (leading) return;
+  for (auto& entry : reserved)
+    if (entry.second == kOcelHintEnd && columns.empty()) entry.second = 0;
+  if (hint.columns.empty()) hint.columns = natural;
+  hint.reserved = std::move(reserved);
 }
 
 // Round EM: a frame of the log's events, objects or changes as the

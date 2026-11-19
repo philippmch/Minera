@@ -391,19 +391,42 @@ void write_event_table(std::ostream& out, const Ocel& log,
   for (const auto& object : log.objects)
     if (known_types.insert(object.type).second) types.push_back(object.type);
 
-  // The reference frame's column order (activity first after an XML read).
+  // The reference frame's column order (activity first after an XML read;
+  // round EP: the frame's own columns where OcelFrameHint::reserved places
+  // them, ocel:eid first as write_ocel_csv puts it).
   const bool activity_first = log.event_activity_first;
-  Row header = activity_first ? Row{options.event_id_column, options.activity_column,
-                                    options.timestamp_column}
-                              : Row{options.event_id_column, options.timestamp_column,
-                                    options.activity_column};
   for (const auto& key : event_attributes) {
     if (key.empty() || key == options.event_id_column || key == options.activity_column ||
         key == options.timestamp_column ||
         key.rfind(options.object_type_prefix, 0) == 0) {
       throw std::invalid_argument("event attribute collides with an OCEL CSV column: " + key);
     }
-    header.push_back(key);
+  }
+  enum class Cell : std::size_t { kId, kTime, kActivity, kAttribute };
+  std::vector<std::pair<Cell, std::size_t>> cells{{Cell::kId, 0}};
+  {
+    std::unordered_map<std::string_view, std::size_t> attribute_at;
+    for (std::size_t i = 0; i < event_attributes.size(); ++i) attribute_at.emplace(event_attributes[i], i);
+    const auto order = ocel_frame::frame_column_order(
+        log.event_frame_hint,
+        activity_first ? std::vector<std::string>{"ocel:eid", "ocel:activity", "ocel:timestamp"}
+                       : std::vector<std::string>{"ocel:eid", "ocel:timestamp", "ocel:activity"},
+        event_attributes);
+    for (const auto& name : order) {
+      if (name == "ocel:eid") continue;
+      if (name == "ocel:timestamp") cells.emplace_back(Cell::kTime, 0);
+      else if (name == "ocel:activity") cells.emplace_back(Cell::kActivity, 0);
+      else cells.emplace_back(Cell::kAttribute, attribute_at.at(name));
+    }
+  }
+  Row header;
+  for (const auto& [cell, at] : cells) {
+    switch (cell) {
+      case Cell::kId: header.push_back(options.event_id_column); break;
+      case Cell::kTime: header.push_back(options.timestamp_column); break;
+      case Cell::kActivity: header.push_back(options.activity_column); break;
+      case Cell::kAttribute: header.push_back(event_attributes[at]); break;
+    }
   }
   for (const auto& type : types) {
     const std::string name = options.object_type_prefix + type;
@@ -436,13 +459,21 @@ void write_event_table(std::ostream& out, const Ocel& log,
   }
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& event = log.events[index];
-    Row row = activity_first ? Row{event.id, event.activity, std::move(timestamps[index])}
-                             : Row{event.id, std::move(timestamps[index]), event.activity};
-    for (const auto& key : event_attributes) {
-      const auto* attr = find_attribute(event.attributes, key);
-      row.push_back(attr == nullptr ? std::string{}
-                                    : csv_attribute_text(*attr, log.event_type_attributes,
-                                                         event.activity, frame.dtype(key)));
+    Row row;
+    for (const auto& [cell, at] : cells) {
+      switch (cell) {
+        case Cell::kId: row.push_back(event.id); break;
+        case Cell::kTime: row.push_back(std::move(timestamps[index])); break;
+        case Cell::kActivity: row.push_back(event.activity); break;
+        case Cell::kAttribute: {
+          const auto& key = event_attributes[at];
+          const auto* attr = find_attribute(event.attributes, key);
+          row.push_back(attr == nullptr ? std::string{}
+                                        : csv_attribute_text(*attr, log.event_type_attributes,
+                                                             event.activity, frame.dtype(key)));
+          break;
+        }
+      }
     }
     const auto event_it = refs.find(event.id);
     for (const auto& type : types) {
@@ -488,17 +519,31 @@ void write_object_table(std::ostream& out, const Ocel& log,
       return frame.position(left) < frame.position(right);
     });
   }
-  Row header{options.object_id_column, options.object_type_column};
   for (const auto& key : attributes) {
     if (key.empty() || key == options.object_id_column || key == options.object_type_column) {
       throw std::invalid_argument("object attribute collides with an OCEL CSV column: " + key);
     }
-    header.push_back(key);
   }
+  // Round EP: the frame's order as is, id and type where
+  // OcelFrameHint::reserved places them (observed black-box).
+  const auto order = ocel_frame::frame_column_order(log.object_frame_hint, {"ocel:oid", "ocel:type"}, attributes);
+  Row header;
+  for (const auto& name : order)
+    header.push_back(name == "ocel:oid"    ? options.object_id_column
+                     : name == "ocel:type" ? options.object_type_column
+                                           : name);
   write_row(out, header, options.delimiter);
   for (const auto& object : log.objects) {
-    Row row{object.id, object.type};
-    for (const auto& key : attributes) {
+    Row row;
+    for (const auto& key : order) {
+      if (key == "ocel:oid") {
+        row.push_back(object.id);
+        continue;
+      }
+      if (key == "ocel:type") {
+        row.push_back(object.type);
+        continue;
+      }
       const auto* attr = find_attribute(object.attributes, key);
       row.push_back(attr == nullptr ? std::string{}
                                     : csv_attribute_text(*attr, log.object_type_attributes,
@@ -844,6 +889,13 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   // in first-appearance order.
   std::vector<OcelObject> object_list;
   std::unordered_map<std::string, std::size_t> object_index;
+  // Round EP: the files' attribute columns in file order and the rows the
+  // reference drops, for the frame hints (see below).
+  std::vector<std::string> event_file_columns, object_file_columns;
+  std::vector<ocel_frame::HintRow> dropped_events, dropped_objects;
+  // The objects frame's own columns among them (OcelFrameHint::reserved):
+  // the object table's order, or (ocel:type, ocel:oid) without one.
+  std::vector<std::string> object_order{"ocel:type", "ocel:oid"};
   if (object_table != nullptr) {
     const auto object_header = read_header(*object_table, options, "object");
     const auto object_id = required_column(object_header, options.object_id_column, "object");
@@ -856,13 +908,28 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
         }
       }
     }
+    object_order.clear();
+    for (std::size_t i = 0; i < object_header.names.size(); ++i) {
+      if (i == object_id) object_order.emplace_back("ocel:oid");
+      else if (i == object_type) object_order.emplace_back("ocel:type");
+      else {
+        object_file_columns.push_back(object_header.names[i]);
+        object_order.push_back(object_header.names[i]);
+      }
+    }
     for (std::size_t row_index = 1; row_index < object_table->size(); ++row_index) {
       const auto& row = (*object_table)[row_index];
       // A missing id or type (an empty cell or a short row) is NaN in the
       // reference frame, which drops the row.
       const std::string& id = row[object_id];
       const std::string& type = row[object_type];
-      if (id.empty() || type.empty()) continue;
+      if (id.empty() || type.empty()) {
+        auto& dropped = dropped_objects.emplace_back();
+        for (std::size_t i = 0; i < object_header.names.size(); ++i)
+          if (i != object_id && i != object_type && !row[i].empty())
+            dropped.cells.push_back({object_header.names[i], row[i]});
+        continue;
+      }
       OcelObject object{id, type, {}};
       for (std::size_t i = 0; i < object_header.names.size(); ++i) {
         if (i == object_id || i == object_type) continue;
@@ -879,6 +946,22 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   }
   // Attribute cells stay text, as the reference CSV reader keeps them (it
   // types only the timestamp); empty cells are missing values.
+  std::vector<std::size_t> attribute_indices;
+  std::vector<std::string> event_order;
+  for (std::size_t i = 0; i < event_header.names.size(); ++i) {
+    if (i == event_id) event_order.emplace_back("ocel:eid");
+    if (i == activity) event_order.emplace_back("ocel:activity");
+    if (i == timestamp) event_order.emplace_back("ocel:timestamp");
+    if (i == event_id || i == activity || i == timestamp ||
+        std::any_of(object_columns.begin(), object_columns.end(),
+                    [i](const auto& column) { return column.second == i; }) ||
+        std::find(ignored_columns.begin(), ignored_columns.end(), i) != ignored_columns.end()) {
+      continue;
+    }
+    attribute_indices.push_back(i);
+    event_file_columns.push_back(event_header.names[i]);
+    event_order.push_back(event_header.names[i]);
+  }
   Ocel log;
   // Its frame keeps the file's column order.
   log.event_activity_first = activity < timestamp;
@@ -899,6 +982,9 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
         throw std::invalid_argument("event CSV timestamp is not ISO-8601: " + row[timestamp]);
       }
       event_rows.emplace_back(&row, false);
+      auto& dropped = dropped_events.emplace_back();
+      for (const auto i : attribute_indices)
+        if (!row[i].empty()) dropped.cells.push_back({event_header.names[i], row[i]});
       continue;
     }
     const bool nat = nat_cell(row_index);
@@ -1089,6 +1175,41 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   if (elements.empty()) mark_ocel_relation_free_frames(log, false);
   // Round EO: read_ocel_csv's O2O frame is float64 (Ocel::untyped_o2o).
   log.untyped_o2o = log.o2o.empty();
+  // Round EP: pandas' frames keep the files' attribute columns in file order,
+  // all-empty ones too (write_ocel_csv prints them, the JSON and XML writers
+  // list them among the attribute names), and every row the reference then
+  // drops (an event row without id or activity, an object row without id or
+  // type) is in the build (observed black-box, bank b57).
+  const auto hint = [](OcelFrameHint& frame_hint, std::vector<std::string> columns,
+                       const std::vector<std::string>& natural) {
+    frame_hint.columns = std::move(columns);
+    if (frame_hint.columns == natural) frame_hint.columns.clear();
+  };
+  hint(log.event_frame_hint, event_file_columns, ocel_frame::event_frame(log).names());
+  if (object_table != nullptr)
+    hint(log.object_frame_hint, object_file_columns, ocel_frame::object_frame(log).names());
+  if (!dropped_events.empty() || !dropped_objects.empty()) {
+    if (!dropped_events.empty() && log.event_frame_hint.columns.empty())
+      log.event_frame_hint.columns = event_file_columns;
+    if (!dropped_objects.empty() && log.object_frame_hint.columns.empty())
+      log.object_frame_hint.columns = object_file_columns;
+    ocel_frame::hint_extra_rows(log, dropped_events, dropped_objects, {});
+  }
+  // The frames' own columns stand where the files put them (an event file
+  // with its time column first, an object table with the type first) and
+  // the objects frame without an object table is (ocel:type, ocel:oid);
+  // write_ocel_csv and the SQLite writer follow that order (observed
+  // black-box, bank b57).
+  const std::vector<std::string> event_own{"ocel:eid", "ocel:activity", "ocel:timestamp"};
+  ocel_frame::hint_reserved_order(
+      log.event_frame_hint, event_order, event_own,
+      log.event_activity_first
+          ? std::vector<std::string>{"ocel:eid", "ocel:activity", "ocel:timestamp"}
+          : std::vector<std::string>{"ocel:eid", "ocel:timestamp", "ocel:activity"},
+      event_file_columns);
+  const std::vector<std::string> object_own{"ocel:oid", "ocel:type"};
+  ocel_frame::hint_reserved_order(log.object_frame_hint, object_order, object_own, object_own,
+                                  object_file_columns);
   return log;
 }
 

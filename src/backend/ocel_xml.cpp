@@ -314,7 +314,11 @@ const std::string* exact_attr(const Node& n, std::string_view key) {
 // listed object, raises. An event relates to an object once, where it is
 // first listed, with the qualifier attribute of its last listing ("" when
 // that one has none).
-// Observed black-box, round EC.
+// Observed black-box, round EC. Round EP: the raise is the object map's
+// KeyError on the first such element in document order (events in file
+// order, dropped ones too), naming the value as written (`KeyError: 'x1'`,
+// `KeyError: ''`) or None for an element without a value (a nested list
+// too).
 void append_reference_omap(const Node& event, std::string_view event_id,
                            const std::unordered_map<std::string, std::string>& types, Ocel& log) {
   std::unordered_map<std::string, std::size_t> listed;
@@ -322,8 +326,9 @@ void append_reference_omap(const Node& event, std::string_view event_id,
     if (const auto* key = exact_attr(omap, "key"); key == nullptr || *key != "omap") continue;
     for (const auto& rel : omap.children) {
       const auto* oid = exact_attr(rel, "value");
-      if (oid == nullptr || !types.count(*oid))
-        throw std::invalid_argument("OCEL XML relation references unknown object");
+      if (oid == nullptr) throw std::invalid_argument("KeyError: None");
+      if (!types.count(*oid))
+        throw std::invalid_argument("KeyError: " + ocel_frame::python_str_repr(*oid));
       const auto* qualifier = exact_attr(rel, "qualifier");
       std::string text = qualifier ? *qualifier : std::string{};
       const auto [at, fresh] = listed.emplace(*oid, log.relations.size());

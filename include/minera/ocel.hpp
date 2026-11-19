@@ -147,10 +147,24 @@ struct OcelFrameHint {
   // (observed black-box).
   std::optional<std::size_t> field_at;
   std::optional<std::size_t> time_at;
+  // Round EP (events and objects frames): the frame's own columns
+  // (ocel:eid, ocel:timestamp, ocel:activity; ocel:oid, ocel:type) where
+  // pandas holds them among the attribute columns, in frame order: each
+  // before columns[at] (0: before every attribute column, kOcelHintEnd:
+  // after every one). Empty: the default places before the attributes (id,
+  // time and activity as Ocel::event_activity_first says; id and type).
+  // Set from an OCEL CSV file's own column order, for read_ocel_csv's
+  // objects frame without an object table (ocel:type, ocel:oid) and for
+  // read_ocel2_sqlite's (ocel:oid, the attributes, ocel:type); the CSV
+  // writers and the SQLite writer's type tables follow it (observed
+  // black-box).
+  std::vector<std::pair<std::string, std::size_t>> reserved;
   [[nodiscard]] bool empty() const {
-    return columns.empty() && dropped.empty() && dropped_rows == 0 && !field_at && !time_at;
+    return columns.empty() && dropped.empty() && dropped_rows == 0 && !field_at && !time_at &&
+           reserved.empty();
   }
 };
+inline constexpr std::size_t kOcelHintEnd = static_cast<std::size_t>(-1);
 
 // Declared OCEL type metadata is kept separately from observed records so
 // empty types and attributes survive format round-trips.

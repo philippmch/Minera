@@ -733,30 +733,34 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
     }
     if (options.include_lifecycle_wip_features.value_or(false)) {
       std::vector<double> wip(log.objects.size(), 0.0);
-      for (std::size_t row = 0; row < log.objects.size(); ++row)
-        if (lifecycles[row].event_indices.empty()) wip[row] = 1.0;
       // Sort valid lifecycles by their start/end boundary, then count the
       // contiguous suffix whose start is within the current end boundary.
       // The feature is intentionally directional: an earlier lifecycle can
       // see later starts, while a later nested lifecycle does not look back.
       // Restore the input object order after computing the window counts.
+      // Round EP: an object without events (an OCEL CSV's object listed
+      // but not related) takes part with the lifecycle start and end 0 (the
+      // epoch), as pm4py's do (observed black-box, probe ep wip/w1.py).
       std::vector<std::size_t> ordered;
+      std::vector<std::pair<double, double>> bounds(log.objects.size(), {0.0, 0.0});
       ordered.reserve(log.objects.size());
-      for (std::size_t row = 0; row < log.objects.size(); ++row)
-        if (lifecycles[row].start && lifecycles[row].end)
+      for (std::size_t row = 0; row < log.objects.size(); ++row) {
+        if (lifecycles[row].event_indices.empty()) {
           ordered.push_back(row);
+        } else if (lifecycles[row].start && lifecycles[row].end) {
+          bounds[row] = {*lifecycles[row].start, *lifecycles[row].end};
+          ordered.push_back(row);
+        }
+      }
       std::stable_sort(ordered.begin(), ordered.end(), [&](std::size_t left,
                                                             std::size_t right) {
-        if (*lifecycles[left].start != *lifecycles[right].start)
-          return *lifecycles[left].start < *lifecycles[right].start;
-        return *lifecycles[left].end < *lifecycles[right].end;
+        return bounds[left] < bounds[right];
       });
       for (std::size_t position = 0; position < ordered.size(); ++position) {
         const auto row = ordered[position];
-        const double end = *lifecycles[row].end;
+        const double end = bounds[row].second;
         std::size_t next = position + 1;
-        while (next < ordered.size() &&
-               *lifecycles[ordered[next]].start <= end)
+        while (next < ordered.size() && bounds[ordered[next]].first <= end)
           ++next;
         wip[row] = static_cast<double>(next - position);
       }
@@ -1208,8 +1212,63 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
           "OCEL filter_per_type applies only to the objects variant");
   }
   // Round DV: a degenerate relations frame fails on the event id (events)
-  // or the object id (objects) before anything else.
-  require_ocel_relation_column(log, variant == OcelFeatureVariant::kObjects ? "ocel:oid" : "ocel:eid");
+  // or the object id (objects) with the default families. Round EP: it fails
+  // in the first family that reads it, in pm4py's order of families, and a
+  // log whose families read no relation answers (observed black-box, probes
+  // ep wip/rf.py and rf2.py: an OCEL CSV whose rows name no object).
+  if (ocel_relations_frame_degenerate(log)) {
+    const auto key_error = [](std::string_view column) {
+      return std::invalid_argument("KeyError: '" + std::string(column) + "'");
+    };
+    const bool raw = ocel_raw_event_times(log);
+    const bool nat_event = std::any_of(log.events.begin(), log.events.end(), [](const OcelEvent& event) {
+      return event.raw_time == OcelRawTime::kNone && ocel_frame::nat_time_text(event.timestamp);
+    });
+    // The event families: the timestamps (a raw or NaT time raises there),
+    // the relation counts, the endpoints, the new interactions.
+    const auto event_families = [&](bool related_objects) {
+      if (options.include_timestamp_features && raw && !log.events.empty())
+        throw std::invalid_argument(std::string("AttributeError: '") + ocel_raw_time_type(log.events.front().raw_time) +
+                                    "' object has no attribute 'timestamp'");
+      if (options.include_timestamp_features && nat_event)
+        throw std::invalid_argument(ocel_frame::nat_timestamp_error(log));
+      if (options.include_event_num_rel_objs_features.value_or(options.include_relation_features) ||
+          options.include_event_num_rel_objs_type_features.value_or(options.include_relation_features))
+        throw key_error("ocel:eid");
+      if (options.include_event_start_ot_features.value_or(options.include_endpoint_features) ||
+          options.include_event_end_ot_features.value_or(options.include_endpoint_features))
+        throw key_error("ocel:oid");
+      if (options.include_new_interactions_features.value_or(options.include_interaction_features))
+        throw key_error("ocel:eid");
+      if (related_objects) throw key_error("ocel:oid");
+    };
+    if (variant == OcelFeatureVariant::kEvents) {
+      event_families(options.include_related_objects_features);
+    } else if (variant == OcelFeatureVariant::kObjects) {
+      const bool lifecycle = options.include_lifecycle_features.value_or(true);
+      const bool all = options.include_all_object_features.value_or(false);
+      if (lifecycle && (options.include_lifecycle_length_features.value_or(true) ||
+                        options.include_lifecycle_unique_activity_features.value_or(true) ||
+                        options.include_lifecycle_duration_features.value_or(true)))
+        throw key_error("ocel:oid");
+      if (options.include_degree_centrality_features.value_or(all || options.include_interaction_features) ||
+          options.include_interaction_features || options.include_general_interaction_features.value_or(all) ||
+          options.include_general_descendants_features.value_or(all) ||
+          options.include_general_inheritance_features.value_or(all) || options.include_cobirth_features.value_or(all) ||
+          options.include_codeath_features.value_or(all))
+        throw key_error("ocel:eid");
+      if (lifecycle && options.include_lifecycle_activity_features.value_or(true)) throw key_error("ocel:oid");
+      if (options.include_interaction_by_type_features.value_or(all)) throw key_error("ocel:eid");
+      if (lifecycle && options.include_lifecycle_wip_features.value_or(false)) throw key_error("ocel:oid");
+      if (options.include_related_events_features || options.include_related_activities_features)
+        event_families(false);
+      if ((lifecycle && options.include_lifecycle_path_features.value_or(false)) ||
+          options.include_obj_con_in_graph_features)
+        throw key_error("ocel:oid");
+    } else {
+      require_ocel_relation_column(log, "ocel:eid");
+    }
+  }
   // Round DT: the reference reads the objects frame's type (events) or id
   // (objects) first.
   require_ocel_object_column(log, variant == OcelFeatureVariant::kObjects ? "ocel:oid" : "ocel:type");
@@ -1345,11 +1404,13 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
         if (!first_event) first_event = event;
         last_event = event;
       }
+    // Round EP: the endpoint columns look the objects up type by type, the
+    // types sorted, each type's objects in table order (observed black-box,
+    // probe ep wip/k1.py: an OCEL CSV's objects listed but not related).
     for (std::size_t object = 0; object < log.objects.size(); ++object)
-      if (object_events[object].empty()) {
+      if (object_events[object].empty() &&
+          (!first_object || log.objects[object].type < log.objects[*first_object].type))
         first_object = object;
-        break;
-      }
     // Round EG: a NaT event time (an OCEL 2.0 SQLite '' or NULL) raises in
     // the reference's timestamp columns of the events, and in the lifecycle
     // columns of an object whose events all have one (NaT times are left out

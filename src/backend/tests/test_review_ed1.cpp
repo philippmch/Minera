@@ -257,10 +257,11 @@ void reference_shapes() {
   check(R"(<event><string key="id" value="e1"/><string key="activity" value="a"/><date key="timestamp" value="2024-01-01T10:00:00"/><list key="omap"><string key="object-id" value="o1"/></list><list key="vmap"/></event>)",
         R"(<object><string key="id" value="o1"/><string key="type" value="t"/><list key="ovmap"><string key="ocel:type" value="u"/></list></object>)",
         R"({"error":"'NoneType' object has no attribute 'endswith'"})");
-  // "object-id" is no id key: the relation names an unlisted object
+  // "object-id" is no id key: the relation names an unlisted object (round
+  // EP: the object map's KeyError)
   check(R"(<event><string key="id" value="e1"/><string key="activity" value="a"/><date key="timestamp" value="2024-01-01T10:00:00"/><list key="omap"><string key="object-id" value="o1"/></list><list key="vmap"/></event>)",
         R"(<object><string key="type" value="t"/><list key="ovmap"/><string key="object-id" value="o1"/></object>)",
-        R"({"error":"OCEL XML relation references unknown object"})");
+        R"({"error":"KeyError: 'o1'"})");
   // declared: a vmap ocel:activity entry is refused
   check(R"(<event><string key="id" value="e1"/><string key="activity" value="a"/><date key="timestamp" value="2024-01-01T10:00:00"/><list key="omap"><string key="object-id" value="o1"/></list><list key="vmap"><string key="ocel:activity" value="z"/></list></event>)",
         R"(<object><string key="id" value="o1"/><string key="type" value="t"/><list key="ovmap"/></object>)",

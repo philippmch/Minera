@@ -818,6 +818,12 @@ std::string serialize_ocel_object_graph_json(const OcelObjectGraph& graph) {
 
 OcelHeterogeneousGraph discover_ocel_heterogeneous_graph(
     const Ocel& log, const OcelHeterogeneousGraphOptions& options) {
+  // Round EP: pm4py selects the relations' event and object ids, which a
+  // degenerate relations frame lacks (observed black-box, bank b58: an OCEL
+  // CSV whose rows name no object; the two names come in a set's order,
+  // which follows the hash seed: declared).
+  if (ocel_relations_frame_degenerate(log))
+    throw std::invalid_argument("KeyError: \"['ocel:eid', 'ocel:oid'] not in index\"");
   OcelHeterogeneousGraph result;
   result.include_df = options.include_df;
   result.include_object_changes = options.include_object_changes;

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <set>
 #include <stdexcept>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -49,8 +50,26 @@ Ocel filter_ocel_activity_type_matching_exact(
   // Round DV: a degenerate relations frame (an OCEL CSV import without any
   // object reference) fails on the activity key first (black-box).
   require_ocel_relation_column(log, options.activity_key);
-  require_relation_column(log, options.object_type_key);
+  // Round EP: the reference reads the activity column first, adds the
+  // separator text to it, and then reads the type column, so a missing
+  // activity key raises first, and a relations frame without rows of a
+  // reference read (float64 columns, Ocel::untyped_relations) raises numpy's
+  // UFuncTypeError naming the separator's length in code points (at least 1)
+  // before a missing type key (black-box).
   require_relation_column(log, options.activity_key);
+  if (log.relations.empty() && log.untyped_relations) {
+    std::size_t length = 4;
+    if (options.temporary_separator) {
+      length = 0;
+      for (const char byte : *options.temporary_separator)
+        if ((static_cast<unsigned char>(byte) & 0xC0) != 0x80) ++length;
+      length = std::max<std::size_t>(length, 1);
+    }
+    throw std::invalid_argument(
+        "UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('float64'), "
+        "dtype('<U" + std::to_string(length) + "')) -> None");
+  }
+  require_relation_column(log, options.object_type_key);
   std::unordered_map<std::string, const OcelEvent*> events;
   std::unordered_map<std::string, const OcelObject*> objects;
   for (const auto& event : log.events) events.emplace(event.id, &event);
