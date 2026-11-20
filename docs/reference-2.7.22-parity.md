@@ -676,9 +676,14 @@ OCEL flattening evidence: `flatten_ocel_to_event_log` projects one non-empty
 object type into a conventional `EventLog`. Each selected object becomes a
 trace case id; source events drive the left-join order, while matching
 event-object rows retain object-table and relation order, including duplicate
-rows. The source event id is retained as `ocel:eid`, canonical activity and
-timestamp fields can be replaced by scalar event selectors, and scalar event
+rows. The source event id is retained as `ocel:eid`, and scalar event
 and object attributes retain their native kinds and original keys. The
+activity and timestamp selectors rename the merged frame's columns as
+pm4py's flattening does (round FE, Review FE1): the selected cells become
+`concept:name` and `time:timestamp` as they are, the canonical activity and
+time stay as `ocel:activity` and `ocel:timestamp`, a `case:` column moves
+onto the events, and ocel:timestamp as the activity alone collapses into
+the time rename. The
 selected object type is emitted as `ocel:type`; no `case:` prefix is added to
 trace attributes by the XES exporter. Public adapters accept the independent
 `event_activity_attribute` and `event_timestamp_attribute` selectors (with
@@ -687,7 +692,8 @@ CLI flags). Unreferenced objects and events are
 omitted, while O2O, E2E, and object-change records are ignored. Null scalar
 attributes are omitted because the conventional event-log/XES model has no
 null attribute kind. Unknown non-empty object types produce an empty XES log;
-empty or all-whitespace selectors are rejected; object-type and selector values
+empty selectors take the canonical columns and all-whitespace ones are
+rejected; object-type and selector values
 are otherwise matched as supplied. The standalone `minera_ocel --flatten-object-type` selector
 and multipart local `POST /api/ocel/flatten?object_type=...` route emit the
 resulting XES.
@@ -35404,3 +35410,99 @@ object, float64 and datetime64 columns; each canonical temporary column
 dropped through the transport, the KeyErrors, the two-row statistics, the
 qualifier restored on a new log; a NULL qualifier on an unlisted and on a
 listed row of a written SQLite file).
+
+## Review FE1: the flattening's selectors, SQLite NULL cells as None, CSV event times with an offset as labels (2026-11-20)
+
+Round FE checked FD's CI (run 44827214734 on b85505e: all six jobs
+green). Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow)
+in the reference venv with round FD's banks o81 (OCEL 2.0 JSON, and its
+SQLite files read again as o81s2 after FE1-2) and q28 (CSV), a fresh CSV
+bank q29 (`eq/csv/q2gen.py 2802 60`) and a fresh o83 (`fc/o3/o3gen.py 83
+60`, JSON, SQLite and XML). New sweeps: `q/fl.py` (the flattening of each
+of the first two object types with `event_activity_attribute` and
+`event_timestamp_attribute` on each events column, the canonical columns,
+`case:` columns, unknown names and both selectors together; native XES
+against pm4py's frame as `pm4py.write_xes` prints it), `q/xn.py` (round
+FD's xe.py on the non-exact attribute filters with typed values plus
+None), `q/cocd.py` (the OC-DFG discovery with selectors on chain
+results), and `q/csw.py` SET=tmp2 with `q/crsw.py` (the type matching's
+temporary column on names the relations frame does not hold, through
+chains, writers and routes).
+
+FD's fixes matched: the non-exact attribute filters with None (xn 0 of
+3,580 on o81's JSON and 0 of 3,924 on its SQLite; q28's 32 of 2,445 are
+FD's declared window that keeps nothing on CSV before the filters); the edge metrics with selectors
+(o81 179 of 637 and 192 of 658, q28 119 of 465) and the OC-DFG of chain
+results (o81 32 of 14,996 and 70 of 15,585, q28 731 of 8,790) leave only
+the declared classes (the edge metrics' typed and missing labels, the
+first failing pair's hash-seed order, the objects named but not listed)
+and the SQLite None cells of FE1-2; the temporary column on unheld names
+gives 0 of 21,168 chains on o81's JSON and only the declared date
+fractions of the downloads on the routes after them (168 of 8,892).
+
+Fixed:
+- **FE1-1 The flattening's selectors.** `flattening.flatten(ocel, type,
+  parameters)` merges the events frame with the `case:`-prefixed objects
+  frame and renames `{activity: "concept:name", timestamp:
+  "time:timestamp"}`, a dict literal: the selected cells become
+  `concept:name` and `time:timestamp` as they are (any type; the XES
+  writer prints `concept:name` as `str()` of the cell, `3.0` for an int of
+  a float64 column, `2024-02-02 00:00:00+00:00` for a date), the canonical
+  activity and time stay as `ocel:activity` and `ocel:timestamp` columns,
+  `ocel:eid` can be the activity or the time, a `case:` column (an object
+  attribute, `case:ocel:type`) moves onto the events and leaves the trace,
+  a name no column holds renames nothing (the events then have no
+  `concept:name` or no `time:timestamp`), ocel:timestamp as the activity
+  alone collapses into the time rename (the activity column stays
+  `ocel:activity`), and renaming `case:concept:name` raises the XES
+  writer's `the specified case ID column is not contained in the
+  dataframe. Available columns: [...]` (the sorted renamed columns). An
+  event whose selected cell is missing or null has no `concept:name` or
+  `time:timestamp`. Native required the selected attribute on every event
+  (`OCEL flatten event activity attribute 'x' is missing for e2`), read
+  `concept:name`, `ocel:activity` and the like as aliases of the canonical
+  fields, kept the selected attribute under its own key and wrote no
+  `ocel:activity` or `ocel:timestamp` column (FD's server:
+  o81's JSON 1,111 of 1,115, its SQLite 1,140 of 1,141, q28 1,002 of
+  1,101). The server's flatten route now sets an event's nanosecond time
+  only where ocel:timestamp is `time:timestamp`.
+- **FE1-2 SQLite NULL cells as None.** `read_ocel2_sqlite` reads each
+  type table with `read_sql`, whose NULL cells are None in a column of
+  texts next to numbers, of BLOBs or of NULLs alone (object), and NaN in a
+  column of texts alone (str) or of numbers alone (float64); the concat of
+  the type tables keeps each cell. Native dropped every NULL cell (a
+  missing attribute, NaN), so an exact filter with None matched nothing
+  there and the OC-DFG's attribute time named `'float'` where pm4py names
+  `'NoneType'`. The type-table reader now keeps such a NULL as an explicit
+  null attribute (`none_cell_columns`, ocel:activity of the event tables
+  aside), which the transports carry and the writers skip as pm4py's do
+  (FD's server: xe on o81's SQLite 106 of 2,187, ocd 18 of 1,286).
+- **FE1-3 A CSV event time with an offset as a label.** `read_ocel_csv`
+  keeps a time column sharing one offset as `datetime64[us, UTC+02:00]`,
+  so the flattening's activity of ocel:timestamp (with another time
+  column) is that wall clock with its offset (`2024-02-01
+  02:00:00.500000+02:00`, `-05:30` likewise), a UTC column's `+00:00`, a
+  naive column's without offset. Native printed UTC (q29 7 of 1,679 after
+  FE1-1). The flattening now prints the event time at the offset every
+  event time shares (`shared_nonzero_offset`, as the XML and SQLite
+  writers do since round EP).
+
+Results with the fixed server: fl 0 of 2,303 on o81's JSON and 0 of 2,344
+on its SQLite; on q29 254 of 1,679, all declared (objects-file rows
+without a type or an id in seven files, 158; the hash-seed object order of
+five files without an objects file, 96); on o81s2 xe 0 of 2,187, rsw3 0
+of 2,340, dsw 0 of 420, esw 0 of 960, fsw 0 of 740, fsw2 0 of 740, osw 0
+of 360, xsw 0 of 780, ocd 5 of 1,286 (the declared first failing pair:
+each outcome is one of pm4py's under seeds 0 to 9, `'int' and 'NoneType'`
+among them); on the fresh o83 fl 0 of 2,153 (JSON) and 0 of 2,164
+(SQLite), xe 0 of 5,988 and 0 of 5,396, ocd 3 of 1,257 and 2 of 1,285
+(the same declared first failing pair, `probe/hs2.py` under seeds 0 to 9).
+The fixture replay gives 2,673 responses unchanged.
+
+In the suite: `minera_review_fe1_tests` (the selectors on a hand-built
+OCEL 2.0 log: attribute, canonical, `case:` and unknown names, the
+collapsed rename, the case id error, str() of float64 and date cells; a
+written SQLite file with hand-made columns of mixed, text, real and NULL
+cells and the exact object filter with None and NaN on them; CSV logs with
+`+02:00`, `-05:30`, UTC and naive times flattened with ocel:timestamp as
+the activity); `minera_ocel_transform_tests` follows the rename.

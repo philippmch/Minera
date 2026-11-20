@@ -129,9 +129,12 @@ struct OcelFlattenOptions {
   // Required object type.  An all-whitespace value is invalid; an unknown
   // non-empty type produces an empty EventLog.
   std::string object_type;
-  // Optional event attribute selectors.  Empty selectors use the canonical
-  // OcelEvent activity/timestamp fields; non-empty selectors name scalar
-  // event attributes (or their canonical aliases).
+  // Optional selectors, as pm4py's flattening parameters: the named column
+  // of the merged frame (an event attribute, ocel:eid, ocel:timestamp,
+  // ocel:activity, or a "case:"-prefixed object column) is renamed
+  // concept:name / time:timestamp, and the canonical activity and time keep
+  // their ocel:activity / ocel:timestamp columns (round FE).  Empty
+  // selectors use the canonical columns.
   std::string event_activity_attribute;
   std::string event_timestamp_attribute;
 };

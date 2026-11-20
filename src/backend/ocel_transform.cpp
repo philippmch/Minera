@@ -1167,57 +1167,80 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
                           AttributeKind::kString};
   };
 
-  const auto selector_value = [&](const OcelValue& value,
-                                  std::string_view selector,
-                                  std::string_view field,
-                                  std::string_view event_id) {
-    if (std::holds_alternative<std::nullptr_t>(value))
-      throw std::invalid_argument("OCEL flatten " + std::string(field) +
-                                  " selector '" + std::string(selector) +
-                                  "' is null for " + std::string(event_id));
-    if (const auto* text = std::get_if<std::string>(&value)) {
-      if (text->empty())
-        throw std::invalid_argument(
-            "OCEL flatten " + std::string(field) + " selector '" +
-            std::string(selector) + "' is empty for " +
-            std::string(event_id));
-      return *text;
-    }
-    if (const auto* boolean = std::get_if<bool>(&value))
-      return *boolean ? std::string("true") : std::string("false");
-    if (const auto* integer = std::get_if<std::int64_t>(&value))
-      return std::to_string(*integer);
-    const auto number = std::get<double>(value);
-    if (!std::isfinite(number))
-      throw std::invalid_argument("OCEL flatten " + std::string(field) +
-                                  " selector '" + std::string(selector) +
-                                  "' is non-finite for " +
-                                  std::string(event_id));
-    std::ostringstream rendered;
-    rendered << std::setprecision(std::numeric_limits<double>::max_digits10)
-             << number;
-    return rendered.str();
+  // Round FE: the selectors rename the flattened frame's columns as pm4py's
+  // flattening does, rename(columns={activity: "concept:name", timestamp:
+  // "time:timestamp"}) on the events frame merged with the "case:"-prefixed
+  // objects frame (observed black-box, probe fe t1/flsel.py). Each column
+  // keeps its cells: a selected attribute moves to concept:name or
+  // time:timestamp (rows without it have none), the columns it does not
+  // rename stay (ocel:activity, ocel:timestamp, ocel:eid), a name no column
+  // has renames nothing, and the dict literal keeps one selector naming both
+  // keys as time:timestamp. pm4py.write_xes prints concept:name as str() of
+  // the cell and time:timestamp by the cell's type.
+  const std::string activity_column =
+      options.event_activity_attribute.empty() ? std::string("ocel:activity") : options.event_activity_attribute;
+  const std::string time_column =
+      options.event_timestamp_attribute.empty() ? std::string("ocel:timestamp") : options.event_timestamp_attribute;
+  const auto renamed = [&](const std::string& column) -> std::string {
+    if (column == time_column) return "time:timestamp";
+    if (column == activity_column) return "concept:name";
+    return column;
   };
-  const auto selected_field = [&](const OcelEvent& event,
-                                  std::string_view selector,
-                                  std::string_view field) {
-    const bool canonical =
-        selector.empty() ||
-        (field == "activity" &&
-         (selector == "activity" || selector == "concept:name" ||
-          selector == "ocel:activity")) ||
-        (field == "timestamp" &&
-         (selector == "timestamp" || selector == "time:timestamp" ||
-          selector == "ocel:timestamp"));
-    if (canonical)
-      return field == "activity" ? event.activity : event.timestamp;
-    for (const auto& attribute : event.attributes) {
-      if (attribute.key == selector)
-        return selector_value(attribute.value, selector, field, event.id);
+  const auto event_columns = ocel_frame::event_frame(log, true);
+  const auto object_columns = ocel_frame::object_frame(log, true);
+  // write_xes checks the case id column, which a selector naming it renamed.
+  if (renamed("case:concept:name") != "case:concept:name") {
+    std::vector<std::string> columns = {"ocel:eid", "ocel:timestamp", "ocel:activity", "case:concept:name",
+                                        "case:ocel:type"};
+    for (const auto& name : event_columns.names())
+      if (std::find(columns.begin(), columns.end(), name) == columns.end()) columns.push_back(name);
+    for (const auto& name : object_columns.names())
+      if (std::find(columns.begin(), columns.end(), "case:" + name) == columns.end()) columns.push_back("case:" + name);
+    for (auto& column : columns) column = renamed(column);
+    std::sort(columns.begin(), columns.end());
+    std::string listed = "[";
+    for (std::size_t index = 0; index < columns.size(); ++index)
+      listed += (index ? ", " : "") + ocel_frame::python_str_repr(columns[index]);
+    throw std::invalid_argument(
+        "the specified case ID column is not contained in the dataframe. Available columns: " + listed + "]");
+  }
+  // The offset every event time shares when it is not zero: an OCEL CSV read
+  // keeps such a column as datetime64[us, UTC+02:00], whose str() is the wall
+  // clock with that offset (observed black-box: "2024-02-01 02:00:00+02:00"
+  // as the activity of ocel:timestamp, round FE); the other readers hold UTC.
+  const auto event_offset = [&]() -> std::optional<std::int32_t> {
+    std::vector<std::string_view> texts;
+    texts.reserve(log.events.size());
+    for (const auto& event : log.events)
+      if (event.raw_time == OcelRawTime::kNone) texts.emplace_back(event.timestamp);
+    return ocel_frame::shared_nonzero_offset(texts);
+  }();
+  // str() of a frame cell: a datetime as pandas prints it (at `offset` when
+  // the column holds one), an int of a float64 column as a float.
+  const auto python_cell_text = [](const OcelValue& value, bool date, ocel_frame::Dtype dtype,
+                                   std::optional<std::int32_t> offset = std::nullopt) {
+    if (date)
+      if (const auto* text = ocel_frame::date_value_text(value))
+        return ocel_frame::offset_timestamp_text(*text, ' ', offset, std::nullopt);
+    if (const auto* integer = std::get_if<std::int64_t>(&value); integer && dtype == ocel_frame::Dtype::kFloat64)
+      return ocel_frame::float_repr(static_cast<double>(*integer));
+    return ocel_frame::python_str(value);
+  };
+  // Places one cell of the merged row under its renamed column.
+  const auto place = [&](Event& event, const std::string& column, const OcelValue& value, bool date,
+                         ocel_frame::Dtype dtype, std::optional<EventAttribute> converted) {
+    const auto name = renamed(column);
+    if (name == "concept:name") {
+      event.activity = python_cell_text(value, date, dtype, column == "ocel:timestamp" ? event_offset : std::nullopt);
+      event.activity_state = FirstClassAttributeState::kPresent;
+      return;
     }
-    throw std::invalid_argument("OCEL flatten event " + std::string(field) +
-                                " attribute '" + std::string(selector) +
-                                "' is missing for " + event.id);
+    if (!converted) return;
+    converted->key = name;
+    event.attributes.push_back(std::move(*converted));
+  };
+  const auto date_attribute = [](const std::string& key, const std::string& text) {
+    return EventAttribute{key, ocel_frame::utc_timestamp_text(text, 'T', "+00:00"), AttributeKind::kDate};
   };
 
   const auto make_trace = [&](const OcelObject* object) {
@@ -1225,9 +1248,12 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
     trace.case_id = object->id;
     // Trace attributes use the source object keys. The case id itself is
     // represented by Trace::case_id, so no object-id attribute is duplicated.
-    trace.attributes.push_back(
-        {"ocel:type", object->type, AttributeKind::kString});
+    // A column a selector renamed is an event cell instead (Round FE).
+    if (renamed("case:ocel:type") == "case:ocel:type")
+      trace.attributes.push_back(
+          {"ocel:type", object->type, AttributeKind::kString});
     for (const auto& attribute : object->attributes) {
+      if (renamed("case:" + attribute.key) != "case:" + attribute.key) continue;
       const auto converted = convert_attribute(
           attribute, !attribute.text && ocel_frame::declared_date(log.object_type_attributes, object->type, attribute.key));
       if (converted) trace.attributes.push_back(*converted);
@@ -1249,24 +1275,36 @@ EventLog flatten_ocel_to_event_log(const Ocel& log,
 
       Event event;
       event.case_id = object->id;
-      event.activity =
-          selected_field(source, options.event_activity_attribute, "activity");
-      event.timestamp =
-          selected_field(source, options.event_timestamp_attribute, "timestamp");
       event.input_order = input_order++;
       // The source event id is not represented by an Event field, so retain
       // it explicitly for round-tripping and downstream joins.
-      event.attributes.push_back(
-          {"ocel:eid", source.id, AttributeKind::kString});
+      place(event, "ocel:eid", OcelValue(source.id), false, ocel_frame::Dtype::kObject,
+            EventAttribute{"ocel:eid", source.id, AttributeKind::kString});
+      if (renamed("ocel:timestamp") == "time:timestamp") {
+        event.timestamp = source.timestamp;
+      } else if (!source.timestamp.empty()) {
+        place(event, "ocel:timestamp", OcelValue(source.timestamp), true, ocel_frame::Dtype::kDatetime,
+              date_attribute("ocel:timestamp", source.timestamp));
+      }
+      place(event, "ocel:activity", OcelValue(source.activity), false, ocel_frame::Dtype::kObject,
+            EventAttribute{"ocel:activity", source.activity, AttributeKind::kString});
       for (const auto& attribute : source.attributes) {
-        if ((!options.event_activity_attribute.empty() &&
-             attribute.key == options.event_activity_attribute) ||
-            (!options.event_timestamp_attribute.empty() &&
-             attribute.key == options.event_timestamp_attribute))
-          continue;
-        const auto converted = convert_attribute(
-            attribute, !attribute.text && ocel_frame::declared_date(log.event_type_attributes, source.activity, attribute.key));
-        if (converted) event.attributes.push_back(*converted);
+        const bool date = !attribute.text && ocel_frame::declared_date(log.event_type_attributes, source.activity, attribute.key);
+        auto converted = convert_attribute(attribute, date);
+        if (!converted) continue;
+        place(event, attribute.key, attribute.value, date, event_columns.dtype(attribute.key), std::move(converted));
+      }
+      // The objects frame's columns a selector renamed.
+      if (renamed("case:ocel:type") != "case:ocel:type")
+        place(event, "case:ocel:type", OcelValue(object->type), false, ocel_frame::Dtype::kObject,
+              EventAttribute{"ocel:type", object->type, AttributeKind::kString});
+      for (const auto& attribute : object->attributes) {
+        const auto column = "case:" + attribute.key;
+        if (renamed(column) == column) continue;
+        const bool date = !attribute.text && ocel_frame::declared_date(log.object_type_attributes, object->type, attribute.key);
+        auto converted = convert_attribute(attribute, date);
+        if (!converted) continue;
+        place(event, column, attribute.value, date, object_columns.dtype(attribute.key), std::move(converted));
       }
       result.traces[trace_it->second].events.push_back(std::move(event));
     }

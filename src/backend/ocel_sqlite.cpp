@@ -736,6 +736,43 @@ std::unordered_set<std::string> float64_integer_columns(sqlite3* db, std::string
   return result;
 }
 
+// Round FE: the columns of a type table whose NULL cells read_sql holds as
+// None: an object column (a BLOB, or texts next to numbers) and an all-NULL
+// one; a column of texts alone is str (NaN) and one of numbers alone float64
+// (NaN), whose NULLs stay missing cells (observed black-box, probe fe
+// t2/nulls.py, pandas 3.0.5).
+std::unordered_set<std::string> none_cell_columns(sqlite3* db, std::string_view table,
+                                                  const std::vector<TableColumn>& columns) {
+  struct Seen {
+    bool text = false, blob = false, number = false, null = false;
+  };
+  std::vector<Seen> seen(columns.size());
+  Statement statement(db, "SELECT * FROM " + quote_identifier(table));
+  while (true) {
+    const auto status = sqlite3_step(statement.get());
+    if (status == SQLITE_DONE) break;
+    if (status != SQLITE_ROW) throw std::runtime_error("SQLite type-table column query failed");
+    const auto count = std::min<std::size_t>(columns.size(),
+                                             static_cast<std::size_t>(sqlite3_column_count(statement.get())));
+    for (std::size_t index = 0; index < count; ++index) {
+      switch (sqlite3_column_type(statement.get(), static_cast<int>(index))) {
+        case SQLITE_INTEGER:
+        case SQLITE_FLOAT: seen[index].number = true; break;
+        case SQLITE_TEXT: seen[index].text = true; break;
+        case SQLITE_BLOB: seen[index].blob = true; break;
+        default: seen[index].null = true; break;
+      }
+    }
+  }
+  std::unordered_set<std::string> result;
+  for (std::size_t index = 0; index < columns.size(); ++index) {
+    const auto& column = seen[index];
+    if (column.null && (column.blob || (column.text && column.number) || (!column.text && !column.number)))
+      result.insert(columns[index].name);
+  }
+  return result;
+}
+
 void floatify_integer(OcelValue& value) {
   if (const auto* integer = std::get_if<std::int64_t>(&value)) value = static_cast<double>(*integer);
 }
@@ -773,6 +810,7 @@ class TypeTableRows {
     };
     if (id_index < 0) throw key_error(base == TypeTableBase::kEvents ? "ocel:eid" : "ocel:oid");
     has_time_ = time_index >= 0;
+    const auto none_columns = none_cell_columns(db, table, columns);
     Statement statement(db, "SELECT * FROM " + quote_identifier(table));
     bool integers = true, nulls = true, objects = false, texts = false, blobs = false, numbers = false;
     std::vector<bool> valued(columns.size(), false);
@@ -874,8 +912,13 @@ class TypeTableRows {
       for (std::size_t index = 0; index < columns.size(); ++index) {
         const auto& column = columns[index];
         if (reserved(column.name)) continue;
-        if (sqlite3_column_type(row, static_cast<int>(index)) == SQLITE_NULL)
+        // Round FE: a NULL cell of an object column is None there (an
+        // explicit null), of any other a missing cell (none_cell_columns).
+        if (sqlite3_column_type(row, static_cast<int>(index)) == SQLITE_NULL) {
+          if (none_columns.contains(column.name) && !(events && column.name == "ocel:activity"))
+            entry->second.attributes.push_back({column.name, nullptr});
           continue;
+        }
         entry->second.attributes.push_back(
             {column.name, read_sqlite_cell(row, static_cast<int>(index),
                                            column.declared_type)});

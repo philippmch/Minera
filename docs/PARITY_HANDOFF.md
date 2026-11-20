@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FD (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–FE (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8081,6 +8081,65 @@ OCEL, OC-DFG and review tests that touch the changed routes; the fixture replay 
 responses unchanged. FC's CI
 run 44803654768 finished green in all six jobs. The generators, the comparers and the probes are
 in the project files under `review-harness/round-fd/`.
+
+Round FE re-reviewed FD (Review FE1). FD's fixes matched on its banks and
+fresh ones (q29 from `eq/csv/q2gen.py 2802 60`, o83 from `fc/o3/o3gen.py
+83 60`): the non-exact attribute filters with None (`q/xn.py`), the edge
+metrics with selectors, the OC-DFG of chain results (`q/cocd.py`) and the
+temporary column on names the relations frame does not hold (`q/csw.py`
+SET=tmp2, `q/crsw.py`) gave only declared classes and the carried SQLite
+item. The new flattening sweep (`q/fl.py`, both selectors on every events
+column, the canonical and `case:` columns) found two classes. Fixed:
+FE1-1, the flattening's selectors rename the merged frame's columns as
+pm4py's dict literal does (the selected cells as they are under
+concept:name and time:timestamp, ocel:activity and ocel:timestamp kept, a
+`case:` column moved onto the events, ocel:timestamp as the activity alone
+collapsing into the time rename, `case:concept:name` raising the XES
+writer's column check); FE1-2 (the carried item), the SQLite reader keeps a
+NULL cell as None where read_sql makes the column object (texts next to
+numbers, BLOBs, NULLs alone) and leaves it out where the column is str or
+float64; FE1-3, the activity of ocel:timestamp after a CSV read whose
+times share an offset prints that offset. Declared, unchanged: the CSV
+objects-file rows without a type or an id, the hash-seed object order
+without an objects file, the first failing pair's hash-seed order.
+
+In the suite: `minera_review_fe1_tests`; `minera_ocel_transform_tests`
+follows the rename. The full ctest passed 652 of 652 on the first run (28
+minutes, -j2); the fixture replay gave 2,673 responses unchanged. FD's CI
+run 44827214734 finished green in all six jobs. The generators,
+the comparers and the probes are in the project files under
+`review-harness/round-fe/`.
+
+Next round (FF) should start by re-reviewing round FE:
+
+- FE's CI run (FD's run 44827214734 finished green in all six jobs);
+- FE1-1 on the other places that flatten (the CLI's
+  `--flatten-object-type` with both selectors, the flattening of filter
+  and chain results, the frontend's flatten form), with selectors naming
+  object columns of a CSV objects file and timestamps as `case:` cells;
+- FE1-2 on the other readers' null cells (OCEL 2.0 JSON `null` values,
+  OCEL 2.0 XML elements without text, OCEL 1.0 JSON nulls) and on the
+  routes that read None and NaN apart beyond the exact filters (the
+  non-exact filters on SQLite, the attribute statistics and features, the
+  CSV writer, the event type tables' NULL cells);
+- FE1-3 on the other labels taken from the event time of a CSV log with an
+  offset (the edge metrics and the event-object graph with ocel:timestamp
+  as the key, compared as raw text rather than through the harness's UTC
+  normaliser) and such logs through chains;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FE's list, taken in FE: FD's CI (all six jobs green),
+FD1-1 on the other attribute-timed routes (the edge metrics' performance
+and the OC-DFG of chain results: only declared classes) and the null
+activity label on the flattening (FE1-1, FE1-3), FD1-2 on the non-exact
+filters (xn 0 on o81) and the carried SQLite NULL cells (FE1-2), FD1-3
+with the temporary column on unheld names (0 of 21,168 chains on o81's
+JSON, the routes after them only the declared download fractions). Carried to FF: EV1-1, the
+SQLite leftovers, the new Polars dtypes, DW1, the other declared items,
+the rest of the CU list and the open choices.
+
+Previous list for round FE (kept for its older items):
 
 Next round (FE) should start by re-reviewing round FD:
 

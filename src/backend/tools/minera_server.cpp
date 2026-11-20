@@ -3359,9 +3359,9 @@ void handle_ocel_flatten(const httplib::Request& request,
     auto flattened = minera::flatten_ocel_to_event_log(log, options);
     // Round EM: pm4py's flattened frame holds the times as datetime64[ns],
     // which pm4py.write_xes prints with their nanoseconds (a number read as
-    // nanoseconds since the epoch keeps them; observed black-box).
-    if (options.event_timestamp_attribute.empty())
-      for (auto& trace : flattened.traces)
+    // nanoseconds since the epoch keeps them; observed black-box). Round FE:
+    // the events' time is set only where ocel:timestamp is time:timestamp.
+    for (auto& trace : flattened.traces)
         for (auto& event : trace.events)
           if (!event.timestamp_attribute && !event.timestamp.empty() &&
               minera::parse_timestamp(event.timestamp)) {

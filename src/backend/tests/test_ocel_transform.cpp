@@ -482,43 +482,43 @@ void flatten_contract() {
   custom_options.event_timestamp_attribute = "event_time";
   const auto custom_flattened =
       minera::flatten_ocel_to_event_log(custom, custom_options);
+  // Round FE: the selectors rename the flattened frame's columns as pm4py's
+  // flattening does: the selected cells become concept:name and
+  // time:timestamp (time:timestamp keeps the cell's type), the canonical
+  // activity and time stay as ocel:activity and ocel:timestamp.
   assert(custom_flattened.traces[0].events[0].activity == "Created");
-  assert(custom_flattened.traces[0].events[0].timestamp == "42");
+  assert(custom_flattened.traces[0].events[0].timestamp.empty());
+  assert(custom_flattened.traces[0].events[0].attribute("time:timestamp") != nullptr);
+  assert(*custom_flattened.traces[0].events[0].attribute("time:timestamp") == "42");
+  assert(custom_flattened.traces[0].events[0].attribute("ocel:activity") != nullptr);
+  assert(custom_flattened.traces[0].events[0].attribute("ocel:timestamp") != nullptr);
   assert(custom_flattened.traces[0].events[0].attribute(
              "display_activity") == nullptr);
   assert(custom_flattened.traces[0].events[0].attribute("event_time") ==
          nullptr);
   assert(custom_flattened.traces[0].events[2].activity == "Packed");
-  assert(custom_flattened.traces[0].events[2].timestamp == "43");
+  assert(*custom_flattened.traces[0].events[2].attribute("time:timestamp") == "43");
   assert(custom_flattened.traces[0].events[2].attribute(
              "display_activity") == nullptr);
   assert(custom_flattened.traces[0].events[2].attribute("event_time") ==
          nullptr);
 
+  // A null or missing selected cell is a gap of the frame (no
+  // time:timestamp on that event), an infinity a float.
   auto null_selector = custom;
   null_selector.events[0].attributes.push_back(
       {"null_time", std::nullptr_t{}});
   custom_options.event_timestamp_attribute = "null_time";
-  threw = false;
-  try {
-    (void)minera::flatten_ocel_to_event_log(null_selector, custom_options);
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  assert(threw);
+  const auto null_flattened = minera::flatten_ocel_to_event_log(null_selector, custom_options);
+  assert(null_flattened.traces[0].events[0].attribute("time:timestamp") == nullptr);
 
   auto nonfinite_selector = custom;
   nonfinite_selector.events[0].attributes.push_back(
       {"nonfinite_time", std::numeric_limits<double>::infinity()});
   custom_options.event_timestamp_attribute = "nonfinite_time";
-  threw = false;
-  try {
-    (void)minera::flatten_ocel_to_event_log(nonfinite_selector,
-                                            custom_options);
-  } catch (const std::invalid_argument&) {
-    threw = true;
-  }
-  assert(threw);
+  const auto nonfinite_flattened = minera::flatten_ocel_to_event_log(nonfinite_selector, custom_options);
+  assert(nonfinite_flattened.traces[0].events[0].attribute("time:timestamp") != nullptr);
+  assert(*nonfinite_flattened.traces[0].events[0].attribute("time:timestamp") == "inf");
 
   custom_options.event_activity_attribute = " ";
   threw = false;
