@@ -34933,3 +34933,125 @@ single-pass split contract compares the rows). The 100 OCEL and review
 tests and 91 OC, server and JSON tests then passed, and the fixture replay
 gave 2,673 responses unchanged. Harness: `review-harness/round-ez/` in the
 project files (README).
+
+## Review FA1: exact filters on transports, OCEL 1.0 XML object changes (2026-11-20)
+
+Round FA checked EZ's CI (run 44744424886 on a5efaee: all six jobs green,
+ctest on Linux, macOS and Windows). Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow)
+in the reference venv with fresh banks (`ex/q/jqgen.py`: j7 of 150 OCEL
+2.0 JSON files from b65, seed 2101; k7 of 120 classic from b64, seed 2201;
+`ew/q/sgen.py` on b65, seed 107: s107 of 150 SQLite files;
+`eo/c1/c1gen.py 59 120`: c59, OCEL 1.0 XML; `eq/csv/q2gen.py 2301 80`
+with every feature: q23, CSV; ev's b64, pm4py-written OCEL 2.0 XML: b64x;
+native OCEL 2.0 XML exports of c59: n59; and a new OCEL 1.0 XML generator
+for EY1-3's mark, `fa/c2/c2gen.py` (a key a `<date>` declares for one type
+or activity next to date-like and plain `<string>`s, `<float>`s and
+`<int>`s of the same or other types, repeated ovmap keys with timestamps
+whose values mix `<date>` and `<string>`, tag spellings `Date` and
+`datetime`): c61 of 40, seed 61, and c62 of 40, seed 62) and a new chain
+sweep, `fa/q/csw.py`: fifteen single filters (the exact attribute filters
+and their negations, the object type, object, event and activity
+negations, the levels, the component and count filters, the activity-type
+matching, the exact window), twenty chains of two steps (a filter of a
+filter, a filter after an enrichment or a split, a split after a filter),
+the capped splits and both enrichments, each step's native result posted
+to the next route as the transport, the last result through the seven
+downloads of round EO's dsw (`fa/q/crsw.py` runs round ET's rsw3 routes
+on the chain results).
+
+EZ's fixes matched: round EZ's filter and split download sweeps (fdsw,
+fdsw2, ssw) gave 0 on every bank (results below), and the chain sweep with
+EZ's server found the classes below, on the exact filters (the routes that
+read their input with literal names) and on OCEL 1.0 XML object changes: s107 758 of 7,513 (FA1-1),
+j7 2 of 7,513 and c59x 1 of 7,099 (FA1-2), q23 1,069 of 4,920 (the
+declared CSV classes, noid, notype, and two FA1-2 chains), c61 809 of
+9,779 (FA1-3 to FA1-5), b64x 0 of 7,553, k7 0 of 7,518. n59 (native
+exports read back) gave 2,422 of 6,966 and dsw 94 of 196, all the
+declared typed values of native OCEL 2.0 XML (OC8: native names each
+value's type, which read_ocel2_xml ignores: `1000.0` of a type that
+declares the key `string` reads back as `'1000.0'`, an empty text as
+`'None'`); b64x, the same reader on pm4py's own files, gave 0.
+
+Fixed:
+- **FA1-1 Exact filters lost a SQLite import's change cells.** An exact
+  filter reads its input with literal names (the former reading of round
+  EE), which kept only a change's field value, so the other cells of an
+  OCEL 2.0 SQLite change row and read_ocel2_sqlite's `"@@cumcount"` (round
+  EN) were gone from the result's downloads (write_ocel_json's change
+  entries, write_ocel2_sqlite's type tables, the OCEL 2.0 declarations).
+  The literal reading now keeps a change entry's other non-null keys as
+  its cells, as the reference reading does.
+- **FA1-2 Exact attribute filters raised KeyError on a column only removed
+  rows held.** After an object type filter, pm4py's frames keep a column
+  only the removed events or objects held (round EZ), so
+  filter_ocel_event_attribute and filter_ocel_object_attribute select
+  nothing (everything, negated); native raised `'x1'`. The column check
+  now consults the frame hints' columns and dropped columns.
+- **FA1-3 Exact filters compared plain texts and numbers under a date key
+  as datetimes.** Under a key a `<date>` declares for an object type (or
+  activity), a `<string>` `""` or a `<float>` 1.5 of the same type stays a
+  str or float of the object column, which pm4py's isin matches as it is;
+  native compared every value of a date-declared column as a datetime, so
+  nothing matched. A cell now compares as a datetime only when it reads as
+  a timestamp (or is missing or `NaT`); an explicit column kind keeps its
+  comparison.
+- **FA1-4 OCEL 1.0 XML changes frame column order.** read_ocel_xml builds
+  each change row from the object's id and type, the key's value,
+  `ocel:timestamp` and `ocel:field`, so write_ocel2_sqlite's type tables
+  hold `ocel_time` before `ocel_changed_field`; native wrote the field
+  first (the OCEL 2.0 order). The classic XML reader now records the
+  changes frame's order in its frame hint (time and field places, round
+  EO's mechanism for OCEL 2.0 JSON).
+- **FA1-5 A `<string>` change under a date-declared key.** read_ocel_xml
+  types a repeated key's element as it types a first one, so a `<string>`
+  change of a key a `<date>` declares stays its text (`2024-02-01T10:00:00Z`
+  in every writer, a TEXT column next to the dates' isoformats), where
+  native read it as a date. An object change now carries EZ's per-cell text
+  mark (`OcelObjectChange::text`), set by the OCEL 1.0 XML reader, honoured
+  by the frame typing, the JSON, SQLite and OCEL 2.0 XML writers and the
+  date conversion, and carried by both transports as a change's
+  `"minera:text"` with the document's `"minera:textChanges"` (the OCEL 2.0
+  transport also marks a text under a date declaration its reader would
+  convert). A `<date>` change under a key no `<date>` declares already
+  matched (its isoformat text).
+- **FA1-6 write_ocel2_xml printed ints of a float64 column after an exact
+  filter.** An int column with a missing cell in another type table is
+  float64 in read_ocel2_sqlite's objects frame (`1.0`); the exact filter's
+  input keeps its ints, and the OCEL 2.0 XML writer printed them as such
+  (`1`). It now prints an int of a float64 frame column as a float, as it
+  already did for changes.
+
+Results with the fixed server: c61 csw 0 of 9,219, dsw 0 of 280, fdsw 0
+of 1,680, ssw 0 of 672; c62 csw 0 of 9,240, dsw 0 of 280, fdsw 0 of
+1,680, ssw 0 of 742; s107 csw 0 of 7,105; c59x csw 0 of 6,699; fdsw 0 of 1,260 and 1,260, fdsw2 0 of 1,680 and 1,680, ssw 0 of 644
+and 637 on j7 and k7; s107 fdsw 0 of 1,260, fdsw2 0 of 1,680, ssw 0 of
+644; c59x fdsw 0 of 1,218, fdsw2 0 of 1,624, ssw 0 of 420.
+crsw (rsw3's routes on csw's chain results) on eight c62 files gave 94
+of 4,017: the declared date fractions of the JSON downloads (48) and
+FA1-7 below (46; 236 before rsw3 learned the change mark, `eq-rt/rsw3.py`).
+Two files of c61 gave the same 483 comparisons with EZ's server (140
+differences) and the fixed one (0); the banks' smaller totals come from
+the sweep's later step list.
+
+Declared:
+- FA1-7: a `<date>` change under a key no `<date>` of its type declares
+  (a `<string>` or `<float>` first value) is a datetime in pm4py's changes
+  frame and its isoformat text natively; every download prints the same
+  (the isoformat, a TEXT column), so only the transport's model differs
+  (rsw3's comparison of the filter results' changes). Typing it a date
+  would take a date declaration the first values do not make.
+- n59: native OCEL 2.0 XML exports read back through read_ocel2_xml keep
+  the native value types (OC8).
+- EV1-1 stays declared.
+- Carried: the CSV classes (noid, notype, notlisted, dupeid), an event's
+  relation order in OCEL 2.0 JSON (OC1), the date fractions of the JSON
+  downloads, the CSV type column order (hash seed), list, dict, big int and
+  infinite qualifiers, infinite REAL and BLOB qualifiers.
+
+In the suite: `minera_review_fa1_tests` (the exact filters on a SQLite
+import's transport and after an object type filter, texts and numbers
+under a date key, the XML changes frame order and text mark through both
+transports and four writers, write_ocel2_xml's ints of a float64 column).
+The full ctest passed 648 of 648 on the first run, and the fixture replay
+gave 2,673 responses unchanged. Harness: `review-harness/round-fa/` in the project files
+(README).

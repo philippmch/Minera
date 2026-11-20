@@ -500,13 +500,14 @@ struct HeldColumnChange {
 
 void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
                            std::unordered_map<std::string, std::string>& types,
-                           std::vector<HeldColumnChange>& held_changes) {
+                           std::vector<HeldColumnChange>& held_changes,
+                           std::vector<std::string>& change_keys) {
   bool has_id = false;
   std::string id, type;
   std::vector<OcelAttribute> attributes;
   std::unordered_set<std::string> held{"ocel:oid", "ocel:type"};
   std::unordered_set<std::string> dated;
-  struct Change { std::string time, field; OcelValue value; };
+  struct Change { std::string time, field; OcelValue value; bool text; };
   std::vector<Change> changes;
   std::vector<std::size_t> pending_type_changes;
   for (const auto& c : on.children) {
@@ -533,6 +534,7 @@ void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
           attributes.push_back({*entry_key, std::move(value), text});
           continue;
         }
+        change_keys.push_back(*entry_key);
         if (*entry_key == "ocel:oid" || *entry_key == "ocel:type") {
           (void)reference_change_time(entry);
           auto value = reference_value(entry, true);
@@ -546,7 +548,13 @@ void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
           }
           continue;
         }
-        changes.push_back({reference_change_time(entry), *entry_key, reference_value(entry, true)});
+        // Round FA: a change's element is typed as a first one's (see
+        // OcelObjectChange::text).
+        auto time = reference_change_time(entry);
+        const bool date = reference_value_kind(entry) == ReferenceValueKind::kDate;
+        auto value = reference_value(entry, true);
+        const bool text = !date && std::holds_alternative<std::string>(value);
+        changes.push_back({std::move(time), *entry_key, std::move(value), text});
       }
     }
   }
@@ -562,7 +570,8 @@ void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
   if (!has_id) id.clear();
   for (const auto index : pending_type_changes) held_changes[index].object_id = id;
   for (auto& change : changes)
-    log.object_changes.push_back({id, type, std::move(change.time), std::move(change.field), std::move(change.value)});
+    log.object_changes.push_back({id, type, std::move(change.time), std::move(change.field), std::move(change.value),
+                                  OcelRawTime::kNone, {}, change.text});
   log.objects.push_back({std::move(id), std::move(type), std::move(attributes)});
 }
 
@@ -773,11 +782,45 @@ void mark_classic_xml_texts(Ocel& log) {
       if (attribute.text)
         attribute.text = ocel_frame::reference_date_value(log.object_type_attributes, object.type, attribute.key,
                                                           attribute.value);
+  // Round FA: so do the changes' (OcelObjectChange::text).
+  for (auto& change : log.object_changes)
+    if (change.text)
+      change.text = ocel_frame::reference_date_value(log.object_type_attributes, change.object_type, change.field,
+                                                     change.value);
+}
+
+// Round FA: read_ocel_xml builds its changes frame from records of an object
+// id, type, the changed key's value, "ocel:timestamp" and "ocel:field" (a
+// change of ocel:oid or ocel:type writes the own column), so its time column
+// follows the first change's key and its field column the time (observed
+// black-box: write_ocel2_sqlite's type tables put ocel_time before
+// ocel_changed_field, bank c2/c61). `change_keys` are the changed keys in
+// file order (OcelFrameHint, as for OCEL 2.0 JSON in ocel.cpp).
+void hint_classic_xml_change_frame(Ocel& log, const std::vector<std::string>& change_keys) {
+  if (change_keys.empty()) return;
+  std::vector<std::string> order;
+  const auto add = [&](const std::string& key) {
+    if (key == "ocel:oid" || key == "ocel:type") return;
+    if (std::find(order.begin(), order.end(), key) == order.end()) order.push_back(key);
+  };
+  for (const auto& key : change_keys) {
+    add(key);
+    add(ocel_frame::kChangeTimeColumn);
+    add(ocel_frame::kChangeFieldColumn);
+  }
+  auto& hint = log.change_frame_hint;
+  hint.columns.clear();
+  for (std::size_t at = 0; at < order.size(); ++at) {
+    if (order[at] == ocel_frame::kChangeTimeColumn) hint.time_at = at;
+    else if (order[at] == ocel_frame::kChangeFieldColumn) hint.field_at = at;
+    else hint.columns.push_back(order[at]);
+  }
 }
 
 std::vector<OcelXmlTime> parse_classic(const Node& root, Ocel& log, bool reject_lists,
                                        std::vector<HeldColumnChange>& held_changes,
-                                       std::vector<XmlFrameOverride>& overrides) {
+                                       std::vector<XmlFrameOverride>& overrides,
+                                       std::vector<std::string>& change_keys) {
   check_reference_values(root);
   std::unordered_map<std::string, std::string> types;
   for (const auto* objects : children(root, "objects")) {
@@ -785,7 +828,7 @@ std::vector<OcelXmlTime> parse_classic(const Node& root, Ocel& log, bool reject_
       const auto* on = &element;
       // read_ocel_xml reads every child of <objects> as an object.
       if (reference_shaped_object(*on)) {
-        read_reference_object(*on, log, reject_lists, types, held_changes);
+        read_reference_object(*on, log, reject_lists, types, held_changes, change_keys);
         continue;
       }
       if (local(on->name) != "object") continue;
@@ -1249,8 +1292,10 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   std::vector<XmlFrameOverride> overrides;
   if (standard) parse_standard(root, log, options.reject_unsupported);
   else {
-    classic_times = parse_classic(root, log, options.reject_unsupported, held_changes, overrides);
+    std::vector<std::string> change_keys;
+    classic_times = parse_classic(root, log, options.reject_unsupported, held_changes, overrides, change_keys);
     mark_classic_xml_texts(log);
+    hint_classic_xml_change_frame(log, change_keys);
   }
   // The rows a vmap ocel:* entry drops from the events frame (see
   // XmlFrameOverride): an id other than the own one drops the row unless a
@@ -1708,6 +1753,16 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
   // Round EM: with the rows the reader or writer dropped (OcelFrameHint).
   const auto standard_event_frame = ocel_frame::event_frame(log);
   const auto standard_object_frame = ocel_frame::object_frame(log);
+  // Round FA: an int of a float64 frame column prints as a float, as the
+  // changes' do below (an exact filter's input keeps its ints, see
+  // parse_ocel_json_literal_names; observed black-box: read_ocel2_sqlite's
+  // union of the type tables, bank s107_0027).
+  const auto frame_value = [](const OcelAttribute& attribute, const ocel_frame::Columns& frame) -> OcelValue {
+    if (const auto* integer = std::get_if<std::int64_t>(&attribute.value);
+        integer != nullptr && frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64)
+      return static_cast<double>(*integer);
+    return attribute.value;
+  };
   ocel_frame::Columns standard_change_frame;
   standard_change_frame.seed(log.change_frame_hint);
   for (const auto& change : log.object_changes) {
@@ -1723,7 +1778,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
       return ocel_frame::declared_date(log.object_type_attributes, object.type, key);
     };
     for (const auto* attribute : ocel_frame::frame_row(object.attributes, standard_object_frame))
-      write_standard_value(attributes, attribute->value, attribute->key, "        ",
+      write_standard_value(attributes, frame_value(*attribute, standard_object_frame), attribute->key, "        ",
                            "1970-01-01T00:00:00Z", !attribute->text && object_date(attribute->key), true);
     // Round EJ: an object's changes in log order, as write_ocel2_xml writes
     // them (observed black-box: not sorted by time).
@@ -1760,7 +1815,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
                                : change_time_text(change->timestamp),
                            // Round ES: a change of an "ocel:"-prefixed field
                            // is written (observed black-box, probe es x3).
-                           object_date(change->field), false);
+                           !change->text && object_date(change->field), false);
     const auto text = attributes.str();
     if (text.empty()) out << "      <attributes/>\n";
     else out << "      <attributes>\n" << text << "      </attributes>\n";
@@ -1818,7 +1873,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
         << "\">\n";
     std::ostringstream attributes;
     for (const auto* attribute : ocel_frame::frame_row(event.attributes, standard_event_frame))
-      write_standard_value(attributes, attribute->value, attribute->key, "        ", {},
+      write_standard_value(attributes, frame_value(*attribute, standard_event_frame), attribute->key, "        ", {},
                            !attribute->text && ocel_frame::declared_date(log.event_type_attributes,
                                                                          event.activity, attribute->key),
                            true);

@@ -971,6 +971,22 @@ struct ClassicListing {
   bool o2o = false;                         // round EO: any object link (Ocel::untyped_o2o)
 };
 
+// Round FA: a transport's change text marks (OcelObjectChange::text): the
+// document's "minera:textChanges" and a change's (or a change entry's)
+// "minera:text".
+bool transport_text_changes(const Json::Object& root) {
+  const auto* marker = optional(root, "minera:textChanges");
+  if (marker == nullptr) return false;
+  if (!marker->is_bool()) throw std::invalid_argument("minera:textChanges must be boolean");
+  return std::get<bool>(marker->value);
+}
+bool transport_change_text(const Json::Object& entry) {
+  const auto* marker = optional(entry, "minera:text");
+  if (marker == nullptr) return false;
+  if (!marker->is_bool()) throw std::invalid_argument("minera:text must be boolean");
+  return std::get<bool>(marker->value);
+}
+
 // Round EL: a transport's "minera:rawTime" of an event or change (see
 // OcelRawTime): "str", "int", "float" or "nan".
 OcelRawTime transport_raw_time(const Json* marker) {
@@ -990,6 +1006,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
                              bool lenient_change_times = false, bool typed_qualifiers = false) {
   using namespace classic_json;
   const auto& root = root_json.object();
+  const bool text_changes = transport_text_changes(root);  // round FA
   Ocel log;
   parse_classic_type_catalog(optional(root, "ocel:objectTypes"), log.object_type_attributes, "ocel:objectTypes");
   parse_classic_type_catalog(optional(root, "ocel:eventTypes"), log.event_type_attributes, "ocel:eventTypes");
@@ -1162,6 +1179,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
     std::string refusal;  // why a native OCEL cannot hold it, if it remains
     OcelRawTime raw_time = OcelRawTime::kNone;
     std::vector<OcelAttribute> cells;  // round EN: see OcelObjectChange::cells
+    bool text = false;                 // round FA: see OcelObjectChange::text
   };
   std::vector<RawChange> changes;
   if (const auto* raw_changes = optional(root, "ocel:objectChanges"); raw_changes && !raw_changes->is_null()) {
@@ -1230,7 +1248,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
       AttributeRows::Row row;
       for (const auto& key : entry->keys)
         if (key != "ocel:oid" && key != "ocel:type" && key != "ocel:timestamp" && key != "ocel:field" &&
-            !(lenient_change_times && key == "minera:rawTime"))
+            !(lenient_change_times && key == "minera:rawTime") && !(text_changes && key == "minera:text"))
           row.values.emplace_back(key, &change.at(key));
       change_rows.rows.push_back(std::move(row));
     }
@@ -1248,6 +1266,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
       // says; an id that is no str finds no type (the change keeps NaN).
       RawChange raw{found->second, {}, {}, nullptr, {}};
       if (lenient_change_times) raw.raw_time = transport_raw_time(optional(change, "minera:rawTime"));
+      if (text_changes) raw.text = transport_change_text(change);
       const auto refuse = [&](const std::string& why) {
         if (raw.refusal.empty())
           raw.refusal = "OCEL JSON object change of " + *id + ": " + why + ", which a native OCEL cannot hold";
@@ -1489,7 +1508,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
             repr(*type) + " as the file has it (no str), which a native OCEL cannot hold");
     log.object_changes.push_back({objects[change.object].id, *object_type[change.object], std::move(change.time),
                                   std::move(change.field), std::move(change.value), change.raw_time,
-                                  std::move(change.cells)});
+                                  std::move(change.cells), change.text});
   }
 
   // Native extensions the reference ignores: event links (an entry native
@@ -1534,6 +1553,7 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
 // The former classic reading, kept for exact filter inputs (literal names).
 Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_relations = false) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
+  const bool text_changes = transport_text_changes(root);
   // Round EW: int and float qualifiers of a transport (see serialize_ocel_json).
   const auto* typed_marker = optional(root, "minera:typedQualifiers");
   const bool typed_qualifiers = typed_marker != nullptr && typed_marker->is_bool() && std::get<bool>(typed_marker->value);
@@ -1617,7 +1637,25 @@ Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_r
   }
   // A change has its object's type, as the reference reader gives it
   // whatever the change's own "ocel:type" says (observed black-box).
-  if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) continue; /* the reference drops it */ if (const auto* type = optional(rr, "ocel:type")) (void)str(*type, "ocel:type"); c.object_type = types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field); log.object_changes.push_back(std::move(c)); } }
+  if (const auto* ch = optional(root, "ocel:objectChanges")) { if (!ch->is_array()) throw std::invalid_argument("ocel:objectChanges must be array"); for (const auto& r : ch->array()) { const auto& rr = obj(r, "ocel:objectChanges"); OcelObjectChange c; c.object_id = str(required(rr, "ocel:oid"), "ocel:oid"); if (!types.count(c.object_id)) continue; /* the reference drops it */ if (const auto* type = optional(rr, "ocel:type")) (void)str(*type, "ocel:type"); c.object_type = types[c.object_id]; c.timestamp = str(required(rr, "ocel:timestamp"), "ocel:timestamp"); c.field = str(required(rr, "ocel:field"), "ocel:field"); c.value = scalar(required(rr, c.field), c.field);
+      // Round FA: the entry's other non-null keys are the change row's other
+      // cells (OcelObjectChange::cells, a transport of an OCEL 2.0 SQLite
+      // import: its other fields' cells and "@@cumcount"), read as
+      // parse_classic_reference reads them; an exact filter input kept only
+      // the field's value, so its results and their downloads lost them.
+      const auto& change_keys = r.keys;
+      for (const auto& key : change_keys) {
+        if (key == "ocel:oid" || key == "ocel:type" || key == "ocel:timestamp" || key == "ocel:field" ||
+            key == c.field || key.starts_with("minera:"))
+          continue;
+        const auto& cell_json = rr.at(key);
+        if (classic_json::missing_value(cell_json) || !cell_json.is_scalar()) continue;
+        auto value = scalar(cell_json, key);
+        if (std::holds_alternative<std::nullptr_t>(value)) continue;
+        c.cells.push_back({key, std::move(value)});
+      }
+      if (text_changes) c.text = transport_change_text(rr);
+      log.object_changes.push_back(std::move(c)); } }
   for (const auto& category : {"ocel:global-log", "ocel:global-event", "ocel:global-object"}) if (const auto* g = optional(root, category)) { for (const auto& [key, value] : obj(*g, category)) { if (value.is_scalar()) log.globals[std::string(category) + "." + key] = scalar(value, key); } }
   // read_ocel_json keeps the scopes as the file lists them, empty or not.
   log.global_event_scope = optional(root, "ocel:global-event") != nullptr;
@@ -1646,7 +1684,9 @@ Ocel parse_standard(const Json::Object& root, bool typed_qualifiers, bool repeat
     OcelValue value;
     bool has_time = false;
     std::string time;
+    bool text = false;  // round FA: a change's OcelObjectChange::text
   };
+  const bool text_changes = transport_text_changes(root);
   // A change time of a JSON type other than str or null (refused after the
   // walk, see the objects below).
   bool untexted_change_time = false;
@@ -1759,6 +1799,7 @@ Ocel parse_standard(const Json::Object& root, bool typed_qualifiers, bool repeat
           entry.has_time = true;
           entry.time.clear();
         }
+        if (text_changes) entry.text = transport_change_text(a);
         const auto [slot, added] = group_index.try_emplace(name, grouped.size());
         if (added) grouped.emplace_back(name, std::vector<StandardAttribute>{});
         grouped[slot->second].second.push_back(std::move(entry));
@@ -1789,7 +1830,7 @@ Ocel parse_standard(const Json::Object& root, bool typed_qualifiers, bool repeat
           continue;
         }
         log.object_changes.push_back(
-            {id, type, entries[i].time, name, entries[i].value});
+            {id, type, entries[i].time, name, entries[i].value, OcelRawTime::kNone, {}, entries[i].text});
       }
     }
     const auto [slot, added] = object_index.try_emplace(id, log.objects.size());
@@ -2328,7 +2369,7 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
       write_string(out, change->field);
       out << ':';
       if (!transport_markers &&
-          ocel_frame::reference_date_value(log.object_type_attributes, owner, change->field, change->value))
+          ocel_frame::reference_date_value(log.object_type_attributes, owner, *change))
         write_string(out, ocel_frame::object_datetime_text(std::get<std::string>(change->value)));
       else
         write_cell(change->field, change->value);
@@ -2356,6 +2397,8 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
       else
         write_cell(cell.key, cell.value);
     }
+    // Round FA: see OcelObjectChange::text (with "minera:textChanges").
+    if (transport_markers && change->text) out << ",\"minera:text\":true";
     out << '}';
   }
   out << ']';
@@ -3514,7 +3557,7 @@ void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
       if (const auto found = object_types.find(change.object_id); found != object_types.end())
         type = std::string(found->second);
     bool naive = false;
-    if (declared(log.object_type_attributes, type, change.field))
+    if (!change.text && declared(log.object_type_attributes, type, change.field))
       naive = json ? convert_date_value(change.value, reader, true, false) : (convert(change.value, true), false);
     if (naive) naive_changes.push_back(index);
     else if (json && !std::holds_alternative<std::nullptr_t>(change.value)) mixed_fields.insert(change.field);
@@ -4637,8 +4680,30 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     return found == object_type_of.end() ? std::string() : std::string(found->second);
   };
   const auto change_date = [&](const OcelObjectChange& change) {
-    return ocel_frame::reference_date_value(log.object_type_attributes, change_owner(change), change.field,
-                                            change.value);
+    return ocel_frame::reference_date_value(log.object_type_attributes, change_owner(change), change);
+  };
+  // Round FA: the changes a transport marks (OcelObjectChange::text); the
+  // OCEL 2.0 form also marks every other text under a date declaration its
+  // reader would convert (as write_text_values marks values).
+  const auto change_text_mark = [&](const OcelObjectChange& change, bool standard_form) {
+    if (change.text) return true;
+    if (!standard_form || !std::holds_alternative<std::string>(change.value)) return false;
+    const auto owner = change_owner(change);
+    if (!ocel_frame::declared_date(log.object_type_attributes, owner, change.field) ||
+        ocel_frame::reference_date_value(log.object_type_attributes, owner, change))
+      return false;
+    OcelValue converted = change.value;
+    try {
+      convert_ocel_date_value(converted, OcelTimestampReader::kIsoFormatOrFileOrder, true);
+    } catch (const std::exception&) {
+      return true;
+    }
+    return converted != change.value;
+  };
+  const auto write_text_changes = [&](bool standard_form) {
+    if (std::any_of(log.object_changes.begin(), log.object_changes.end(),
+                    [&](const OcelObjectChange& change) { return change_text_mark(change, standard_form); }))
+      out << ",\"minera:textChanges\":true";
   };
   {
     // Round EM: with the rows the reader or writer dropped (OcelFrameHint).
@@ -4825,6 +4890,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         out << ",\"time\":";
         if (change->raw_time != OcelRawTime::kNone) write_raw_time(out, change->raw_time, change->timestamp);
         else write_string(out, change_time(change->timestamp));
+        if (transport_markers && change_text_mark(*change, true)) out << ",\"minera:text\":true";
         out << '}';
       }
       out << "],\"relationships\":";
@@ -4862,6 +4928,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       write_untyped_relations();
       write_typed_qualifiers();
       write_text_values(true);
+      write_text_changes(true);
       write_naive_event_times();
       write_frame_hints();
       write_nanoseconds();
@@ -5021,6 +5088,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   if (transport_markers) {
     write_untyped_relations();
     write_text_values(false);
+    write_text_changes(false);
     // Round EY: see read_classic_dates_as_texts.
     if (declares_dates(log)) out << ",\"minera:declaredDates\":true";
     write_naive_event_times();

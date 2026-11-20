@@ -121,6 +121,13 @@ struct OcelObjectChange {
   // they type the changes frame's columns. The OCEL transport carries them
   // ("minera:cells").
   std::vector<OcelAttribute> cells;
+  // Round FA: a text value the reference keeps as a str although its object
+  // type declares the field a date (see OcelAttribute::text): read_ocel_xml
+  // types a repeated ovmap key's element as it types a first one, so a
+  // <string> change under a key a <date> declares stays its text. The OCEL
+  // transport carries it as the change's "minera:text" (with the document's
+  // "minera:textChanges").
+  bool text = false;
 };
 
 // Round EN: read_ocel2_sqlite's row counter column of the changes frame.

@@ -127,6 +127,12 @@ inline bool reference_date_value(const OcelTypeCatalog& catalog, const std::stri
                                  const OcelAttribute& attribute) {
   return !attribute.text && reference_date_value(catalog, owner, attribute.key, attribute.value);
 }
+// Round FA: a change's field value, unless it is such a text
+// (OcelObjectChange::text).
+inline bool reference_date_value(const OcelTypeCatalog& catalog, const std::string& owner,
+                                 const OcelObjectChange& change) {
+  return !change.text && reference_date_value(catalog, owner, change.field, change.value);
+}
 
 // Columns in first-appearance order with their value statistics.
 class Columns {
@@ -156,7 +162,7 @@ class Columns {
   // Round EN: a change row of `owner` (counts no row): its field's value and
   // its other cells (OcelObjectChange::cells), date values by the catalog.
   void observe_change(const OcelObjectChange& change, const OcelTypeCatalog& catalog, const std::string& owner) {
-    observe(change.field, change.value, reference_date_value(catalog, owner, change.field, change.value));
+    observe(change.field, change.value, reference_date_value(catalog, owner, change));
     for (const auto& cell : change.cells) observe(cell.key, cell.value, reference_date_value(catalog, owner, cell));
   }
   void observe_change(const OcelObjectChange& change) {
@@ -730,8 +736,7 @@ inline void hint_subset_rows(const Ocel& source, const std::vector<Ocel*>& resul
           [&](std::size_t row, Frame& frame) {
             const auto& change = source.object_changes[row];
             const auto& owner = owners[row];
-            count(frame, change.field, change.value,
-                  reference_date_value(source.object_type_attributes, owner, change.field, change.value));
+            count(frame, change.field, change.value, reference_date_value(source.object_type_attributes, owner, change));
             for (const auto& cell : change.cells)
               count(frame, cell.key, cell.value, reference_date_value(source.object_type_attributes, owner, cell));
           });

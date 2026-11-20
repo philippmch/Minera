@@ -536,9 +536,21 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
 }
 
 namespace {
+// Round FA: a column only rows a reader or an earlier filter removed hold
+// stays a column of the reference frame (OcelFrameHint, round EM / EZ), so
+// the exact attribute filters find it there (observed black-box: pm4py
+// filters an object type and then an event attribute only the removed events
+// held without a KeyError).
+bool frame_hint_has_column(const OcelFrameHint& hint, std::string_view key) {
+  if (std::find(hint.columns.begin(), hint.columns.end(), key) != hint.columns.end()) return true;
+  return std::any_of(hint.dropped.begin(), hint.dropped.end(),
+                     [&](const OcelFrameHintColumn& column) { return column.key == key; });
+}
+
 bool event_filter_column_exists(const Ocel& log, std::string_view key) {
   if (key == "ocel:eid" || key == "ocel:activity" || key == "ocel:timestamp")
     return true;
+  if (frame_hint_has_column(log.event_frame_hint, key)) return true;
   if (log.table_columns.events)
     return std::find(log.table_columns.events->begin(),
                      log.table_columns.events->end(), key) !=
@@ -616,6 +628,7 @@ bool object_filter_column_exists(const Ocel& log, std::string_view key) {
   // id or type either; declared frames with other names keep them.
   if (log.table_columns.objects && log.table_columns.objects->empty()) return false;
   if (key == "ocel:oid" || key == "ocel:type") return true;
+  if (frame_hint_has_column(log.object_frame_hint, key)) return true;
   if (log.table_columns.objects)
     return std::find(log.table_columns.objects->begin(),
                      log.table_columns.objects->end(), key) !=
@@ -645,6 +658,21 @@ bool object_filter_timestamp_column(const Ocel& log, const OcelObject& object,
   return attribute != type->second.end() &&
          (attribute->second.find("date") != std::string::npos ||
           attribute->second.find("time") != std::string::npos);
+}
+
+// Round FA: whether a candidate of a date-declared column compares as a
+// datetime: a timestamp text (or "NaT") and a missing cell (NaT) do; a plain
+// text or a number under the key stays a scalar of the reference frame's
+// object column, which pm4py's isin compares as it is (observed black-box,
+// bank c2/c61: `<string key="z" value=""/>` and `<float key="z">` next to
+// `<date>`s of the same object type match "" and 1.5). An explicit column
+// kind keeps its comparison.
+bool date_like_candidate(const OcelValue& candidate) {
+  if (std::holds_alternative<std::nullptr_t>(candidate)) return true;
+  if (const auto* real = std::get_if<double>(&candidate)) return std::isnan(*real);
+  if (const auto* text = std::get_if<std::string>(&candidate))
+    return *text == "NaT" || parse_timestamp_exact(*text).has_value();
+  return false;
 }
 
 bool attribute_filter_datetime_equal(
@@ -739,7 +767,8 @@ Ocel filter_ocel_event_attribute_exact(
     bool matches = false;
     const auto candidate = event_filter_scalar(event, attribute_key);
     if (!kept_text_value(event.attributes, attribute_key) &&
-        event_filter_timestamp_column(log, event, attribute_key, column_kind)) {
+        event_filter_timestamp_column(log, event, attribute_key, column_kind) &&
+        (column_kind != OcelEventAttributeColumnKind::kAutomatic || date_like_candidate(candidate))) {
       for (const auto& value : values)
         matches = matches || attribute_filter_datetime_equal(candidate, value);
     } else {
@@ -815,7 +844,8 @@ Ocel filter_ocel_object_attribute_exact(
   filter_records(filtered.objects, [&](const OcelObject& object) {
     const auto candidate = object_filter_scalar(object, attribute_key);
     const bool datetime = !kept_text_value(object.attributes, attribute_key) &&
-                          object_filter_timestamp_column(log, object, attribute_key, column_kind);
+                          object_filter_timestamp_column(log, object, attribute_key, column_kind) &&
+                          (column_kind != OcelObjectAttributeColumnKind::kAutomatic || date_like_candidate(candidate));
     const bool matches = std::any_of(values.begin(), values.end(), [&](const auto& value) {
       return datetime ? attribute_filter_datetime_equal(candidate, value)
                       : event_filter_scalar_equal(candidate, value);

@@ -2867,7 +2867,7 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       };
       for (const auto* object : rows) bind_row(object->id, object->attributes, nullptr);
       for (const auto* change : changes) {
-        std::vector<OcelAttribute> cells{{change->field, change->value}};
+        std::vector<OcelAttribute> cells{{change->field, change->value, change->text}};
         for (const auto& cell : change->cells)
           if (cell.key != change->field) cells.push_back(cell);
         bind_row(change->object_id, cells, change);

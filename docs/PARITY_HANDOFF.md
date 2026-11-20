@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EZ (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–FA (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7943,6 +7943,67 @@ OCEL, review, OC, server and JSON tests passed; the fixture replay gave
 2,673 responses unchanged. EY's CI run 44725615359 finished green in all
 six jobs. The generators, the comparers and the probes are in the project
 files under `review-harness/round-ez/`.
+
+Round FA re-reviewed EZ (Review FA1). EZ's fixes matched on fresh banks
+(`ex/q/jqgen.py`: j7 OCEL 2.0 JSON, k7 classic; `ew/q/sgen.py`: s107
+SQLite; `eo/c1/c1gen.py`: c59 OCEL 1.0; `eq/csv/q2gen.py`: q23 CSV; b64x
+pm4py-written OCEL 2.0 XML; n59 native OCEL 2.0 XML exports of c59; the
+new `fa/c2/c2gen.py` for EY1-3's mark: c61, c62): fdsw, fdsw2 and ssw 0 on
+j7, k7, s107 and c59x. The new chain sweep (`fa/q/csw.py`: single filters,
+chains of two steps through the transport, capped splits, enrichments,
+then the seven downloads) found six classes. Fixed: FA1-1, the exact
+filters' literal reading dropped a SQLite change row's other cells and
+`"@@cumcount"`; FA1-2, the exact attribute filters raised KeyError on a
+column only removed rows held (they consult the frame hints now); FA1-3,
+they compared a plain text or a number under a date-declared key as a
+datetime (now only a timestamp text, a missing cell or `NaT`); FA1-4,
+read_ocel_xml's changes frame holds the time column before the field
+column (a frame hint of the classic XML reader, so write_ocel2_sqlite's
+type tables match); FA1-5, a `<string>` change under a key a `<date>`
+declares stays its text (`OcelObjectChange::text`, set by the OCEL 1.0
+XML reader, honoured by the frame typing, the writers and the date
+conversion, carried as a change's `"minera:text"` with
+`"minera:textChanges"` in both transports); FA1-6, write_ocel2_xml printed
+the ints of a float64 column an exact filter's input kept. n59's
+differences are the declared typed values of native OCEL 2.0 XML (OC8).
+Declared: FA1-7, a `<date>` change under a key no `<date>` of its type
+declares is a datetime in pm4py and its isoformat text natively (the
+downloads agree; only the rsw3 models of filter results differ). EV1-1
+stays declared.
+
+In the suite: `minera_review_fa1_tests`. The full ctest passed 648 of 648 on the first run (37 minutes, -j2); the
+fixture replay gave 2,673 responses unchanged. EZ's CI run
+44744424886 finished green in all six jobs. The generators, the comparers and the probes are in
+the project files under `review-harness/round-fa/`.
+
+Next round (FB) should start by re-reviewing round FA:
+
+- FA's CI run;
+- FA1-5's change mark on more banks and routes (OCEL 1.0 XML changes
+  under date keys through the flattening, the OC-DFG, the event-object
+  graph and the object change routes; other c2gen seeds; changes of
+  `ocel:`-prefixed keys);
+- FA1-3's rule on the event side and on OCEL 2.0 inputs with date
+  declarations (texts the OCEL 2.0 readers do not convert, numbers under a
+  date type), and the exact window and timestamp filters on such columns;
+- the chain sweep on chains of three steps, on CSV inputs past the
+  declared classes and through rsw3 (`fa/q/crsw.py`), and the sampling
+  routes (pm4py's object and component sampling draw without a seed:
+  invariants only);
+- EV1-1 if a cheap model appears;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round FA's list, taken in FA: EZ's CI, EZ1-1 on fresh banks and transforms
+(every filter family, both splits, filters after enrichments and splits,
+filters of filter results through the transport; the sampling routes not
+yet), EY1-3's mark on more OCEL 1.0 XML banks (c2gen; FA1-3 to FA1-5) and
+through the OCEL 2.0 XML import of a native export (declared OC8),
+EV1-1 (declared). Carried to FB: the sampling routes, EV1-1, the SQLite
+leftovers, the new Polars dtypes, DW1, the other declared items, the rest
+of the CU list and the open choices.
+
+Previous list for round FA (kept for its older items):
 
 Next round (FA) should start by re-reviewing round EZ:
 
