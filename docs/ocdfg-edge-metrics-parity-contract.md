@@ -50,10 +50,25 @@ groups and edge entries as a practical native container contract.
 The direct relation-table carrier is bounded to string identity, activity and
 object-type cells with a stable type per object. Missing/non-string row cells
 and type changes reject explicitly; their full reference behavior is not
-claimed. The native `Ocel` adapter derives denormalized relation labels from
-the actual stored event/object fields and attributes, retaining declared
-relation columns. It requires event/object records for every relation. Direct
-relation-table inputs can retain their own captured denormalized cells.
+claimed. Direct relation-table inputs can retain their own captured
+denormalized cells.
+
+Review FC1 (round FC, observed black-box) replaced the native `Ocel`
+adapter's denormalized relation rows with pm4py's frame-side reading: the
+event ID and activity come from the events frame (the first activity per
+event ID), the object ID from the relations frame (its six columns:
+`ocel:eid`, `ocel:activity`, `ocel:timestamp`, `ocel:oid`, `ocel:type`,
+`ocel:qualifier`; an attribute there raises `KeyError`), and the type from
+the objects frame (the first per object ID). The walk follows the events
+frame's IDs, each with its relation group's objects in relations order, so a
+repeated event-ID key (such as `ocel:activity`) repeats its group, and a type
+key that an event attribute shares reads the object's value. The checks run
+in that order: the events frame's event ID (`'<name>'`) and activity
+(`'Column not found: <name>'`), the relations frame's event ID and object
+ID, the objects frame's object ID and type. The adapter keeps the bounded
+labels: a missing or non-string label cell still rejects (pm4py keys such
+edges by NaN, numbers or timestamps, which the string JSON report does not
+carry; declared in Review FC1).
 
 ## Validation and application use
 

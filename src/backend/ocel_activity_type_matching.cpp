@@ -101,8 +101,18 @@ Ocel filter_ocel_activity_type_matching_exact(
         "dtype('<U" + std::to_string(length) + "')) -> None");
   }
   refuse_typed_qualifier_key(log, options.activity_key, true, length);
+  // Round FC: the relations frame's ocel:timestamp column is datetime64, so
+  // the separator added to it raises, rows or not; as the type column the
+  // text column added to it raises per cell (pandas names the scalar with
+  // two rows or more, the array with one) and an empty frame passes
+  // (observed black-box, probes fc t1/atmts.py, atmts2.py).
+  if (options.activity_key == "ocel:timestamp")
+    throw std::invalid_argument("TypeError: unsupported operand type(s) for +: 'DatetimeArray' and 'str'");
   require_relation_column(log, options.object_type_key);
   refuse_typed_qualifier_key(log, options.object_type_key, false, length);
+  if (options.object_type_key == "ocel:timestamp" && !log.relations.empty())
+    throw std::invalid_argument(std::string("TypeError: unsupported operand type(s) for +: '") +
+                                (log.relations.size() == 1 ? "DatetimeArray" : "Timestamp") + "' and 'str'");
   std::unordered_map<std::string, const OcelEvent*> events;
   std::unordered_map<std::string, const OcelObject*> objects;
   for (const auto& event : log.events) events.emplace(event.id, &event);

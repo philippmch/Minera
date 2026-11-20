@@ -1254,6 +1254,10 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     if (frame_hint.columns == natural) frame_hint.columns.clear();
   };
   hint(log.event_frame_hint, event_file_columns, ocel_frame::event_frame(log).names());
+  // Round FC: read_ocel_csv reads the files with dtype=str, so every event
+  // attribute column is a str one, a column of empty cells alone too (the
+  // attribute window compares nothing there; observed black-box, bank q26).
+  log.event_frame_hint.str_columns = true;
   if (object_table != nullptr)
     hint(log.object_frame_hint, object_file_columns, ocel_frame::object_frame(log).names());
   if (!dropped_events.empty() || !dropped_objects.empty()) {

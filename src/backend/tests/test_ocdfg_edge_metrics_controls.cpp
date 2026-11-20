@@ -68,13 +68,19 @@ void actual_edge_metrics_http_controls() {
   const auto ordinary = post({});
   assert(ordinary && ordinary->status == 200);
   assert(ordinary->body == R"({"object_types":[{"object_type":"Order","edges":[{"source_activity":"A","target_activity":"B","associations":[["e0","e1","o"]],"event_couples":[["e0","e1"]],"total_objects":[["e0","e1","o"]],"unique_objects":["o"]}]}]})");
-  const auto selected = post({{"ocdfg_edge_metrics_event_id_key", ""},
-      {"ocdfg_edge_metrics_object_id_key", "object key"},
-      {"ocdfg_edge_metrics_object_type_key", "type key"},
+  // Round FC: the selectors read pm4py's frames: the event id and activity
+  // from the events frame, the object id from the relations frame (its six
+  // columns), the type from the objects frame (observed black-box).
+  const auto selected = post({{"ocdfg_edge_metrics_object_type_key", "type key"},
       {"ocdfg_edge_metrics_activity_key", "alternate label"},
       {"ocdfg_edge_metrics_timestamp_key", "missing and inactive"}});
   assert(selected && selected->status == 200);
-  assert(selected->body == R"({"object_types":[{"object_type":"alternate type","edges":[{"source_activity":"start","target_activity":"finish","associations":[["x0","x1","alternate object"]],"event_couples":[["x0","x1"]],"total_objects":[["x0","x1","alternate object"]],"unique_objects":["alternate object"]}]}]})");
+  assert(selected->body == R"({"object_types":[{"object_type":"alternate type","edges":[{"source_activity":"start","target_activity":"finish","associations":[["e0","e1","o"]],"event_couples":[["e0","e1"]],"total_objects":[["e0","e1","o"]],"unique_objects":["o"]}]}]})");
+  const auto event_column = post({{"ocdfg_edge_metrics_event_id_key", ""}});
+  assert(event_column && event_column->status == 400 && event_column->body == "''");
+  const auto object_column = post({{"ocdfg_edge_metrics_object_id_key", "object key"}});
+  assert(object_column && object_column->status == 400 &&
+         object_column->body == "'Column not found: object key'");
   const auto missing = post({{"ocdfg_edge_metrics_event_id_key", "missing"}});
   assert(missing && missing->status == 400 && missing->body == "'missing'");
   assert(serialize_ocel_json(source) == before);

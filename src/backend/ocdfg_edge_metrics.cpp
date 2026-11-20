@@ -1,6 +1,9 @@
 #include "minera/ocdfg_edge_metrics.hpp"
 
 #include <algorithm>
+#include <unordered_map>
+
+#include "ocel_frame_types.hpp"
 
 namespace minera {
 namespace {
@@ -25,47 +28,118 @@ std::string string_cell(const std::map<std::string, OcelValue>& row,
   throw std::invalid_argument("OCDFG association companion requires string cells: " + key);
 }
 
-OcdfgAssociationTable relation_table(const Ocel& log) {
-  OcdfgAssociationTable table;
-  if (log.table_columns.relations) table.columns = *log.table_columns.relations;
-  else {
-    std::set<std::string> columns = {"ocel:eid", "ocel:activity", "ocel:timestamp",
-                                     "ocel:oid", "ocel:type", "ocel:qualifier"};
-    for (const auto& event : log.events)
-      for (const auto& attribute : event.attributes) columns.insert(attribute.key);
-    for (const auto& object : log.objects)
-      for (const auto& attribute : object.attributes) columns.insert(attribute.key);
-    for (const auto& [type, schema] : log.event_type_attributes) {
-      (void)type;
-      for (const auto& [key, value] : schema) { (void)value; columns.insert(key); }
+// Round FC: find_associations_per_edge reads the event id and activity
+// columns of the events frame, the event id and object id columns of the
+// relations frame (its six columns: an attribute there raises KeyError) and
+// the object id and type columns of the objects frame, in that order:
+//   identifiers = events[eid]; activities = events.groupby(eid)[activity]
+//   omap = relations.groupby(eid)[oid]; objtypes = objects.groupby(oid)[type]
+// then walks the identifiers (repeated keys repeat their objects; a missing
+// key is no group). Observed black-box (round FC em.py): the former adapter
+// joined each relation row with its event's and object's attributes (event
+// first), so a type key an event attribute shares took the event's value and
+// a repeated event id key paired relation rows instead.
+const std::string kEid = "ocel:eid", kOid = "ocel:oid", kActivity = "ocel:activity",
+                  kType = "ocel:type", kTimestamp = "ocel:timestamp", kQualifier = "ocel:qualifier";
+
+[[noreturn]] void key_error(const std::string& text) {
+  throw OcdfgEdgeMetricsError("KeyError", ocel_frame::python_str_repr(text));
+}
+
+std::set<std::string> event_columns(const Ocel& log) {
+  if (log.table_columns.events)
+    return {log.table_columns.events->begin(), log.table_columns.events->end()};
+  std::set<std::string> columns = {kEid, kTimestamp, kActivity};
+  const auto frame = ocel_frame::event_frame(log);
+  columns.insert(frame.names().begin(), frame.names().end());
+  return columns;
+}
+std::set<std::string> object_columns(const Ocel& log) {
+  if (log.table_columns.objects)
+    return {log.table_columns.objects->begin(), log.table_columns.objects->end()};
+  std::set<std::string> columns = {kOid, kType};
+  const auto frame = ocel_frame::object_frame(log);
+  columns.insert(frame.names().begin(), frame.names().end());
+  return columns;
+}
+std::set<std::string> relation_columns(const Ocel& log) {
+  if (log.table_columns.relations)
+    return {log.table_columns.relations->begin(), log.table_columns.relations->end()};
+  return {kEid, kActivity, kTimestamp, kOid, kType, kQualifier};
+}
+
+// A frame cell: a text, a missing cell or another value. The carrier stays
+// bounded to string cells: a missing or other cell rejects where the
+// reference uses it as a label (declared; a missing key is no group).
+struct Cell {
+  enum class Kind { kText, kMissing, kOther } kind = Kind::kMissing;
+  std::string text;
+  Cell() = default;
+  Cell(std::string value) : kind(Kind::kText), text(std::move(value)) {}
+  static Cell other() { Cell cell; cell.kind = Kind::kOther; return cell; }
+  [[nodiscard]] bool missing() const { return kind == Kind::kMissing; }
+};
+// How a frame reads an attribute column's texts: a value read as a datetime
+// is a Timestamp label in pm4py. Its text names it in a datetime64 column
+// (every value a datetime), but an object column holds it next to texts
+// that may print the same (o81's o3_81_0011: "2024-02-01T10:00:00Z" a str
+// under one type, a datetime under another, two groups in pm4py), so there
+// it rejects as another value (Round FC).
+struct Reading {
+  const OcelTypeCatalog* catalog = nullptr;
+  bool date_column = false;
+};
+Cell attribute_cell(const std::vector<OcelAttribute>& attributes, const std::string& key,
+                    const std::string& owner, const Reading& reading) {
+  for (const auto& attribute : attributes) {
+    if (attribute.key != key) continue;
+    if (std::holds_alternative<std::nullptr_t>(attribute.value)) return {};
+    if (const auto* text = std::get_if<std::string>(&attribute.value)) {
+      if (reading.catalog != nullptr && !reading.date_column &&
+          ocel_frame::reference_date_value(*reading.catalog, owner, attribute))
+        return Cell::other();
+      return Cell(*text);
     }
-    for (const auto& [type, schema] : log.object_type_attributes) {
-      (void)type;
-      for (const auto& [key, value] : schema) { (void)value; columns.insert(key); }
-    }
-    table.columns.assign(columns.begin(), columns.end());
+    return Cell::other();
   }
-  std::map<std::string, const OcelEvent*> events;
-  std::map<std::string, const OcelObject*> objects;
-  for (const auto& event : log.events) events[event.id] = &event;
-  for (const auto& object : log.objects) objects[object.id] = &object;
-  for (const auto& relation : log.relations) {
-    const auto event = events.find(relation.event_id);
-    const auto object = objects.find(relation.object_id);
-    if (event == events.end() || object == objects.end())
-      throw std::invalid_argument("OCDFG association adapter requires source events and objects for each relation");
-    std::map<std::string, OcelValue> row;
-    for (const auto& attribute : event->second->attributes) row.emplace(attribute.key, attribute.value);
-    for (const auto& attribute : object->second->attributes) row.emplace(attribute.key, attribute.value);
-    row["ocel:eid"] = relation.event_id;
-    row["ocel:activity"] = event->second->activity;
-    row["ocel:timestamp"] = event->second->timestamp;
-    row["ocel:oid"] = relation.object_id;
-    row["ocel:type"] = object->second->type;
-    row["ocel:qualifier"] = relation.qualifier;
-    table.rows.push_back(std::move(row));
-  }
-  return table;
+  return {};
+}
+Cell event_cell(const OcelEvent& event, const std::string& key, const Reading& reading = {}) {
+  if (key == kEid) return Cell(event.id);
+  if (key == kActivity) return Cell(event.activity);
+  if (key == kTimestamp) return event.raw_time == OcelRawTime::kNone ? Cell(event.timestamp) : Cell::other();
+  return attribute_cell(event.attributes, key, event.activity, reading);
+}
+Cell object_cell(const OcelObject& object, const std::string& key, const Reading& reading = {}) {
+  if (key == kOid) return Cell(object.id);
+  if (key == kType) return Cell(object.type);
+  return attribute_cell(object.attributes, key, object.type, reading);
+}
+Cell relation_cell(const OcelRelation& relation, const OcelEvent& event, const OcelObject& object,
+                   const std::string& key) {
+  if (key == kEid) return Cell(relation.event_id);
+  if (key == kOid) return Cell(relation.object_id);
+  if (key == kActivity || key == kTimestamp) return event_cell(event, key);
+  if (key == kType) return Cell(object.type);
+  if (key == kQualifier)
+    return relation.qualifier_kind == OcelQualifierKind::kStr ? Cell(relation.qualifier) : Cell::other();
+  // A declared relations frame column beyond the six (a frame built by hand,
+  // as in the retained public bank) has no native storage: its cell is the
+  // event's attribute of that name, else the object's.
+  if (const auto cell = event_cell(event, key); !cell.missing()) return cell;
+  return object_cell(object, key);
+}
+const std::string& label(const Cell& cell, const std::string& key) {
+  if (cell.kind == Cell::Kind::kMissing)
+    throw std::invalid_argument("OCDFG string association row is missing cell: " + key);
+  if (cell.kind == Cell::Kind::kOther)
+    throw std::invalid_argument("OCDFG association companion requires string cells: " + key);
+  return cell.text;
+}
+// A groupby key: a missing cell is no group; another value rejects.
+const std::string* group_key(const Cell& cell, const std::string& key) {
+  if (cell.missing()) return nullptr;
+  return &label(cell, key);
 }
 
 template <class Output, class Project>
@@ -113,7 +187,81 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
 
 OcdfgEdgeAssociations find_ocdfg_edge_associations(
     const Ocel& log, const OcdfgAssociationOptions& options) {
-  return find_ocdfg_edge_associations(relation_table(log), options);
+  const auto eid = options.event_id_attribute.value_or(kEid);
+  const auto oid = options.object_id_attribute.value_or(kOid);
+  const auto type = options.object_type_attribute.value_or(kType);
+  const auto activity = options.activity_attribute.value_or(kActivity);
+  const auto events = event_columns(log);
+  if (!events.contains(eid)) key_error(eid);
+  if (!events.contains(activity)) key_error("Column not found: " + activity);
+  const auto relations = relation_columns(log);
+  if (!relations.contains(eid)) key_error(eid);
+  if (!relations.contains(oid)) key_error("Column not found: " + oid);
+  const auto objects = object_columns(log);
+  if (!objects.contains(oid)) key_error(oid);
+  if (!objects.contains(type)) key_error("Column not found: " + type);
+
+  const auto event_frame = ocel_frame::event_frame(log, true);
+  const auto object_frame = ocel_frame::object_frame(log, true);
+  const auto events_reading = [&](const std::string& key) {
+    return Reading{&log.event_type_attributes, event_frame.dtype(key) == ocel_frame::Dtype::kDatetime};
+  };
+  const auto objects_reading = [&](const std::string& key) {
+    return Reading{&log.object_type_attributes, object_frame.dtype(key) == ocel_frame::Dtype::kDatetime};
+  };
+  const auto eid_reading = events_reading(eid), activity_reading = events_reading(activity);
+  const auto oid_reading = objects_reading(oid), type_reading = objects_reading(type);
+
+  std::vector<Cell> identifiers;
+  std::unordered_map<std::string, Cell> activities;
+  identifiers.reserve(log.events.size());
+  for (const auto& event : log.events) {
+    identifiers.push_back(event_cell(event, eid, eid_reading));
+    if (const auto* key = group_key(identifiers.back(), eid))
+      activities.try_emplace(*key, event_cell(event, activity, activity_reading));
+  }
+  std::unordered_map<std::string, const OcelEvent*> event_by_id;
+  std::unordered_map<std::string, const OcelObject*> object_by_id;
+  for (const auto& event : log.events) event_by_id.emplace(event.id, &event);
+  for (const auto& object : log.objects) object_by_id.emplace(object.id, &object);
+  std::unordered_map<std::string, std::vector<std::string>> omap;
+  for (const auto& relation : log.relations) {
+    const auto event = event_by_id.find(relation.event_id);
+    const auto object = object_by_id.find(relation.object_id);
+    if (event == event_by_id.end() || object == object_by_id.end())
+      throw std::invalid_argument("OCDFG association adapter requires source events and objects for each relation");
+    const auto key = relation_cell(relation, *event->second, *object->second, eid);
+    const auto* group = group_key(key, eid);
+    if (group == nullptr) continue;
+    omap[*group].push_back(label(relation_cell(relation, *event->second, *object->second, oid), oid));
+  }
+  std::unordered_map<std::string, Cell> objtypes;
+  for (const auto& object : log.objects) {
+    const auto key = object_cell(object, oid, oid_reading);
+    if (const auto* group = group_key(key, oid)) objtypes.try_emplace(*group, object_cell(object, type, type_reading));
+  }
+
+  std::unordered_map<std::string, std::string> history;
+  OcdfgEdgeAssociations result;
+  for (const auto& cell : identifiers) {
+    if (cell.kind != Cell::Kind::kText) continue;
+    const auto* evid = &cell.text;
+    const auto related = omap.find(*evid);
+    if (related == omap.end()) continue;
+    for (const auto& obj : related->second) {
+      const auto previous = history.find(obj);
+      if (previous != history.end()) {
+        const auto found_type = objtypes.find(obj);
+        if (found_type == objtypes.end()) key_error(obj);
+        const auto& object_type = label(found_type->second, type);
+        const auto& source = label(activities.at(previous->second), activity);
+        const auto& target = label(activities.at(*evid), activity);
+        result[object_type][{source, target}].emplace_back(previous->second, *evid, obj);
+      }
+      history[obj] = *evid;
+    }
+  }
+  return result;
 }
 
 OcdfgEventCoupleAggregation aggregate_ocdfg_event_couples(const OcdfgEdgeAssociations& input) {

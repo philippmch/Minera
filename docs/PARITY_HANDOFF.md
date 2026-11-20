@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FB (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–FC (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8008,6 +8008,72 @@ affected tests passed; the fixture replay gave 2,673 responses unchanged.
 FA's CI run 44765194634 finished green in all six jobs. The generators, the
 comparers and the probes are in the project files under
 `review-harness/round-fb/`.
+
+Round FC re-reviewed FB (Review FC1). FB's fixes matched on fresh banks
+(the new `fc/o3/o3gen.py` for FB1-1 to FB1-5 on OCEL 2.0 inputs, "ocel:"-
+prefixed names, several object types and change-only fields, as JSON, XML
+and SQLite: o81, o82; FB's c66, c67, o73; CSV q26): imports, dsw, xf,
+csw3, the key chains (PFX=1) and the event-object graph gave only declared
+classes. The new sweeps of the routes that read input with literal names
+(`fc/q/em.py` for the OC-DFG edge metrics, `fc/q/atm.py` for
+activity_type_matching_exact) and the key chains on CSV and dropped rows
+found four classes. Fixed: FC1-1, activity_type_matching_exact with
+`ocel:timestamp` as the activity key raises pandas' DatetimeArray + str
+TypeError, rows or not, and as the type key per cell (one row: the array,
+more: the Timestamp) and not without rows; FC1-2, the edge metrics read
+pm4py's frames (event id and activity from the events frame, the object
+id from the six-column relations frame, the type from the objects frame,
+walking the events frame's ids), so a type key an event attribute shares,
+a repeated event id key and an attribute as the object id key follow
+pm4py, and a datetime next to texts in an object column rejects with the
+other non-string labels; FC1-3, read_ocel_csv's columns are str
+(`OcelFrameHint::str_columns`, transport `"strColumns"`), so the exact
+window on a column of empty cells keeps no event instead of raising
+'float'; FC1-4, the exact window on a naive datetime64 column raises on a
+frame without rows too (a filter's result keeps the dtype). Declared: the
+edge metrics' typed and missing labels (the string report's bounded
+carrier). Carried: the temporary column naming a relations column drops it
+from pm4py's result (an empty log's ocel:eid raises nothing then).
+
+In the suite: `minera_review_fc1_tests`; `minera_ocdfg_edge_metrics_controls_tests`
+follows pm4py's reading. The full ctest passed 650 of 650 on the first run
+(29 minutes, -j2); the fixture replay gave 2,673 responses unchanged. FB's CI run 44787379225 finished green
+in all six jobs. The generators, the comparers and the probes are in the
+project files under `review-harness/round-fc/`.
+
+Next round (FD) should start by re-reviewing round FC:
+
+- FC's CI run (FB's run 44787379225 finished green in all six jobs);
+- FC1-1 with the temporary column and the separator on typed relations
+  columns (qualifiers of SQLite and OCEL 2.0 XML reads), and the carried
+  temporary-column item: pm4py's result lacks a relations column the
+  temporary column names; compare the routes after such a result (OC-DFG,
+  flattening, downloads, a second type matching);
+- FC1-2 on the other OC-DFG routes that take selectors (the statistics
+  route's edge associations, performance with business hours) and with
+  non-unique event id keys from attributes (groupby first skips a missing
+  cell: native rejects it, declared);
+- FC1-3 on CSV object tables (str columns there too: object attribute
+  filters, the object side's null-only columns) and on CSV results posted
+  through chains (the mark survives the transport);
+- FC1-4 on the other empty-frame comparisons (attribute filters on dtypes
+  without rows, the timestamp filter's own column after a filter that
+  keeps nothing);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FC's list, taken in FC: FB's CI, FB1-1 on the literal-name routes
+(edge metrics: FC1-2; exact filters' negations and levels, flattening and
+OC-DFG of exact results: 0 through csw3 and the key chains; OCEL 2.0 inputs
+with prefixed names: o81, o82), FB1-2 on other readers, object-side keys and
+dropped rows (FC1-3, FC1-4; object keys KeyError on both), FB1-3 on objects
+with changes and CSV read back (dsw 0), FB1-4 and FB1-5 on multi-type logs
+and change-combining routes (o81, o82: 0). Also FC1-1 from the literal
+reading of type matching. Carried to FD: EV1-1, the SQLite leftovers, the
+new Polars dtypes, DW1, the other declared items, the rest of the CU list
+and the open choices.
+
+Previous list for round FC (kept for its older items):
 
 Next round (FC) should start by re-reviewing round FB:
 

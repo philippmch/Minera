@@ -35182,3 +35182,100 @@ datetimes there), so the frame check became the route's
 (`reference_frame`); then the 26 tests of the filter header's callers and
 the server passed. The fixture replay gave 2,673 responses unchanged. Harness:
 `review-harness/round-fb/` in the project files (README).
+
+## Review FC1: the timestamp in type matching, edge-metric selectors, CSV and empty-frame windows (2026-11-20)
+
+Round FC checked FB's CI (run 44787379225 on f0be222: all six jobs green). Observed black-box on
+pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv with fresh
+banks: a new OCEL 2.0 generator for FB1-1 to FB1-5 on OCEL 2.0 inputs,
+`fc/o3/o3gen.py` (attribute names with an "ocel:" prefix, up to three
+object types whose attribute sets differ, fields a type holds only by
+changes, declared time, string, integer, float and boolean types whose
+values mix aware, naive and date-only timestamps, texts the readers may not
+convert and numbers; each log as OCEL 2.0 JSON, XML and SQLite): o81 and
+o82 of 60 (seeds 81, 82); round FB's c66 and c67 (`fb/c3/c3gen.py`), o73
+(`fb/o2/o2tgen.py`) and the CSV bank q26 (`eq/csv/q2gen.py`). New sweeps:
+`fc/q/em.py` (the OC-DFG route's edge metrics with each selector on the
+canonical columns and on every attribute column), `fc/q/atm.py`
+(activity_type_matching_exact with the activity and type keys on each
+relations column and on attribute columns, and the temporary column on
+each relations column), `fc/q/egw.py` (the event-object graph with and
+without changes), and round FB's chain sweep with `ocel:`-prefixed columns
+first and the window keys (`fc/q/csw.py`, PFX=1, SET=key).
+
+FB's fixes matched: csw3 0 on o81's JSON, SQLite and XML imports (17,304,
+17,500, 17,192); the key chains 0 on o81's JSON (8,470), o82's JSON (8,421)
+and c67 (5,712); dsw 0 on c66, c67, o73, o81, o82 and q26; xf 0 on c66,
+c67, o73, o81's three readers, o82 and q26 (with the same messages); the
+event-object graph 0 on c66, c67, o73 and o82; rsw3 only the declared date
+fractions of the JSON downloads (o81's JSON 42 of 2,340; SQLite and XML 0).
+Object-side window keys raise KeyError on both sides.
+
+Fixed:
+- **FC1-1 activity_type_matching_exact on the timestamp column.** pm4py
+  adds the separator to the relations frame's activity column and then the
+  type column to that. With `ocel:timestamp` (datetime64) as the activity
+  key it raises `TypeError: unsupported operand type(s) for +:
+  'DatetimeArray' and 'str'`, rows or not; as the type key it raises per
+  cell (`'DatetimeArray' and 'str'` with one row, `'Timestamp' and 'str'`
+  with more) and passes a frame without rows. Native kept no event (o81's
+  JSON 38 of 542).
+- **FC1-2 The edge metrics' selectors read pm4py's frames.**
+  find_associations_per_edge reads the event id and activity from the
+  events frame, the object id from the relations frame (its six columns),
+  the type from the objects frame, and walks the events frame's ids with
+  each relation group's objects. Native joined each relation row with its
+  event's and object's attributes (event first): a type key an event
+  attribute shares took the event's value, a repeated event id key such as
+  `ocel:activity` paired relation rows, and an attribute as the object id
+  key was accepted where pm4py raises `KeyError: 'Column not found: k'`.
+  The adapter now reads the frames in pm4py's order and with its errors. A
+  value the frame reads as a datetime next to texts in an object column
+  now rejects with the other non-string labels (pm4py keeps a str and a
+  Timestamp of the same text as two groups: o81's o3_81_0011).
+- **FC1-3 The exact window on a CSV column of empty cells.**
+  read_ocel_csv reads with dtype=str, so such a column is a str column and
+  the window compares nothing (keeps no event); native typed it float64
+  and raised `'>=' not supported between instances of 'float' and
+  'datetime.datetime'` (q26's key chains 90 of 1,224). The CSV reader now
+  marks its events frame's str columns (`OcelFrameHint::str_columns`, the
+  transport's `"strColumns"`), which filters keep.
+- **FC1-4 The exact window on a naive date column of a frame without
+  rows.** A filter's result keeps its source's dtypes, so the window on a
+  naive datetime64 column raises `Invalid comparison between
+  dtype=datetime64[us] and datetime` with no row left (o73's o2t73_0019
+  after a negated object type filter: 9 of 2,816); native passed every
+  empty frame. Other empty columns still pass.
+
+Results with the fixed server: atm 0 on o81's JSON and XML (1,592, 1,521)
+and 6 of 1,614 on its SQLite (below); the key chains 0 on q26 (1,764) and
+o73 (2,807); xf 0 on q26 (1,457) and o73 (1,014); em leaves only the declared labels below (o81's JSON 179 of 637,
+SQLite 192 of 658, XML 134 of 612; o82's JSON 178 of 649); FB's server gave
+106, 86 and 87 of o81's outcomes that differed with both sides returning,
+now 0. The downloads and the event-object graph stay 0 on q26 (560, 80).
+
+Declared:
+- The edge metrics' typed labels: pm4py keys an edge by any label value
+  (NaN, numbers, booleans, Timestamps next to texts), which the string JSON
+  report does not carry; native rejects a missing or non-string label cell
+  (`docs/ocdfg-edge-metrics-parity-contract.md`). These are all of em's remaining
+  outcomes: a missing label cell (a row without the attribute; o81's JSON
+  81, SQLite 121, XML 102, o82's JSON 86) or a non-string one (98, 71, 32,
+  92).
+- Carried to FD: activity_type_matching with the temporary column naming a
+  relations column drops that column from pm4py's result relations frame
+  (an empty log's `ocel:eid` or `ocel:oid` raises no KeyError then: o81's
+  SQLite o3_81_0007, 0020, 0039, 6 of 1,614); native keeps it unless the
+  relation columns are declared. The routes after such a result are not
+  yet compared.
+- EV1-1 and round FB's carried items stay as they were.
+
+In the suite: `minera_review_fc1_tests` (the timestamp as the activity and
+the type key, with one row and none; the edge metrics' selectors and errors
+on a three-event log and a datetime next to a text; the window on a CSV
+column of empty cells through the transport; the naive date column with and
+without rows). `minera_ocdfg_edge_metrics_controls_tests` now selects the
+type and activity keys and checks the event id and object id errors under
+pm4py's reading. The full ctest passed 650 of 650 on the first run (29
+minutes, -j2); the fixture replay gave 2,673 responses unchanged. Harness: `review-harness/round-fc/` in the
+project files (README).

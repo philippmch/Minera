@@ -186,6 +186,12 @@ struct OcelFrameHint {
   // writers and the SQLite writer's type tables follow it (observed
   // black-box).
   std::vector<std::pair<std::string, std::size_t>> reserved;
+  // Round FC (events frame): read_ocel_csv reads its files with dtype=str,
+  // so each attribute column is a str one, a column holding nulls alone
+  // too (observed black-box). Set by the OCEL CSV reader; filters keep it;
+  // the transport carries it as "strColumns". It is no column layout, so
+  // empty() leaves it out.
+  bool str_columns = false;
   [[nodiscard]] bool empty() const {
     return columns.empty() && dropped.empty() && dropped_rows == 0 && !field_at && !time_at &&
            reserved.empty();

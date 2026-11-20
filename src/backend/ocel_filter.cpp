@@ -714,9 +714,20 @@ bool event_filter_timestamp_column(const Ocel& log, const OcelEvent& event,
 // (ocel_frame::reference_date_value); the rest of the filter then compares
 // the aware ones as before.
 void check_event_attribute_window_column(const Ocel& log, std::string_view key) {
-  if (log.events.empty()) return;
   const std::string name(key);
   const auto frame = ocel_frame::event_frame(log, true);
+  if (log.events.empty()) {
+    // Round FC: a frame without rows compares nothing, save that a naive
+    // datetime64 column raises for its dtype; a filter's result keeps its
+    // source's dtypes (the frame hint's dropped rows; observed black-box:
+    // o73's o2t73_0019 after a negated object type filter keeps no event;
+    // pandas 3.0.5 passes an empty int64, float64, bool, object, str or
+    // aware datetime64 column).
+    const auto* stats = frame.stats(name);
+    if (frame.dtype(name) == ocel_frame::Dtype::kDatetime && stats != nullptr && stats->has_naive_date)
+      throw std::invalid_argument("TypeError: Invalid comparison between dtype=datetime64[us] and datetime");
+    return;
+  }
   const auto refuse = [](std::string_view type) {
     throw std::invalid_argument(std::string("TypeError: '>=' not supported between instances of '") +
                                 std::string(type) + "' and 'datetime.datetime'");
@@ -732,6 +743,10 @@ void check_event_attribute_window_column(const Ocel& log, std::string_view key) 
       // events, raises 'float'); an all-NULL SQLite table column is object.
       const auto* stats = frame.stats(name);
       if (stats != nullptr && stats->has_none) return;
+      // Round FC: read_ocel_csv reads its files as str, so its column of
+      // nulls is a str one and compares nothing (OcelFrameHint::str_columns;
+      // observed black-box: q26's files whose column only empty cells hold).
+      if (log.event_frame_hint.str_columns) return;
       const bool every = std::all_of(log.events.begin(), log.events.end(), [&](const OcelEvent& event) {
         return std::any_of(event.attributes.begin(), event.attributes.end(),
                            [&](const OcelAttribute& attribute) { return attribute.key == key; });

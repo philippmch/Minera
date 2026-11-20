@@ -2939,6 +2939,11 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
           hint.reserved.emplace_back(item.array()[0].string(), at);
         }
       }
+      // Round FC: an OCEL CSV read's str columns (OcelFrameHint::str_columns).
+      if (const auto* str = optional(entry, "strColumns")) {
+        if (!str->is_bool()) throw std::invalid_argument("minera:frameHints strColumns must be boolean");
+        hint.str_columns = std::get<bool>(str->value);
+      }
     };
     read("events", result.event_frame_hint);
     read("objects", result.object_frame_hint);
@@ -4418,11 +4423,12 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   // "minera:frameHints": {"events": {"columns": [...], "dropped": [[key,
   // kinds, present], ...], "rows": n}, "objects": ..., "changes": ...}.
   const auto write_frame_hints = [&] {
-    if (log.event_frame_hint.empty() && log.object_frame_hint.empty() && log.change_frame_hint.empty()) return;
+    const auto bare = [](const OcelFrameHint& hint) { return hint.empty() && !hint.str_columns; };
+    if (bare(log.event_frame_hint) && bare(log.object_frame_hint) && bare(log.change_frame_hint)) return;
     out << ",\"minera:frameHints\":{";
     bool first = true;
     const auto write = [&](const char* name, const OcelFrameHint& hint) {
-      if (hint.empty()) return;
+      if (bare(hint)) return;
       if (!first) out << ',';
       first = false;
       write_string(out, name);
@@ -4453,6 +4459,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         }
         out << ']';
       }
+      if (hint.str_columns) out << ",\"strColumns\":true";
       out << '}';
     };
     write("events", log.event_frame_hint);
