@@ -147,12 +147,17 @@ void bind_null(sqlite3_stmt* statement, int index) {
 // Round EW: write_ocel2_sqlite declares a qualifier column as pandas'
 // to_sql infers it from the values (observed black-box): INTEGER when every
 // qualifier is an int, REAL when every one is a float, TEXT otherwise (a str,
-// or ints next to floats, written as their str). A table without rows keeps
-// the declaration below (declared: the reference's dtype of an emptied
-// column is not carried).
+// or ints next to floats, written as their str). Round EY: a table without
+// rows follows the column's dtype (Ocel::relation_qualifier_dtype): INTEGER
+// for int64 or bool, REAL for float64, TEXT for an object or str column.
 template <class Relation>
-const char* qualifier_column_type(const std::vector<Relation>& rows) {
-  if (rows.empty()) return "TEXT";
+const char* qualifier_column_type(const std::vector<Relation>& rows,
+                                  const std::optional<OcelQualifierKind>& dtype) {
+  if (rows.empty()) {
+    const auto kind = ocel_qualifier_dtype(rows, dtype);
+    if (kind == OcelQualifierKind::kStr) return "TEXT";
+    return kind == OcelQualifierKind::kFloat ? "REAL" : "INTEGER";
+  }
   const auto kind = rows.front().qualifier_kind;
   if (kind == OcelQualifierKind::kStr) return "TEXT";
   for (const auto& row : rows)
@@ -237,7 +242,7 @@ std::string column_string(sqlite3_stmt* statement, int column) {
 // (observed black-box, probe ew q/wq.py). The qualifier is then the
 // number's Python repr (OcelQualifierKind). An infinite REAL keeps its text.
 template <class Relation>
-void type_sqlite_qualifiers(std::vector<Relation>& rows, std::size_t first,
+OcelQualifierKind type_sqlite_qualifiers(std::vector<Relation>& rows, std::size_t first,
                             const std::vector<QualifierCell>& cells) {
   bool text = false, real = false, integer = false, null = false;
   for (const auto& cell : cells) {
@@ -246,7 +251,7 @@ void type_sqlite_qualifiers(std::vector<Relation>& rows, std::size_t first,
     else if (cell.type == SQLITE_INTEGER) integer = true;
     else null = true;
   }
-  if (!real && !integer) return;
+  if (!real && !integer) return OcelQualifierKind::kStr;
   const bool float_column = !text && (real || null);
   for (std::size_t i = 0; i < cells.size() && first + i < rows.size(); ++i) {
     auto& row = rows[first + i];
@@ -264,6 +269,12 @@ void type_sqlite_qualifiers(std::vector<Relation>& rows, std::size_t first,
       row.qualifier_kind = OcelQualifierKind::kFloat;
     }
   }
+  // Round EY: the dtype stays when rows go (Ocel::relation_qualifier_dtype);
+  // a NULL filled with '' makes a float64 column an object one, before
+  // rows naming unknown ids drop (observed black-box, probe ey esq.py on
+  // s104).
+  if (text || null) return OcelQualifierKind::kStr;
+  return float_column ? OcelQualifierKind::kFloat : OcelQualifierKind::kInt;
 }
 
 std::string quote_identifier(std::string_view identifier) {
@@ -1548,7 +1559,9 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
         throw std::invalid_argument("OCEL SQLite event-object relation references an unknown id");
       log.relations.push_back(std::move(relation));
     }
-    if (qualifier_column >= 0) type_sqlite_qualifiers(log.relations, first_relation, qualifier_cells);
+    // Round EY: the column's dtype stays when its rows go (Ocel::relation_qualifier_dtype).
+    if (qualifier_column >= 0)
+      log.relation_qualifier_dtype = type_sqlite_qualifiers(log.relations, first_relation, qualifier_cells);
   }
   require_table(db, "object_object");
   // Round ES: its qualifier column is looked up after the change rows
@@ -1588,7 +1601,7 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
         throw std::invalid_argument("OCEL SQLite object-object relation references an unknown id");
       log.o2o.push_back(std::move(relation));
     }
-    if (!qualifier_missing) type_sqlite_qualifiers(log.o2o, first_link, qualifier_cells);
+    if (!qualifier_missing) log.o2o_qualifier_dtype = type_sqlite_qualifiers(log.o2o, first_link, qualifier_cells);
   }
   if (native_tables && table_exists(db, "event_event")) {
     Statement statement(db, "SELECT source_event_id, target_event_id, "
@@ -2390,8 +2403,8 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
                              SQLITE_OPEN_FULLMUTEX);
   sqlite3* db = database.get();
   database.exec("PRAGMA foreign_keys=OFF; BEGIN IMMEDIATE;");
-  const char* relation_qualifier_type = qualifier_column_type(log.relations);
-  const char* o2o_qualifier_type = qualifier_column_type(log.o2o);
+  const char* relation_qualifier_type = qualifier_column_type(log.relations, log.relation_qualifier_dtype);
+  const char* o2o_qualifier_type = qualifier_column_type(log.o2o, log.o2o_qualifier_dtype);
   try {
     database.exec(
         "CREATE TABLE event (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"

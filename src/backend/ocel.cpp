@@ -438,6 +438,36 @@ void parse_standard_type_table(const Json* raw, StandardAttributeTypes& types,
   }
 }
 
+// Round EY: whether a catalog type declares a date (as the native frames
+// read one, see ocel_frame::declared_date).
+bool date_declaration(std::string type) {
+  for (auto& ch : type) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+  return type.find("date") != std::string::npos || type.find("time") != std::string::npos;
+}
+
+// Round EY: read_ocel_json ignores a classic file's ocel:eventTypes and
+// ocel:objectTypes, so a declared date or time attribute keeps the file's
+// texts, a str column whose writers declare it "string" (observed
+// black-box, probe ey p/d1.py), where the native frames read a declared
+// date's timestamp texts as datetimes. A classic document's date
+// declarations therefore read as "string", save in a transport of a log
+// whose dates are datetimes (an OCEL 1.0 XML import, say), which says so
+// with "minera:declaredDates".
+bool declares_dates(const Ocel& log) {
+  for (const auto* catalog : {&log.event_type_attributes, &log.object_type_attributes})
+    for (const auto& [owner, attributes] : *catalog)
+      for (const auto& [name, type] : attributes)
+        if (date_declaration(type)) return true;
+  return false;
+}
+
+void read_classic_dates_as_texts(Ocel& log) {
+  for (auto* catalog : {&log.event_type_attributes, &log.object_type_attributes})
+    for (auto& [owner, attributes] : *catalog)
+      for (auto& [name, type] : attributes)
+        if (date_declaration(type)) type = "string";
+}
+
 void parse_classic_type_catalog(const Json* raw, OcelTypeCatalog& catalog,
                                 std::string_view field) {
   if (!raw) return;
@@ -788,6 +818,27 @@ std::pair<std::string, OcelQualifierKind> frame_qualifier(const Json* value, Col
   }
   if (kind == Column::Kind::kFloat) return {ocel_frame::float_repr(*float_cell(*value)), OcelQualifierKind::kFloat};
   return {repr(*value), value->is_int() ? OcelQualifierKind::kInt : OcelQualifierKind::kFloat};
+}
+
+// Round EY: the qualifier dtype of a frame column of `kind` (see
+// Ocel::relation_qualifier_dtype; an object column is kStr).
+OcelQualifierKind frame_qualifier_dtype(Column::Kind kind) {
+  switch (kind) {
+    case Column::Kind::kBool: return OcelQualifierKind::kBool;
+    case Column::Kind::kInt: return OcelQualifierKind::kInt;
+    case Column::Kind::kFloat: return OcelQualifierKind::kFloat;
+    case Column::Kind::kObject: break;
+  }
+  return OcelQualifierKind::kStr;
+}
+
+// Round EY: the readers fill a missing qualifier with '' after dropping
+// the rows of empty ids, empty types and missing activities and before
+// dropping dangling links and unrelated or empty-typed objects' links, so a
+// missing qualifier left at that point makes an int, float or bool column
+// an object one (observed black-box, probes ey p/e5.py, p/e6.py).
+OcelQualifierKind filled_qualifier_dtype(Column::Kind kind, bool filled) {
+  return filled ? OcelQualifierKind::kStr : frame_qualifier_dtype(kind);
 }
 
 // A vmap, ovmap or change value: the native value, or the reason it cannot
@@ -1408,6 +1459,15 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
     log.relations.push_back({event.id, object.id, std::move(qualifier), qualifier_kind});
   }
 
+  // Round EY: the columns keep their dtypes when rows go (a transport's
+  // come from its marker, see Ocel::relation_qualifier_dtype).
+  if (!typed_qualifiers) {
+    log.relation_qualifier_dtype = frame_qualifier_dtype(relation_qualifiers.kind());
+    log.o2o_qualifier_dtype = filled_qualifier_dtype(
+        link_qualifiers.kind(), std::any_of(links.begin(), links.end(), [](const auto& link) {
+          return !link.source.empty() && (link.qualifier == nullptr || missing_value(*link.qualifier));
+        }));
+  }
   // Object links: the target column reads as str (an int target 1 names
   // object "1"); a link to an object the frames do not keep is dropped.
   listing.o2o = !links.empty();
@@ -1791,6 +1851,12 @@ Ocel parse_standard(const Json::Object& root, bool typed_qualifiers, bool repeat
     for (std::size_t o = 0; o < object_o2o.size(); ++o)
       type_qualifiers(object_o2o[o], object_qualifiers[o], std::vector<bool>(object_o2o[o].size(), true), column,
                       "object relationship");
+    // Round EY: the column keeps its dtype when rows go (Ocel::o2o_qualifier_dtype).
+    bool filled = false;
+    for (std::size_t o = 0; o < object_qualifiers.size(); ++o)
+      if (!log.objects[o].id.empty())
+        for (const auto* value : object_qualifiers[o]) filled = filled || classic_json::missing_value(*value);
+    if (!typed_qualifiers) log.o2o_qualifier_dtype = classic_json::filled_qualifier_dtype(column.kind(), filled);
   }
   for (auto& relations : object_o2o)
     for (auto& relation : relations) log.o2o.push_back(std::move(relation));
@@ -1830,6 +1896,7 @@ Ocel parse_standard(const Json::Object& root, bool typed_qualifiers, bool repeat
     }
     for (std::size_t e = 0; e < event_relations.size(); ++e)
       type_qualifiers(event_relations[e], event_qualifiers[e], counted[e], column, "event relationship");
+    if (!typed_qualifiers) log.relation_qualifier_dtype = classic_json::frame_qualifier_dtype(column.kind());
   }
   for (auto& relations : event_relations)
     for (auto& relation : relations) log.relations.push_back(std::move(relation));
@@ -2659,6 +2726,13 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   // empty type names from the catalogs.
   if (!literal_names) drop_empty_ocel_names(result);
   if (!keep_unrelated && !classic_reference) drop_unrelated_ocel_entries(result);
+  // Round EY: a missing qualifier the readers keep makes the relations
+  // column an object one (classic_json::filled_qualifier_dtype); the rows
+  // they drop before the fill are gone here.
+  if (result.relation_qualifier_dtype && *result.relation_qualifier_dtype != OcelQualifierKind::kStr &&
+      std::any_of(result.relations.begin(), result.relations.end(),
+                  [](const OcelRelation& relation) { return relation.qualifier_kind == OcelQualifierKind::kStr; }))
+    result.relation_qualifier_dtype = OcelQualifierKind::kStr;
   // A log whose reference frame is activity first (read from XML, see
   // Ocel::event_activity_first) keeps that order between routes.
   if (const auto* marker = optional(r, "minera:eventActivityFirst")) {
@@ -2691,6 +2765,39 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     result.untyped_o2o = !keep_unrelated && !literal_names &&
                          (classic_reference ? !listing.o2o : standard && result.untyped_o2o);
   }
+  // Round EY: a classic document's date declarations (see
+  // read_classic_dates_as_texts).
+  if (!standard) {
+    bool declared_dates = false;
+    if (const auto* marker = optional(r, "minera:declaredDates")) {
+      if (!marker->is_bool()) throw std::invalid_argument("minera:declaredDates must be boolean");
+      declared_dates = std::get<bool>(marker->value);
+    }
+    if (!declared_dates) read_classic_dates_as_texts(result);
+  }
+  // Round EY: see Ocel::relation_qualifier_dtype (written with the
+  // untyped markers).
+  if (const auto* marker = optional(r, "minera:qualifierDtypes")) {
+    const auto refuse = [] {
+      throw std::invalid_argument("minera:qualifierDtypes must map relations or o2o to object, int64, float64 or bool");
+    };
+    if (!marker->is_object()) refuse();
+    for (const auto& [key, value] : marker->object()) {
+      if ((key != "relations" && key != "o2o") || !value.is_string()) refuse();
+      const auto& name = value.string();
+      const auto kind = name == "object"    ? OcelQualifierKind::kStr
+                        : name == "int64"   ? OcelQualifierKind::kInt
+                        : name == "float64" ? OcelQualifierKind::kFloat
+                        : name == "bool"    ? OcelQualifierKind::kBool
+                                            : (refuse(), OcelQualifierKind::kStr);
+      (key == "relations" ? result.relation_qualifier_dtype : result.o2o_qualifier_dtype) = kind;
+    }
+  }
+  // A document without the marker fixes the dtype its rows show, so a
+  // filter that empties them keeps it (the reference read's frame).
+  if (!result.relation_qualifier_dtype)
+    result.relation_qualifier_dtype = ocel_qualifier_dtype(result.relations, std::nullopt);
+  if (!result.o2o_qualifier_dtype) result.o2o_qualifier_dtype = ocel_qualifier_dtype(result.o2o, std::nullopt);
   result.naive_event_time_unit = std::move(naive_unit);
   if (const auto* marker = optional(r, "minera:noneEventTimes")) {
     if (!marker->is_bool()) throw std::invalid_argument("minera:noneEventTimes must be boolean");
@@ -4133,6 +4240,22 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << ",\"minera:untypedRelations\":" << (log.untyped_relations ? "true" : "false");
     // Round EO: see Ocel::untyped_o2o.
     if (log.o2o.empty()) out << ",\"minera:untypedO2o\":" << (log.untyped_o2o ? "true" : "false");
+    // Round EY: a qualifier column's dtype that its rows do not show (see
+    // Ocel::relation_qualifier_dtype).
+    const auto relations_dtype = log.relation_qualifier_dtype &&
+                                         *log.relation_qualifier_dtype != ocel_qualifier_dtype(log.relations, std::nullopt)
+                                     ? ocel_qualifier_dtype_name(*log.relation_qualifier_dtype)
+                                     : nullptr;
+    const auto o2o_dtype = log.o2o_qualifier_dtype &&
+                                   *log.o2o_qualifier_dtype != ocel_qualifier_dtype(log.o2o, std::nullopt)
+                               ? ocel_qualifier_dtype_name(*log.o2o_qualifier_dtype)
+                               : nullptr;
+    if (relations_dtype || o2o_dtype) {
+      out << ",\"minera:qualifierDtypes\":{";
+      if (relations_dtype) out << "\"relations\":\"" << relations_dtype << '"';
+      if (o2o_dtype) out << (relations_dtype ? "," : "") << "\"o2o\":\"" << o2o_dtype << '"';
+      out << '}';
+    }
   };
   // Round DU: a log whose reference events frame is naive travels with its
   // resolution and its texts (see Ocel::naive_event_time_unit).
@@ -4787,6 +4910,8 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   write_keep_unrelated();
   if (transport_markers) {
     write_untyped_relations();
+    // Round EY: see read_classic_dates_as_texts.
+    if (declares_dates(log)) out << ",\"minera:declaredDates\":true";
     write_naive_event_times();
     write_frame_hints();
     write_event_time_offset();

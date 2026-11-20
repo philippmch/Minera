@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EX (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–EY (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7879,6 +7879,60 @@ fixture replay gave 2,673 responses unchanged. EW's CI run 44697743625
 finished green in all six jobs. The
 generators, the comparers and the probes are in the project files under
 `review-harness/round-ex/`.
+
+Round EY re-reviewed EX (Review EY1). EX's fixes matched on fresh JSON
+qualifier banks (`ex/q/jqgen.py`: j2, j3 OCEL 2.0 JSON, k3, k4 classic;
+wcmpj 0 differences, only declared classes in the sweeps). Fixed: EY1-1,
+the dtype of an emptied qualifier column (EW1, declared): the OCEL model
+holds a dtype per relation and O2O table (`relation_qualifier_dtype`,
+`o2o_qualifier_dtype`), fixed by the readers from every row a frame is
+built from (the JSON readers fill a missing qualifier with '' between the
+drops of empty ids or types and of dangling or unrelated links;
+read_ocel2_sqlite makes a NULL next to numbers object), kept by filters and
+splits, set by the enrichments (lifecycle: str, float64 without rows; O2O:
+str when it computes links), carried as `"minera:qualifierDtypes"` where
+the rows do not show it. write_ocel2_sqlite declares an emptied int64 or
+bool column INTEGER and a float64 one REAL, and the activity-type matching
+raises numpy's UFuncTypeError on a numpy column with or without rows and
+Python's TypeError on an object column of ints. EY1-2: read_ocel_json
+ignores a classic file's catalogs, so declared date or time attributes
+stay texts (`string`, TEXT, the texts in CSV); a classic transport of a
+log with datetimes says `"minera:declaredDates": true`. Checked with
+`ey/q/esq.py` (emptied tables: j2 0 of 480, 217 with EX's build; k4 0 of
+600; s104 0 of 600) and every sweep on j2, k4, s104 and c57. Declared:
+EY1-3, a date-like `<string>` next to a `<date>` of the same key and type
+in OCEL 1.0 XML (pm4py keeps the text per element, native types dates per
+type and key; it predates EY and needs a per-cell text mark), EV1-1 (no
+cheap model).
+
+In the suite: `minera_review_ey1_tests`; `minera_ocel_tests` expects a
+classic date declaration as `string`. The full ctest passed 645
+of 645 and the fixture replay gave 2,673 responses unchanged. EX's CI run 44709922071
+finished green (ctest on Linux, macOS and Windows). The generators, the
+comparers and the probes are in the project files under
+`review-harness/round-ey/`.
+
+Next round (EZ) should start by re-reviewing round EY:
+
+- EY's CI run;
+- EY1-1 and EY1-2 on fresh banks (other seeds and source logs: an emptied
+  table after every filter family, the splits and the enrichments, SQLite
+  inputs with NULL and REAL qualifiers, classic files with date, time and
+  timestamp catalogs through every download and the CSV import);
+- EY1-3 if a per-cell text mark is cheap enough (the OCEL 1.0 XML reader,
+  both transports, the six writers, the attribute filters and the
+  flattening);
+- EV1-1 if a cheap model appears;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round EY's list, taken in EY: EX's CI, EX1-1 on fresh banks, the emptied
+table dtype (EY1-1), the classic date catalog (EY1-2), a fresh OCEL 1.0
+bank (EY1-3, declared). Carried to EZ: EY1-3, EV1-1, the SQLite leftovers,
+the new Polars dtypes, DW1, the other declared items, the rest of the CU
+list and the open choices.
+
+Previous list for round EY (kept for its older items):
 
 Next round (EY) should start by re-reviewing round EX:
 

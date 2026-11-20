@@ -55,6 +55,14 @@ const std::string* relation_value(const OcelRelation& relation,
 void refuse_typed_qualifier_key(const Ocel& log, std::string_view key, bool activity,
                                 std::size_t separator_length) {
   if (key != "ocel:qualifier") return;
+  // Round EY: the column's dtype decides numpy's error, rows or not (an
+  // object column of ints raises Python's TypeError; observed black-box,
+  // probes ey p/e1.py, p/e2.py).
+  const auto dtype = ocel_qualifier_dtype(log.relations, log.relation_qualifier_dtype);
+  if (activity && dtype != OcelQualifierKind::kStr)
+    throw std::invalid_argument(
+        std::string("UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('") +
+        ocel_qualifier_dtype_name(dtype) + "'), dtype('<U" + std::to_string(separator_length) + "')) -> None");
   const auto first = std::find_if(log.relations.begin(), log.relations.end(), [](const OcelRelation& relation) {
     return relation.qualifier_kind != OcelQualifierKind::kStr;
   });
@@ -62,13 +70,6 @@ void refuse_typed_qualifier_key(const Ocel& log, std::string_view key, bool acti
   const auto kind = first->qualifier_kind;
   const std::string type = kind == OcelQualifierKind::kInt ? "int" : kind == OcelQualifierKind::kFloat ? "float" : "bool";
   if (!activity) throw std::invalid_argument("TypeError: can only concatenate str (not \"" + type + "\") to str");
-  const bool numpy = std::all_of(log.relations.begin(), log.relations.end(),
-                                 [&](const OcelRelation& relation) { return relation.qualifier_kind == kind; });
-  if (numpy)
-    throw std::invalid_argument(
-        std::string("UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('") +
-        (kind == OcelQualifierKind::kInt ? "int64" : kind == OcelQualifierKind::kFloat ? "float64" : "bool") +
-        "'), dtype('<U" + std::to_string(separator_length) + "')) -> None");
   throw std::invalid_argument("TypeError: unsupported operand type(s) for +: '" + type + "' and 'str'");
 }
 }  // namespace
@@ -143,11 +144,13 @@ Ocel filter_ocel_activity_type_matching_exact(
       columns.erase(std::remove(columns.begin(), columns.end(), key), columns.end());
     }
     // Round EX: the cleared qualifier is a str ('').
-    if (key == "ocel:qualifier")
+    if (key == "ocel:qualifier") {
       for (auto& relation : relations) {
         relation.qualifier.clear();
         relation.qualifier_kind = OcelQualifierKind::kStr;
       }
+      filtered.relation_qualifier_dtype = OcelQualifierKind::kStr;
+    }
   }
   std::map<std::string, std::vector<std::string>> propagation_pairs;
   for (const auto& [type, activities] : retained_pairs)

@@ -1621,8 +1621,11 @@ int main() {
   const auto classic_metadata_log = minera::parse_ocel_json(with_globals(classic_metadata));
   assert(classic_metadata_log.event_type_attributes.at("Create").at("approved") ==
          "boolean");
+  // Round EY: read_ocel_json ignores the classic catalog, so a declared
+  // date reads as a text column ("string") unless a transport says
+  // "minera:declaredDates".
   assert(classic_metadata_log.event_type_attributes.at("Create").at("when") ==
-         "datetime");
+         "string");
   assert(classic_metadata_log.event_type_attributes.at("EmptyEvent").empty());
   assert(classic_metadata_log.object_type_attributes.at("Order").at("amount") ==
          "decimal");

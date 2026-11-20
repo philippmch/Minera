@@ -34717,3 +34717,111 @@ old refusal; their rows now hold pm4py's reading (`5`). The full ctest
 passed 643 of 644 on the first run (that bank row) and 644 of 644 after it,
 and the fixture replay gave 2,673 responses unchanged. Harness:
 `review-harness/round-ex/` in the project files (README).
+
+## Review EY1: the dtype of an emptied qualifier column, classic JSON date declarations (2026-11-20)
+
+Round EY checked EX's CI (run 44709922071 on a040f1f8: the three builds,
+the frontend, Python and verifier jobs green; ctest green on Linux, macOS
+and Windows). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv
+with hand-made files (`ey/p/e1.py` to `e6.py`: dangling links, filters that
+empty the relations or O2O frame, object columns of ints, the E2O lifecycle
+and O2O enrichments, SQLite tables without rows, and where the JSON readers
+fill a missing qualifier relative to the rows they drop; `ey/p/d1.py`:
+classic catalogs declaring date, time, float, integer and boolean
+attributes), EX1-1 on fresh banks (`ex/q/jqgen.py`: j2 of 120 OCEL 2.0 JSON
+files from b64, j3 of 150 from b65, k3 of 120 classic from b64 with dates
+declared as strings, k4 of 150 classic from b65 with its date catalogs),
+EW's SQLite recipe on a fresh seed (`ew/q/sgen.py` on b65, seed 104: s104
+of 150), a fresh OCEL 1.0 bank (`eo/c1/c1gen.py 57 120`: c57, XML and
+JSON), and a route comparer for emptied tables (`ey/q/esq.py`: a timestamp
+window outside every event, the O2O enrichment or the E2O lifecycle
+enrichment before it, the lifecycle enrichment after it, then the SQLite
+writer's qualifier declarations).
+
+EX's fixes matched on the fresh banks: wcmpj (four writers) 0 of 120 (j2),
+0 of 150 (j3), 0 of 120 (k3); imports 0 in each; esw, xsw and fsw 0; rsw3
+195 of 4,680 (j2) and 225 of 5,850 (j3), all the JSON downloads' date
+fractions (declared), 0 of 4,680 (k3); osw 5 of 720 (j2) and 21 of 900 (j3),
+all write_ocel_csv's type column order (hash seed, declared since EP); dsw
+7 of 840 (j2), 8 of 1,050 (j3) and 4 of 840 (k3), all emptied O2O tables'
+declarations (EY1-1).
+
+Fixed:
+- **EY1-1 The dtype of an emptied qualifier column (EW1, declared).** A
+  frame whose rows the reader or a filter removed keeps its qualifier
+  column's dtype: write_ocel2_sqlite declares an emptied int64 or bool
+  column INTEGER and a float64 one REAL (an object or str column TEXT), and
+  the activity-type matching adds its separator to an int64, float64 or
+  bool column with numpy's `UFuncTypeError`, rows or not, while an object
+  column of ints raises Python's `TypeError: unsupported operand type(s)
+  for +: 'int' and 'str'` (EX declared it). The readers fix the dtype:
+  read_ocel2_json and read_ocel_json from every row a frame is built from
+  (EX1-1), filling a missing qualifier with `''` after they drop the rows of
+  empty ids, empty types and missing activities and before they drop
+  dangling links and unrelated or empty-typed objects' links, so a missing
+  qualifier left at that point makes the column object (a null on a
+  dropped event's relation leaves float64, one on a dangling link makes
+  the O2O column object); read_ocel2_sqlite from every table row, a NULL
+  next to numbers making the column object (filled before rows naming
+  unknown ids drop). The E2O lifecycle enrichment leaves a str qualifier
+  column, float64 on a frame without rows (REAL); the O2O enrichment's
+  computed links make the O2O column str, and it keeps its dtype without
+  one. Native declared an emptied column TEXT, raised nothing in the
+  matching on an emptied frame, and took any column whose rows share a kind
+  for a numpy one. The OCEL model holds the dtype per table
+  (`Ocel::relation_qualifier_dtype`, `o2o_qualifier_dtype`); filters and
+  splits keep it, both transports carry it as `"minera:qualifierDtypes"`
+  where the rows do not show it, and a document without the marker fixes
+  the dtype its rows show.
+- **EY1-2 Classic JSON date declarations.** read_ocel_json ignores a
+  classic file's `ocel:eventTypes` and `ocel:objectTypes`: a declared date
+  or time attribute keeps the file's texts (a str column), and every writer
+  declares what the frame holds (`string`; a TEXT SQLite column; the texts
+  as written in CSV). Native read the catalog's date declarations and
+  wrote such attributes as dates (`date`, TIMESTAMP, `2024-02-02
+  00:00:00+00:00`). A classic document's date declarations now read as
+  `string`, save in a classic transport of a log whose dates are datetimes
+  (an OCEL 1.0 XML or OCEL 2.0 read), which says `"minera:declaredDates":
+  true`.
+
+Results: esq 0 of 480 on j2 (217 with EX's build), 0 of 600 on k4, 0 of 600 on s104
+(13 before, all NULL-filled float columns, and the lifecycle enrichment's
+REAL on every bank). Through the sweeps with the fixed server: j2 imports 0
+of 120, dsw 0 of 840 (7 before), esw 0 of 1,920, xsw 0 of 1,560, fsw 0 of
+1,564, rsw3 195 of 4,680 (date fractions), osw 12 of 720 (type column
+order); k4 imports 0 of 150, dsw 0 of 1,050, rsw3 0 of 5,850, esw 0 of
+2,400, xsw 0 of 1,950, osw 0 of 900, fsw 0 of 1,948 (EX's k1 with its date
+catalogs: dsw 527 of 840); s104 imports 0 of 150, dsw 0 of 1,050, esw 0 of
+2,400, xsw 0 of 1,950, fsw 0 of 1,948, rsw3 0 of 5,850, osw 0 of 900; c57 OCEL 1.0 XML imports 0 of 120, esw 0
+of 1,856, xsw 0 of 1,508, osw 0 of 696, dsw 9 of 812, rsw3 32 of 4,524
+and fsw 26 of 1,584, all in three files and one class (EY1-3, declared
+below; EX's build gives the same counts on them); c57 OCEL 1.0 JSON
+imports 0 of 120, rsw3 0 of 4,680, esw 0 of 1,920, xsw 0 of 1,560, osw 0
+of 720, dsw 0 of 840, fsw 0 of 1,624.
+
+Declared:
+- **EY1-3 A date-like `<string>` next to a `<date>` of the same key and
+  type in OCEL 1.0 XML** (c57_0016, c57_0035, c57_0117; it predates EY).
+  read_ocel_xml types each element: a `<string>` stays text, a `<date>`
+  becomes a datetime, so the type's slice of the column is object and
+  every writer and filter keeps the text (`string` declared,
+  `2024-02-01T10:00:00Z` in CSV). Native types dates per type and key, so
+  a `<date>` element makes the key a date under its type and the text
+  reads as that date (`date`, `2024-02-01 10:00:00+00:00`). A model needs a
+  per-cell text mark in the OCEL model, both transports and every writer
+  and filter; carried.
+- EV1-1 (routes on XML logs whose event times share an offset of a day or
+  more) stays declared: no cheap model appeared.
+- Carried: an event's relation order in OCEL 2.0 JSON (OC1), the date
+  fractions of the JSON downloads, the CSV type column order (hash seed),
+  list, dict, big int and infinite qualifiers, infinite REAL and BLOB
+  qualifiers.
+
+In the suite: `minera_review_ey1_tests` (the readers' dtypes and fill
+timing, emptied tables, the matching, both transports, the enrichments,
+the classic date declarations); `minera_ocel_tests` expects a classic
+file's date declaration as `string`. The full ctest passed 645 of 645
+(39 min at -j2) and the fixture replay gave 2,673 responses unchanged.
+Harness:
+`review-harness/round-ey/` in the project files (README).

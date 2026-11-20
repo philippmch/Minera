@@ -148,6 +148,9 @@ Ocel empty_like(const Ocel& log) {
   result.event_activity_first = log.event_activity_first;
   result.untyped_relations = log.untyped_relations;
   result.untyped_o2o = log.untyped_o2o;
+  // Round EY: a subset keeps its qualifier columns' dtypes.
+  result.relation_qualifier_dtype = log.relation_qualifier_dtype;
+  result.o2o_qualifier_dtype = log.o2o_qualifier_dtype;
   result.naive_event_time_unit = log.naive_event_time_unit;
   result.none_event_times = log.none_event_times;
   // Round EM: the rows the reader dropped still type the frames.
@@ -668,6 +671,10 @@ void append_reference_o2o(Ocel& result, const EnrichmentIndex& index,
         OcelEnrichmentGraph::kCodeath);
   for (const auto& [source, target, qualifier] : computed)
     result.o2o.push_back({source, target, qualifier});
+  // Round EY: the computed links' texts make the O2O qualifier column str
+  // (object next to typed links); without a computed link it keeps its
+  // dtype (observed black-box, probe ey p/e3b.py).
+  if (!computed.empty()) result.o2o_qualifier_dtype = OcelQualifierKind::kStr;
 }
 }  // namespace
 
@@ -701,6 +708,11 @@ Ocel enrich_ocel(const Ocel& log, const OcelEnrichmentOptions& options) {
           "UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('float64'), "
           "dtype('<U2')) -> None");
     apply_lifecycle_qualifiers(result, index);
+    // Round EY: the lifecycle texts leave a str qualifier column, and a
+    // frame without rows a float64 one (write_ocel2_sqlite declares it
+    // REAL; observed black-box, probe ey p/e3b.py).
+    result.relation_qualifier_dtype =
+        result.relations.empty() ? OcelQualifierKind::kFloat : OcelQualifierKind::kStr;
   }
   return result;
 }

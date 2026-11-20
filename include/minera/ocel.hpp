@@ -230,6 +230,21 @@ struct Ocel {
   // object_object columns REAL. The OCEL transport carries it as
   // "minera:untypedO2o" while the log has no link.
   bool untyped_o2o = false;
+  // Round EY: the dtype of the reference relations and O2O qualifier
+  // columns where the reader or a transform fixes it (kStr for an object or
+  // str column; nullopt: the rows' kinds, see ocel_qualifier_dtype).
+  // read_ocel2_json and read_ocel_json type a column from every row the
+  // frame is built from, read_ocel2_sqlite from every table row (round EX,
+  // EW); a frame whose rows the reader or a filter removed keeps it, so
+  // write_ocel2_sqlite declares an emptied int64 or bool column INTEGER and
+  // a float64 one REAL, and the activity-type matching adds its separator
+  // to such a column with numpy's UFuncTypeError, rows or not; the E2O
+  // lifecycle enrichment leaves a str column (float64 on a frame without
+  // rows), the O2O enrichment's links make the O2O column str (observed
+  // black-box, probes ey p/e1.py..e3b.py). The OCEL transport carries it as
+  // "minera:qualifierDtypes" where it differs from the rows' kinds.
+  std::optional<OcelQualifierKind> relation_qualifier_dtype;
+  std::optional<OcelQualifierKind> o2o_qualifier_dtype;
   // The resolution of a naive reference events frame (round DU), empty for
   // an aware one: an OCEL CSV file whose times carry no offset reads as
   // datetime64[us] (ns when a time has more than six fraction digits, s
@@ -254,6 +269,31 @@ struct Ocel {
 };
 
 using OCEL = Ocel;
+
+// Round EY: the dtype of a qualifier column (see
+// Ocel::relation_qualifier_dtype): the fixed one, else the kind every row
+// shares (kStr for no row or a mix).
+template <class Rows>
+[[nodiscard]] OcelQualifierKind ocel_qualifier_dtype(const Rows& rows,
+                                                     const std::optional<OcelQualifierKind>& dtype) {
+  if (dtype) return *dtype;
+  if (rows.empty()) return OcelQualifierKind::kStr;
+  const auto kind = rows.front().qualifier_kind;
+  for (const auto& row : rows)
+    if (row.qualifier_kind != kind) return OcelQualifierKind::kStr;
+  return kind;
+}
+
+// numpy's name of a qualifier dtype: object, int64, float64 or bool.
+[[nodiscard]] inline const char* ocel_qualifier_dtype_name(OcelQualifierKind kind) {
+  switch (kind) {
+    case OcelQualifierKind::kInt: return "int64";
+    case OcelQualifierKind::kFloat: return "float64";
+    case OcelQualifierKind::kBool: return "bool";
+    case OcelQualifierKind::kStr: break;
+  }
+  return "object";
+}
 
 // Whether the log's event time column is raw (see OcelRawTime).
 [[nodiscard]] inline bool ocel_raw_event_times(const Ocel& log) {
