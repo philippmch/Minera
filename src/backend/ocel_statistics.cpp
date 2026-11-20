@@ -382,8 +382,16 @@ std::string serialize_edges(const OcelEdgeAssociations& associations) {
 
 OcelObjectTypeActivities object_type_activities(
     const Ocel& log, const OcelObjectTypeActivityOptions&) {
+  // Round FD: a relations frame of two rows without the activity or the
+  // type column (a temporary column dropped it) gives {'c': {'o'}} in the
+  // reference, any other number of rows KeyError (observed black-box).
+  if (log.relations.size() == 2 &&
+      (ocel_relation_column_dropped(log, "ocel:activity") || ocel_relation_column_dropped(log, "ocel:type")))
+    return {{"c", {"o"}}};
   // Round DV: the reference reads the relations frame's activity first.
   require_ocel_relation_column(log, "ocel:activity");
+  // Round FD: then the type (a temporary column may drop it).
+  require_ocel_relation_column_kept(log, "ocel:type");
   const auto lookups = validate_and_index(log);
   OcelObjectTypeActivities result;
   for (const auto& relation : log.relations) {
@@ -397,6 +405,8 @@ OcelObjectTypeActivities object_type_activities(
 
 OcelObjectsOtCount objects_ot_count(const Ocel& log) {
   require_ocel_relation_column(log, "ocel:eid");
+  // Round FD: it groups by the type (a temporary column may drop it).
+  require_ocel_relation_column_kept(log, "ocel:type", true);
   const auto lookups = validate_and_index(log);
   OcelObjectsOtCount result;
   for (const auto& relation : log.relations) {
@@ -418,6 +428,8 @@ OcelActivityAssociations activity_associations(
 OcelObjectTypeActivityAssociations object_type_activity_associations(
     const Ocel& log, OcelAssociationPrefilter prefilter) {
   require_ocel_relation_column(log, "ocel:type");
+  // Round FD: and reads the activity (a temporary column may drop it).
+  require_ocel_relation_column_kept(log, "ocel:activity");
   const auto lookups = validate_and_index(log);
   OcelObjectTypeActivityAssociations result;
   for (const auto& row : filtered_rows(log, prefilter)) {

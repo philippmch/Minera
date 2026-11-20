@@ -35279,3 +35279,128 @@ type and activity keys and checks the event id and object id errors under
 pm4py's reading. The full ctest passed 650 of 650 on the first run (29
 minutes, -j2); the fixture replay gave 2,673 responses unchanged. Harness: `review-harness/round-fc/` in the
 project files (README).
+
+## Review FD1: the OC-DFG discovery's selectors, nulls in the exact filters, the type matching's temporary column (2026-11-20)
+
+Round FD checked FC's CI (run 44803654768 on 99f7339: all six jobs green). Observed black-box on
+pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv with fresh
+banks: o81 (`fc/o3/o3gen.py 81 60`, OCEL 2.0 JSON read with read_ocel2_json
+and SQLite), q28 (`eq/csv/q2gen.py 2801 60`, CSV with objects tables), and
+j92 and s91 (round EX's and EW's generators, seeds 92 and 91: qualifiers
+redrawn as ints, floats, bools, nulls and texts) for FC1-1's separator on
+typed relations columns. New sweeps: `q/ocd.py` (the OC-DFG discovery with
+ocdfg_activity_attribute, ocdfg_object_type_attribute,
+ocdfg_event_id_attribute and ocdfg_timestamp_attribute on each column, with
+and without business hours), `q/xe.py` (the exact event and object
+attribute filters on every column with its distinct values plus None, NaT
+and NaN, positive and negated, on the full log and after a filter that
+keeps nothing), `q/atm2.py` (activity_type_matching_exact with typed keys,
+separators and temporary columns), and round FC's chain sweep with
+activity_type_matching's temporary column on each relations column, alone
+and followed by the other steps and the writers (`q/csw.py` SET=tmp,
+`q/crsw.py`).
+
+FC's fixes matched: atm2 0 on o81's JSON (4,680) and j92 (4,680), and on
+s91 after FD1-4 (the separator on typed qualifiers); the statistics
+route's edge associations take no selectors (business hours on the
+canonical time only, as rounds EL and EN compared); the chains on q28
+(`q/csw.py` SET=chain, FC1-3's CSV results through chains) leave only the
+declared hash-seed object order of the six files without an objects file
+(268 of 4,774).
+
+Fixed:
+- **FD1-1 The OC-DFG discovery's own selectors.** pm4py reads the events,
+  objects and relations frames as they are: the activity column from the
+  events and relations frames, the type column from the objects and
+  relations frames, the event id column from the relations and events
+  frames (the relations frame holds its six columns, so an attribute column
+  as the activity or type raises KeyError, and ocel:eid or ocel:timestamp
+  as the activity, ocel:oid as the type are valid). With ocel:timestamp as
+  the activity a missing time (CSV) is a null label: the activity
+  associations drop its rows, the start and end activities take an
+  object's first and last label that is not null (with its first and last
+  row's event; none if all are null), the edges label it NaT and the
+  activities list names it None in a naive column, NaT in an aware one.
+  With an events attribute column as the time column the performance
+  subtracts the frame's Python cells: two numbers measure 0, two datetimes
+  their difference, anything else raises with the operands' type names (a
+  missing cell is a float NaN, an explicit null None, a str column holds
+  NaN, a date-read text is a datetime.datetime, a "NaT" text under a date
+  declaration a str, as read_ocel2_json keeps it); naive next to aware raises
+  `can't subtract offset-naive and offset-aware datetimes`; with business
+  hours each side's replace() raises first (`str.replace() takes no
+  keyword arguments`, `'float' object has no attribute 'replace'`, ...).
+  The first pair measured comes from the object type whose first couple
+  comes first in the traversal of the events, then that type's edge whose
+  first couple comes first; an edge's couples are a set (a hash-seed
+  order). Native joined relation rows with the canonical columns and timed
+  every pair by the cells' texts (FC's server: o81's JSON 674 of 1,241,
+  SQLite 668 of 1,286).
+- **FD1-2 The exact attribute filters with None, NaT and NaN.** The values
+  go to isin, which matches the nulls by the column's dtype: a str column
+  matches its missing cells with any of the three, an object column an
+  explicit None with None and a missing cell with NaN (NaT matches
+  nothing, a "NaT" text of a date-declared column included: it is a str
+  cell), a float64 column NaN alone, a datetime64 column NaT alone, int
+  and bool columns nothing. Native compared None, NaN and NaT as values
+  (FC's server: q28 337 of 6,117 with the empty-frame steps, o81's JSON 120
+  of 4,730).
+- **FD1-3 The type matching's temporary column on a relations column.**
+  activity_type_matching drops its temporary column from the result's
+  relations frame, a canonical one too. The routes after it read the frame:
+  every writer raises `KeyError: 'ocel:qualifier'` without the qualifier,
+  the CSV writer `KeyError: 'ocel:type'` without the type, the per-type
+  filters, the statistics, the object features, the ancestors/descendants
+  split and a second type matching raise KeyError on the column they read
+  (a groupby `KeyError: 'Column not found: k'` where pandas words it so),
+  and the object type activities of a two-row frame without the activity
+  or the type give `{'c': {'o'}}` (any other number of rows KeyError). A
+  log pm4py builds anew (a filter's, an enrichment's) has the qualifier
+  column again (None values); the other columns stay dropped, through the
+  connected-components split too. Native kept the column (FC's server: the
+  chains 1,965 of 18,204, the routes on chain results 1,836 of 8,892). The
+  result now lists its relations columns without the temporary one
+  (`Ocel::table_columns`, `ocel_relation_column_dropped`), the routes
+  check them (`require_ocel_relation_column_kept`) and the filter and
+  enrichment routes restore the qualifier (`restore_ocel_relation_qualifier`).
+- **FD1-4 read_ocel2_sqlite's NULL qualifier on an unlisted row.** The
+  reader drops the event-object rows whose event or object id the event or
+  object table does not list before it fills a NULL qualifier with `''`,
+  so a NULL on such a row leaves a REAL column float64 (the type matching
+  then raises numpy's `UFuncTypeError`); a NULL on a listed row, an event
+  without a row in its type table included, still makes the column object
+  (round EY). The O2O table fills first. Native made the column object for
+  every NULL (s91's s91_0041, 26 of 4,680).
+
+Results with the fixed server: ocd 5 of 1,241 on o81's JSON, 18 of 1,286
+on its SQLite and 4 of 1,041 on q28 (below); atm2 on s91 30 of 4,680 (the
+"nocol" class below, 56 before FD1-4); xe 0 on o81's JSON (9,820)
+and q28 (7,336) with None, NaT and NaN and after the filters that keep
+nothing (events, object types, activities); the temporary-column chains 0
+on o81's JSON (19,173) and the routes on their results only the declared
+date fractions of the downloads (126 of 8,892).
+
+Declared:
+- The first failing pair within an edge: pm4py iterates an edge's couples
+  as a set, so which pair raises first depends on the hash seed where an
+  edge has several couples that cannot be measured (each remaining ocd
+  case matches one of seeds 0 to 5: o81's o3_81_0014, 0015, 0019, 0024,
+  0025, 0030, 0037 and q28's q2801_0000; native takes the traversal's order).
+- atm2's empty SQLite results (o81's SQLite and s91, 30 of 4,680 each): the comparer
+  reads pm4py's frame without the temporary column as "nocol" and native's
+  empty transport as no rows; both keep nothing.
+- The exact filters after the plain timestamp window that keeps nothing on
+  CSV: native's window takes aware bounds (round DU) where the harness
+  passes texts.
+- Carried to FE: the SQLite reader's NULL attribute cells are None in pm4py's object
+  columns where native leaves the attribute out (xe on o81's SQLite 106 of
+  2,187: None matches them; ocd: `'NoneType'` where native names
+  `'float'`: o3_81_0008, 0015, 0023).
+
+In the suite: `minera_review_fd1_tests` (the attribute time column's
+cells, errors and first pair on JSON logs, ocel:timestamp as the activity
+on a CSV with missing times, naive and aware; the null matching on str,
+object, float64 and datetime64 columns; each canonical temporary column
+dropped through the transport, the KeyErrors, the two-row statistics, the
+qualifier restored on a new log; a NULL qualifier on an unlisted and on a
+listed row of a written SQLite file).

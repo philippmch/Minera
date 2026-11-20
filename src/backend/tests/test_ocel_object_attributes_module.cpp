@@ -10945,7 +10945,9 @@ void full_native_state() {
   const auto dated_before=serialize_oc_playout_workbench_ocel_json(dated);
   const auto instant=datetime("2026-01-01T00:00:00.000000001Z");
   const auto nat=filter_ocel_object_attribute_exact(dated,"date",{OcelObjectAttributeNaT{}});
-  assert(nat.objects.size()==1 && nat.objects[0].id==raw);
+  // Round FD: the "NaT" text is a str cell of the reference's object column
+  // (read_ocel2_json keeps it), which NaT does not match (review FD1-2).
+  assert(nat.objects.empty());
   assert(filter_ocel_object_attribute_exact(dated,"date",{nullptr}).objects.empty());
   assert(filter_ocel_object_attribute_exact(dated,"date",
       {std::numeric_limits<double>::quiet_NaN()}).objects.empty());

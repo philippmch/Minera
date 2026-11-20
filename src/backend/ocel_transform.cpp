@@ -1334,6 +1334,9 @@ OcelSplitResult split_ocel(const Ocel& log, const OcelSplitOptions& options) {
       throw std::invalid_argument(
           "OCEL ancestors/descendants split requires object_type");
     require_ocel_relation_column(log, "ocel:eid");
+    // Round FD: it groups the relations' times (a temporary column may drop
+    // them).
+    require_ocel_relation_column_kept(log, "ocel:timestamp", true);
     auto unbounded = options;
     unbounded.max_objects = std::numeric_limits<std::size_t>::max();
     const auto candidates = ancestors_descendants(log, unbounded);

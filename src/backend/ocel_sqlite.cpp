@@ -241,15 +241,24 @@ std::string column_string(sqlite3_stmt* statement, int column) {
 // keeps each number as an int or float; the NULLs then read as empty texts
 // (observed black-box, probe ew q/wq.py). The qualifier is then the
 // number's Python repr (OcelQualifierKind). An infinite REAL keeps its text.
+// Round FD: a NULL on an event-object row whose event or object id the
+// event or object table does not list drops with the row before the fill,
+// so it leaves a float64 column float64 (`filled`: whether each cell's NULL
+// is filled; observed black-box, probe fd t4/dt.py, dt2.py).
 template <class Relation>
 OcelQualifierKind type_sqlite_qualifiers(std::vector<Relation>& rows, std::size_t first,
-                            const std::vector<QualifierCell>& cells) {
-  bool text = false, real = false, integer = false, null = false;
-  for (const auto& cell : cells) {
+                            const std::vector<QualifierCell>& cells,
+                            const std::vector<bool>* filled = nullptr) {
+  bool text = false, real = false, integer = false, null = false, filled_null = false;
+  for (std::size_t i = 0; i < cells.size(); ++i) {
+    const auto& cell = cells[i];
     if (cell.type == SQLITE_TEXT || cell.type == SQLITE_BLOB) text = true;
     else if (cell.type == SQLITE_FLOAT) real = true;
     else if (cell.type == SQLITE_INTEGER) integer = true;
-    else null = true;
+    else {
+      null = true;
+      if (!filled || (i < filled->size() && (*filled)[i])) filled_null = true;
+    }
   }
   if (!real && !integer) return OcelQualifierKind::kStr;
   const bool float_column = !text && (real || null);
@@ -273,7 +282,7 @@ OcelQualifierKind type_sqlite_qualifiers(std::vector<Relation>& rows, std::size_
   // a NULL filled with '' makes a float64 column an object one, before
   // rows naming unknown ids drop (observed black-box, probe ey esq.py on
   // s104).
-  if (text || null) return OcelQualifierKind::kStr;
+  if (text || filled_null) return OcelQualifierKind::kStr;
   return float_column ? OcelQualifierKind::kFloat : OcelQualifierKind::kInt;
 }
 
@@ -1524,7 +1533,9 @@ void read_declared_type_catalog(sqlite3* db, std::string_view table,
 
 // Returns the O2O table's missing qualifier column (KeyError
 // 'ocel:qualifier'), which the caller raises after the change rows.
-bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool native_tables) {
+bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool native_tables,
+                    const std::map<std::string, std::string>& listed_events,
+                    const std::map<std::string, std::string>& listed_objects) {
   const std::set<std::string> event_ids = [&] {
     std::set<std::string> result;
     for (const auto& event : log.events) result.insert(event.id);
@@ -1548,6 +1559,7 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
     if (qualifier_column < 0) qualifier_column = result_column(statement.get(), "ocel:qualifier");
     const auto first_relation = log.relations.size();
     std::vector<QualifierCell> qualifier_cells;
+    std::vector<bool> listed;
     while (true) {
       const auto status = sqlite3_step(statement.get());
       if (status == SQLITE_DONE) break;
@@ -1561,11 +1573,12 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
           (!event_ids.contains(relation.event_id) ||
            !object_ids.contains(relation.object_id)))
         throw std::invalid_argument("OCEL SQLite event-object relation references an unknown id");
+      listed.push_back(listed_events.contains(relation.event_id) && listed_objects.contains(relation.object_id));
       log.relations.push_back(std::move(relation));
     }
     // Round EY: the column's dtype stays when its rows go (Ocel::relation_qualifier_dtype).
     if (qualifier_column >= 0)
-      log.relation_qualifier_dtype = type_sqlite_qualifiers(log.relations, first_relation, qualifier_cells);
+      log.relation_qualifier_dtype = type_sqlite_qualifiers(log.relations, first_relation, qualifier_cells, &listed);
   }
   require_table(db, "object_object");
   // Round ES: its qualifier column is looked up after the change rows
@@ -2064,7 +2077,8 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
     if (fault != nullptr) throw std::invalid_argument(fault);
   }
   if (events_untimed) throw key_error("['ocel:timestamp'] not in index");
-  const bool o2o_qualifier_missing = read_relations(db, log, options.validate_references.value_or(false), native_tables);
+  const bool o2o_qualifier_missing =
+      read_relations(db, log, options.validate_references.value_or(false), native_tables, event_types, object_types);
 
   if (native_tables && table_exists(db, "object_changes")) {
     Statement statement(db, "SELECT object_id, object_type, ocel_time, "

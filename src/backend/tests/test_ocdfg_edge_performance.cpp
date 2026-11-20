@@ -42,7 +42,8 @@ void practical_timing_contract(){
 
 void missing_datetime_adapter_contract() {
   // These adapter projections use the retained direct NaT outcomes: zero
-  // elapsed time and the captured ValueError under working-time arithmetic.
+  // elapsed time and the captured ValueError under working-time arithmetic
+  // (the canonical time column; an attribute column's "NaT" text is a str).
   for (const auto& key : {std::string("ocel:timestamp"), std::string("observed time"), std::string()}) {
     Ocel log;
     log.events = {{"e1", "A", "NaT", {}},
@@ -63,21 +64,36 @@ void missing_datetime_adapter_contract() {
     OcdfgEdgePerformanceOptions options;
     options.timestamp_attribute = key;
     same_values(calculate_ocdfg_edge_performance(typed, pairs, options), {0.0});
-    same_values(calculate_ocdfg_edge_performance(log, pairs, options), {0.0});
     auto reopened = key.empty() ? parse_ocel_json_literal_names(before) : parse_ocel_json(before);
-    same_values(calculate_ocdfg_edge_performance(reopened, pairs, options), {0.0});
     OcdfgDiscoveryOptions discovery;
     discovery.edge_performance_options = options;
-    const auto graph = discover_ocdfg_classic_with_options(log, discovery);
-    const auto& edge = graph.edges.at("Order").at({"A", "B"});
-    same_values(edge.performance_event_couples, {0.0});
-    same_values(edge.performance_total_objects, {0.0, 0.0});
-    same_values(edge.performance, {0.0, 0.0});
+    // Round FD: an attribute column's "NaT" text is a str cell next to a
+    // datetime (read_ocel2_json keeps it), so the pair raises (review FD1-1).
+    const bool attribute = key != "ocel:timestamp";
+    const auto check_text = [&](auto action, bool business_hours) {
+      if (business_hours) error_is(action, "TypeError", "str.replace() takes no keyword arguments");
+      else error_is(action, "TypeError", "unsupported operand type(s) for -: 'datetime.datetime' and 'str'");
+    };
+    if (attribute) {
+      check_text([&] { (void)calculate_ocdfg_edge_performance(log, pairs, options); }, false);
+      check_text([&] { (void)calculate_ocdfg_edge_performance(reopened, pairs, options); }, false);
+      check_text([&] { (void)discover_ocdfg_classic_with_options(log, discovery); }, false);
+    } else {
+      same_values(calculate_ocdfg_edge_performance(log, pairs, options), {0.0});
+      same_values(calculate_ocdfg_edge_performance(reopened, pairs, options), {0.0});
+      const auto graph = discover_ocdfg_classic_with_options(log, discovery);
+      const auto& edge = graph.edges.at("Order").at({"A", "B"});
+      same_values(edge.performance_event_couples, {0.0});
+      same_values(edge.performance_total_objects, {0.0, 0.0});
+      same_values(edge.performance, {0.0, 0.0});
+    }
     options.business_hours = true;
     const auto check_missing = [&](auto action) {
-      error_is(action, "ValueError", "cannot convert float NaN to integer");
+      if (attribute) check_text(action, true);
+      else error_is(action, "ValueError", "cannot convert float NaN to integer");
     };
-    check_missing([&] { (void)calculate_ocdfg_edge_performance(typed, pairs, options); });
+    error_is([&] { (void)calculate_ocdfg_edge_performance(typed, pairs, options); }, "ValueError",
+             "cannot convert float NaN to integer");
     check_missing([&] { (void)calculate_ocdfg_edge_performance(log, pairs, options); });
     check_missing([&] { (void)calculate_ocdfg_edge_performance(reopened, pairs, options); });
     discovery.edge_performance_options = options;

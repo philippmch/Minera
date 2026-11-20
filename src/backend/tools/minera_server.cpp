@@ -2543,7 +2543,10 @@ void handle_ocel_filter(const httplib::Request& request,
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
     const bool exact_names=variant=="event_attribute_exact" || variant=="object_attribute_exact" ||
         variant=="timestamp_exact" || variant=="object_count_exact" || variant=="activity_type_matching_exact";
-    const auto source = exact_names?minera::parse_ocel_json_literal_names(body):minera::parse_ocel_json(body);
+    auto source = exact_names?minera::parse_ocel_json_literal_names(body):minera::parse_ocel_json(body);
+    // Round FD: the reference's filters build a new OCEL, which has a
+    // qualifier column again after a temporary column dropped it.
+    minera::restore_ocel_relation_qualifier(source);
     const bool positive = ocel_query_bool(request, "positive", true);
     const auto object_type = request.has_param("object_type")
                                  ? request.get_param_value("object_type")
@@ -2724,7 +2727,11 @@ void handle_ocel_sqlite(const httplib::Request& request,
       if (!output) throw std::runtime_error("cannot write temporary SQLite upload");
     }
     if (mode == "export") {
-      minera::export_ocel_sqlite(minera::parse_ocel_json(body), temporary, options);
+      const auto exported = minera::parse_ocel_json(body);
+      // Round FD: a relations frame without its qualifier (dropped by a
+      // temporary column) fails every reference writer on it.
+      minera::require_ocel_relation_column(exported, "ocel:qualifier");
+      minera::export_ocel_sqlite(exported, temporary, options);
       std::ifstream input(temporary, std::ios::binary | std::ios::ate);
       if (!input) throw std::runtime_error("cannot read temporary SQLite output");
       const auto size = input.tellg();
@@ -2825,6 +2832,9 @@ void handle_ocel_exchange(const httplib::Request& request,
       // Round DV: with a degenerate relations frame (an OCEL CSV import
       // naming no object, an empty playout) the OCEL 2.0 XML writer fails on
       // its event id first, the CSV writer on its type (black-box).
+      // Round FD: a relations frame without its qualifier (dropped by a
+      // temporary column) fails every reference writer on it.
+      minera::require_ocel_relation_column(log, "ocel:qualifier");
       if (format == "xml_standard") minera::require_ocel_relation_column(log, "ocel:eid");
       if (format == "csv" || format == "csv_objects") minera::require_ocel_relation_column(log, "ocel:type");
       // Round DT: the reference JSON and XML writers read the objects
@@ -3202,7 +3212,10 @@ void handle_ocel_enrichment(const httplib::Request& request,
         request, "lifecycle_qualifiers", options.include_lifecycle_qualifiers);
     const auto body = ocel_request_body(request, "log");
     if (body.empty()) throw std::invalid_argument("missing OCEL JSON body");
-    const auto enriched = minera::enrich_ocel(minera::parse_ocel_json(body), options);
+    // Round FD: so does an enrichment (see restore_ocel_relation_qualifier).
+    auto enrich_source = minera::parse_ocel_json(body);
+    minera::restore_ocel_relation_qualifier(enrich_source);
+    const auto enriched = minera::enrich_ocel(enrich_source, options);
     auto payload = minera::serialize_ocel_enrichment_json(enriched, options);
     if (ocel_query_bool(request, "include_open_source", false)) {
       payload.pop_back();

@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "minera/conformance.hpp"
+#include "minera/ocdfg_edge_performance.hpp"
 #include "minera/ocel_csv.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/oc_causal_net.hpp"
@@ -1439,12 +1440,28 @@ int main() {
   }
   assert(missing_selector_rejected);
 
+  // Round FD: pm4py's OC-DFG reads its activity and type selectors from the
+  // relations frame's six columns too, so an attribute selector on a
+  // reader's frames raises KeyError (review FD1-1); the selected model
+  // comes from a log carrying the selected labels as its own.
   minera::OcdfgDiscoveryOptions ocdfg_selected_options;
   ocdfg_selected_options.activity_attribute = "selected_activity";
   ocdfg_selected_options.object_type_attribute = "selected_type";
-  const auto selected_ocdfg =
-      minera::discover_ocdfg_classic_with_options(selected_log,
-                                                  ocdfg_selected_options);
+  bool selected_ocdfg_rejected = false;
+  try {
+    (void)minera::discover_ocdfg_classic_with_options(selected_log, ocdfg_selected_options);
+  } catch (const minera::OcdfgPerformanceError& error) {
+    selected_ocdfg_rejected = error.type == "KeyError" && std::string(error.what()) == "'selected_activity'";
+  }
+  assert(selected_ocdfg_rejected);
+  auto projected_log = selected_log;
+  for (auto& event : projected_log.events)
+    for (const auto& attribute : event.attributes)
+      if (attribute.key == "selected_activity") event.activity = std::get<std::string>(attribute.value);
+  for (auto& object : projected_log.objects)
+    for (const auto& attribute : object.attributes)
+      if (attribute.key == "selected_type") object.type = std::get<std::string>(attribute.value);
+  const auto selected_ocdfg = minera::discover_ocdfg_classic(projected_log);
   assert(selected_ocdfg.activities ==
          std::vector<std::string>({"Assemble", "Deliver"}));
   assert(selected_ocdfg.object_types ==
@@ -1506,6 +1523,9 @@ int main() {
       try { (void)minera::discover_ocdfg_classic_with_options(input, options); }
       catch (const std::out_of_range& error) {
         missing = error.what() == std::string("'") + selector + "'";
+      } catch (const minera::OcdfgPerformanceError& error) {
+        // A reader's frames (round FD): pm4py's KeyError.
+        missing = error.type == "KeyError" && error.what() == std::string("'") + selector + "'";
       }
       assert(missing);
     };
@@ -1517,9 +1537,7 @@ int main() {
     expect_missing_column(empty_tables, "selected_activity", true);
   }
   ocdfg_selected_options.compute_edges_performance = false;
-  const auto selected_ocdfg_plain =
-      minera::discover_ocdfg_classic_with_options(selected_log,
-                                                  ocdfg_selected_options);
+  const auto selected_ocdfg_plain = minera::discover_ocdfg_classic(projected_log, false);
   assert(!selected_ocdfg_plain.performance_computed);
   assert(selected_ocdfg_plain.activities == selected_ocdfg.activities);
   assert(selected_ocdfg_plain.edges.at("order-main")
@@ -1530,8 +1548,8 @@ int main() {
     auto invalid = ocdfg_selected_options;
     invalid.object_type_attribute = "missing_type";
     (void)minera::discover_ocdfg_classic_with_options(selected_log, invalid);
-  } catch (const std::out_of_range& error) {
-    ocdfg_missing_selector_rejected = std::string(error.what()) == "'missing_type'";
+  } catch (const minera::OcdfgPerformanceError& error) {
+    ocdfg_missing_selector_rejected = error.type == "KeyError" && std::string(error.what()) == "'missing_type'";
   }
   assert(ocdfg_missing_selector_rejected);
 

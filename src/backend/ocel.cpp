@@ -4272,11 +4272,56 @@ bool ocel_relations_frame_degenerate(const Ocel& log) {
   return true;
 }
 
+// Round FD: a relations frame declared with canonical columns alone that
+// lacks one of the six (activity_type_matching's temporary column drops the
+// one it names from the result's relations, observed black-box) fails where
+// the reference reads that column, as a degenerate frame does (which keeps
+// its own rules: ocel_relations_frame_degenerate).
+bool ocel_relation_column_dropped(const Ocel& log, std::string_view column) {
+  const auto& declared = log.table_columns.relations;
+  if (!declared || ocel_relations_frame_degenerate(log)) return false;
+  const auto canonical = [](std::string_view name) {
+    return name == "ocel:eid" || name == "ocel:oid" || name == "ocel:activity" || name == "ocel:type" ||
+           name == "ocel:timestamp" || name == "ocel:qualifier";
+  };
+  if (!canonical(column) || declared->empty()) return false;
+  if (!std::all_of(declared->begin(), declared->end(), [&](const std::string& name) { return canonical(name); }))
+    return false;
+  return std::find(declared->begin(), declared->end(), column) == declared->end();
+}
+
 void require_ocel_relation_column(const Ocel& log, std::string_view column) {
-  if (!ocel_relations_frame_degenerate(log)) return;
+  if (!ocel_relations_frame_degenerate(log)) {
+    if (ocel_relation_column_dropped(log, column))
+      throw std::invalid_argument("KeyError: '" + std::string(column) + "'");
+    return;
+  }
   const auto& declared = *log.table_columns.relations;
   if (std::find(declared.begin(), declared.end(), column) == declared.end())
     throw std::invalid_argument("KeyError: '" + std::string(column) + "'");
+}
+
+void require_ocel_relation_column_found(const Ocel& log, std::string_view column) {
+  try {
+    require_ocel_relation_column(log, column);
+  } catch (const std::invalid_argument&) {
+    throw std::invalid_argument("KeyError: 'Column not found: " + std::string(column) + "'");
+  }
+}
+
+void require_ocel_relation_column_kept(const Ocel& log, std::string_view column, bool groupby) {
+  if (ocel_relation_column_dropped(log, column))
+    throw std::invalid_argument("KeyError: '" + std::string(groupby ? "Column not found: " : "") +
+                                std::string(column) + "'");
+}
+
+void restore_ocel_relation_qualifier(Ocel& log) {
+  if (!ocel_relation_column_dropped(log, "ocel:qualifier")) return;
+  auto& declared = *log.table_columns.relations;
+  declared.emplace_back("ocel:qualifier");
+  const std::set<std::string> six = {"ocel:eid", "ocel:activity", "ocel:timestamp",
+                                     "ocel:oid", "ocel:type", "ocel:qualifier"};
+  if (std::set<std::string>(declared.begin(), declared.end()) == six) log.table_columns.relations.reset();
 }
 
 bool ocel_events_frame_columnless(const Ocel& log) {
@@ -5148,6 +5193,9 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
 }
 
 EtotGraph discover_etot_classic(const Ocel& log) {
+  // Round FD: the relations' activity and type (a temporary column may drop one).
+  require_ocel_relation_column_kept(log, "ocel:activity");
+  require_ocel_relation_column_kept(log, "ocel:type");
   EtotGraph result; std::set<std::string> activities, types; std::map<std::pair<std::string, std::string>, std::size_t> counts; std::unordered_map<std::string, std::string> lookup; std::unordered_map<std::string, std::string> event_activity; for (const auto& o : log.objects) lookup[o.id] = o.type; for (const auto& e : log.events) event_activity[e.id] = e.activity; for (const auto& r : log.relations) { auto it = lookup.find(r.object_id); auto a = event_activity.find(r.event_id); if (it == lookup.end() || a == event_activity.end()) continue; activities.insert(a->second); types.insert(it->second); ++counts[{a->second, it->second}]; } result.activities.assign(activities.begin(), activities.end()); result.object_types.assign(types.begin(), types.end()); for (const auto& [key, frequency] : counts) result.edges.push_back({key.first, key.second, frequency}); return result;
 }
 
@@ -5297,6 +5345,313 @@ OcdfgGraph discover_ocdfg_classic(const Ocel& log, bool compute_edges_performanc
   return discover_ocdfg_classic_with_options(log, options);
 }
 
+// An edge's first couple in the traversal of the events (smaller is
+// earlier), keyed by object type and edge.
+using OcdfgEdgeFirstSeen = std::map<std::pair<std::string, std::pair<std::string, std::string>>, std::size_t>;
+
+// The edge association normalisation and performance shared by the
+// canonical discovery and the reader-frame selector discovery (round FD):
+// `timestamp` maps an event identifier to its time text, `first_seen`
+// orders the edges for the first pair an attribute time column measures.
+static void finish_ocdfg_edges(OcdfgGraph& result, const Ocel& log, const OcdfgDiscoveryOptions& options,
+                               std::map<std::string, std::string>& timestamp, const OcdfgEdgeFirstSeen& first_seen) {
+  auto normalize_activity = [](OcdfgActivityMetric& metric) {
+    std::sort(metric.events.begin(), metric.events.end());
+    metric.events.erase(std::unique(metric.events.begin(), metric.events.end()), metric.events.end());
+    std::sort(metric.unique_objects.begin(), metric.unique_objects.end());
+    metric.unique_objects.erase(std::unique(metric.unique_objects.begin(), metric.unique_objects.end()), metric.unique_objects.end());
+  };
+  // Round EL: a raw time column (OcelRawTime) fails on the first pair the
+  // reference measures, the one whose events come first in the log
+  // (observed black-box).
+  if (options.compute_edges_performance && ocel_raw_event_times(log)) {
+    std::unordered_map<std::string_view, std::size_t> position;
+    for (std::size_t i = 0; i < log.events.size(); ++i) position.emplace(log.events[i].id, i);
+    const auto at = [&](const std::string& id) {
+      const auto found = position.find(id);
+      return found == position.end() ? log.events.size() : found->second;
+    };
+    std::optional<std::pair<std::size_t, std::size_t>> first;
+    for (const auto& [type, metrics] : result.edges)
+      for (const auto& [pair, edge] : metrics)
+        for (const auto& [from, to] : edge.event_couples) {
+          const std::pair<std::size_t, std::size_t> key{at(from), at(to)};
+          if (key.first < log.events.size() && key.second < log.events.size() && (!first || key < *first))
+            first = key;
+        }
+    if (first)
+      throw ocdfg_raw_pair_error(log.events[first->first].raw_time, log.events[first->second].raw_time,
+                                 options.edge_performance_options && options.edge_performance_options->business_hours);
+  }
+  // Round FD: an events attribute column as the time column fails on the
+  // first pair it cannot measure. The reference measures the object types
+  // in the order of their first couple in the traversal of the events, each
+  // type's edges in the order of their first couple, and an edge's couples
+  // as a set, an order that depends on the hash seed (here the traversal's;
+  // see calculate_ocdfg_edge_performance; observed black-box).
+  if (options.compute_edges_performance && options.edge_performance_options) {
+    const auto& time_key = options.edge_performance_options->timestamp_attribute;
+    if (time_key && *time_key != "ocel:timestamp" && *time_key != "ocel:eid" && *time_key != "ocel:activity") {
+      const auto seen = [&](const std::string& type, const std::pair<std::string, std::string>& pair) {
+        const auto found = first_seen.find({type, pair});
+        return found == first_seen.end() ? std::numeric_limits<std::size_t>::max() : found->second;
+      };
+      std::map<std::string, std::size_t> type_seen;
+      for (const auto& [type, metrics] : result.edges) {
+        auto& first = type_seen.try_emplace(type, std::numeric_limits<std::size_t>::max()).first->second;
+        for (const auto& [pair, edge] : metrics) first = std::min(first, seen(type, pair));
+      }
+      std::vector<std::tuple<std::size_t, std::size_t, const OcdfgEdgeMetric*>> order;
+      for (const auto& [type, metrics] : result.edges)
+        for (const auto& [pair, edge] : metrics) order.emplace_back(type_seen.at(type), seen(type, pair), &edge);
+      std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) {
+        return std::tie(std::get<0>(a), std::get<1>(a)) < std::tie(std::get<0>(b), std::get<1>(b));
+      });
+      std::vector<std::pair<std::string, std::string>> couples;
+      for (const auto& [type_first, edge_first, edge] : order) {
+        std::set<std::pair<std::string, std::string>> distinct;
+        for (const auto& couple : edge->event_couples)
+          if (distinct.insert(couple).second) couples.push_back(couple);
+      }
+      (void)calculate_ocdfg_edge_performance(log, couples, *options.edge_performance_options);
+    }
+  }
+  for (auto& [type, metrics] : result.start_activities) for (auto& [act, metric] : metrics) normalize_activity(metric);
+  for (auto& [type, metrics] : result.end_activities) for (auto& [act, metric] : metrics) normalize_activity(metric);
+  for (auto& [type, metrics] : result.edges) for (auto& [pair, edge] : metrics) {
+    std::sort(edge.event_couples.begin(), edge.event_couples.end()); edge.event_couples.erase(std::unique(edge.event_couples.begin(), edge.event_couples.end()), edge.event_couples.end());
+    std::sort(edge.unique_objects.begin(), edge.unique_objects.end()); edge.unique_objects.erase(std::unique(edge.unique_objects.begin(), edge.unique_objects.end()), edge.unique_objects.end());
+    std::sort(edge.event_objects.begin(), edge.event_objects.end()); edge.event_objects.erase(std::unique(edge.event_objects.begin(), edge.event_objects.end()), edge.event_objects.end());
+    std::sort(edge.total_objects.begin(), edge.total_objects.end()); edge.total_objects.erase(std::unique(edge.total_objects.begin(), edge.total_objects.end()), edge.total_objects.end());
+    edge.performance.clear();
+    edge.performance_event_couples.clear();
+    edge.performance_total_objects.clear();
+    if (options.compute_edges_performance && options.edge_performance_options) {
+      const auto& timing_options = *options.edge_performance_options;
+      edge.performance_event_couples = calculate_ocdfg_edge_performance(
+          log, edge.event_couples, timing_options);
+      std::vector<std::pair<std::string, std::string>> object_couples;
+      object_couples.reserve(edge.total_objects.size());
+      for (const auto& triple : edge.total_objects)
+        object_couples.emplace_back(std::get<0>(triple), std::get<1>(triple));
+      edge.performance_total_objects = calculate_ocdfg_edge_performance(
+          log, object_couples, timing_options);
+      edge.performance = edge.performance_total_objects;
+    } else if (options.compute_edges_performance) {
+      // Round EH: a time column of None (Ocel::none_event_times) fails on
+      // the first pair, as the reference's OC-DFG does (observed black-box).
+      if (log.none_event_times && (!edge.event_couples.empty() || !edge.total_objects.empty()))
+        throw OcdfgPerformanceError("TypeError",
+                                    "unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
+      // Round EL: and so does a raw one (OcelRawTime).
+      if (ocel_raw_event_times(log) && (!edge.event_couples.empty() || !edge.total_objects.empty())) {
+        std::unordered_map<std::string_view, OcelRawTime> kinds;
+        for (const auto& event : log.events) kinds.emplace(event.id, event.raw_time);
+        const auto& [from, to] = !edge.event_couples.empty()
+                                     ? edge.event_couples.front()
+                                     : std::pair<std::string, std::string>(std::get<0>(edge.total_objects.front()),
+                                                                           std::get<1>(edge.total_objects.front()));
+        const auto kind = [&](const std::string& id) {
+          const auto found = kinds.find(id);
+          return found == kinds.end() ? OcelRawTime::kNaN : found->second;
+        };
+        throw ocdfg_raw_pair_error(kind(from), kind(to), false);
+      }
+      for (const auto& couple : edge.event_couples) {
+        if (const auto seconds = legacy_edge_elapsed(timestamp[couple.first],
+                                                     timestamp[couple.second]))
+          edge.performance_event_couples.push_back(*seconds);
+      }
+      for (const auto& triple : edge.total_objects) {
+        if (const auto seconds = legacy_edge_elapsed(timestamp[std::get<0>(triple)],
+                                                     timestamp[std::get<1>(triple)]))
+          edge.performance_total_objects.push_back(*seconds);
+      }
+      // Keep the historic field as the total-object projection.
+      edge.performance = edge.performance_total_objects;
+    }
+    std::sort(edge.performance_event_couples.begin(),
+              edge.performance_event_couples.end());
+    std::sort(edge.performance_total_objects.begin(),
+              edge.performance_total_objects.end());
+    std::sort(edge.performance.begin(), edge.performance.end());
+  }
+}
+
+// Round FD: the OC-DFG with selectors on a reader's frames (no declared
+// relations frame). pm4py reads the activity column from the events and the
+// relations frames, the type column from the objects and the relations
+// frames, and the event id column (Parameters event id) from the relations
+// and the events frames, all through the whole discovery: the relations
+// frame holds its six columns only, so an attribute column as the activity
+// or type raises KeyError, and ocel:eid or ocel:timestamp as the activity,
+// ocel:oid as the type, ocel:activity or ocel:timestamp as the event id are
+// valid. The errors come in this order: events[activity], objects[type],
+// relations[activity], the relations' event id column ("Columns not found"),
+// relations[type], events[event id]. The activity associations group the
+// relation rows by their activity (and type) cells, the start and end
+// activities take each object's first and last relation row, and the edges
+// walk the events frame's identifiers as the edge metrics do (round FC):
+// an identifier's activity is its first row's, its objects every relation
+// row it labels, in row order, so a repeated identifier repeats them. An
+// identifier's time is its first row's (observed black-box, probes fd
+// t2/ocdp.py, ocdp2.py, ocdp3.py; sweep fd q/ocd.py). Labels are the cells'
+// texts.
+static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDiscoveryOptions& options,
+                                               const std::string& activity_column,
+                                               const std::string& type_column,
+                                               const std::string& event_id_column) {
+  static const std::set<std::string> relation_frame = {"ocel:eid",  "ocel:activity", "ocel:timestamp",
+                                                       "ocel:oid",  "ocel:type",     "ocel:qualifier"};
+  const auto key_error = [](const std::string& text) {
+    throw OcdfgPerformanceError("KeyError", ocel_frame::python_str_repr(text));
+  };
+  std::set<std::string> event_frame_columns, object_frame_columns;
+  if (log.table_columns.events) {
+    event_frame_columns.insert(log.table_columns.events->begin(), log.table_columns.events->end());
+  } else {
+    event_frame_columns = {"ocel:eid", "ocel:activity", "ocel:timestamp"};
+    const auto frame = ocel_frame::event_frame(log);
+    event_frame_columns.insert(frame.names().begin(), frame.names().end());
+  }
+  if (log.table_columns.objects) {
+    object_frame_columns.insert(log.table_columns.objects->begin(), log.table_columns.objects->end());
+  } else {
+    object_frame_columns = {"ocel:oid", "ocel:type"};
+    const auto frame = ocel_frame::object_frame(log);
+    object_frame_columns.insert(frame.names().begin(), frame.names().end());
+  }
+  if (!event_frame_columns.contains(activity_column)) key_error(activity_column);
+  if (!object_frame_columns.contains(type_column)) key_error(type_column);
+  if (!relation_frame.contains(activity_column)) key_error(activity_column);
+  if (!relation_frame.contains(event_id_column))
+    key_error("Columns not found: " + ocel_frame::python_str_repr(event_id_column));
+  if (!relation_frame.contains(type_column)) key_error(type_column);
+  if (!event_frame_columns.contains(event_id_column)) key_error(event_id_column);
+  // Every selector now names a column both frames hold: the event's id,
+  // activity or time, the object's id or type.
+  // A missing time (an OCEL CSV row's empty cell) is NaT, labelled "NaT";
+  // in a naive time column the activities list it as None. As the activity
+  // it is a null label: the activity associations drop its rows, the start
+  // and end activities take an object's first and last label that is not
+  // null (with its first and last row's event, none if all are null), and
+  // the edges label it NaT (observed black-box, probe fd probe/p10.py).
+  static const std::string kNaT = "NaT", kNone = "None";
+  const auto& missing_time = log.naive_event_time_unit.empty() ? kNaT : kNone;
+  const auto event_label = [&missing_time](const OcelEvent& event, const std::string& key) -> const std::string& {
+    return key == "ocel:eid"        ? event.id
+           : key == "ocel:activity" ? event.activity
+           : event.timestamp.empty() ? missing_time
+                                     : event.timestamp;
+  };
+  const auto object_label = [](const OcelObject& object, const std::string& key) -> const std::string& {
+    return key == "ocel:oid" ? object.id : object.type;
+  };
+  OcdfgGraph result;
+  result.performance_computed = options.compute_edges_performance;
+  std::set<std::string> activities, types;
+  for (const auto& event : log.events) activities.insert(event_label(event, activity_column));
+  for (const auto& object : log.objects) types.insert(object_label(object, type_column));
+  result.activities.assign(activities.begin(), activities.end());
+  result.object_types.assign(types.begin(), types.end());
+
+  std::unordered_map<std::string, const OcelEvent*> event_by_id;
+  std::unordered_map<std::string, const OcelObject*> object_by_id;
+  for (const auto& event : log.events) event_by_id.emplace(event.id, &event);
+  for (const auto& object : log.objects) object_by_id.emplace(object.id, &object);
+  struct Row { std::string event; std::string object; std::string activity; std::string type; bool null_activity; };
+  std::vector<Row> rows;
+  for (const auto& relation : log.relations) {
+    const auto event = event_by_id.find(relation.event_id);
+    const auto object = object_by_id.find(relation.object_id);
+    if (event == event_by_id.end() || object == object_by_id.end()) continue;
+    rows.push_back({event_label(*event->second, event_id_column), relation.object_id,
+                    event_label(*event->second, activity_column), object_label(*object->second, type_column),
+                    activity_column == "ocel:timestamp" && event->second->timestamp.empty()});
+  }
+  const auto add_association = [](OcdfgActivityMetric& metric, const std::string& event, const std::string& object) {
+    metric.events.push_back(event);
+    metric.unique_objects.push_back(object);
+    metric.event_objects.emplace_back(event, object);
+    metric.total_objects.emplace_back(event, object);
+  };
+  const auto normalize = [](OcdfgActivityMetric& metric) {
+    std::sort(metric.events.begin(), metric.events.end());
+    metric.events.erase(std::unique(metric.events.begin(), metric.events.end()), metric.events.end());
+    std::sort(metric.unique_objects.begin(), metric.unique_objects.end());
+    metric.unique_objects.erase(std::unique(metric.unique_objects.begin(), metric.unique_objects.end()),
+                                metric.unique_objects.end());
+  };
+  struct Bounds { std::size_t first, last; std::optional<std::size_t> first_label, last_label; };
+  std::map<std::string, Bounds> bounds;
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    const auto& row = rows[i];
+    auto& types = result.activities_ot[row.type];
+    if (!row.null_activity) {
+      add_association(result.activities_indep[row.activity], row.event, row.object);
+      add_association(types[row.activity], row.event, row.object);
+    }
+    auto& range = bounds.try_emplace(row.object, Bounds{i, i, std::nullopt, std::nullopt}).first->second;
+    range.last = i;
+    if (!row.null_activity) {
+      if (!range.first_label) range.first_label = i;
+      range.last_label = i;
+    }
+  }
+  for (const auto& [object, range] : bounds) {
+    const auto& first = rows[range.first];
+    const auto& last = rows[range.last];
+    auto& starts = result.start_activities[first.type];
+    auto& ends = result.end_activities[last.type];
+    if (range.first_label) add_association(starts[rows[*range.first_label].activity], first.event, object);
+    if (range.last_label) add_association(ends[rows[*range.last_label].activity], last.event, object);
+  }
+  for (auto& [activity, metric] : result.activities_indep) normalize(metric);
+  for (auto& [type, metrics] : result.activities_ot) for (auto& [activity, metric] : metrics) normalize(metric);
+  for (auto& [type, metrics] : result.start_activities) for (auto& [activity, metric] : metrics) normalize(metric);
+  for (auto& [type, metrics] : result.end_activities) for (auto& [activity, metric] : metrics) normalize(metric);
+
+  std::vector<const std::string*> identifiers;
+  std::unordered_map<std::string, std::string> activity_of;
+  std::map<std::string, std::string> timestamp;
+  identifiers.reserve(log.events.size());
+  for (const auto& event : log.events) {
+    const auto& identifier = event_label(event, event_id_column);
+    identifiers.push_back(&identifier);
+    activity_of.try_emplace(identifier, activity_column == "ocel:timestamp" && event.timestamp.empty()
+                                            ? kNaT
+                                            : event_label(event, activity_column));
+    timestamp.try_emplace(identifier, event.timestamp);
+  }
+  std::unordered_map<std::string, std::vector<std::string>> objects_of;
+  for (const auto& row : rows) objects_of[row.event].push_back(row.object);
+  std::unordered_map<std::string, std::string> type_of;
+  for (const auto& object : log.objects) type_of.try_emplace(object.id, object_label(object, type_column));
+  std::unordered_map<std::string, std::string> history;
+  OcdfgEdgeFirstSeen first_seen;
+  for (const auto* identifier : identifiers) {
+    const auto related = objects_of.find(*identifier);
+    if (related == objects_of.end()) continue;
+    for (const auto& object : related->second) {
+      const auto previous = history.find(object);
+      if (previous != history.end()) {
+        const auto type = type_of.find(object);
+        if (type == type_of.end()) key_error(object);
+        std::pair<std::string, std::string> pair{activity_of.at(previous->second), activity_of.at(*identifier)};
+        first_seen.try_emplace({type->second, pair}, first_seen.size());
+        auto& edge = result.edges[type->second][pair];
+        edge.event_couples.emplace_back(previous->second, *identifier);
+        edge.unique_objects.push_back(object);
+        edge.event_objects.emplace_back(previous->second, *identifier, object);
+        edge.total_objects.emplace_back(previous->second, *identifier, object);
+      }
+      history[object] = *identifier;
+    }
+  }
+  finish_ocdfg_edges(result, log, options, timestamp, first_seen);
+  return result;
+}
+
 OcdfgGraph discover_ocdfg_classic_with_options(
     const Ocel& log, const OcdfgDiscoveryOptions& options) {
   const auto column = [](const std::string& selected, bool event) {
@@ -5328,6 +5683,13 @@ OcdfgGraph discover_ocdfg_classic_with_options(
   };
   const auto activity_column = column(options.activity_attribute, true);
   const auto type_column = column(options.object_type_attribute, false);
+  // Round FD: selectors on a reader's frames (see discover_ocdfg_reader_frames).
+  const auto& timing = options.edge_performance_options;
+  const std::string event_id_column =
+      timing && timing->event_id_attribute ? *timing->event_id_attribute : std::string("ocel:eid");
+  if (!log.table_columns.relations &&
+      (activity_column != "ocel:activity" || type_column != "ocel:type" || event_id_column != "ocel:eid"))
+    return discover_ocdfg_reader_frames(log, options, activity_column, type_column, event_id_column);
   // Round DV: a degenerate relations frame fails on the activity first.
   require_ocel_relation_column(log, activity_column);
   require_column(log.table_columns.events, event_columns, activity_column);
@@ -5391,6 +5753,7 @@ OcdfgGraph discover_ocdfg_classic_with_options(
 
   std::map<std::string, std::vector<Rel>> by_object;
   for (const auto& relation : rels) by_object[relation.object].push_back(relation);
+  OcdfgEdgeFirstSeen first_seen;
   for (auto& [object, sequence] : by_object) {
     std::sort(sequence.begin(), sequence.end(), [](const Rel& a, const Rel& b) { return a.order < b.order; });
     if (sequence.empty()) continue;
@@ -5408,6 +5771,8 @@ OcdfgGraph discover_ocdfg_classic_with_options(
       const auto source = activity[sequence[i - 1].event];
       const auto target = activity[sequence[i].event];
       auto& edge = result.edges[type][{source, target}];
+      auto& seen = first_seen.try_emplace({type, {source, target}}, sequence[i].order).first->second;
+      seen = std::min(seen, sequence[i].order);
       edge.event_couples.emplace_back(sequence[i - 1].event, sequence[i].event);
       edge.unique_objects.push_back(object);
       edge.event_objects.emplace_back(sequence[i - 1].event, sequence[i].event, object);
@@ -5415,88 +5780,7 @@ OcdfgGraph discover_ocdfg_classic_with_options(
                                       object);
     }
   }
-  // Round EL: a raw time column (OcelRawTime) fails on the first pair the
-  // reference measures, the one whose events come first in the log
-  // (observed black-box).
-  if (options.compute_edges_performance && ocel_raw_event_times(log)) {
-    std::unordered_map<std::string_view, std::size_t> position;
-    for (std::size_t i = 0; i < log.events.size(); ++i) position.emplace(log.events[i].id, i);
-    const auto at = [&](const std::string& id) {
-      const auto found = position.find(id);
-      return found == position.end() ? log.events.size() : found->second;
-    };
-    std::optional<std::pair<std::size_t, std::size_t>> first;
-    for (const auto& [type, metrics] : result.edges)
-      for (const auto& [pair, edge] : metrics)
-        for (const auto& [from, to] : edge.event_couples) {
-          const std::pair<std::size_t, std::size_t> key{at(from), at(to)};
-          if (key.first < log.events.size() && key.second < log.events.size() && (!first || key < *first))
-            first = key;
-        }
-    if (first)
-      throw ocdfg_raw_pair_error(log.events[first->first].raw_time, log.events[first->second].raw_time,
-                                 options.edge_performance_options && options.edge_performance_options->business_hours);
-  }
-  for (auto& [type, metrics] : result.start_activities) for (auto& [act, metric] : metrics) normalize_activity(metric);
-  for (auto& [type, metrics] : result.end_activities) for (auto& [act, metric] : metrics) normalize_activity(metric);
-  for (auto& [type, metrics] : result.edges) for (auto& [pair, edge] : metrics) {
-    std::sort(edge.event_couples.begin(), edge.event_couples.end()); edge.event_couples.erase(std::unique(edge.event_couples.begin(), edge.event_couples.end()), edge.event_couples.end());
-    std::sort(edge.unique_objects.begin(), edge.unique_objects.end()); edge.unique_objects.erase(std::unique(edge.unique_objects.begin(), edge.unique_objects.end()), edge.unique_objects.end());
-    std::sort(edge.event_objects.begin(), edge.event_objects.end()); edge.event_objects.erase(std::unique(edge.event_objects.begin(), edge.event_objects.end()), edge.event_objects.end());
-    std::sort(edge.total_objects.begin(), edge.total_objects.end()); edge.total_objects.erase(std::unique(edge.total_objects.begin(), edge.total_objects.end()), edge.total_objects.end());
-    edge.performance.clear();
-    edge.performance_event_couples.clear();
-    edge.performance_total_objects.clear();
-    if (options.compute_edges_performance && options.edge_performance_options) {
-      const auto& timing_options = *options.edge_performance_options;
-      edge.performance_event_couples = calculate_ocdfg_edge_performance(
-          log, edge.event_couples, timing_options);
-      std::vector<std::pair<std::string, std::string>> object_couples;
-      object_couples.reserve(edge.total_objects.size());
-      for (const auto& triple : edge.total_objects)
-        object_couples.emplace_back(std::get<0>(triple), std::get<1>(triple));
-      edge.performance_total_objects = calculate_ocdfg_edge_performance(
-          log, object_couples, timing_options);
-      edge.performance = edge.performance_total_objects;
-    } else if (options.compute_edges_performance) {
-      // Round EH: a time column of None (Ocel::none_event_times) fails on
-      // the first pair, as the reference's OC-DFG does (observed black-box).
-      if (log.none_event_times && (!edge.event_couples.empty() || !edge.total_objects.empty()))
-        throw OcdfgPerformanceError("TypeError",
-                                    "unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
-      // Round EL: and so does a raw one (OcelRawTime).
-      if (ocel_raw_event_times(log) && (!edge.event_couples.empty() || !edge.total_objects.empty())) {
-        std::unordered_map<std::string_view, OcelRawTime> kinds;
-        for (const auto& event : log.events) kinds.emplace(event.id, event.raw_time);
-        const auto& [from, to] = !edge.event_couples.empty()
-                                     ? edge.event_couples.front()
-                                     : std::pair<std::string, std::string>(std::get<0>(edge.total_objects.front()),
-                                                                           std::get<1>(edge.total_objects.front()));
-        const auto kind = [&](const std::string& id) {
-          const auto found = kinds.find(id);
-          return found == kinds.end() ? OcelRawTime::kNaN : found->second;
-        };
-        throw ocdfg_raw_pair_error(kind(from), kind(to), false);
-      }
-      for (const auto& couple : edge.event_couples) {
-        if (const auto seconds = legacy_edge_elapsed(timestamp[couple.first],
-                                                     timestamp[couple.second]))
-          edge.performance_event_couples.push_back(*seconds);
-      }
-      for (const auto& triple : edge.total_objects) {
-        if (const auto seconds = legacy_edge_elapsed(timestamp[std::get<0>(triple)],
-                                                     timestamp[std::get<1>(triple)]))
-          edge.performance_total_objects.push_back(*seconds);
-      }
-      // Keep the historic field as the total-object projection.
-      edge.performance = edge.performance_total_objects;
-    }
-    std::sort(edge.performance_event_couples.begin(),
-              edge.performance_event_couples.end());
-    std::sort(edge.performance_total_objects.begin(),
-              edge.performance_total_objects.end());
-    std::sort(edge.performance.begin(), edge.performance.end());
-  }
+  finish_ocdfg_edges(result, log, options, timestamp, first_seen);
   return result;
 }
 
@@ -6321,6 +6605,8 @@ OcelTupleDescription describe_ocel_tuples(const Ocel& log,
   require_ocel_object_columns(log);
   // Round DV: then it sorts the relations by their time.
   require_ocel_relation_column(log, "ocel:timestamp");
+  // Round FD: and reads their activity (a temporary column may drop it).
+  require_ocel_relation_column(log, "ocel:activity");
   OcelTupleDescription result;
   result.includes_timestamps = options.include_timestamps;
   std::map<std::string, const OcelEvent*> events;

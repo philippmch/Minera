@@ -221,6 +221,11 @@ Ocel ocel(const Json& spec, bool labelled = false) {
     for (const auto& object : event.items[3].items)
       log.relations.push_back({event.items[0].text, object.text, ""});
   }
+  // The bank's labelled relations frame holds the label and kind columns
+  // too (pm4py's OC-DFG reads its selectors from that frame, round FD).
+  if (labelled)
+    log.table_columns.relations = std::vector<std::string>{"ocel:eid", "ocel:activity", "ocel:timestamp", "ocel:oid",
+                                                           "ocel:type", "ocel:qualifier", "label", "kind"};
   return log;
 }
 

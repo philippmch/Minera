@@ -17,6 +17,8 @@ bool canonical_relation_column(std::string_view key) {
 }
 
 void require_relation_column(const Ocel& log, std::string_view key) {
+  // Round FD: unless an earlier temporary column dropped it.
+  if (ocel_relation_column_dropped(log, key)) throw std::out_of_range("'" + std::string(key) + "'");
   // Canonical native roles stay available when a dataframe adapter has kept
   // its original literal role names in the descriptive schema.
   if (canonical_relation_column(key)) return;
@@ -167,7 +169,18 @@ Ocel filter_ocel_activity_type_matching_exact(
     propagation_pairs.emplace(type, std::vector<std::string>(activities.begin(), activities.end()));
   // Reuse the established stable relation-based six-table propagation. Its
   // predicate admits every already selected native relation and no new rows.
-  return filter_ocel_activity_type_matching(filtered, propagation_pairs);
+  auto result = filter_ocel_activity_type_matching(filtered, propagation_pairs);
+  // Round FD: the result's relations frame lacks the temporary column, a
+  // canonical one too (observed black-box): routes reading it then fail as
+  // the reference does (ocel_relation_column_dropped).
+  if (options.temporary_column && !result.table_columns.relations &&
+      canonical_relation_column(*options.temporary_column)) {
+    std::vector<std::string> columns;
+    for (const char* name : {"ocel:eid", "ocel:activity", "ocel:timestamp", "ocel:oid", "ocel:type", "ocel:qualifier"})
+      if (name != *options.temporary_column) columns.emplace_back(name);
+    result.table_columns.relations = std::move(columns);
+  }
+  return result;
 }
 
 }  // namespace minera

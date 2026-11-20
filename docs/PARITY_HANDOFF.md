@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FC (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–FD (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8040,6 +8040,83 @@ follows pm4py's reading. The full ctest passed 650 of 650 on the first run
 (29 minutes, -j2); the fixture replay gave 2,673 responses unchanged. FB's CI run 44787379225 finished green
 in all six jobs. The generators, the comparers and the probes are in the
 project files under `review-harness/round-fc/`.
+
+Round FD re-reviewed FC (Review FD1). FC's fixes matched on fresh banks
+(o81 from `fc/o3/o3gen.py` as JSON and SQLite, CSV q28, the typed-qualifier
+banks j92 and s91): type matching with typed keys and separators (atm2)
+gave only declared classes, and the statistics route's edge associations
+take no selectors. The new sweeps of the OC-DFG discovery's own selectors
+(`q/ocd.py`), the exact filters with None, NaT and NaN on full logs and
+after filters that keep nothing (`q/xe.py`), and the temporary column on
+each relations column through chains, writers and routes (`q/csw.py`
+SET=tmp, `q/crsw.py`) found three classes, and atm2 on s91 a fourth. Fixed: FD1-1, the OC-DFG
+discovery reads pm4py's frames for its selectors (the relations frame's
+six columns, a missing time as the activity a null label that the
+associations drop and the start and end activities skip, the edges label
+NaT, the activities list None or NaT), and with an events attribute
+column as the time column subtracts the frame's Python cells (two numbers
+0, other mixes raise with the type names, business hours raise on each
+side's replace()), the first pair measured coming from the type and then
+the edge whose first couple comes first in the traversal; FD1-2, the
+exact filters match None, NaT and NaN as isin does by the column's dtype
+(str: all three on missing cells; object: None on None, NaN on missing;
+float64: NaN; datetime64: NaT); FD1-3, activity_type_matching drops its
+temporary column from the result's relations frame, so the writers, the
+per-type filters, the statistics, the features, the split and a second
+type matching raise KeyError on it (the object type activities of a
+two-row frame give {'c': {'o'}}), and a log pm4py builds anew has its
+qualifier column again; FD1-4, read_ocel2_sqlite drops the event-object
+rows naming unlisted ids before it fills a NULL qualifier, so such a NULL
+leaves a REAL column float64. Declared: an edge's couples as a set (the first
+failing pair's hash-seed order), atm2's "nocol" reading of empty SQLite
+results, the exact filters after the CSV window that keeps nothing.
+Carried: SQLite NULL attribute cells are None in pm4py's object columns
+(native leaves the attribute out).
+
+In the suite: `minera_review_fd1_tests`. The full ctest ran 645 of 651 green on the first
+run (31 minutes, -j2); the six others held expectations from before FD1-1 to FD1-3 (a "NaT"
+text as NaT, the kept temporary column, the joined selectors) or met a degenerate relations
+frame the dropped-column check misread, and pass after the updates and the fix, with the 67
+OCEL, OC-DFG and review tests that touch the changed routes; the fixture replay gave 2,673
+responses unchanged. FC's CI
+run 44803654768 finished green in all six jobs. The generators, the comparers and the probes are
+in the project files under `review-harness/round-fd/`.
+
+Next round (FE) should start by re-reviewing round FD:
+
+- FD's CI run (FC's run 44803654768 finished green in all six jobs);
+- FD1-1 on the other routes that time pairs by an attribute column (the
+  edge metrics' performance, the OC-DFG of filter and chain results) and
+  with object types whose first couples tie on one event, and the null
+  activity label on other routes that take ocel:timestamp as a key (the
+  edge metrics, the event-object graph, the flattening);
+- FD1-2 on the other routes that pass values to isin or compare them (the
+  non-exact attribute filters, the object filters with levels, the
+  windows), and the carried SQLite item: pm4py's SQLite read has None where
+  a cell is NULL (object columns), native leaves the attribute out (xe on
+  o81's SQLite 106 of 2,187, the OC-DFG time cells), which touches the
+  transports, the writers and the fixtures;
+- FD1-3 after the other OCEL constructions (the sampling-free routes that
+  copy the frames: the flattening, the OC-DFG, the object graphs, the
+  downloads of chains of three steps) and with the temporary column on
+  attribute columns the relations frame does not hold;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FD's list, taken in FD: FC's CI, FC1-1 with the temporary column
+and the separator on typed relations columns (atm2 0 on j92, s91 and o81;
+the carried temporary-column item: FD1-3), FC1-2 on the other routes with
+selectors (the OC-DFG discovery's own: FD1-1; the statistics route takes
+none; repeated event id keys follow groupby first), FC1-3 on CSV object
+tables and chains (xe 0 on q28's object attribute filters; the chains in
+`q/csw.py` SET=chain on q28: only the declared hash-seed object order of
+the files without an objects file), FC1-4 on the other empty-frame
+comparisons (xe after the event, object type and activity filters that
+keep nothing: 0; the null matching is FD1-2). Carried to FE: EV1-1, the
+SQLite leftovers (now with NULL cells), the new Polars dtypes, DW1, the
+other declared items, the rest of the CU list and the open choices.
+
+Previous list for round FD (kept for its older items):
 
 Next round (FD) should start by re-reviewing round FC:
 

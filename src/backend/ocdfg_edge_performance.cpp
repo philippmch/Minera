@@ -1,5 +1,6 @@
 #include "minera/ocdfg_edge_performance.hpp"
 #include "business_hours.hpp"
+#include "ocel_frame_types.hpp"
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -26,6 +27,11 @@ std::vector<BusinessHourSlot> slots(const OcdfgBusinessHourSlots& value){
 std::int64_t wall_microseconds(const ParsedExactTimestamp& value){return value.seconds*1000000+static_cast<std::int64_t>(value.offset_minutes)*60000000+value.nanoseconds/1000;}
 double elapsed(const ParsedExactTimestamp& a,const ParsedExactTimestamp& b){return ocdfg_elapsed_seconds(a,b);}
 bool has_column(const Ocel& log,const std::string& key){
+ // Round FD: a frame column no kept row holds (OcelFrameHint: an OCEL CSV
+ // column of empty cells, a dropped row's column).
+ const auto& hint=log.event_frame_hint;
+ if(std::find(hint.columns.begin(),hint.columns.end(),key)!=hint.columns.end())return true;
+ for(const auto& column:hint.dropped)if(column.key==key)return true;
  if(log.table_columns.events)return std::find(log.table_columns.events->begin(),log.table_columns.events->end(),key)!=log.table_columns.events->end();
  if(key=="ocel:eid"||key=="ocel:activity"||key=="ocel:timestamp")return true;
  for(const auto& event:log.events)for(const auto& attribute:event.attributes)if(attribute.key==key)return true;
@@ -57,9 +63,101 @@ bool datetime_column(const Ocel& log,const OcelEvent& event,
         (field->second.find("date")!=std::string::npos||
          field->second.find("time")!=std::string::npos);
 }
+// Round FD: an events attribute column as the time column. The reference
+// subtracts and replace()s the frame's Python cells: in a datetime64 column
+// Timestamps (a missing cell NaT, as the canonical column), in any other
+// column the cells as they are (a date-read text a datetime.datetime, a
+// missing cell a float NaN, an explicit null None, numbers int, float or
+// bool by the column's dtype; a str column holds a null as NaN too): a pair
+// of two numbers measures 0, a pair of anything else but two datetimes
+// raises with the operands' type names (observed black-box). A repeated
+// identifier times by its first row's cell, null or not.
+struct TimeCell {
+ enum class Kind { kDate, kNaT, kStr, kInt, kFloat, kBool, kNone } kind = Kind::kNaT;
+ ParsedExactTimestamp date{};
+};
+const char* python_type(const TimeCell& cell){
+ switch(cell.kind){
+  case TimeCell::Kind::kDate:return "datetime.datetime";
+  case TimeCell::Kind::kStr:return "str";
+  case TimeCell::Kind::kInt:return "int";
+  case TimeCell::Kind::kBool:return "bool";
+  case TimeCell::Kind::kNone:return "NoneType";
+  default:return "float";
+ }
+}
+bool number(const TimeCell& cell){return cell.kind==TimeCell::Kind::kInt||cell.kind==TimeCell::Kind::kFloat||cell.kind==TimeCell::Kind::kBool;}
+TimeCell time_cell(const Ocel& log,const OcelEvent& event,const std::string& key,ocel_frame::Dtype dtype,bool str_column,bool csv){
+ using Kind=TimeCell::Kind;using ocel_frame::Dtype;
+ TimeCell cell;
+ if(csv){
+  for(const auto& attribute:event.attributes)
+   if(attribute.key==key&&!std::holds_alternative<std::nullptr_t>(attribute.value)){cell.kind=Kind::kStr;return cell;}
+  cell.kind=Kind::kFloat;return cell;
+ }
+ const OcelAttribute* found=nullptr;
+ for(const auto& attribute:event.attributes)if(attribute.key==key){found=&attribute;break;}
+ const bool dates=dtype==Dtype::kDatetime;
+ if(!found){cell.kind=dates?Kind::kNaT:Kind::kFloat;return cell;}
+ const auto& value=found->value;
+ if(std::holds_alternative<std::nullptr_t>(value)){cell.kind=dates?Kind::kNaT:dtype==Dtype::kFloat64||str_column?Kind::kFloat:Kind::kNone;return cell;}
+ if(const auto* text=std::get_if<std::string>(&value)){
+  if(ocel_frame::reference_date_value(log.event_type_attributes,event.activity,*found)){
+   if(const auto parsed=parse_timestamp_exact(*text)){cell.kind=Kind::kDate;cell.date=*parsed;return cell;}
+  }
+  cell.kind=Kind::kStr;return cell;
+ }
+ if(std::holds_alternative<bool>(value)){cell.kind=Kind::kBool;return cell;}
+ if(std::holds_alternative<std::int64_t>(value)){cell.kind=dtype==Dtype::kFloat64?Kind::kFloat:Kind::kInt;return cell;}
+ cell.kind=Kind::kFloat;return cell;
+}
+std::vector<double> attribute_performance(const Ocel& log,const std::vector<std::pair<std::string,std::string>>& couples,
+                                          const OcdfgEdgePerformanceOptions& options,const std::string& id_key,const std::string& time_key){
+ using Kind=TimeCell::Kind;
+ const auto frame=ocel_frame::event_frame(log,true);
+ const auto dtype=frame.dtype(time_key);
+ const auto* stats=frame.stats(time_key);
+ // An OCEL CSV read's columns are str ones (OcelFrameHint::str_columns).
+ const bool csv=log.event_frame_hint.str_columns;
+ const bool str_column=csv||(dtype==ocel_frame::Dtype::kObject&&stats&&stats->has_string&&!stats->has_bool&&!stats->has_int&&
+                       !stats->has_float&&!stats->has_date()&&!stats->has_none);
+ std::map<std::string,TimeCell> cells;
+ for(const auto& source:log.events){
+  const auto identifier=selected_string(source,id_key);
+  if(!identifier||cells.count(*identifier))continue;
+  cells.emplace(*identifier,time_cell(log,source,time_key,dtype,str_column,csv));
+ }
+ for(const auto& [from,to]:couples){if(!cells.count(from))missing(from);if(!cells.count(to))missing(to);}
+ // The pairs measure in the order given (see finish_ocdfg_edges).
+ std::optional<std::vector<BusinessHourSlot>> schedule;
+ std::vector<double> result;result.reserve(couples.size());
+ for(const auto& [from,to]:couples){
+  const TimeCell& a=cells.at(from);const TimeCell& b=cells.at(to);
+  if(options.business_hours){
+   for(const TimeCell* side:{&a,&b}){
+    if(side->kind==Kind::kStr)throw OcdfgPerformanceError("TypeError","str.replace() takes no keyword arguments");
+    if(side->kind!=Kind::kDate&&side->kind!=Kind::kNaT)throw OcdfgPerformanceError("AttributeError",std::string("'")+python_type(*side)+"' object has no attribute 'replace'");
+   }
+   if(a.kind==Kind::kNaT||b.kind==Kind::kNaT)throw OcdfgPerformanceError("ValueError","cannot convert float NaN to integer");
+   if(!schedule)schedule=slots(options.business_hour_slots);
+   result.push_back(detail::business_elapsed_seconds_microseconds(wall_microseconds(a.date),wall_microseconds(b.date),*schedule));
+   continue;
+  }
+  if((a.kind==Kind::kDate||a.kind==Kind::kNaT)&&(b.kind==Kind::kDate||b.kind==Kind::kNaT)){
+   if(a.kind==Kind::kNaT||b.kind==Kind::kNaT){result.push_back(0.0);continue;}
+   if(a.date.timezone_aware!=b.date.timezone_aware)throw OcdfgPerformanceError("TypeError","can't subtract offset-naive and offset-aware datetimes");
+   result.push_back(elapsed(a.date,b.date));continue;
+  }
+  if(number(a)&&number(b)){result.push_back(0.0);continue;}
+  throw OcdfgPerformanceError("TypeError",std::string("unsupported operand type(s) for -: '")+python_type(b)+"' and '"+python_type(a)+"'");
+ }
+ std::sort(result.begin(),result.end());return result;
+}
 } // namespace
 std::vector<double> calculate_ocdfg_edge_performance(const std::vector<OcdfgPerformanceEvent>& events,const std::vector<std::pair<std::string,std::string>>& couples,const OcdfgEdgePerformanceOptions& options){
- std::map<std::string,const OcdfgPerformanceTimestamp*> times;for(const auto& event:events)times[event.id]=&event.timestamp;
+ // Round FD: a repeated event identifier (an event id column whose values
+ // repeat) times by its first event, as the reference's groupby first().
+ std::map<std::string,const OcdfgPerformanceTimestamp*> times;for(const auto& event:events)times.try_emplace(event.id,&event.timestamp);
  // Empty aggregation entries don't enter calendar/slot processing.
  std::optional<std::vector<BusinessHourSlot>> schedule;
  std::vector<double> result;result.reserve(couples.size());
@@ -96,6 +194,8 @@ std::vector<double> calculate_ocdfg_edge_performance(const Ocel& log,const std::
   const auto kind=[&](const std::string& id){const auto found=kinds.find(id);if(found==kinds.end())missing(id);return found->second;};
   throw ocdfg_raw_pair_error(kind(couples.front().first),kind(couples.front().second),options.business_hours);
  }
+ if(time_key!="ocel:timestamp"&&time_key!="ocel:eid"&&time_key!="ocel:activity")
+  return attribute_performance(log,couples,options,id_key,time_key);
  std::vector<OcdfgPerformanceEvent> events;events.reserve(log.events.size());
  for(const auto& source:log.events){OcdfgPerformanceEvent event;event.id=source.id;
   const auto identifier=selected_string(source,id_key);

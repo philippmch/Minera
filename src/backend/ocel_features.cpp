@@ -1269,6 +1269,15 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       require_ocel_relation_column(log, "ocel:eid");
     }
   }
+  // Round FD: the objects' lifecycle families sort the relations by their
+  // time and group their activities (a temporary column may drop either).
+  if (variant == OcelFeatureVariant::kObjects && options.include_lifecycle_features.value_or(true) &&
+      (options.include_lifecycle_length_features.value_or(true) ||
+       options.include_lifecycle_unique_activity_features.value_or(true) ||
+       options.include_lifecycle_duration_features.value_or(true))) {
+    require_ocel_relation_column_kept(log, "ocel:timestamp");
+    require_ocel_relation_column_kept(log, "ocel:activity", true);
+  }
   // Round DT: the reference reads the objects frame's type (events) or id
   // (objects) first.
   require_ocel_object_column(log, variant == OcelFeatureVariant::kObjects ? "ocel:oid" : "ocel:type");

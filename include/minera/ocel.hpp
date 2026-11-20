@@ -493,8 +493,23 @@ void require_ocel_object_columns(const Ocel& log);
 // declare literal role names next to those).
 [[nodiscard]] bool ocel_relations_frame_degenerate(const Ocel& log);
 // Throws std::invalid_argument "KeyError: '<column>'" when the relations frame
-// is degenerate and lacks `column`.
+// is degenerate (or dropped it, see below) and lacks `column`.
 void require_ocel_relation_column(const Ocel& log, std::string_view column);
+// Round FD: whether a relations frame declared with canonical columns alone
+// lacks the canonical `column` (activity_type_matching's temporary column
+// drops it); require_ocel_relation_column then throws too, and
+// require_ocel_relation_column_found throws "KeyError: 'Column not found:
+// <column>'" (a groupby selection) for it or a degenerate frame's.
+[[nodiscard]] bool ocel_relation_column_dropped(const Ocel& log, std::string_view column);
+void require_ocel_relation_column_found(const Ocel& log, std::string_view column);
+// Round FD: throws "KeyError: '<column>'" ("KeyError: 'Column not found:
+// <column>'" for a groupby selection) only for a dropped column (routes
+// whose degenerate-frame behavior stays as observed).
+void require_ocel_relation_column_kept(const Ocel& log, std::string_view column, bool groupby = false);
+// Round FD: a log the reference builds anew (an OCEL object a filter or an
+// enrichment returns) has a qualifier column again (None in every row; ''
+// natively): drops the qualifier's mark (see ocel_relation_column_dropped).
+void restore_ocel_relation_qualifier(Ocel& log);
 // An events frame declared without any column (an empty playout).
 [[nodiscard]] bool ocel_events_frame_columnless(const Ocel& log);
 // Throws std::invalid_argument "KeyError: '<column>'" for such a frame.

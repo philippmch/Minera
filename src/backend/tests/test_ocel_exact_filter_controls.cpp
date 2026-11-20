@@ -114,10 +114,13 @@ void typed_nat_native_controls(){
   const auto ordinary=checked("ordinary",[&]{return parse_ocel_event_filter_values_json(R"([{"type":"null"},{"type":"decimal","value":"NaN"}])");});
   assert(filter_ocel_event_attribute_exact(source,"ocel:timestamp",nat).events.at(0).id=="e1");
   assert(filter_ocel_event_attribute_exact(source,"ocel:timestamp",ordinary).events.empty());
-  assert(filter_ocel_object_attribute_exact(source,"when",nat).objects.at(0).id=="o1");
+  // Round FD: an object attribute's "NaT" text is a str cell of the
+  // reference's object column (read_ocel2_json keeps it), which NaT does
+  // not match (review FD1-2; the canonical time column above is datetime64).
+  assert(filter_ocel_object_attribute_exact(source,"when",nat).objects.empty());
   assert(filter_ocel_object_attribute_exact(source,"when",ordinary).objects.empty());
   assert(filter_ocel_object_attribute_exact(source,"when",nat,true,OcelEventAttributeColumnKind::kScalar).objects.empty());
-  assert(filter_ocel_object_attribute_exact(source,"when",nat,false).objects.at(0).id=="o2");
+  assert(filter_ocel_object_attribute_exact(source,"when",nat,false).objects.size()==2);
 }
 void matching_json_controls(){
   const auto allowed=parse_ocel_exact_activity_type_correspondence_json(R"({"":[]," A,B:C;D|E ":[""," A,B:C;D|E ","","\u0000"],"constructor":["toString"]})");
@@ -187,6 +190,8 @@ void actual_http_matching_controls(){
   check({{"allowed_json",R"({"":["A,|&=+","A,|&=+"],"U":[]})"}},expected);
   check({{"allowed_json",R"({"":["A,|&=+"]})"},{"activity_key","ocel:activity"},{"object_type_key","ocel:type"},{"temporary_separator",""},{"temporary_column",""}},expected);
   auto cleared=expected;for(auto& relation:cleared.relations)relation.qualifier.clear();
+  // Round FD: the temporary column drops its relations column (review FD1-3).
+  cleared.table_columns.relations={"ocel:eid","ocel:activity","ocel:timestamp","ocel:oid","ocel:type"};
   check({{"allowed_json",R"({"":["A,|&=+"]})"},{"temporary_column","ocel:qualifier"}},cleared);
   auto empty=expected;empty.events.clear();empty.objects.clear();empty.relations.clear();empty.o2o.clear();empty.e2e.clear();
   empty.event_frame_hint.dropped_rows=2;empty.object_frame_hint.dropped_rows=3;  // round EZ: every row dropped
