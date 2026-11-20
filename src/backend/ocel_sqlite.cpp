@@ -470,9 +470,12 @@ void read_attributes(sqlite3* db, std::string_view table,
 struct TableColumn {
   std::string name;
   std::string declared_type;
+  std::string file_name;  // the name in the file (name may be the reference's renamed one)
 };
 
-std::vector<TableColumn> table_columns(sqlite3* db, std::string_view table) {
+// field_alias: no object table read has an "ocel_changed_field" column but
+// one has "ocel:field" (computed where the reader reads the object tables).
+std::vector<TableColumn> table_columns(sqlite3* db, std::string_view table, bool field_alias = false) {
   std::vector<TableColumn> result;
   if (!table_exists(db, table)) return result;
   Statement statement(db, "PRAGMA table_info(" + quote_identifier(table) + ")");
@@ -481,8 +484,8 @@ std::vector<TableColumn> table_columns(sqlite3* db, std::string_view table) {
     if (status == SQLITE_DONE) break;
     if (status != SQLITE_ROW)
       throw std::runtime_error("SQLite table-info query failed");
-    result.push_back({column_string(statement.get(), 1),
-                      column_string(statement.get(), 2)});
+    auto name = column_string(statement.get(), 1);
+    result.push_back({name, column_string(statement.get(), 2), name});
   }
   // Round ER: the reference renames a type table's columns (ocel_id to
   // ocel:eid or ocel:oid, ocel_time to ocel:timestamp) before it looks them
@@ -496,9 +499,16 @@ std::vector<TableColumn> table_columns(sqlite3* db, std::string_view table) {
       return std::any_of(result.begin(), result.end(), [&](const TableColumn& column) { return column.name == name; });
     };
     const bool id = present("ocel_id"), time = present("ocel_time");
+    // Round ET: the reference renames ocel_changed_field to "ocel:field"
+    // after concatenating the object tables, so when none of them has an
+    // ocel_changed_field column an "ocel:field" column is their changed
+    // field (observed black-box, probe et t1; next to one in any table the
+    // split raises, see repeated_time_fault's caller).
+    const bool changed = present("ocel_changed_field");
     for (auto& column : result) {
       if (!id && column.name == (events ? "ocel:eid" : "ocel:oid")) column.name = "ocel_id";
       else if (!time && column.name == "ocel:timestamp") column.name = "ocel_time";
+      else if (objects && field_alias && !changed && column.name == "ocel:field") column.name = "ocel_changed_field";
     }
   }
   return result;
@@ -616,8 +626,8 @@ enum class TypeTableBase { kEvents, kNullChangedField, kFirstRow };
 
 class TypeTableRows {
  public:
-  TypeTableRows(sqlite3* db, std::string_view table, TypeTableBase base) {
-    const auto columns = table_columns(db, table);
+  TypeTableRows(sqlite3* db, std::string_view table, TypeTableBase base, bool field_alias = false) {
+    const auto columns = table_columns(db, table, field_alias);
     if (columns.empty()) return;
     exists_ = true;
     for (const auto& column : columns) column_names_.push_back(column.name);
@@ -818,21 +828,22 @@ class TypeTableRows {
 
 // True when some object type table has a row without a changed field (a
 // table without that column counts: every row of it lacks one).
-bool object_tables_have_base_rows(sqlite3* db, const std::vector<std::string>& tables) {
+bool object_tables_have_base_rows(sqlite3* db, const std::vector<std::string>& tables, bool field_alias) {
   for (const auto& table : tables) {
-    const auto columns = table_columns(db, table);
+    const auto columns = table_columns(db, table, field_alias);
     if (columns.empty()) continue;
-    if (std::none_of(columns.begin(), columns.end(), [](const auto& column) {
-          return column.name == "ocel_changed_field";
-        })) {
+    const auto changed = std::find_if(columns.begin(), columns.end(), [](const auto& column) {
+      return column.name == "ocel_changed_field";
+    });
+    if (changed == columns.end()) {
       Statement any(db, "SELECT 1 FROM " + quote_identifier(table) + " LIMIT 1");
       const auto status = sqlite3_step(any.get());
       if (status == SQLITE_ROW) return true;
       if (status != SQLITE_DONE) throw std::runtime_error("SQLite object base-row query failed");
       continue;
     }
-    Statement base(db, "SELECT 1 FROM " + quote_identifier(table) +
-                           " WHERE ocel_changed_field IS NULL LIMIT 1");
+    Statement base(db, "SELECT 1 FROM " + quote_identifier(table) + " WHERE " +
+                           quote_identifier(changed->file_name) + " IS NULL LIMIT 1");
     const auto status = sqlite3_step(base.get());
     if (status == SQLITE_ROW) return true;
     if (status != SQLITE_DONE) throw std::runtime_error("SQLite object base-row query failed");
@@ -855,8 +866,8 @@ void read_type_table_changes(sqlite3* db, std::string_view table,
                              std::vector<OcelSqliteTime>& times,
                              std::vector<OcelSqliteTimeColumn>& table_columns_read,
                              std::unordered_map<std::string, std::int64_t>& id_rows,
-                             bool& timed, bool& untimed_changes) {
-  const auto columns = table_columns(db, table);
+                             bool& timed, bool& untimed_changes, bool field_alias) {
+  const auto columns = table_columns(db, table, field_alias);
   const auto changed = std::find_if(
       columns.begin(), columns.end(), [](const auto& column) {
         return column.name == "ocel_changed_field";
@@ -1798,14 +1809,30 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   // object without such a row is not read.
   std::vector<std::string> object_tables;
   for (const auto& type : object_type_names) object_tables.push_back(object_table(type));
-  const bool has_base_rows = object_tables_have_base_rows(db, object_tables);
+  // Round ET: an "ocel:field" column is the object tables' changed field
+  // when none of them has an ocel_changed_field column (table_columns), so
+  // it is no attribute either.
+  bool field_alias = false;
+  {
+    bool field = false, changed_field = false;
+    for (const auto& table : object_tables)
+      for (const auto& column : table_columns(db, table)) {
+        field = field || column.name == "ocel:field";
+        changed_field = changed_field || column.name == "ocel_changed_field";
+      }
+    field_alias = field && !changed_field;
+    if (field_alias)
+      for (auto& [type, schema] : log.object_type_attributes) schema.erase("ocel:field");
+  }
+  const bool has_base_rows = object_tables_have_base_rows(db, object_tables, field_alias);
   {
     std::unordered_set<std::string> read;
     for (const auto& type : object_type_names) {
       const auto table = object_table(type);
       const TypeTableRows rows(db, table,
                                has_base_rows ? TypeTableBase::kNullChangedField
-                                             : TypeTableBase::kFirstRow);
+                                             : TypeTableBase::kFirstRow,
+                               field_alias);
       if (!rows.exists())
         throw std::invalid_argument("OCEL SQLite object type table is missing: " + table);
       for (const auto& cells : rows.extra_rows()) extra_object_rows.push_back({type, cells});
@@ -1954,7 +1981,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         read_type_table_changes(db, table, type, log, object_ids,
                                 options.validate_references.value_or(false), has_base_rows,
                                 first_rows, type_rank, places, change_times, change_columns, id_rows,
-                                timed, untimed_changes);
+                                timed, untimed_changes, field_alias);
       }
       ++type_rank;
     }

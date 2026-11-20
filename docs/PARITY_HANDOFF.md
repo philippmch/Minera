@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–ES (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–ET (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7723,6 +7723,72 @@ The full ctest passed 640 of 640 on the first run (35 min at -j2), the
 fixture replay gave 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-es/`.
+
+Round ET re-reviewed ES (Review ET1). ES's CI run 44659629135 on 95a3c65a:
+six jobs green, the Linux, macOS and Windows ctest included. ET ran a fresh
+OCEL 2.0 bank with object attributes renamed to hard or reserved-looking
+names next to change rows of every kind (`et/g/o2rh.py`, h65: JSON and
+pm4py's XML and SQLite files), the OCEL 2.0 XML copies of a bank renamed
+like the frames' columns (r64), CSV banks with columns dropped, repeated,
+mangled, added and renamed in both files (`et/csv/cxgen.py`, cx902, cx903)
+and with reserved columns (rx902, rx903), and a fresh structural SQLite
+fuzz with repeated labels and broken relation tables next to the other
+faults (`et/sq/hb4.py`, f87 and f88), all through every sweep:
+- read_ocel2_sqlite renames `ocel_changed_field` to `ocel:field` after
+  concatenating the object tables, so a literal `ocel:field` column is
+  their changed field when no object table has `ocel_changed_field`
+  (ET1-1);
+- write_ocel2_json leaves out changes without a value before its NaT check
+  (ET1-2);
+- write_ocel_xml lists an object related twice to an event twice (ET1-3).
+The hard names (ES1-5), the repeated labels (ES1-6), the O2O qualifier
+(ES1-7) and the CSV checks (ES1-3, ES1-4) matched; OCEL 2.0 JSON times
+with offsets of a day or more read as pm4py reads them (the carried
+day-offset item, closed for JSON). After the fixes every bank differs only
+in declared classes and the comparer's spelling. Declared, new: an object
+attribute named `ocel:field` with changes in an OCEL 2.0 JSON file
+(pm4py's change field becomes the value). Harness fix: rsw3 and fsw built
+an event's relations as the cross product of `ocel:omap` and
+`ocel:typedOmap`, counting an object related twice four times; they read
+`ocel:typedOmap` now. rsw3, esw, fsw and fsw2 stopped at the first
+reference frame their specs could not read (cx902 lost most of its rsw3,
+esw and fsw in the first pass); such a file is one `SPECS` line now.
+Pick bank files by a strict glob (`h65/h6403_????.json`): the sweeps leave
+`FILE.t.json.norm.json` files that `h65/h*.json` picks up.
+
+In the suite: `minera_review_et1_tests` (hand cases of ET1-1 to ET1-3).
+The full ctest passed 641 of 641 on the first run (40 min at -j2, next to
+the reruns), the fixture replay gave 2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-et/`.
+
+Next round (EU) should start by re-reviewing round ET:
+
+- ET's CI run;
+- the `ocel:field` alias (ET1-1) in a structural fuzz that renames or adds
+  `ocel:field`, `ocel_changed_field` and the time columns across several
+  object tables (with and without change rows, with and without a time
+  column in each table), through rsw3, esw and xsw;
+- NaN-valued and NaT changes (ET1-2) through every OCEL 2.0 download
+  (JSON, XML, SQLite) and the classic ones, on SQLite inputs with change
+  rows whose value or field is missing;
+- relations repeated with other qualifiers (ET1-3) through the CSV and
+  OCEL 2.0 downloads and the filters (fsw, fsw2), and in the classic XML
+  of JSON and CSV inputs;
+- the XML day offsets (JSON closed in ET) and the declared `ocel:field`
+  changes if a cheap model appears;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round ET's list, taken in ET: ES's CI, the SQLite writer's hard names on
+JSON, XML and CSV inputs (h65, r64), the repeated labels and the O2O
+qualifier in a fresh fuzz (f87, f88), the CSV reader's checks on mutated
+CSV banks (cx902, cx903, rx902, rx903), the JSON day offsets. EE1-3's
+overrides stay declared (no cheap model). Carried to EU: the XML day
+offsets, the SQLite leftovers, the new Polars dtypes, DW1, the other
+declared items, the rest of the CU list and the open choices.
+
+Previous list for round ET (kept for its older items):
 
 Next round (ET) should start by re-reviewing round ES:
 

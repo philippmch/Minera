@@ -1547,11 +1547,12 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
         }
       }
       const auto& rows = rows_of(relations, event.id);
-      std::unordered_set<std::string_view> listed;
+      // Round ET: one element per relation row, an object related twice
+      // (two qualifiers) listed twice (observed black-box, fuzz files
+      // h88_0018, h88_0183: read_ocel2_sqlite keeps both rows).
       write_list("omap", [&] {
         for (const auto* relation : rows)
-          if (listed.insert(relation->object_id).second)
-            out << "        <string key=\"object-id\" value=\"" << esc(relation->object_id) << "\"/>\n";
+          out << "        <string key=\"object-id\" value=\"" << esc(relation->object_id) << "\"/>\n";
       }, rows.empty());
       // Round EK: in the frame's column order (observed black-box).
       write_list("vmap", [&] {

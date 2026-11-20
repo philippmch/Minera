@@ -34175,3 +34175,128 @@ Tests:
 
 The full ctest passed 640 of 640 on the first run (35 min at -j2); the
 fixture replay gave 2,673 responses unchanged.
+
+## Review ET1: re-review of round ES, the SQLite reader's "ocel:field" column, NaN-valued changes in the JSON writer, an object related twice in the classic XML download (2026-11-20)
+
+Round ET checked ES's CI (run 44659629135 on 95a3c65a: six jobs green,
+the Linux, macOS and Windows ctest included). Observed black-box on pm4py
+2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv, on a fresh OCEL
+2.0 bank whose object attributes are renamed to hard or reserved-looking
+names (`ocel_time`, `ocel_changed_field`, `ocel_id`, `ocel:field`,
+`ocel:timestamp`, `@@cumcount`, `ocel:activity`, ...), preferring
+attributes with change rows and adding change rows of every kind of value,
+with some event attributes renamed too (`et/g/o2rh.py`, h65: 150 JSON
+logs from o2gen.py's b65, pm4py's OCEL 2.0 XML of 133 and SQLite of
+87 of them); on the OCEL 2.0 XML copies of a bank renamed like the
+frames' columns (`es/g/o2rx.py` on b64, r64: 120 files); on two CSV banks
+whose columns are mutated in both files (a required column dropped, a
+header repeated so pandas mangles it, a mangled name that exists already,
+a reserved-looking column added, a header in another case, an objects file
+emptied to its header: `et/csv/cxgen.py` on q2gen's base902 and base903,
+cx902 and cx903 of 80 and 100) and two with reserved columns
+(`es/csv/rxgen.py`, rx902 and rx903 of 80 and 100), all through imports,
+rsw3, esw, xsw, osw, dsw and fsw (`es/runS.sh`); on a fresh structural
+SQLite fuzz with hb3's mutations and ET's (a type table holding its id or
+time column under both names, an object table's `ocel:field`, relation
+tables with a column dropped, renamed or nulled, or rows naming unknown
+ids: `et/sq/hb4.py`, f87 and f88 of 300 each) through every sweep; and on
+the probes `et/hc/t1` to `t6`.
+
+- **ET1-1 An "ocel:field" column in read_ocel2_sqlite.** The reader
+  renames the object tables' `ocel_changed_field` to `ocel:field` after
+  concatenating them, so when no object table has an
+  `ocel_changed_field` column an `ocel:field` column is their changed
+  field: a row with a value there is a change of that field (its object is
+  not read from it, so an object whose only row has one is not listed and
+  its relations are dropped), the column is no attribute, and change rows
+  without a time column in any object table raise KeyError
+  'ocel:timestamp' (a time column under either name, `ocel_time` or
+  `ocel:timestamp`, times them). Next to an `ocel_changed_field` column in
+  any object table it is ES1-6's repeated label. Native read the column as
+  an attribute (probe `t1`: f3, f7, f8; bank h65's h6403_0004).
+- **ET1-2 NaN-valued changes in write_ocel2_json.** The writer leaves out
+  a change whose value is missing (NaN, or a field without a column in the
+  objects frame) before it converts the change times, so a NaT time of
+  such a change does not raise KeyError 'ocel:timestamp' (EJ's NaT
+  check); a NaT change with a value still does. Native raised on every NaT
+  change (probe `t4` nat.py: v1, v2, v5; fuzz file h87_0028).
+- **ET1-3 An object related twice in the classic XML download.**
+  write_ocel_xml writes one `object-id` element per relation row, so an
+  object related to an event twice (two qualifiers, which
+  read_ocel2_sqlite keeps as two rows) is listed twice in the event's
+  omap, in the relations frame's order, as the classic JSON download
+  lists it (which matched already). Native's XML writer listed it once.
+  Fuzz files h88_0018 and h88_0183, probe `t5`.
+
+Checked and matching (no change): the SQLite writer's hard names (ES1-5)
+on the JSON, XML and CSV banks (every pm4py writer fault in h65's modes
+is native's, in its order); the repeated labels (ES1-6) and the O2O
+qualifier (ES1-7) in the f87/f88 fuzz (every import fault in pm4py's
+order; the differences are the comparer's spelling of the error type);
+the CSV reader's checks (ES1-3, ES1-4) on cx902/cx903 and rx902/rx903;
+OCEL 2.0 JSON event and attribute times with offsets of a day or more
+(`+24:00`, `+25:00`, `-24:00`, `+99:00`, `+2400`, `+24`, `-25:30`; probe
+`t3`), so the carried day-offset item is closed for JSON.
+
+After the fixes, on the final server: h65's JSON logs: imports 0 of
+150; rsw3 1,194 of 5,850, esw 400 of 2,400, xsw 325 of 1,950, osw 136 of
+900, dsw 151 of 1,050, fsw 355 of 1,922, all in declared classes (a change
+of `ocel:timestamp`, the new `ocel:field` changes below, EE1-3's
+overrides, EK1's fractions with 3 per file in rsw3, the CSV type columns'
+set order in osw). h65's SQLite files: imports 19 of 87 (the comparer's
+spelling), every sweep 0 (2,574 rsw3, 1,056 esw, 858 xsw, 396 osw, 462 dsw,
+826 fsw; before ET1-1 xsw 13, osw 6, dsw 7). h65's XML files: imports 0 of
+133; rsw3 405 of 4,875, esw 96 of 2,000, xsw 78 of 1,625, osw 34 of 750,
+dsw 40 of 875, fsw 78 of 1,606, and r64: imports 0 of 120, rsw3 211 of
+4,680, esw 16, xsw 13, osw 5, dsw 6, fsw 15, all a change of
+`ocel:timestamp`, EE1-3's overrides or EK1's fractions. The fuzz banks:
+imports 74 and 73 of 300 (the comparer's spelling), f87 rsw3 56 of 4,602,
+esw 27 of 1,888, xsw 11 of 1,534, osw 14 of 708, dsw 24 of 826, fsw 22 of
+1,476, f88 rsw3 42 of 5,304, esw 16 of 2,176, xsw 9 of 1,768, osw 12 of
+816, dsw 20 of 952 (23 before ET1-3), fsw 19 of 1,752, all in five files of
+each bank with declared mutations (numeric event times, EB2-1; object
+tables without a changed-field column, EK1; extra object_object columns).
+The CSV banks: imports rx902 26 of 80 (ten duplicate event ids, the rest
+the comparer's spelling), rx903 15 of 100 (spelling), cx902 31 of 80 and
+cx903 16 of 100 (declared: an id under several type columns, objects files
+without a type column or without an id column and rows, duplicate event
+ids, trimmed headers); rx902's sweeps (rsw3 307 of 2,106, esw 198 of 864,
+xsw 164 of 702, osw 85 of 324, dsw 128 of 378, fsw 197 of 728) all in base
+files with object rows without id or type; rx903 rsw3 0 of 3,315, esw 1
+of 1,360 and xsw 6 of 1,105 (EP1-5's type name), osw 0 of 510, dsw 0 of
+595, fsw 0 of 1,144; cx902 (rsw3 345 of 1,521, esw 191 of 624, xsw 265 of
+611, osw 141 of 282, dsw 190 of 329, fsw 192 of 514) and cx903 (rsw3 63 of
+2,535, esw 39 of 1,040, xsw 27 of 845, osw 18 of 390, dsw 21 of 455, fsw 31
+of 836) only in declared classes (object rows without id or type, trimmed
+fields, repeated type columns, objects files emptied to the header,
+duplicate event ids, NA spellings, EP1-5's type name). Harness fixes:
+rsw3 and fsw built an event's relations as the cross product of
+`ocel:omap` and `ocel:typedOmap` (an object related twice counted four
+times; they read `ocel:typedOmap` now), and the sweeps stopped at the
+first reference frame their specs could not read (cx902's c902_0008, an
+objects file whose type header ends in a blank; one `SPECS` line now).
+
+Declared (outside the model), new:
+- an object attribute named `ocel:field` with changes in an OCEL 2.0 JSON
+  file: pm4py's change row puts the value in its own field column, so the
+  change's field becomes its value (a number, a boolean, or a Timestamp for
+  an ISO text); native keeps the field's name (h65: eleven to thirteen
+  files in each sweep).
+As before: EE1-3's overrides, a change of `ocel:timestamp`, EK1's
+fractions of datetime64 cells in the JSON and XML downloads (3 per file in
+rsw3), CSV field trimming, duplicate CSV event ids, object rows without id
+or type, objects named but not listed (an objects file emptied to its
+header among them), an object id under several type columns (pandas'
+mangled `ocel:type:X.1`), objects CSV files without a type column or
+without an id column and rows, NA spellings in CSV attribute cells (kept
+as text: cx903's c903_0027 through the filters), numeric SQLite event times
+(EB2-1), extra or reordered object_object columns, object tables without
+a changed-field column (EK1), which type OCPN discovery names in EP1-5's
+KeyError (rx903's q903_0046 and q903_0063, cx903's c903_0046).
+
+Tests:
+- New: `minera_review_et1_tests` (hand cases of ET1-1 to ET1-3; the pm4py
+  side computed with `et/hc/t2/et1ref.py` and `et/hc/t5/om.py`).
+
+The full ctest passed 641 of 641 on the first run (40 min at -j2, next to
+the reruns); the fixture replay gave 2,673 responses unchanged.

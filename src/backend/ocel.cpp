@@ -4283,12 +4283,16 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
             (event->raw_time == OcelRawTime::kNone && ocel_frame::nat_time_text(event->timestamp)))
           throw std::invalid_argument("KeyError: 'ocel:timestamp'");
     // Round EJ: and on a NaT change time (an OCEL 2.0 JSON change without a
-    // time; observed black-box).
+    // time; observed black-box). Round ET: only of a change it writes, so
+    // not of one whose value is missing (NaN, or a field without a column;
+    // observed black-box, probe et t4 nat.py, fuzz file h87_0028).
     if (!transport_markers)
-      for (const auto& change : log.object_changes)
+      for (const auto& change : log.object_changes) {
+        if (std::holds_alternative<std::nullptr_t>(change.value)) continue;
         if (ocel_raw_time_missing(change.raw_time) ||
             (change.raw_time == OcelRawTime::kNone && nat_change_time(change.timestamp)))
           throw std::invalid_argument("KeyError: 'ocel:timestamp'");
+      }
     StandardTypeTable object_types;
     StandardTypeTable event_types;
     collect_standard_types(log, object_types, event_types, transport_markers);
