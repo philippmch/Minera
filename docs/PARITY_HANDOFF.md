@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EW (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–EX (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7849,6 +7849,62 @@ the fixture replay gave 2,673 responses unchanged. EU's CI run 44685379415 finis
 green in all six jobs; EV's run 44690434272 had four jobs green and both
 ctest jobs running at EW's push. The generators, the comparers and the
 probes are in the project files under `review-harness/round-ew/`.
+
+Round EX fixed EW1's declared JSON item (Review EX1): number, bool and
+null qualifiers in OCEL 2.0 and classic JSON inputs. Both JSON readers type
+the relation and O2O qualifiers as pandas types read_ocel2_json's and
+read_ocel_json's record frames (int64, float64 with missing qualifiers as
+'', bool, object), on the rows those frames are built from (dropped events
+and objects, dangling links and unrelated objects' links count; replaced
+relations, relations to unlisted objects and typedOmap entries outside the
+omap do not). A bool kind joins int and float: the JSON writers and the
+event-object graph print bools, write_ocel2_xml raises lxml's TypeError on
+an O2O bool, the SQLite writer declares a bool-only column INTEGER. EW's
+gaps: the OCEL 2.0 transport now carries `"minera:typedQualifiers": true`
+(the routes refused an SQLite import with number qualifiers), and the
+frontend's graph validator accepts number and bool qualifiers. The
+activity-type matching raises pm4py's UFuncTypeError or TypeError with a
+typed qualifier column as a key. Checked on hand files (`ex/p/`), three
+fuzz banks (`ex/q/jqgen.py`: j1 of 150 OCEL 2.0 JSON files from b65, k1 of
+120 classic from b64, k2 of 150 classic from b65 with dates declared as
+strings) with `ex/q/wcmpj.py` (four writers: 0 differences) and through
+every sweep (only declared classes). Declared: list, dict, big int and
+infinite qualifiers (native refuses them), an object column whose kept rows
+share a kind in the matching.
+
+In the suite: `minera_review_ex1_tests`; EE1's bank holds pm4py's reading
+of its two classic files with a number qualifier (the old refusal before).
+The full ctest passed 644 of 644 (643 on the first run, that bank), the
+fixture replay gave 2,673 responses unchanged. EW's CI run 44697743625
+finished green in all six jobs. The
+generators, the comparers and the probes are in the project files under
+`review-harness/round-ex/`.
+
+Next round (EY) should start by re-reviewing round EX:
+
+- EX's CI run;
+- EX1-1 on fresh JSON qualifier banks (other seeds and source logs, the
+  JSON downloads read back by pm4py, the typed transport through the
+  filters and enrichments, the frontend's graph panel on such a log);
+- an empty-table dtype hint: an emptied relation or O2O table keeps the
+  read column's dtype in pm4py's SQLite writer (INTEGER or REAL, declared
+  since EW1), so the transport could carry the column's kind when no row
+  is left;
+- the classic date catalog (native reads declared date attributes of a
+  classic JSON file as dates): a transport marker might keep them as
+  texts, as typedQualifiers does for qualifiers;
+- EV1-1 if a cheap model appears (a day-offset reading in the route
+  parsers only for texts the XML reader kept);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round EX's list, taken in EX: EW's CI, typed qualifiers from the JSON
+readers (both formats, the bool kind, the writers, the graph), EW1-1 on a
+fresh SQLite bank (s103). Carried to EY: EV1-1, the SQLite leftovers, the
+new Polars dtypes, DW1, the other declared items, the rest of the CU list
+and the open choices.
+
+Previous list for round EX (kept for its older items):
 
 Next round (EX) should start by re-reviewing round EW:
 

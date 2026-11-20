@@ -101,7 +101,8 @@ struct OcelGraphEdge {
   std::string type;
   std::string qualifier;
   std::string object;
-  // Round EW: an int or float qualifier prints as a number.
+  // Round EW: an int or float qualifier prints as a number; round EX: a
+  // bool one as a bool.
   OcelQualifierKind qualifier_kind = OcelQualifierKind::kStr;
 };
 

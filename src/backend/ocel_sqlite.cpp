@@ -157,7 +157,9 @@ const char* qualifier_column_type(const std::vector<Relation>& rows) {
   if (kind == OcelQualifierKind::kStr) return "TEXT";
   for (const auto& row : rows)
     if (row.qualifier_kind != kind) return "TEXT";
-  return kind == OcelQualifierKind::kInt ? "INTEGER" : "REAL";
+  // Round EX: bools only (read_ocel2_json, read_ocel_json) are INTEGER too
+  // (probe ex p/wj.py, wj2.py).
+  return kind == OcelQualifierKind::kFloat ? "REAL" : "INTEGER";
 }
 
 void step_done(sqlite3* db, sqlite3_stmt* statement) {
@@ -172,6 +174,12 @@ void step_done(sqlite3* db, sqlite3_stmt* statement) {
 
 void bind_qualifier(sqlite3_stmt* statement, int index, const std::string& text,
                     OcelQualifierKind kind, std::string_view column) {
+  // Round EX: a bool binds as the integer 1 or 0, which a TEXT column
+  // stores as '1' or '0' (observed black-box, probe ex p/wj.py).
+  if (kind == OcelQualifierKind::kBool) {
+    if (column == "INTEGER") return bind_integer(statement, index, text == "True" ? 1 : 0);
+    return bind_text(statement, index, text == "True" ? "1" : "0");
+  }
   if (column == "INTEGER" && kind == OcelQualifierKind::kInt) {
     errno = 0;
     char* end = nullptr;

@@ -34593,10 +34593,127 @@ Declared:
   qualifier`; `qualifier 2 is no str, which a native OCEL cannot hold`, as
   declared since EE), so a native download with number qualifiers reads
   back only through the SQLite reader or the transport. Target of the next
-  round (probe `ew/q/jq.py`).
+  round (probe `ew/q/jq.py`). Fixed in round EX (EX1-1).
 
 In the suite: `minera_review_ew1_tests` (the reader's typing on the hand
 logs, the JSON writers, write_ocel2_xml's TypeError and its event text, the
 SQLite writer's columns). The full ctest passed 643 of 643 and the
 fixture replay gave 2,673 responses unchanged. Harness:
 `review-harness/round-ew/` in the project files (README).
+
+## Review EX1: number, bool and null qualifiers in OCEL JSON inputs, typed qualifiers in the OCEL 2.0 transport (2026-11-20)
+
+Round EX checked EW's CI (run 44697743625 on d2ca3c93: all six jobs green,
+the Windows ctest last). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv
+with EW's probe `ew/q/jq.py`, hand-made OCEL 2.0 and classic JSON files
+(`ex/p/p1.py` to `p5c.py`: ints, floats, ints next to floats, nulls or
+missing qualifiers, bools, bools next to nulls, numbers or texts, NaN,
+lists, dicts, ints past 64 bits, infinities, and the rows a frame is built
+from: replaced relations, relations and links to unlisted objects, events
+and objects the reader drops, unrelated objects' links, typedOmap entries
+left out or naming objects outside the omap), their writes through every
+writer (`ex/p/wj.py`, `wj2.py`), the activity-type matching with the
+qualifier column as a key (`ex/p/atm.py`, `atm2.py`), and three fuzz banks
+(`ex/q/jqgen.py`: j1 of 150 OCEL 2.0 JSON files from b65, k1 of 120 classic
+JSON files from b64, k2 of 150 classic ones from b65 with their date
+attributes declared as strings), whose qualifiers are redrawn per frame
+from a style (ints, floats, ints next to nulls, bools, bools next to nulls
+or numbers, a mix, texts with one number, nulls only, NaN) next to rows
+that count for a frame's dtype and then drop, compared by `ex/q/wcmpj.py`
+(each writer's qualifiers with their JSON or Python types, the OCEL 2.0 XML
+outcome, the SQLite qualifier columns' declarations and storage classes)
+and through every sweep.
+
+Fixed:
+- **EX1-1 Number, bool and null qualifiers in OCEL JSON inputs (EW1,
+  declared).** read_ocel2_json and read_ocel_json keep a JSON number or
+  bool qualifier as the Python value and build the relations and O2O
+  frames from records, so a qualifier column's dtype comes from every row
+  the frame is built from: ints only give an int64 column; a float, or a
+  missing qualifier next to ints, a float64 one (an int prints as a float:
+  `2` is `2.0`); bools only a bool column, a bool next to a missing one
+  too; any other mix an object column that keeps each value. A missing
+  qualifier (a null or NaN, an omap entry without a typedOmap qualifier)
+  then reads as `''`. The rows that count: the O2O frame holds every link
+  of each object's last listing (dangling links and links of objects the
+  reader then drops, such as unrelated ones, included); the OCEL 2.0
+  relations frame holds each event's last listing without its relations to
+  unlisted objects, one row per object (the last), and the classic one the
+  omap's relations to listed objects with their typedOmap qualifier (the
+  last entry for an object wins, an entry for an object outside the omap
+  is no row); rows of events the reader then drops (an empty id or type, a
+  missing activity) count. Native refused every number, bool or null
+  qualifier (`OCEL field must be string: qualifier`; `qualifier 2 is no
+  str, which a native OCEL cannot hold`). Both readers now type the
+  relation and O2O qualifiers on those rows as pandas does into round EW's
+  qualifier kinds, with a new bool kind (text `True` or `False`), and
+  pm4py's writers follow: write_ocel2_json and write_ocel_json print a bool
+  as a JSON bool, write_ocel2_xml raises lxml's `TypeError: Argument must
+  be bytes or unicode, got 'bool'` on an object's bool qualifier and prints
+  an event's as `True` or `False`, write_ocel2_sqlite declares a bool-only
+  column INTEGER (1 and 0) and stores a bool in a TEXT column as `1` or
+  `0`, and the event-object graph prints a bool. A relationship without a
+  qualifier key still raises `KeyError: 'qualifier'`.
+- **EX1-2 Typed qualifiers in the OCEL 2.0 transport (EW gap).** Round
+  EW's OCEL 2.0 JSON transport (the open source view of an OCEL 2.0
+  import, which the routes read back) wrote number qualifiers as JSON
+  numbers without saying so, so the routes refused an SQLite import with
+  number qualifiers; it now writes `"minera:typedQualifiers": true` as the
+  classic transport does, and both readers keep the kinds literally under
+  it (no new frame typing, so an int next to an emptied qualifier stays an
+  int).
+- **EX1-3 Number and bool qualifiers in the frontend's event-object graph
+  (EW gap).** The graph response's validator accepted only text qualifiers,
+  so the panel refused EW's number qualifiers; it accepts finite numbers and
+  bools now, and the labels and the edges table show the Python text (an
+  int `0`, a float `2.0`, a bool `False`).
+- **EX1-4 Activity-type matching with a typed qualifier as a key.**
+  pm4py's activity_type_matching filter adds the separator to the
+  activity column and the type column to that: with the qualifier
+  column as the activity key, an int64, float64 or bool column raises
+  numpy's `UFuncTypeError: ufunc 'add' did not contain a loop with
+  signature matching types (dtype('int64'), dtype('<U4')) -> None` (the U
+  length is the separator's) and an object column `TypeError: unsupported
+  operand type(s) for +: 'int' and 'str'` (the type of its first value that
+  is no str); as the type key, `TypeError: can only concatenate str (not
+  "int") to str`. Native matched the texts. A temporary column named
+  `ocel:qualifier` leaves a str qualifier (`''`).
+
+Results: j1, k1 and k2 give 0 differences in the four writers (wcmpj).
+Through the sweeps: j1 imports 0 of 150, esw 0 of 2,400, xsw 0 of 1,950,
+fsw 0 of 1,948, rsw3 225 of 5,850 (all fraction texts in the JSON
+downloads, declared; the same on b65 with EW's server), dsw 11 of 1,050
+(emptied O2O tables' declarations, EW1 declared), osw 12 of 900
+(write_ocel_csv's type column order, which follows the hash seed for OCEL
+2.0 JSON reads, declared since EP); k1 imports 0 of 120, esw 0 of 1,920,
+xsw 0 of 1,560, osw 0 of 720, fsw2 0 of 1,564, dsw 527 of 840 (the classic
+date catalog, which native reads as dates, declared) and rsw3 1,300 of
+4,680 (dates too: rsw3, fsw and fsw2 still converted a classic read's
+declared dates, fixed in the harness); hence k2, whose dates are declared
+as strings: imports 0 of 150, rsw3 0 of 5,850, esw 0 of 2,400, xsw 0 of
+1,950, osw 0 of 900, fsw 0 of 1,948, dsw 9 of 1,050 (emptied O2O tables'
+declarations). EW's bank recipe on a fresh seed (s103: `ew/q/sgen.py` on
+b64, seed 103) gives 0 of 120 in EW's wcmp.
+
+Declared:
+- A list, dict, int past 64 bits or infinite float qualifier in OCEL JSON
+  (pm4py keeps the Python value; native refuses the file, on a row the
+  reader then drops too).
+- A qualifier column of Python objects whose kept rows share one kind is
+  taken for a numpy column in the activity-type matching (`UFuncTypeError`
+  where pm4py raises Python's `TypeError`): the kinds hold the values, not
+  the reader's dtype.
+- Carried: an emptied relation or O2O table's qualifier declaration (EW1),
+  the classic date catalog, an event's relation order in OCEL 2.0 JSON
+  (OC1) and the date fractions of the JSON downloads.
+
+In the suite: `minera_review_ex1_tests` (both readers' typing and rows on
+hand files, the refusals, the writers, both transports, the activity-type
+matching keys) and the frontend's validator and graph tests. EE1's bank
+(`docs/ocel-json-reference-ee-bank.tsv.gz`) held two classic files with a
+number qualifier (a typedOmap qualifier 5, an O2O qualifier 5) under the
+old refusal; their rows now hold pm4py's reading (`5`). The full ctest
+passed 643 of 644 on the first run (that bank row) and 644 of 644 after it,
+and the fixture replay gave 2,673 responses unchanged. Harness:
+`review-harness/round-ex/` in the project files (README).

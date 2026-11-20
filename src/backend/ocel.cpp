@@ -593,8 +593,8 @@ std::string type_name(const Json& value) {
 }
 
 // Round EW: a qualifier of a document Minera wrote with
-// "minera:typedQualifiers" may be a JSON int or float (OcelQualifierKind);
-// nullopt for any other non-string value.
+// "minera:typedQualifiers" may be a JSON int, float or (round EX) bool
+// (OcelQualifierKind); nullopt for any other non-string value.
 std::optional<std::pair<std::string, OcelQualifierKind>> typed_transport_qualifier(const Json& value);
 
 std::string repr(const Json& value) {
@@ -626,6 +626,7 @@ std::optional<std::pair<std::string, OcelQualifierKind>> typed_transport_qualifi
   if (value.is_int() || value.is_uint()) return std::pair{repr(value), OcelQualifierKind::kInt};
   if (const auto* real = std::get_if<double>(&value.value); real != nullptr && std::isfinite(*real))
     return std::pair{repr(value), OcelQualifierKind::kFloat};
+  if (value.is_bool()) return std::pair{repr(value), OcelQualifierKind::kBool};
   return std::nullopt;
 }
 
@@ -757,6 +758,36 @@ std::optional<std::string> column_str(const Json& value, Column::Kind kind) {
   if (kind == Column::Kind::kFloat)
     if (const auto real = float_cell(value)) return ocel_frame::float_repr(*real);
   return value.is_string() ? value.string() : repr(value);
+}
+
+// Round EX: a qualifier as read_ocel2_json's and read_ocel_json's frames
+// hold it (observed black-box, probes ex p/p1.py..p5c.py): the relations
+// and O2O frames are built from records, so the qualifier column's dtype
+// comes from every row the frame is built from (`kind`, a Column over
+// them): a str stays a str and a missing qualifier (None, NaN, or an
+// omap entry without one) reads as ''; an int is an int in an int64 or
+// object column and a float next to floats or missing qualifiers; a bool
+// stays a bool. A list, a dict, an integer past 64 bits or an infinite
+// float is refused (`refusal` names it).
+std::pair<std::string, OcelQualifierKind> frame_qualifier(const Json* value, Column::Kind kind,
+                                                          std::string& refusal) {
+  if (value == nullptr || missing_value(*value)) return {std::string(), OcelQualifierKind::kStr};
+  if (value->is_string()) return {value->string(), OcelQualifierKind::kStr};
+  if (value->is_bool()) return {repr(*value), OcelQualifierKind::kBool};
+  if (value->is_array() || value->is_object()) {
+    refusal = "is a " + type_name(*value) + " (" + repr(*value) + "), which pandas keeps as a Python object";
+    return {std::string(), OcelQualifierKind::kStr};
+  }
+  if (value->is_uint() || value->is_big_int()) {
+    refusal = "is an integer past 64 bits (" + repr(*value) + ")";
+    return {std::string(), OcelQualifierKind::kStr};
+  }
+  if (const auto* real = std::get_if<double>(&value->value); real != nullptr && !std::isfinite(*real)) {
+    refusal = "is an infinite float (" + repr(*value) + ")";
+    return {std::string(), OcelQualifierKind::kStr};
+  }
+  if (kind == Column::Kind::kFloat) return {ocel_frame::float_repr(*float_cell(*value)), OcelQualifierKind::kFloat};
+  return {repr(*value), value->is_int() ? OcelQualifierKind::kInt : OcelQualifierKind::kFloat};
 }
 
 // A vmap, ovmap or change value: the native value, or the reason it cannot
@@ -1339,6 +1370,26 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
     log.events.push_back({raw.id, *event_activity[i], std::move(raw.time), std::move(attributes), raw.raw_time});
     log.event_type_attributes.try_emplace(*event_activity[i]);
   }
+  // Round EX: the relations and O2O frames type their qualifier columns
+  // from every row they are built from, the dropped ones too (an omap entry
+  // without a typedOmap qualifier is missing there; see frame_qualifier); a
+  // transport's typed qualifiers keep their own kinds.
+  Column relation_qualifiers, link_qualifiers;
+  for (const auto& relation : relations) relation_qualifiers.observe(relation.qualifier);
+  for (const auto& link : links) link_qualifiers.observe(link.qualifier);
+  const auto qualifier_of = [&](const Json* value, const Column& column,
+                                const std::string& what) -> std::pair<std::string, OcelQualifierKind> {
+    if (typed_qualifiers && value != nullptr && !value->is_null()) {
+      if (const auto typed = typed_transport_qualifier(*value)) return *typed;
+      if (!value->is_string())
+        raise(what + ": qualifier " + repr(*value) + " is no str, which a native OCEL cannot hold");
+      return {value->string(), OcelQualifierKind::kStr};
+    }
+    std::string refusal;
+    auto result = frame_qualifier(value, column.kind(), refusal);
+    if (!refusal.empty()) raise(what + ": qualifier " + refusal + ", which a native OCEL cannot hold");
+    return result;
+  };
   for (std::size_t r = 0; r < relations.size(); ++r) {
     const auto& relation = relations[r];
     const auto& event = events[relation.event];
@@ -1352,16 +1403,8 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
       raise("OCEL JSON object " + object.id + ": pm4py reads its type as '" + *object_type[relation.object] +
             "' in the objects frame and '" + *relation_type[relation.object] +
             "' in the relations frame (the columns' dtypes differ), which a native OCEL cannot hold");
-    std::string qualifier;
-    auto qualifier_kind = OcelQualifierKind::kStr;
-    if (relation.qualifier != nullptr && !relation.qualifier->is_null()) {
-      const auto typed = typed_qualifiers ? typed_transport_qualifier(*relation.qualifier) : std::nullopt;
-      if (typed) std::tie(qualifier, qualifier_kind) = *typed;
-      else if (!relation.qualifier->is_string())
-        raise("OCEL JSON relation " + event.id + " - " + object.id + ": qualifier " + repr(*relation.qualifier) +
-              " is no str, which a native OCEL cannot hold");
-      else qualifier = relation.qualifier->string();
-    }
+    auto [qualifier, qualifier_kind] =
+        qualifier_of(relation.qualifier, relation_qualifiers, "OCEL JSON relation " + event.id + " - " + object.id);
     log.relations.push_back({event.id, object.id, std::move(qualifier), qualifier_kind});
   }
 
@@ -1373,16 +1416,8 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
   for (const auto& link : links) {
     const auto target = column_str(link.target, targets.kind());
     if (!target || !kept_object_ids.count(link.source) || !kept_object_ids.count(*target)) continue;
-    std::string qualifier;
-    auto qualifier_kind = OcelQualifierKind::kStr;
-    if (!link.qualifier->is_null()) {
-      const auto typed = typed_qualifiers ? typed_transport_qualifier(*link.qualifier) : std::nullopt;
-      if (typed) std::tie(qualifier, qualifier_kind) = *typed;
-      else if (!link.qualifier->is_string())
-        raise("OCEL JSON object link " + link.source + " - " + *target + ": qualifier " + repr(*link.qualifier) +
-              " is no str, which a native OCEL cannot hold");
-      else qualifier = link.qualifier->string();
-    }
+    auto [qualifier, qualifier_kind] =
+        qualifier_of(link.qualifier, link_qualifiers, "OCEL JSON object link " + link.source + " - " + *target);
     log.o2o.push_back({link.source, *target, std::move(qualifier), qualifier_kind});
   }
   for (auto& change : changes) {
@@ -1532,7 +1567,10 @@ Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_r
   return log;
 }
 
-Ocel parse_standard(const Json::Object& root) {
+// Round EX: `typed_qualifiers` (a transport's "minera:typedQualifiers")
+// keeps each qualifier's JSON kind; `repeated_relations` keeps every
+// relation of an event to one object (the reader keeps the last one).
+Ocel parse_standard(const Json::Object& root, bool typed_qualifiers, bool repeated_relations) {
   Ocel log;
   std::unordered_map<std::string, std::string> types;
   StandardAttributeTypes object_attribute_types;
@@ -1560,6 +1598,9 @@ Ocel parse_standard(const Json::Object& root) {
   // of its last one, relations included.
   std::unordered_map<std::string, std::size_t> event_index;
   std::vector<std::vector<OcelRelation>> event_relations;
+  // Round EX: each relation's (and object link's) qualifier as the file has
+  // it, typed after the walk (see the relations below).
+  std::vector<std::vector<const Json*>> event_qualifiers;
   // The Python type of each event time that is no str (by event id, the
   // last listing's), raised when the times are read.
   std::unordered_map<std::string, std::string> untexted_times;
@@ -1583,14 +1624,15 @@ Ocel parse_standard(const Json::Object& root) {
       }
     }
     std::vector<OcelRelation> relations;
+    std::vector<const Json*> qualifiers;
     if (const auto* rels = optional(x, "relationships"); standard_truthy(rels)) {
       if (!rels->is_array())
         throw std::invalid_argument("event relationships must be array");
       for (const auto& r : rels->array()) {
         const auto& y = obj(r, "relationship");
         const auto oid = str(standard_key(y, "objectId"), "objectId");
-        const auto qualifier = str(standard_key(y, "qualifier"), "qualifier");
-        relations.push_back({{}, oid, qualifier});
+        qualifiers.push_back(&standard_key(y, "qualifier"));
+        relations.push_back({{}, oid, {}});
       }
     }
     const auto id = str(standard_key(x, "id"), "id");
@@ -1602,9 +1644,11 @@ Ocel parse_standard(const Json::Object& root) {
     if (added) {
       log.events.push_back(std::move(event));
       event_relations.push_back(std::move(relations));
+      event_qualifiers.push_back(std::move(qualifiers));
     } else {
       log.events[slot->second] = std::move(event);
       event_relations[slot->second] = std::move(relations);
+      event_qualifiers[slot->second] = std::move(qualifiers);
     }
   }
   const auto& object_array = standard_key(root, "objects");
@@ -1618,6 +1662,7 @@ Ocel parse_standard(const Json::Object& root) {
   // under the last type.
   std::unordered_map<std::string, std::size_t> object_index;
   std::vector<std::vector<OcelO2oRelation>> object_o2o;
+  std::vector<std::vector<const Json*>> object_qualifiers;
   for (const auto& raw : object_array.array()) {
     const auto& x = obj(raw, "objects[]");
     // An empty id or type is dropped with drop_empty_ocel_names.
@@ -1660,14 +1705,15 @@ Ocel parse_standard(const Json::Object& root) {
       }
     }
     std::vector<OcelO2oRelation> o2o;
+    std::vector<const Json*> link_qualifiers;
     if (const auto* rr = optional(x, "relationships"); standard_truthy(rr)) {
       if (!rr->is_array())
         throw std::invalid_argument("object relationships must be array");
       for (const auto& r : rr->array()) {
         const auto& y = obj(r, "relationship");
         const auto target = str(standard_key(y, "objectId"), "objectId");
-        const auto qualifier = str(standard_key(y, "qualifier"), "qualifier");
-        o2o.push_back({{}, target, qualifier});
+        link_qualifiers.push_back(&standard_key(y, "qualifier"));
+        o2o.push_back({{}, target, {}});
       }
     }
     const auto id = str(standard_key(x, "id"), "id");
@@ -1690,13 +1736,43 @@ Ocel parse_standard(const Json::Object& root) {
     if (added) {
       log.objects.push_back(std::move(object));
       object_o2o.push_back(std::move(o2o));
+      object_qualifiers.push_back(std::move(link_qualifiers));
     } else {
       log.objects[slot->second] = std::move(object);
       object_o2o[slot->second] = std::move(o2o);
+      object_qualifiers[slot->second] = std::move(link_qualifiers);
     }
   }
-  for (auto& relations : object_o2o)
-    for (auto& relation : relations) log.o2o.push_back(std::move(relation));
+  // Round EX: read_ocel2_json keeps a JSON number or bool qualifier, typed
+  // by its frame (classic_json::frame_qualifier; observed black-box, probes
+  // ex p/p1.py, p3.py..p5.py): the O2O frame is built from every link of
+  // each object's last listing (dangling links, links of objects it then
+  // drops), the relations frame from each event's last listing without its
+  // relations to unlisted objects, one per object (the last); events and
+  // objects it then drops (empty names) count too. A list, dict, integer
+  // past 64 bits or infinite float is refused. A transport's typed
+  // qualifiers keep their own kinds.
+  const auto type_qualifiers = [&](auto& rows, const std::vector<const Json*>& values,
+                                   const std::vector<bool>& counted, const classic_json::Column& column,
+                                   const char* what) {
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      if (!counted[i]) continue;
+      const Json* value = values[i];
+      if (typed_qualifiers && !value->is_null()) {
+        if (const auto typed = classic_json::typed_transport_qualifier(*value)) {
+          std::tie(rows[i].qualifier, rows[i].qualifier_kind) = *typed;
+          continue;
+        }
+        rows[i].qualifier = str(*value, "qualifier");
+        continue;
+      }
+      std::string refusal;
+      std::tie(rows[i].qualifier, rows[i].qualifier_kind) = classic_json::frame_qualifier(value, column.kind(), refusal);
+      if (!refusal.empty())
+        throw std::invalid_argument(std::string("OCEL JSON ") + what + " qualifier " + refusal +
+                                    ", which a native OCEL cannot hold");
+    }
+  };
   for (auto& change : log.object_changes) change.object_type = types.at(change.object_id);
   for (const auto& object : log.objects) log.object_type_attributes.try_emplace(object.type);
   // The times are read after the walk, in event order: a time that is no
@@ -1708,10 +1784,53 @@ Ocel parse_standard(const Json::Object& root) {
       iso_wall_microseconds(event.timestamp);
     }
   if (untexted_change_time) throw std::invalid_argument("OCEL field must be string: time");
+  {
+    classic_json::Column column;
+    for (const auto& values : object_qualifiers)
+      for (const auto* value : values) column.observe(value);
+    for (std::size_t o = 0; o < object_o2o.size(); ++o)
+      type_qualifiers(object_o2o[o], object_qualifiers[o], std::vector<bool>(object_o2o[o].size(), true), column,
+                      "object relationship");
+  }
+  for (auto& relations : object_o2o)
+    for (auto& relation : relations) log.o2o.push_back(std::move(relation));
   // read_ocel2_json drops a relation to an unlisted object (and the event
   // when it keeps none), observed black-box.
-  for (auto& relations : event_relations)
-    std::erase_if(relations, [&](const OcelRelation& relation) { return !types.count(relation.object_id); });
+  for (std::size_t e = 0; e < event_relations.size(); ++e) {
+    auto& relations = event_relations[e];
+    auto& qualifiers = event_qualifiers[e];
+    std::size_t kept = 0;
+    for (std::size_t i = 0; i < relations.size(); ++i) {
+      if (!types.count(relations[i].object_id)) continue;
+      if (kept != i) {
+        relations[kept] = std::move(relations[i]);
+        qualifiers[kept] = qualifiers[i];
+      }
+      ++kept;
+    }
+    relations.resize(kept);
+    qualifiers.resize(kept);
+  }
+  // Round EX: the relations frame's qualifier column (see the O2O frame
+  // above); a relation the reader replaces by a later one to the same
+  // object is no row of it.
+  {
+    std::vector<std::vector<bool>> counted(event_relations.size());
+    classic_json::Column column;
+    for (std::size_t e = 0; e < event_relations.size(); ++e) {
+      const auto& relations = event_relations[e];
+      counted[e].assign(relations.size(), repeated_relations);
+      if (!repeated_relations) {
+        std::unordered_set<std::string> seen;
+        for (std::size_t i = relations.size(); i-- > 0;)
+          if (seen.insert(relations[i].object_id).second) counted[e][i] = true;
+      }
+      for (std::size_t i = 0; i < relations.size(); ++i)
+        if (counted[e][i]) column.observe(event_qualifiers[e][i]);
+    }
+    for (std::size_t e = 0; e < event_relations.size(); ++e)
+      type_qualifiers(event_relations[e], event_qualifiers[e], counted[e], column, "event relationship");
+  }
   for (auto& relations : event_relations)
     for (auto& relation : relations) log.relations.push_back(std::move(relation));
   for (const auto& event : log.events) log.event_type_attributes.try_emplace(event.activity);
@@ -1971,9 +2090,11 @@ void write_standard_type_table(std::ostringstream& out,
 }
 
 // Round EW: an int or float qualifier (OcelQualifierKind) is a JSON number,
-// as pm4py's JSON writers write it (observed black-box, probe ew q/wq.py).
+// as pm4py's JSON writers write it (observed black-box, probe ew q/wq.py);
+// round EX: a bool one a JSON bool (probe ex p/wj.py).
 void write_qualifier(std::ostringstream& out, const std::string& text, OcelQualifierKind kind) {
-  if (kind != OcelQualifierKind::kStr) out << text;
+  if (kind == OcelQualifierKind::kBool) out << (text == "True" ? "true" : "false");
+  else if (kind != OcelQualifierKind::kStr) out << text;
   else write_string(out, text);
 }
 
@@ -2375,7 +2496,7 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
   const bool keep_unrelated_flag = keep_unrelated_marker && keep_unrelated_marker->is_bool() &&
                                   std::get<bool>(keep_unrelated_marker->value);
   ClassicListing listing;
-  Ocel result = standard ? parse_standard(r)
+  Ocel result = standard ? parse_standard(r, typed_qualifiers, repeated_relations)
                 : classic_reference
                     ? parse_classic_reference(root, repeated_relations, lenient_times,
                                               !keep_unrelated_flag && !optional(r, "minera:untypedRelations"),
@@ -3996,6 +4117,17 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   // Round DT: a log without relations travels with its frame type, so a
   // route reads an empty filter result as the in-memory log it was rather
   // than as a file without events (see Ocel::untyped_relations).
+  // Round EW: typed qualifiers (OcelQualifierKind) travel as JSON numbers
+  // and (round EX) bools; round EX: the OCEL 2.0 transport (an OCEL SQLite
+  // import's open source view) says so too, which EW left out (its
+  // qualifiers then failed every route).
+  const auto write_typed_qualifiers = [&] {
+    if (std::any_of(log.relations.begin(), log.relations.end(),
+                    [](const OcelRelation& relation) { return relation.qualifier_kind != OcelQualifierKind::kStr; }) ||
+        std::any_of(log.o2o.begin(), log.o2o.end(),
+                    [](const OcelO2oRelation& relation) { return relation.qualifier_kind != OcelQualifierKind::kStr; }))
+      out << ",\"minera:typedQualifiers\":true";
+  };
   const auto write_untyped_relations = [&] {
     if (log.relations.empty())
       out << ",\"minera:untypedRelations\":" << (log.untyped_relations ? "true" : "false");
@@ -4496,6 +4628,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     // enriched logs) keeps times past the microsecond too (round BB).
     if (transport_markers) {
       write_untyped_relations();
+      write_typed_qualifiers();
       write_naive_event_times();
       write_frame_hints();
       write_nanoseconds();
@@ -4674,11 +4807,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << ",\"minera:unreadableEventTimes\":true";
     // Round EW: an int or float qualifier travels as a JSON number, which
     // parse_ocel_json reads back only from a document that says so.
-    if (std::any_of(log.relations.begin(), log.relations.end(),
-                    [](const OcelRelation& relation) { return relation.qualifier_kind != OcelQualifierKind::kStr; }) ||
-        std::any_of(log.o2o.begin(), log.o2o.end(),
-                    [](const OcelO2oRelation& relation) { return relation.qualifier_kind != OcelQualifierKind::kStr; }))
-      out << ",\"minera:typedQualifiers\":true";
+    write_typed_qualifiers();
     // Round EJ: a change time read_ocel_json cannot read (the NaT of an
     // OCEL 2.0 JSON change without a time) is kept between routes too.
     if (std::any_of(log.object_changes.begin(), log.object_changes.end(), [](const OcelObjectChange& change) {

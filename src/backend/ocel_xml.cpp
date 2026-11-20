@@ -1739,10 +1739,15 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
         // column of read_ocel2_sqlite's object_object table) reaches lxml's
         // attribute setter as a number (observed black-box); the event
         // relationships print its str.
+        // Round EX: a bool one too (read_ocel2_json, read_ocel_json; probe
+        // ex p/wj.py); an event-object one prints "True" or "False".
         if (relation->qualifier_kind != OcelQualifierKind::kStr)
           throw std::invalid_argument(
               std::string("TypeError: Argument must be bytes or unicode, got '") +
-              (relation->qualifier_kind == OcelQualifierKind::kInt ? "int" : "float") + "'");
+              (relation->qualifier_kind == OcelQualifierKind::kInt     ? "int"
+               : relation->qualifier_kind == OcelQualifierKind::kFloat ? "float"
+                                                                       : "bool") +
+              "'");
         out << "        <relationship object-id=\"" << esc(relation->target_id)
             << "\" qualifier=\"" << esc(relation->qualifier) << "\"/>\n";
       }

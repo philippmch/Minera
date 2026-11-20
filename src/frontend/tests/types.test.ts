@@ -449,6 +449,15 @@ describe("isOcelHeterogeneousGraphResult", () => {
   it("accepts event, object, change and derived-flow records", () => {
     expect(isOcelHeterogeneousGraphResult(valid)).toBe(true);
   });
+  it("accepts number and bool qualifiers, which pm4py keeps from SQLite and JSON inputs", () => {
+    for (const qualifier of [2, 2.5, 0, true, false])
+      expect(isOcelHeterogeneousGraphResult({ ...valid, edges: [{ source: "e1", target: "o1", type: "O2O", qualifier }] }))
+        .toBe(true);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, edges: [{ source: "e1", target: "o1", type: "E2O", qualifier: null }] }))
+      .toBe(false);
+    expect(isOcelHeterogeneousGraphResult({ ...valid, edges: [{ source: "e1", target: "o1", type: "E2O", qualifier: [1] }] }))
+      .toBe(false);
+  });
   it("rejects malformed node and edge records", () => {
     expect(isOcelHeterogeneousGraphResult({ ...valid, nodes: [{ id: "e1", type: "OTHER" }] }))
       .toBe(false);

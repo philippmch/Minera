@@ -975,7 +975,9 @@ std::string serialize_ocel_heterogeneous_graph_json(
       out << ",\"qualifier\":";
       // Round EW: an int or float qualifier (OcelQualifierKind) is the
       // number pm4py's graph carries.
-      if (edge.qualifier_kind != OcelQualifierKind::kStr) out << edge.qualifier;
+      // Round EX: a bool one a JSON bool.
+      if (edge.qualifier_kind == OcelQualifierKind::kBool) out << (edge.qualifier == "True" ? "true" : "false");
+      else if (edge.qualifier_kind != OcelQualifierKind::kStr) out << edge.qualifier;
       else write_json_string(out, edge.qualifier);
     } else if (edge.type == "DF") {
       out << ",\"object\":";

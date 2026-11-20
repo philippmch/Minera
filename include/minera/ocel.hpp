@@ -72,7 +72,9 @@ struct OcelObject {
 // affinity) as an int or float, which its JSON writers write as a number
 // and write_ocel2_xml refuses for an O2O link (observed black-box, probe
 // ev q1/qprobe.py). The qualifier text is then the number's Python repr.
-enum class OcelQualifierKind : unsigned char { kStr, kInt, kFloat };
+// Round EX: read_ocel2_json and read_ocel_json keep a JSON bool too (text
+// "True" or "False"), which the JSON writers write as a bool.
+enum class OcelQualifierKind : unsigned char { kStr, kInt, kFloat, kBool };
 
 struct OcelRelation {
   std::string event_id;

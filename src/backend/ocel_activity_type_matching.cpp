@@ -41,6 +41,36 @@ const std::string* relation_value(const OcelRelation& relation,
   throw std::invalid_argument("OCEL matching selector has no native relation value: " +
                               std::string(key));
 }
+
+// Round EX: a qualifier column that holds numbers or bools (an OCEL SQLite
+// relation table with a numeric affinity, OCEL JSON; OcelQualifierKind) as
+// the activity or type key. The reference adds the separator to the
+// activity column, then the type column to that (observed black-box, probe
+// ex p/atm2.py): an int64, float64 or bool column raises numpy's
+// UFuncTypeError as the activity column, an object column Python's
+// TypeError naming its first value that is no str, and as the type column
+// any of them raises "can only concatenate str". The column's dtype is read
+// from the rows (one kind throughout is a numpy column; declared: a reader
+// column of Python objects whose kept rows share a kind is not told apart).
+void refuse_typed_qualifier_key(const Ocel& log, std::string_view key, bool activity,
+                                std::size_t separator_length) {
+  if (key != "ocel:qualifier") return;
+  const auto first = std::find_if(log.relations.begin(), log.relations.end(), [](const OcelRelation& relation) {
+    return relation.qualifier_kind != OcelQualifierKind::kStr;
+  });
+  if (first == log.relations.end()) return;
+  const auto kind = first->qualifier_kind;
+  const std::string type = kind == OcelQualifierKind::kInt ? "int" : kind == OcelQualifierKind::kFloat ? "float" : "bool";
+  if (!activity) throw std::invalid_argument("TypeError: can only concatenate str (not \"" + type + "\") to str");
+  const bool numpy = std::all_of(log.relations.begin(), log.relations.end(),
+                                 [&](const OcelRelation& relation) { return relation.qualifier_kind == kind; });
+  if (numpy)
+    throw std::invalid_argument(
+        std::string("UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('") +
+        (kind == OcelQualifierKind::kInt ? "int64" : kind == OcelQualifierKind::kFloat ? "float64" : "bool") +
+        "'), dtype('<U" + std::to_string(separator_length) + "')) -> None");
+  throw std::invalid_argument("TypeError: unsupported operand type(s) for +: '" + type + "' and 'str'");
+}
 }  // namespace
 
 Ocel filter_ocel_activity_type_matching_exact(
@@ -57,19 +87,21 @@ Ocel filter_ocel_activity_type_matching_exact(
   // UFuncTypeError naming the separator's length in code points (at least 1)
   // before a missing type key (black-box).
   require_relation_column(log, options.activity_key);
+  std::size_t length = 4;
+  if (options.temporary_separator) {
+    length = 0;
+    for (const char byte : *options.temporary_separator)
+      if ((static_cast<unsigned char>(byte) & 0xC0) != 0x80) ++length;
+    length = std::max<std::size_t>(length, 1);
+  }
   if (log.relations.empty() && log.untyped_relations) {
-    std::size_t length = 4;
-    if (options.temporary_separator) {
-      length = 0;
-      for (const char byte : *options.temporary_separator)
-        if ((static_cast<unsigned char>(byte) & 0xC0) != 0x80) ++length;
-      length = std::max<std::size_t>(length, 1);
-    }
     throw std::invalid_argument(
         "UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('float64'), "
         "dtype('<U" + std::to_string(length) + "')) -> None");
   }
+  refuse_typed_qualifier_key(log, options.activity_key, true, length);
   require_relation_column(log, options.object_type_key);
+  refuse_typed_qualifier_key(log, options.object_type_key, false, length);
   std::unordered_map<std::string, const OcelEvent*> events;
   std::unordered_map<std::string, const OcelObject*> objects;
   for (const auto& event : log.events) events.emplace(event.id, &event);
@@ -110,8 +142,12 @@ Ocel filter_ocel_activity_type_matching_exact(
       auto& columns = *filtered.table_columns.relations;
       columns.erase(std::remove(columns.begin(), columns.end(), key), columns.end());
     }
+    // Round EX: the cleared qualifier is a str ('').
     if (key == "ocel:qualifier")
-      for (auto& relation : relations) relation.qualifier.clear();
+      for (auto& relation : relations) {
+        relation.qualifier.clear();
+        relation.qualifier_kind = OcelQualifierKind::kStr;
+      }
   }
   std::map<std::string, std::vector<std::string>> propagation_pairs;
   for (const auto& [type, activities] : retained_pairs)

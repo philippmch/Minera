@@ -1819,7 +1819,9 @@ export interface OcelHeterogeneousGraphEdge {
   source: string;
   target: string;
   type: OcelHeterogeneousGraphEdgeType;
-  qualifier?: string;
+  // A qualifier read from an OCEL SQLite relation table with a numeric
+  // affinity, or from OCEL JSON, may be a number or a bool (pm4py keeps it).
+  qualifier?: string | number | boolean;
   object?: string;
 }
 export interface OcelHeterogeneousGraphResult {
@@ -2018,7 +2020,9 @@ function isOcelHeterogeneousGraphEdge(value: unknown): value is OcelHeterogeneou
       typeof value.target !== "string" ||
       !["E2O", "O2O", "DF", "CHANGE"].includes(String(value.type))) return false;
   if (value.type === "E2O" || value.type === "O2O")
-    return typeof value.qualifier === "string";
+    return typeof value.qualifier === "string" ||
+      (typeof value.qualifier === "number" && Number.isFinite(value.qualifier)) ||
+      typeof value.qualifier === "boolean";
   if (value.type === "DF") return typeof value.object === "string";
   return true;
 }
