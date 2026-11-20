@@ -24,9 +24,12 @@ struct OcelCsvImportOptions {
   bool has_header = true;
   bool trim_fields = true;
   // The tabular format has no representation for qualified relations,
-  // object-to-object/event-to-event links, object changes, or globals.  Rejecting those
-  // during a combined import prevents accidental loss of information.
-  bool reject_unsupported = true;
+  // object-to-object/event-to-event links, object changes, or globals.  When
+  // set, an objects file's "ocel:qualifier", "ocel:source", "ocel:target" or
+  // "ocel:timestamp" column is refused instead of read as an attribute.
+  // Round ES: off by default, as read_ocel_csv reads such a column as an
+  // object attribute (observed black-box, round ES CSV bank).
+  bool reject_unsupported = false;
   // Reference extended tables are chronologically ordered after import.
   bool sort_events_by_timestamp = true;
 };

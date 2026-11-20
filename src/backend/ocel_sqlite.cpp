@@ -1,6 +1,7 @@
 #include "minera/ocel_sqlite.hpp"
 
 #include "ocel_frame_types.hpp"
+#include "ocel_reader_index.hpp"
 #include "pandas_to_datetime.hpp"
 #include "sqlite_real_text.hpp"
 #include "minera/timestamp.hpp"
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <numeric>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -350,6 +352,28 @@ bool reserved_type_column(std::string_view key) {
   return key.empty() || key == "ocel_id" || key == "ocel_time" ||
          key == "ocel_changed_field" || key == "@@cumcount";
 }
+
+// Round ES: write_ocel2_sqlite writes the change rows of any field as rows of
+// their type table, "@@cumcount", "ocel:activity", ocel_id, ocel_time and
+// the empty field included (observed black-box, probes es x4, x7), and
+// raises on a change of "ocel_changed_field", ocel_id or ocel_time with a
+// value (see reference_type_table_error).
+
+// A cell pandas keeps as a value (dropna drops None and NaN).
+bool frame_value(const OcelValue& value) {
+  if (std::holds_alternative<std::nullptr_t>(value)) return false;
+  const auto* real = std::get_if<double>(&value);
+  return real == nullptr || !std::isnan(*real);
+}
+
+bool has_frame_value(const std::vector<OcelAttribute>& cells, std::string_view key) {
+  return std::any_of(cells.begin(), cells.end(),
+                     [&](const OcelAttribute& cell) { return cell.key == key && frame_value(cell.value); });
+}
+
+constexpr const char* kAssembleDuplicateKeys = "ValueError: cannot assemble with duplicate keys";
+constexpr const char* kFrameHasNoDtype = "AttributeError: 'DataFrame' object has no attribute 'dtype'";
+constexpr const char* kReindexNotUnique = "InvalidIndexError: Reindexing only valid with uniquely valued Index objects";
 
 using TypeColumns = std::vector<std::pair<std::string, std::string>>;
 
@@ -1309,6 +1333,13 @@ std::map<std::string, std::string> resolve_type_tables(sqlite3* db,
     const auto columns = table_columns(db, table);
     if (std::none_of(columns.begin(), columns.end(), [](const TableColumn& column) { return column.name == "ocel_id"; }))
       throw key_error(prefix == "event_" ? "ocel:eid" : "ocel:oid");
+    // Round ES: a table holding its id column under both names (ocel_id and
+    // ocel:eid or ocel:oid, which table_columns leaves apart then) raises
+    // there too, as the reader takes the renamed id column's strings
+    // (observed black-box, probes es x8 p3.py, p4.py).
+    const auto alias = prefix == "event_" ? "ocel:eid" : "ocel:oid";
+    if (std::any_of(columns.begin(), columns.end(), [&](const TableColumn& column) { return column.name == alias; }))
+      throw std::invalid_argument("AttributeError: 'DataFrame' object has no attribute 'str'");
     return table;
   };
   if (column.only_nulls()) {
@@ -1365,7 +1396,9 @@ void read_declared_type_catalog(sqlite3* db, std::string_view table,
   }
 }
 
-void read_relations(sqlite3* db, Ocel& log, bool validate_references, bool native_tables) {
+// Returns the O2O table's missing qualifier column (KeyError
+// 'ocel:qualifier'), which the caller raises after the change rows.
+bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool native_tables) {
   const std::set<std::string> event_ids = [&] {
     std::set<std::string> result;
     for (const auto& event : log.events) result.insert(event.id);
@@ -1403,6 +1436,10 @@ void read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
     }
   }
   require_table(db, "object_object");
+  // Round ES: its qualifier column is looked up after the change rows
+  // (their KeyError 'ocel:timestamp' first; its ids before them, observed
+  // black-box, probe es x11); a missing one reads as empty texts here.
+  bool qualifier_missing = false;
   {
     Statement statement(db, "SELECT * FROM object_object");
     // Round ER: the O2O columns are looked up only when the table has rows
@@ -1419,12 +1456,14 @@ void read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
       if (log.untyped_o2o) {
         source_column = required_column(statement.get(), "ocel_source_id", "ocel:oid");
         target_column = required_column(statement.get(), "ocel_target_id", "ocel:oid_2");
-        qualifier_column = required_column(statement.get(), "ocel_qualifier", "ocel:qualifier");
+        qualifier_column = result_column(statement.get(), "ocel_qualifier");
+        if (qualifier_column < 0) qualifier_column = result_column(statement.get(), "ocel:qualifier");
+        qualifier_missing = qualifier_column < 0;
       }
       log.untyped_o2o = false;
       OcelO2oRelation relation{column_string(statement.get(), source_column),
                                column_string(statement.get(), target_column),
-                               column_string(statement.get(), qualifier_column)};
+                               qualifier_missing ? std::string() : column_string(statement.get(), qualifier_column)};
       if (validate_references &&
           (!object_ids.contains(relation.source_id) ||
            !object_ids.contains(relation.target_id)))
@@ -1450,6 +1489,7 @@ void read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
       log.e2e.push_back(std::move(relation));
     }
   }
+  return qualifier_missing;
 }
 
 #endif  // MINERA_HAS_SQLITE
@@ -1821,10 +1861,58 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   const bool events_read = !event_tables.empty() || (event_type_column.only_nulls() && event_type_map.none_key);
   const bool objects_read =
       !object_tables_by_type.empty() || (object_type_column.only_nulls() && object_type_map.none_key);
-  if ((!events_read || !objects_read) && !options.validate_references.value_or(false))
-    throw std::invalid_argument("ValueError: No objects to concatenate");
+  // Round ES: a table holding its time column under both names (ocel_time
+  // and ocel:timestamp) repeats a label in the concatenation: pandas raises
+  // InvalidIndexError when the tables' columns differ (a reindex), and
+  // reading the time column's dtype after it when every table has the same
+  // columns; in the object tables a column named "ocel:field" next to a
+  // changed-field column (in any table) repeats the field column's renamed
+  // label, and the split into objects and changes raises. The event tables
+  // first, each after the object tables' own faults (observed black-box,
+  // probes es x8 p3.py, p4.py).
+  const auto repeated_time_fault = [&](const std::vector<std::vector<TableColumn>>& tables) -> const char* {
+    const auto has = [](const std::vector<TableColumn>& columns, std::string_view name) {
+      return std::any_of(columns.begin(), columns.end(), [&](const TableColumn& column) { return column.name == name; });
+    };
+    if (std::none_of(tables.begin(), tables.end(), [&](const auto& columns) {
+          return has(columns, "ocel_time") && has(columns, "ocel:timestamp");
+        }))
+      return nullptr;
+    const auto names = [](const std::vector<TableColumn>& columns) {
+      std::vector<std::string> result;
+      for (const auto& column : columns) result.push_back(column.name);
+      return result;
+    };
+    for (const auto& columns : tables)
+      if (names(columns) != names(tables.front()))
+        return "InvalidIndexError: Reindexing only valid with uniquely valued Index objects";
+    return "AttributeError: 'DataFrame' object has no attribute 'dtype'";
+  };
+  const bool validating = options.validate_references.value_or(false);
+  if (!events_read && !validating) throw std::invalid_argument("ValueError: No objects to concatenate");
+  {
+    std::vector<std::vector<TableColumn>> tables;
+    for (const auto& [activity, table] : event_tables) tables.push_back(table_columns(db, table));
+    if (const auto* fault = repeated_time_fault(tables)) throw std::invalid_argument(fault);
+  }
+  if (!objects_read && !validating) throw std::invalid_argument("ValueError: No objects to concatenate");
+  {
+    std::vector<std::vector<TableColumn>> tables;
+    for (const auto& [type, table] : object_tables_by_type) tables.push_back(table_columns(db, table));
+    const auto* fault = repeated_time_fault(tables);
+    if (fault != nullptr && std::string_view(fault).starts_with("InvalidIndexError")) throw std::invalid_argument(fault);
+    bool field = false, changed_field = false;
+    for (const auto& columns : tables)
+      for (const auto& column : columns) {
+        field = field || column.name == "ocel:field";
+        changed_field = changed_field || column.name == "ocel_changed_field";
+      }
+    if (field && changed_field)
+      throw std::invalid_argument("ValueError: cannot reindex on an axis with duplicate labels");
+    if (fault != nullptr) throw std::invalid_argument(fault);
+  }
   if (events_untimed) throw key_error("['ocel:timestamp'] not in index");
-  read_relations(db, log, options.validate_references.value_or(false), native_tables);
+  const bool o2o_qualifier_missing = read_relations(db, log, options.validate_references.value_or(false), native_tables);
 
   if (native_tables && table_exists(db, "object_changes")) {
     Statement statement(db, "SELECT object_id, object_type, ocel_time, "
@@ -1902,6 +1990,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
       if (const auto listed = object_types.find(change.object_id); listed != object_types.end())
         change.object_type = listed->second;
   }
+  if (o2o_qualifier_missing) throw key_error("ocel:qualifier");
   if (native_tables && table_exists(db, "ocel_globals")) {
     Statement statement(db, "SELECT attribute_name, value_type, text_value, "
                            "integer_value, real_value, bool_value FROM ocel_globals "
@@ -2037,6 +2126,9 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
                                       {"ocel:oid", "ocel:type"}, objects.names());
     }
   }
+  // Round ES: read_ocel2_sqlite loses an event table's "@@index" column (see
+  // drop_reader_event_index).
+  ocel_frame::drop_reader_event_index(log);
   return log;
 #endif
 }
@@ -2091,15 +2183,31 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
         }
       if (raw) (void)coerced_raw_time_texts(table);
     };
+    // Round ES: a type table's columns renamed, an attribute named ocel_time
+    // or ocel_id with a value in the type repeats its time or id column:
+    // pandas raises converting the time column (a frame then), and reading
+    // the id column's dtype after it; the change rows' columns raise at the
+    // conversion (a change of ocel_time) or at their concatenation to the
+    // object rows (a change of ocel_id or "ocel_changed_field", an object
+    // attribute ocel_id), an object type without change rows at the dtype
+    // of an object attribute ocel_id (event types, then object types, each
+    // in sorted order; observed black-box, probes es x5 p4.py, x7).
     for (const auto& [activity, missing] : all_nat) {
       if (missing) throw std::invalid_argument("KeyError: 'ocel_time'");
+      bool time_column = false, id_column = false;
+      for (const auto& event : log.events) {
+        if (event.activity != activity) continue;
+        time_column = time_column || has_frame_value(event.attributes, "ocel_time");
+        id_column = id_column || has_frame_value(event.attributes, "ocel_id");
+      }
+      if (time_column) throw std::invalid_argument(kAssembleDuplicateKeys);
       raw_check(log.events, activity, [](const OcelEvent& event) -> std::string_view { return event.activity; });
+      if (id_column) throw std::invalid_argument(kFrameHasNoDtype);
     }
     std::unordered_map<std::string_view, std::string_view> type_of;
     for (const auto& object : log.objects) type_of.emplace(object.id, object.type);
     std::map<std::string, bool> all_nat_changes;
     for (const auto& change : log.object_changes) {
-      if ((!change.field.empty() && reserved_type_column(change.field)) || change.field == "ocel:activity") continue;
       std::string type = change.object_type;
       if (type.empty()) {
         const auto found = type_of.find(change.object_id);
@@ -2109,17 +2217,35 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       const auto [entry, added] = all_nat_changes.try_emplace(type, true);
       entry->second = entry->second && nat(change.raw_time, change.timestamp);
     }
-    for (const auto& [type, missing] : all_nat_changes) {
-      if (missing) throw std::invalid_argument("KeyError: 'ocel_time'");
+    std::set<std::string> object_types;
+    for (const auto& [type, missing] : all_nat_changes) object_types.insert(type);
+    for (const auto& object : log.objects) object_types.insert(object.type);
+    for (const auto& type : object_types) {
+      const bool id_column = std::any_of(log.objects.begin(), log.objects.end(), [&](const OcelObject& object) {
+        return object.type == type && has_frame_value(object.attributes, "ocel_id");
+      });
+      const auto changed = all_nat_changes.find(type);
+      if (changed == all_nat_changes.end()) {
+        if (id_column) throw std::invalid_argument(kFrameHasNoDtype);
+        continue;
+      }
+      if (changed->second) throw std::invalid_argument("KeyError: 'ocel_time'");
       std::vector<OcelObjectChange> rows;
       for (const auto& change : log.object_changes) {
-        if ((!change.field.empty() && reserved_type_column(change.field)) || change.field == "ocel:activity") continue;
         std::string_view owner = change.object_type;
         if (owner.empty())
           if (const auto found = type_of.find(change.object_id); found != type_of.end()) owner = found->second;
         if (owner == type) rows.push_back(change);
       }
+      const auto changes_field = [&](std::string_view field) {
+        return std::any_of(rows.begin(), rows.end(), [&](const OcelObjectChange& change) {
+          return change.field == field && frame_value(change.value);
+        });
+      };
+      if (changes_field("ocel_time")) throw std::invalid_argument(kAssembleDuplicateKeys);
       raw_check(rows, std::string_view{}, [](const OcelObjectChange&) -> std::string_view { return {}; });
+      if (id_column || changes_field("ocel_id") || changes_field("ocel_changed_field"))
+        throw std::invalid_argument(kReindexNotUnique);
     }
   }
   std::error_code error;
@@ -2368,8 +2494,6 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
     for (const auto& change : log.object_changes) {
       // Round EL: a change of the empty field (an OCEL 2.0 SQLite change row
       // with '' there) is written too, with no value (observed black-box).
-      if ((!change.field.empty() && reserved_type_column(change.field)) || change.field == "ocel:activity")
-        continue;
       std::string resolved_type = change.object_type;
       if (resolved_type.empty()) {
         const auto object_type = object_id_types.find(change.object_id);
@@ -2462,17 +2586,54 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       };
       std::unordered_set<std::string> placed;
       std::vector<std::string> placed_order;
+      // Round ES: an object attribute named "ocel_changed_field" is the
+      // table's changed-field column: the object rows hold its values, the
+      // change rows their fields, at the attribute's place (an object column
+      // with change rows; observed black-box, probe es x5).
+      bool shared_field_column = false;
+      // Round ES: so is an object attribute named ocel_time the table's time
+      // column with change rows: the object rows hold its values, the change
+      // rows their times, at the attribute's place (pandas concatenates the
+      // change rows' converted times to the object rows' column: datetimes
+      // alone stay a TIMESTAMP column, next to other values a TEXT one of
+      // their isoformats; observed black-box, probe es x7). Without change
+      // rows it is a column as any other.
+      bool shared_time_column = false;
       for (const auto& name : object_frame.names()) {
         // Round ER: an object attribute "ocel:activity" is a column (probe er h10).
-        if (reserved_type_column(name) || !present(object_part, name)) continue;
-        add_attribute(name);
+        // Round ES: so is one named "@@cumcount" (probe es x4) or ocel_time.
+        const bool attribute_name = !reserved_type_column(name) || name == kOcelCumcountColumn ||
+                                    name == "ocel_changed_field" || name == "ocel_time";
+        if (!attribute_name || !present(object_part, name)) continue;
+        if (name == "ocel_time" && has_changes) {
+          ocel_frame::ColumnStats values;
+          if (const auto* stats = object_part.stats(name)) values.merge(*stats);
+          values.has_aware_date = true;
+          layout.emplace_back(name, ocel_frame::sql_type(
+                                        ocel_frame::concat_dtype(object_frame.dtype(name), ocel_frame::Dtype::kDatetime),
+                                        values, rows.size() + changes.size()));
+          shared_time_column = true;
+        } else if (name == "ocel_changed_field" && has_changes) {
+          ocel_frame::ColumnStats values;
+          if (const auto* stats = object_part.stats(name)) values.merge(*stats);
+          values.has_string = true;
+          layout.emplace_back(name, ocel_frame::sql_type(
+                                        ocel_frame::concat_dtype(object_frame.dtype(name), ocel_frame::Dtype::kObject),
+                                        values, rows.size() + changes.size()));
+          shared_field_column = true;
+        } else {
+          add_attribute(name);
+        }
         placed.insert(name);
         placed_order.push_back(name);
       }
       if (has_changes)
         for (const auto& name : change_order) {
-          if (name == ocel_frame::kChangeFieldColumn) layout.emplace_back("ocel_changed_field", "");
-          else if (name == ocel_frame::kChangeTimeColumn) layout.emplace_back("ocel_time", "");
+          if (name == ocel_frame::kChangeFieldColumn) {
+            if (!shared_field_column) layout.emplace_back("ocel_changed_field", "");
+          } else if (name == ocel_frame::kChangeTimeColumn) {
+            if (!shared_time_column) layout.emplace_back("ocel_time", "");
+          }
           else if (!placed.count(name) && present(change_part, name) &&
                    (name == kOcelCumcountColumn || !reserved_type_column(name)))
             add_attribute(name);
@@ -2508,7 +2669,12 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
             else bind_null(statement.get(), position);
             continue;
           }
-          if (type_name.empty()) {
+          if (change && name == "ocel_changed_field") {  // round ES: the shared column
+            bind_text(statement.get(), position, change->field);
+            continue;
+          }
+          const bool shared_time = change && shared_time_column && name == "ocel_time";
+          if (type_name.empty() || shared_time) {
             if (!change) {
               bind_null(statement.get(), position);
               continue;
@@ -2517,14 +2683,24 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
             // (a text left in its change-time column) are written as NULL
             // (observed black-box, probe ek: write_ocel2_sqlite coerces them
             // to NaT).
+            // Round ES: in a TEXT column (see shared_time_column) as its
+            // isoformat.
+            const char separator = shared_time && type_name != "TIMESTAMP" ? 'T' : ' ';
             const auto parsed = parse_timestamp_exact(change->timestamp);
             if (const auto coerced = coerced_change_times.find(change); coerced != coerced_change_times.end()) {
-              if (coerced->second) bind_text(statement.get(), position, *coerced->second);
-              else bind_null(statement.get(), position);
+              if (coerced->second) {
+                std::string text = *coerced->second;
+                if (text.size() > 10 && text[10] == ' ') text[10] = separator;
+                bind_text(statement.get(), position, text);
+              } else {
+                bind_null(statement.get(), position);
+              }
             } else if (!parsed || !ocel_frame::civil_timestamp(*parsed))
               bind_null(statement.get(), position);
             else
-              bind_text(statement.get(), position, pandas_time(change->timestamp));
+              bind_text(statement.get(), position,
+                        separator == ' ' ? pandas_time(change->timestamp)
+                                         : ocel_frame::utc_timestamp_text(change->timestamp, 'T', "+00:00", true));
             continue;
           }
           const auto value = values.find(name);

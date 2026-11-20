@@ -5,6 +5,7 @@
 #include "minera/timestamp.hpp"
 #include "ocel_csv_object_cell.hpp"
 #include "ocel_frame_types.hpp"
+#include "ocel_reader_index.hpp"
 #include "pandas_to_datetime.hpp"
 
 #include <algorithm>
@@ -840,9 +841,16 @@ std::optional<Column> convert(const std::vector<std::string_view>& cells) {
 Ocel parse_tables(const Table& event_table, const Table* object_table,
                   const OcelCsvImportOptions& options) {
   const auto event_header = read_header(event_table, options, "event");
-  const auto event_id = required_column(event_header, options.event_id_column, "event");
-  const auto activity = required_column(event_header, options.activity_column, "event");
-  const auto timestamp = required_column(event_header, options.timestamp_column, "event");
+  // Round ES: read_ocel_csv converts the time column first (KeyError on the
+  // name without it), then numbers the rows in an "@@index" column, which
+  // raises on a file's own "@@index" column (a str column) when it has rows,
+  // then selects the id and activity columns (KeyError "[...] not in index"
+  // naming the missing ones), observed black-box (probes es x5 p5.py to
+  // p8.py).
+  const auto timestamp_column = event_header.indexes.find(options.timestamp_column);
+  if (timestamp_column == event_header.indexes.end())
+    throw std::invalid_argument("KeyError: '" + options.timestamp_column + "'");
+  const auto timestamp = timestamp_column->second;
   // Each data row's event time: the cell, or the ISO text of the instant
   // pandas reads from a column of the round DZ shapes.
   std::optional<pandas_guess::Column> guessed;
@@ -854,6 +862,17 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
     guessed = pandas_guess::convert(texts);
     if (!guessed && pandas_iso::covers(texts)) pandas_iso::check_column(texts);
   }
+  if (event_header.indexes.contains(std::string(ocel_frame::kReaderEventIndexColumn)) && event_table.size() > 1)
+    throw std::invalid_argument("TypeError: Invalid value 'RangeIndex(start=0, stop=" +
+                                std::to_string(event_table.size() - 1) + ", step=1)' for dtype 'str'");
+  {
+    std::string missing;
+    for (const auto* name : {&options.event_id_column, &options.activity_column})
+      if (!event_header.indexes.contains(*name)) missing += (missing.empty() ? "'" : ", '") + *name + "'";
+    if (!missing.empty()) throw std::invalid_argument("KeyError: \"[" + missing + "] not in index\"");
+  }
+  const auto event_id = required_column(event_header, options.event_id_column, "event");
+  const auto activity = required_column(event_header, options.activity_column, "event");
   const auto time_text = [&](std::size_t row_index) -> const std::string& {
     return guessed ? guessed->texts[row_index - 1] : event_table[row_index][timestamp];
   };
@@ -898,6 +917,11 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   std::vector<std::string> object_order{"ocel:type", "ocel:oid"};
   if (object_table != nullptr) {
     const auto object_header = read_header(*object_table, options, "object");
+    // Round ES: an objects file with rows but no id column raises KeyError
+    // on the name (observed black-box, probe es x5 p8.py; without rows, or
+    // without a type column, pm4py reads it: declared).
+    if (!object_header.indexes.contains(options.object_id_column) && object_table->size() > 1)
+      throw std::invalid_argument("KeyError: '" + options.object_id_column + "'");
     const auto object_id = required_column(object_header, options.object_id_column, "object");
     const auto object_type = required_column(object_header, options.object_type_column, "object");
     if (options.reject_unsupported) {
@@ -1210,6 +1234,8 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   const std::vector<std::string> object_own{"ocel:oid", "ocel:type"};
   ocel_frame::hint_reserved_order(log.object_frame_hint, object_order, object_own, object_own,
                                   object_file_columns);
+  // Round ES: a file's "@@index" column without rows is lost (see above).
+  ocel_frame::drop_reader_event_index(log);
   return log;
 }
 

@@ -1,6 +1,7 @@
 #include "minera/ocel_xml.hpp"
 
 #include "ocel_frame_types.hpp"
+#include "ocel_reader_index.hpp"
 #include "ocel_xml_times.hpp"
 #include "python_float_text.hpp"
 #include "xml_pull_parser.hpp"
@@ -1322,6 +1323,9 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
             "OCEL XML object change of " + change.key + ": pm4py writes it into the change "
             "frame's own column, which a native OCEL cannot hold");
   }
+  // Round ES: both reference XML readers lose an event attribute "@@index"
+  // (see drop_reader_event_index).
+  ocel_frame::drop_reader_event_index(log);
   return log;
 }
 
@@ -1513,9 +1517,31 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
         } else {
           for (const auto& attribute : event.attributes)
             if (attribute.key == field) {
-              write_classic_value(out, attribute.value, std::string_view(attribute.key).substr(5),
-                                  "      ",
-                                  event_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64);
+              // Round ES: write_ocel_xml sets such a cell as the element's
+              // value as it is: a datetime of a datetime64 column is a
+              // <date>, a str a <string>, an int, float or bool raises
+              // lxml's TypeError (NaN is left out; observed black-box,
+              // probe es x2).
+              const auto& value = attribute.value;
+              const auto key = std::string_view(attribute.key).substr(5);
+              if (std::holds_alternative<std::nullptr_t>(value)) break;
+              if (const auto* real = std::get_if<double>(&value); real != nullptr && std::isnan(*real)) break;
+              const bool date = ocel_frame::reference_date_value(log.event_type_attributes, event.activity,
+                                                                 attribute.key, value);
+              if (date && !mixed_event_dates.contains(attribute.key)) {
+                write_classic_value(out, value, key, "      ", false, true);
+                break;
+              }
+              if (!date && !std::holds_alternative<std::string>(value)) {
+                const bool float_column = event_frame.dtype(attribute.key) == ocel_frame::Dtype::kFloat64 ||
+                                          event_frame.printed_dtype(attribute.key) == ocel_frame::Dtype::kFloat64;
+                const char* type = std::holds_alternative<bool>(value) ? "bool"
+                                   : std::holds_alternative<double>(value) || float_column ? "float"
+                                                                                           : "int";
+                throw std::invalid_argument(std::string("TypeError: Argument must be bytes or unicode, got '") +
+                                            type + "'");
+              }
+              write_classic_value(out, value, key, "      ");
               break;
             }
         }
@@ -1695,7 +1721,9 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
                            ocel_frame::pandas_nat_time_text(change->timestamp)
                                ? std::string("NaT")
                                : change_time_text(change->timestamp),
-                           object_date(change->field), true);
+                           // Round ES: a change of an "ocel:"-prefixed field
+                           // is written (observed black-box, probe es x3).
+                           object_date(change->field), false);
     const auto text = attributes.str();
     if (text.empty()) out << "      <attributes/>\n";
     else out << "      <attributes>\n" << text << "      </attributes>\n";

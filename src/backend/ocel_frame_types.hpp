@@ -239,10 +239,17 @@ class Columns {
 // (OcelFrameHint::field_at, time_at), else after the attribute columns,
 // before "@@cumcount" (pm4py's JSON and XML readers: write_ocel2_sqlite
 // writes them after the other columns, observed black-box).
+// Round ES: an attribute named "ocel:field" or "ocel:timestamp" (a declared
+// one, or a change's field) is that frame column, not one more (the frame's
+// labels are unique; observed black-box, probe es x10).
 inline constexpr const char* kChangeFieldColumn = "ocel:field";
 inline constexpr const char* kChangeTimeColumn = "ocel:timestamp";
 inline std::vector<std::string> change_frame_order(const OcelFrameHint& hint,
-                                                   const std::vector<std::string>& names) {
+                                                   const std::vector<std::string>& all_names) {
+  std::vector<std::string> names;
+  names.reserve(all_names.size());
+  for (const auto& name : all_names)
+    if (name != kChangeFieldColumn && name != kChangeTimeColumn) names.push_back(name);
   const std::size_t total = names.size() + 2;
   std::vector<std::string> order;
   order.reserve(total);

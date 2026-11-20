@@ -5,6 +5,7 @@
 #include "minera/timestamp.hpp"
 #include "minera/filtering_common.hpp"
 #include "ocel_frame_types.hpp"
+#include "ocel_reader_index.hpp"
 #include "ocel_xml_times.hpp"
 #include "ocpn_projection.hpp"
 #include "python_isoformat.hpp"
@@ -2590,6 +2591,10 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     read("objects", result.object_frame_hint);
     read("changes", result.change_frame_hint);
   }
+  // Round ES: both reference JSON readers lose an event attribute "@@index"
+  // (see drop_reader_event_index); exact filter inputs with literal names
+  // keep it.
+  if (!literal_names) ocel_frame::drop_reader_event_index(result);
   return result;
 }
 
@@ -4163,8 +4168,10 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       std::vector<const OcelObjectChange*> changes;
       if (const auto found = changes_by_object.find(object->id); found != changes_by_object.end())
         changes = found->second;
+      // Round ES: a change of an "ocel:"-prefixed field is written (its
+      // static value is not), so the reader takes its first change back as
+      // the static value.
       for (const auto* change : changes) {
-        if (reference_drops_attribute(change->field)) continue;
         if (groups.try_emplace(change->field).second) names.push_back(change->field);
         groups[change->field].push_back(change);
       }
@@ -4352,8 +4359,10 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       // A field without a static value gets no base entry: write_ocel2_json
       // writes only its changes (observed black-box), and a reader takes
       // the first change as the base, as pm4py reads its own export.
+      // Round ES: write_ocel2_json drops an "ocel:"-prefixed column of the
+      // objects frame but writes the changes of such a field (observed
+      // black-box, probe es x3).
       for (const auto* change : changes) {
-        if (reference_drops_attribute(change->field)) continue;
         // Round EK: write_ocel2_json leaves out a change whose value is
         // null (observed black-box); the transport keeps it.
         if (!transport_markers && std::holds_alternative<std::nullptr_t>(change->value)) continue;

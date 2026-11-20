@@ -34027,3 +34027,151 @@ Tests:
 
 The full ctest passed 639 of 639 on the first run (30 min at -j2); the
 fixture replay gave 2,673 responses unchanged.
+
+## Review ES1: re-review of round ER, prefixed attributes in the downloads, "@@index" columns, the CSV reader's column checks, hard names in the SQLite writer, repeated labels in the SQLite reader (2026-11-20)
+
+Round ES checked ER's CI (run 44636939110 on f7bd7aa4: six jobs green, the
+Linux, macOS and Windows ctest included). Observed black-box on pm4py
+2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv, on a fresh OCEL
+2.0 bank whose attributes are named like the frames' and tables' own
+columns (`es/g/o2rx.py`, r63: 120 JSON logs and pm4py's SQLite files of
+them, 116 written) and a CSV bank whose event and object columns are
+(`es/csv/rxgen.py`, rx901: 60 logs), both through imports, rsw3, esw, xsw,
+osw, dsw and fsw (`es/runS.sh`); on 133 hand-built OCEL 2.0 logs written
+by write_ocel2_sqlite and compared table by table with the native download
+(`es/tools/sqcmp.py`, probes `es/hc/x1` to `x10`); on 105 hand-built
+SQLite files with repeated labels (`es/hc/x8`) and 16 with faulty
+relation tables (`es/hc/x11`); and on a fresh structural SQLite fuzz with
+ER's mutations and ES's (untimed change rows, emptied listed type tables,
+numeric and text time cells; 2 to 5 mutations per file:
+`es/sq/hb3.py`, banks f85 and f86 of 400 and 300) through every sweep.
+
+- **ES1-1 Prefixed event attributes in the classic XML download.**
+  write_ocel_xml sets an event's `ocel:`-prefixed cell (ER1-6) as the
+  element's value as it is: a datetime of a datetime64 column is a
+  `<date>`, a str a `<string>` (the prefix dropped from the key), NaN is
+  left out, and an int, float or bool raises lxml's `TypeError: Argument
+  must be bytes or unicode, got 'int'` (`'float'`, `'bool'`). Native wrote
+  numbers and booleans as typed elements.
+- **ES1-2 Changes of prefixed fields in the OCEL 2.0 downloads.**
+  write_ocel2_json leaves an `ocel:`-prefixed column of the objects frame
+  out but writes the changes of such a field (so its reader takes the
+  first change back as the static value); write_ocel2_xml writes them
+  too. Native left the changes out with the static value.
+- **ES1-3 An event attribute "@@index".** read_ocel_json,
+  read_ocel2_json, read_ocel_xml, read_ocel2_xml and read_ocel2_sqlite
+  number the events frame's rows in an `@@index` column (overwriting the
+  file's) that they drop after sorting, so an event attribute of that name
+  is lost while an object's stays. read_ocel_csv numbers them after
+  converting the times and raises on a file's own `@@index` column when the
+  events file has rows (`TypeError: Invalid value 'RangeIndex(start=0,
+  stop=N, step=1)' for dtype 'str'`). Native kept the attribute.
+- **ES1-4 The CSV reader's column checks.** read_ocel_csv converts the
+  time column first (KeyError on its name), then numbers the rows, then
+  selects the id and activity columns (`KeyError "['ocel:eid',
+  'ocel:activity'] not in index"`, naming the missing ones); an objects
+  file with rows but no id column raises KeyError on the name; an objects
+  file's `ocel:qualifier`, `ocel:source`, `ocel:target` and
+  `ocel:timestamp` columns are object attributes. Native checked the
+  columns in its own order and refused those four (now only with
+  `OcelCsvImportOptions::reject_unsupported`).
+- **ES1-5 Hard names in write_ocel2_sqlite.** A change row of any field is
+  a row of its type table, `@@cumcount`, `ocel:activity` and the empty
+  field included (native skipped the reserved-looking ones). An object
+  attribute named `ocel_changed_field` is the table's changed-field column
+  (the object rows hold its values, the change rows their fields); one
+  named `ocel_time` with change rows is the time column (the change rows'
+  converted times concatenated to the object rows' values: datetimes alone
+  stay a TIMESTAMP column, next to other values a TEXT one of their
+  isoformats; without change rows a column as any other). The renamed
+  columns repeat a label otherwise, and pandas raises, event types first,
+  then object types, each in sorted order: an event attribute `ocel_time`
+  with a value at the time conversion (`ValueError: cannot assemble with
+  duplicate keys`), one named `ocel_id` at a dtype (`AttributeError:
+  'DataFrame' object has no attribute 'dtype'`), an object attribute
+  `ocel_id` at a dtype without change rows and at the concatenation with
+  them (`InvalidIndexError: Reindexing only valid with uniquely valued
+  Index objects`), a change of `ocel_time` with a value at the conversion,
+  a change of `ocel_id` or `ocel_changed_field` with a value at the
+  concatenation. An attribute named `ocel:field` or `ocel:timestamp` (an
+  object's, or a change's field) is the changes frame's own column, not
+  one more (native wrote a repeated column and SQLite refused the table;
+  probe `x10`).
+- **ES1-6 Repeated labels in read_ocel2_sqlite** (declared in ER). A type
+  table holding its id column under both names (`ocel_id` and `ocel:eid`
+  or `ocel:oid`) raises when its table is looked up (`AttributeError:
+  'DataFrame' object has no attribute 'str'`); one holding its time column
+  under both names (`ocel_time` and `ocel:timestamp`) raises at the
+  concatenation, `InvalidIndexError` when the tables' columns differ (a
+  reindex) and the dtype `AttributeError` when every table has the same
+  columns; an object table's `ocel:field` next to a changed-field column
+  in any object table raises at the split into objects and changes
+  (`ValueError: cannot reindex on an axis with duplicate labels`). The
+  order: each table's own faults in the table order, "No objects to
+  concatenate" for the events, their time fault, the same for the
+  objects with the split between their reindex and their dtype faults,
+  then KeyError "['ocel:timestamp'] not in index". Native read the
+  canonical column.
+- **ES1-7 The O2O qualifier column.** read_ocel2_sqlite looks the
+  object_object table's ids up before the object tables' change rows and
+  its qualifier column after them: change rows without a time column in
+  any object table raise KeyError 'ocel:timestamp' before a missing
+  qualifier's KeyError 'ocel:qualifier' (fuzz file h85_0398, probe
+  `x11`). Native raised the qualifier's first.
+
+After the fixes: the hand-built OCEL 2.0 logs written by
+write_ocel2_sqlite match the native download table by table in 121 of 133
+(the other twelve are declared: eleven of x9's event attributes named
+`ocel:activity` or `ocel:timestamp`, EE1-3's overrides, and a change of
+`ocel:timestamp`);
+the 105 files with repeated labels and the 16 with faulty relation tables
+read as pm4py does (50 differ in the comparer's spelling of the error
+type). r63: imports 2 of 120 (JSON; r63_0044 and r63_0110, EE1-3's
+`'values' is not ordered`) and 2 of 116 (SQLite, the comparer's
+spelling); JSON rsw3 309 of 4,602, esw 80 of 1,888, xsw 91 of 1,560, osw
+31 of 720, dsw 33 of 840, fsw 68 of 1,494, all in declared classes: EE1-3's
+overrides (attributes named `ocel:eid`, `ocel:oid`, `ocel:activity`,
+`ocel:type` or `ocel:timestamp`, nine files with 16 to 95 each), EK1's
+fractions of datetime64 cells in the JSON and XML downloads (3 per file
+in rsw3), the CSV download's type columns in a set's order (osw), and a
+change of `ocel:timestamp`; SQLite rsw3 9 of 3,627, esw 3 of 1,488, xsw 13
+of 1,222, osw 6, dsw 7 of 658, fsw 2 of 1,162, all a stale transport
+(r63_0012, which native now refuses as pm4py does) or a type named like a
+time (the harness's query strings). rx901: imports 10 of 60 (the
+comparer's spelling of ES1-3's TypeError), rsw3 0 of 1,950, esw 0 of 800,
+xsw 0 of 650, osw 0 of 300, dsw 0 of 350, fsw 0 of 678. The fuzz banks:
+imports 1 of 400 and 2 of 300 (the comparer's spelling; f86's two are
+ES1-6's repeated labels), f85 rsw3 143 of 10,101, esw 72 of 4,144, xsw 28
+of 3,367, osw 29 of 1,554, dsw 58 of 1,813, fsw 60 of 3,264, f86 rsw3 87 of
+6,435, esw 43 of 2,640, xsw 40 of 2,171, osw 24 of 1,002, dsw 52 of 1,169,
+fsw 33 of 2,048, all in declared classes: numeric event time cells (EB2-1:
+`real`, `int`, `text_epoch` mutations), extra object_object columns (a
+column named rowid among them), object tables without a changed-field
+column (EK1), and harness artifacts (two stale transports, a type named
+like a time). Regression banks on the final server: b63 (the JSON logs
+before renaming) imports 0 of 120, esw, xsw, dsw and fsw 0, rsw3 153 of
+4,680 (EK1's fractions) and osw 6 of 720 (the CSV type columns' set
+order); the untimed-change fuzz of ES's first pass (u81, u82, u87; 400
+files) imports 0, the sweeps only in five files with numeric event times
+(EB2-1).
+
+Declared (outside the model), new:
+- a change of `ocel:timestamp` in an OCEL 2.0 JSON file: pm4py's changes
+  frame keeps its time (the value is lost); native's classic transport
+  refuses a change naming that frame column, as its classic reader does;
+- an objects CSV file without an id column and without rows, or without
+  a type column: pm4py reads it (native refuses, as before).
+ES1-6 retires ER's declared repeated labels. As before: extra or reordered
+object_object columns, EE1-3's overrides, numeric SQLite event times
+(EB2-1), duplicate type-table rows and object tables without a
+changed-field column (EK1), the hash-seed object order of a CSV without an
+objects file, objects named but not listed, EP1-5, EP1-6, the c56 and c59
+files, EQ1-2's name, OCPN playouts past the caps.
+
+Tests:
+- New: `minera_review_es1_tests` (hand cases of ES1-1 to ES1-7; its SQLite
+  cases were checked against pm4py with `es/hc/t/es1ref.py`,
+  `es1reader.py` and `es/hc/t2/chk.py`).
+
+The full ctest passed 640 of 640 on the first run (35 min at -j2); the
+fixture replay gave 2,673 responses unchanged.

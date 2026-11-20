@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–ER (2026-11-05 to 2026-11-19, cloud container)
+## Review-fix loop, rounds T–ES (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7679,6 +7679,82 @@ stored. The full ctest passed 639 of 639 on the first run (30 min at -j2),
 the fixture replay gave 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-er/`.
+
+Round ES re-reviewed ER (Review ES1). ER's CI run 44636939110 on f7bd7aa4:
+six jobs green, the Linux, macOS and Windows ctest included. ES ran a fresh
+OCEL 2.0 bank with attributes named like the frames' and tables' own
+columns (`es/g/o2rx.py`, r63: JSON and pm4py's SQLite files) and a CSV bank
+with such columns (`es/csv/rxgen.py`, rx901) through every sweep
+(`es/runS.sh`), compared write_ocel2_sqlite with the native download table
+by table on 133 hand-built logs (`es/tools/sqcmp.py`), read 121 hand-built
+SQLite files with repeated labels and faulty relation tables (`es/hc/x8`,
+`x11`), and ran a fresh structural SQLite fuzz with ES's mutations
+(`es/sq/hb3.py`, f85 and f86) through every sweep:
+- the classic XML download writes an event's `ocel:` cell as it is (a
+  datetime a `<date>`, a str a `<string>`, a number or boolean raises
+  lxml's TypeError; ES1-1), the OCEL 2.0 downloads write the changes of an
+  `ocel:` field whose static value they leave out (ES1-2);
+- the five reference readers but read_ocel_csv lose an event attribute
+  `@@index`, read_ocel_csv raises on one (ES1-3), and checks the time
+  column, then the id and activity columns, and an objects file's id;
+  an objects file's `ocel:qualifier`/`ocel:source`/`ocel:target`/
+  `ocel:timestamp` columns are attributes (ES1-4);
+- write_ocel2_sqlite writes the change rows of every field, shares the
+  changed-field and time columns with object attributes of those names,
+  raises pandas' errors on the other repeated labels (`ocel_time`,
+  `ocel_id`) in its order, and takes attributes named `ocel:field` and
+  `ocel:timestamp` as the changes frame's own columns (ES1-5);
+- read_ocel2_sqlite's repeated labels (id or time under both names,
+  `ocel:field` next to a changed field) raise pandas' errors in its order
+  (ES1-6, declared in ER), and the O2O qualifier column is looked up after
+  the change rows (ES1-7).
+After the fixes the hand-built logs and files match but for declared
+overrides, r63 and the fuzz banks differ only in declared classes (EE1-3's
+overrides, EK1's download fractions, the CSV type columns' set order,
+numeric event times, extra object_object columns, tables without a changed
+field) and harness artifacts (stale transports, types named like times),
+rx901 in none but the comparer's spelling, and the regression banks (b63,
+u81/u82/u87) as before. Declared, new: a JSON change of `ocel:timestamp`
+(pm4py keeps its time), objects CSV files without an id column that pm4py
+reads. ER's declared repeated labels are modelled now (ES1-6).
+
+In the suite: `minera_review_es1_tests` (hand cases of ES1-1 to ES1-7).
+The full ctest passed 640 of 640 on the first run (35 min at -j2), the
+fixture replay gave 2,673 responses unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-es/`.
+
+Next round (ET) should start by re-reviewing round ES:
+
+- ES's CI run;
+- the SQLite writer's hard names (ES1-5) through rsw3, esw and xsw on
+  JSON, XML and CSV inputs (an object attribute `ocel_time` or
+  `ocel_changed_field` next to change rows of every kind), and attributes
+  named like the frames' columns in the OCEL 2.0 XML bank (r63 has JSON
+  and SQLite only);
+- the repeated labels (ES1-6) and the O2O qualifier (ES1-7) in a fresh
+  structural fuzz with mutations that repeat labels and break relation
+  tables next to the other faults (`es/sq/hb3.py` with new seeds);
+- the CSV reader's checks (ES1-3, ES1-4) on CSV banks with missing,
+  repeated and reserved columns in both files;
+- the declared overrides (EE1-3) of the r63 bank (attributes named
+  `ocel:eid`, `ocel:oid`, `ocel:activity`, `ocel:type`, `ocel:timestamp`:
+  r63_0015, 0023, 0044, 0060, 0073, 0080, 0104, 0110, 0111) if a cheap
+  model appears;
+- the carried items below (the XML/JSON day offsets, the SQLite leftovers,
+  the new Polars dtypes, DW1, the declared items, the CU list and the open
+  choices).
+
+Round ES's list, taken in ES: ER's CI, the classic downloads' prefixed
+attributes and the SQLite writer's reserved-looking columns on CSV and
+JSON inputs, untimed SQLite change rows and empty listed type tables in the
+fuzz (f85, f86), a fresh structural SQLite fuzz, the declared
+duplicate-label cases (now modelled, ES1-6). The extra object_object
+columns stay declared. Carried to ET: the XML/JSON day offsets, the SQLite
+leftovers, the new Polars dtypes, DW1, the other declared items, the rest
+of the CU list and the open choices.
+
+Previous list for round ES (kept for its older items):
 
 Next round (ES) should start by re-reviewing round ER:
 
