@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EU (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–EV (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7797,6 +7797,59 @@ other 65 rerun with `-I`), the fixture replay gave 2,673 responses
 unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-eu/`.
+
+Round EV re-reviewed EU (Review EV1). EV ran OCEL 2.0 XML files with
+event times at offsets of a day or more in random reader positions
+(`ev/x1/xgen.py`, x71 to x73, compared by `ev/x1/xcmp.py` without printing
+such values), their OCEL 2.0 JSON counterpart (`ev/x1/jgen.py`, j74, j75),
+logs at offsets between 14 and 24 hours (`ev/h1/hoff.py`, h65), a fresh
+repeated-relation bank (d66 from b64), a fresh OCEL CSV pair (base905,
+d905) and a fresh structural SQLite fuzz (f91), all through every sweep
+and fsw2. EU1-1 and EU1-2 matched everywhere (420 XML and 270 JSON files,
+d66 in three formats: only declared classes). Declared, new:
+- routes on a log whose event times share an offset of a day or more
+  (read_ocel2_xml keeps it and pandas computes on the instants; native's
+  route parsers refuse an offset past 14 hours, so durations, features,
+  OC-DFG with business hours and the LLM abstractions differ: EV1-1);
+- number qualifiers in SQLite relation tables with a numeric affinity
+  (pm4py keeps ints and floats, its JSON writers write numbers, its OCEL 2.0
+  XML writer raises for such an O2O qualifier, its event-object graph
+  raises on repeated O2O rows mixing them; native keeps text: EV1-2).
+pm4py's KeyErrors on CSV objects named but not listed share one model
+(the unlisted object whose second relation row comes first, in OC-DFG,
+edge associations and OCPN), but native's CSV reader lists such objects
+(declared since EP1). Offsets between 14 and 24 hours match in OCEL, XES
+and CSV event logs.
+
+EU's CI run 44685379415 on 1f2909c9: the Linux and macOS ctest, the
+frontend, Python and verifier jobs green; the Windows ctest still ran when
+EV pushed. No source change in EV. The generators, the sweeps, the comparers
+and the probes are in the project files under `review-harness/round-ev/`.
+
+Next round (EW) should start by re-reviewing round EV:
+
+- EV's CI run;
+- a typed qualifier in the OCEL model for EV1-2 (int and float qualifiers
+  from the SQLite reader through the transports, the OCEL 2.0 and classic
+  JSON writers, write_ocel2_xml's TypeError for an O2O qualifier and its
+  text for an event-object one, the SQLite writer's column type, the
+  event-object graph's sort), with `ev/q1/qprobe.py` and f91's u91_0245 as
+  the start, and the same for OCEL 2.0 JSON inputs whose qualifiers are
+  JSON numbers;
+- EV1-1 if a cheap model appears (a day-offset reading in the route
+  parsers only for texts the XML reader kept);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round EV's list, taken in EV: EU's CI, EU1-1 in every reader position on
+XML and JSON banks, EU1-2 through the edge-association consumers (d66 on
+JSON, XML and SQLite, d905 on CSV, fsw2), the objects named but not listed
+next to repeated relations (one model, declared), the day-offset values
+downstream (EV1-1, declared). Carried to EW: the SQLite leftovers, the new
+Polars dtypes, DW1, the other declared items, the rest of the CU list and
+the open choices.
+
+Previous list for round EV (kept for its older items):
 
 Next round (EV) should start by re-reviewing round EU:
 

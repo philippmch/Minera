@@ -34410,3 +34410,109 @@ Tests:
 The full ctest passed 642 of 642 (577 before a container restart, the
 other 65 rerun with `-I`); the fixture replay gave 2,673 responses
 unchanged.
+
+## Review EV1: re-review of round EU, routes on OCEL 2.0 XML logs whose event times share an offset of a day or more, objects named but not listed next to repeated relations, number qualifiers in SQLite relation tables (2026-11-20)
+
+Round EV checked EU's CI (run 44685379415 on 1f2909c9: the Linux and
+macOS ctest, frontend, Python and verifier jobs green, the Windows ctest
+still running at the push). Observed black-box on pm4py 2.7.22 (pandas 3.0.5, python-dateutil
+2.9.0.post0, no pyarrow) in the reference venv, on OCEL 2.0 XML files
+(pm4py-written, o2gen banks b64 and b65) whose event times were rewritten
+to offsets of a day or more in random reader positions (`ev/x1/xgen.py`:
+mixed with other zones and naive times, shared by every event, spelled two
+ways, on one event only, on events the reader drops later (empty id, empty
+type, no relation, a relation to an unlisted object), next to a bad date
+attribute, in files left without relations, plus date attributes and
+change times with such offsets; x71 of 150 files with every spelling, x72
+of 120 and x73 of 150 without the seconds spellings that fail early), on
+the OCEL 2.0 JSON counterpart (`ev/x1/jgen.py`, j74 of 120 and j75 of 150),
+on OCEL 2.0 JSON and XML logs whose times are the same instants under
+offsets between 14 and 24 hours (`ev/h1/hoff.py`, h65), on a fresh
+repeated-relation bank (`eu/g/o2dup.py` on b64, d66: 120 JSON logs and
+pm4py's XML and SQLite copies), a fresh OCEL CSV pair (`eq/csv/q2gen.py
+905` with ET's features, base905, and `eu/csv/dupgen.py` on it, d905, 100
+logs each) and a fresh structural SQLite fuzz (`eu/sq/hbu.py 91`, f91 of 300
+files), all through imports, rsw3, esw, xsw, osw, dsw and fsw
+(`es/runS.sh`), fsw2 on d66, base905 and d905 (`ev/runF3.sh`), and the
+probes `ev/h1/p1.py` (date attribute columns mixing offsets),
+`ev/xes/mk.py` (XES and CSV event logs with offsets past 14 hours),
+`ev/n1/nl.py` (CSV objects named but not listed) and `ev/q1/qprobe.py`
+(number qualifiers in SQLite relation tables).
+
+EU's fixes matched: EU1-1 on 420 XML files (`ev/x1/xcmp.py`: outcome, error
+text, event order and each time as wall clock and offset; 156 raise the
+offset error, 60 the no-relations error, 63 read with one shared day
+offset, the others other errors or UTC columns: 0 differences), and the
+JSON counterpart (270 files, imports 0: read_ocel2_json refuses every day
+offset through fromisoformat). EU1-2 on d66: imports 0 of 120 in each
+format; rsw3 195 of 4,680 for the JSON and XML logs (EK1's fractions, 3 per
+file in 65 files) and 0 for the SQLite files; esw 0 of 1,920, xsw 0 of
+1,560, dsw 0 of 840, fsw 0 of 1,564 in all three formats; osw 13 of 720
+for JSON (the CSV type columns' set order) and 0 otherwise; fsw2 0 of
+1,881 in all three formats.
+
+Found, declared (no cheap model):
+- **EV1-1 Routes on a log whose event times share an offset of a day or
+  more.** read_ocel2_xml keeps such a column as
+  `datetime64[us, tzoffset(None, N)]` (EU1-1), and pandas computes on its
+  instants: OC-DFG and edge-association durations (with and without
+  business hours), the event-object graph's node times, the object and
+  event features (epoch seconds from the instant, calendar parts from the
+  local wall clock: `+24:00` on 2024-01-01T23:26 is day 1, Monday, hour
+  23), the LLM abstractions of the OC-DFG and of the object features; a
+  route that prints a time raises the datetime module's offset error (the
+  LLM description with timestamps). Native keeps such texts as written and
+  its route parsers refuse an offset past 14 hours, so the durations are
+  empty or `nan`, the features and the LLM feature abstraction raise "OCEL
+  feature timestamp is invalid", OC-DFG with business hours raises
+  `TypeError: str.replace() takes no keyword arguments`, the description
+  raises "OCEL description requires valid timestamps" and the filters'
+  outputs keep the texts (63 files of x72 and x73 that pm4py reads: imports
+  0, rsw3 1,436 of 2,457, esw 562 of 1,008, xsw 294 of 819, fsw 727 of 824,
+  most of rsw3 and fsw the comparer's spelling of those texts). The route
+  parsers are shared by every reader (51 source files call them), and only
+  this reader keeps such a time, so the class stays declared next to EU's
+  day-offset values in the downloads. Offsets between 14 and 24 hours,
+  which Python's datetime accepts, read and compute as pm4py does: h65's
+  XML logs (40 files) imports 0, esw 0 of 640, xsw 0 of 520, rsw3 69 of
+  1,560 (EK1's fractions); XES and CSV event logs with such offsets give
+  pm4py's case statistics (probe `ev/xes/mk.py`).
+- **EV1-2 Number qualifiers in SQLite relation tables.** A relation table
+  whose `ocel_qualifier` column has a numeric affinity (`DATE`, `NUMERIC`,
+  `INTEGER`, `REAL`) stores a number-like qualifier as a number, and
+  read_ocel2_sqlite keeps it as an int or float in an object column (an
+  int `2` next to texts in u91_0245's object_object). Its OCEL 2.0 and
+  classic JSON writers then write the number, write_ocel2_xml raises
+  `TypeError: Argument must be bytes or unicode, got 'int'` (or `'float'`)
+  for such an O2O qualifier and prints an event-object one, and its
+  event-object graph raises `TypeError: '<' not supported between
+  instances of 'int' and 'str'` on u91_0245, whose four O2O rows of one
+  pair mix an int with texts (probe `ev/q1/qprobe.py`). Native keeps every qualifier as text
+  (the OCEL model has no typed qualifier), so its downloads write `"2"` and
+  read back. Declared for now; a typed qualifier in the OCEL model is a
+  target of the next round.
+
+Checked and matching (no change):
+- CSV objects named in relation cells but not listed in the objects file
+  (EU's declared KeyErrors of d904): pm4py's OC-DFG, edge associations and
+  OCPN raise `KeyError` for the unlisted object whose second relation row
+  comes first in the relations frame (an edge on it, a self-edge of a
+  repeated row included; an unlisted object related once raises nothing),
+  whether or not the rows repeat (probe `ev/n1/nl.py`); native's CSV reader
+  lists such objects (declared in EP1), so these routes compute. d905
+  against base905: 75 new difference keys (fsw2 6), all in d905_0025 and
+  d905_0039, both with such an object related three times.
+- The f91 fuzz: imports 50 of 300 differ, all in the comparer's spelling
+  but u91_0099 (an object table with `ocel_time` and an all-NULL
+  `ocel:timestamp` and no changed-field column: EK1's tables without a
+  changed-field column, which native refuses); rsw3 370 of 8,268, esw 99 of
+  3,392, xsw 55 of 2,756, osw 63 of 1,272, dsw 131 of 1,484, fsw 221 of
+  2,724, all in 24 files with declared mutations (no changed-field column
+  in 22, extra object_object columns in 2, EB2-1 in 1) but u91_0245
+  (EV1-2).
+- Date attribute columns of read_ocel2_xml mixing offsets, one of them past
+  14 hours: pm4py reads the wall clock as UTC, as native does (probe
+  `ev/h1/p1.py`).
+
+No source change in this round. Harness: `review-harness/round-ev/` in the
+project files (README).
