@@ -1734,9 +1734,18 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
     const auto& links = rows_of(o2o, object.id);
     if (!links.empty()) {
       out << "      <objects>\n";
-      for (const auto* relation : links)
+      for (const auto* relation : links) {
+        // Round EW: a number qualifier (an int64 or float64 qualifier
+        // column of read_ocel2_sqlite's object_object table) reaches lxml's
+        // attribute setter as a number (observed black-box); the event
+        // relationships print its str.
+        if (relation->qualifier_kind != OcelQualifierKind::kStr)
+          throw std::invalid_argument(
+              std::string("TypeError: Argument must be bytes or unicode, got '") +
+              (relation->qualifier_kind == OcelQualifierKind::kInt ? "int" : "float") + "'");
         out << "        <relationship object-id=\"" << esc(relation->target_id)
             << "\" qualifier=\"" << esc(relation->qualifier) << "\"/>\n";
+      }
       out << "      </objects>\n";
     }
     out << "    </object>\n";

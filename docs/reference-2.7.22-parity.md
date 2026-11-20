@@ -34516,3 +34516,87 @@ Checked and matching (no change):
 
 No source change in this round. Harness: `review-harness/round-ev/` in the
 project files (README).
+
+## Review EW1: number qualifiers in OCEL 2.0 SQLite relation tables (2026-11-20)
+
+Round EW checked EV's CI (run 44690434272 on a395e6e3: the frontend,
+Python, verifier and macOS ctest jobs green, the Linux and Windows ctest
+still running at the push) and EU's Windows ctest (run 44685379415: green,
+so all six jobs of EU's run passed). Observed black-box on pm4py 2.7.22
+(pandas 3.0.5, no pyarrow) in the reference venv with hand-made SQLite
+logs (`ew/q/wq.py`: every relation table declared NUMERIC, ints only,
+floats only, ints next to floats, ints next to texts, NULLs next to ints
+and texts, NULLs only, a BOOLEAN column), EV's probe `ev/q1/qprobe.py`,
+and two fuzz banks of pm4py-written SQLite logs whose relation tables were
+rebuilt with a random qualifier affinity (NUMERIC, INTEGER, REAL, DATE,
+TEXT, none) and qualifiers drawn from number texts SQLite converts (`3.0`
+and `1e3` to ints, `007`, `9223372036854775808` to a REAL), floats,
+texts, NULLs, numbers bound as such and rows naming unknown events or
+objects (`ew/q/sgen.py`: s101 of 150 files from b65, s102 of 120 from b64),
+compared by `ew/q/wcmp.py` (each writer's qualifiers with their JSON or
+Python types, the OCEL 2.0 XML outcome, the SQLite qualifier columns'
+declarations and storage classes) and through every sweep.
+
+Fixed:
+- **EW1-1 Number qualifiers in SQLite relation tables (EV1-2).**
+  read_sql types the `ocel_qualifier` column of event_object and
+  object_object from its cells, as stored under the column's affinity: ints
+  only give an int64 column; a float, or a NULL next to numbers, a float64
+  one (an int reads as a float: `2` is `2.0`); a text cell an object column
+  that keeps each int and float. The NULLs then read as `''` (a float64
+  column with a NULL becomes an object column of floats and `''`). pm4py's
+  writers keep the numbers: write_ocel2_json and write_ocel_json print them
+  as JSON numbers (`2`, `2.5`, `2.0`, `1e+20`); write_ocel2_xml raises
+  lxml's `TypeError: Argument must be bytes or unicode, got 'int'` (or
+  `'float'`, the first such O2O qualifier in writer order) and prints an
+  event-object qualifier as its str; write_ocel2_sqlite declares the column
+  as to_sql infers it from the values (INTEGER for ints only, REAL for
+  floats only, TEXT otherwise), and a number in a TEXT column is SQLite's
+  text of it (`7`, `2.0`, `1.0e+20`, `9.22337203685478e+18`: the REAL's 15
+  digits). Native kept every qualifier as text, so its downloads wrote
+  `"2"`. The OCEL model now holds a qualifier kind per relation and O2O row
+  (str, int or float, with the number's Python repr as the text): the
+  SQLite reader types each relation table as read_sql does, the classic
+  JSON transport carries the numbers with `"minera:typedQualifiers": true`
+  (a document without it still refuses a number qualifier), the OCEL 2.0
+  and classic JSON writers and the event-object graph print numbers,
+  write_ocel2_xml raises on an O2O number qualifier, and the SQLite writer
+  declares and binds the column as pandas does (a float in a TEXT column
+  spelled as SQLite 3.45 spells a REAL on every platform). The lifecycle
+  enrichment's qualifiers are texts.
+
+Results: wq.py's 8 logs, s101's 150 and s102's 120 files give 0
+differences in the four writers (s101 holds 15 int64, 12 float64 and 103
+object event_object columns with numbers, 17, 24 and 44 object_object
+ones); qprobe's six cases give pm4py's outcomes. s101 through every sweep:
+imports 0 of 150, rsw3 0 of 5,850, esw 0 of 2,400, xsw 0 of 1,950, osw 0
+of 900, dsw 0 of 1,050, fsw 0 of 1,948.
+
+Correction to EV1-2: the `TypeError: '<' not supported between instances
+of 'int' and 'str'` on u91_0245 came from the sweep's own sort of pm4py's
+event-object graph edges (`xsw.py`), not from pm4py, whose graph computes;
+the sweep sorts the edges by their repr now, and rsw3, fsw and fsw2 read
+native number qualifiers with str (an int `0` no longer reads as empty).
+
+Declared:
+- A relation table whose rows all drop (every row names an object the
+  reader drops) is written with a TEXT qualifier column, where pm4py keeps
+  the read column's dtype (INTEGER for int64, REAL for float64); only the
+  schema of the empty table differs.
+- An infinite REAL qualifier keeps SQLite's text (`Inf`), where pm4py keeps
+  the float; a BLOB qualifier reads as text.
+- OCEL 2.0 and classic JSON inputs whose qualifiers are JSON numbers or
+  booleans: read_ocel2_json and read_ocel_json keep them (typed as pandas
+  types the Python values: an int next to a missing qualifier becomes a
+  float; a bool stays a bool), and a null qualifier in OCEL 2.0 JSON reads
+  as `''`. Native still refuses them (`OCEL field must be string:
+  qualifier`; `qualifier 2 is no str, which a native OCEL cannot hold`, as
+  declared since EE), so a native download with number qualifiers reads
+  back only through the SQLite reader or the transport. Target of the next
+  round (probe `ew/q/jq.py`).
+
+In the suite: `minera_review_ew1_tests` (the reader's typing on the hand
+logs, the JSON writers, write_ocel2_xml's TypeError and its event text, the
+SQLite writer's columns). The full ctest passed 643 of 643 and the
+fixture replay gave 2,673 responses unchanged. Harness:
+`review-harness/round-ew/` in the project files (README).

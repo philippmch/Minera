@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <numeric>
 #include <cctype>
+#include <cerrno>
+#include <cstdlib>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -142,6 +144,22 @@ void bind_null(sqlite3_stmt* statement, int index) {
   }
 }
 
+// Round EW: write_ocel2_sqlite declares a qualifier column as pandas'
+// to_sql infers it from the values (observed black-box): INTEGER when every
+// qualifier is an int, REAL when every one is a float, TEXT otherwise (a str,
+// or ints next to floats, written as their str). A table without rows keeps
+// the declaration below (declared: the reference's dtype of an emptied
+// column is not carried).
+template <class Relation>
+const char* qualifier_column_type(const std::vector<Relation>& rows) {
+  if (rows.empty()) return "TEXT";
+  const auto kind = rows.front().qualifier_kind;
+  if (kind == OcelQualifierKind::kStr) return "TEXT";
+  for (const auto& row : rows)
+    if (row.qualifier_kind != kind) return "TEXT";
+  return kind == OcelQualifierKind::kInt ? "INTEGER" : "REAL";
+}
+
 void step_done(sqlite3* db, sqlite3_stmt* statement) {
   const auto status = sqlite3_step(statement);
   if (status != SQLITE_DONE) {
@@ -150,6 +168,44 @@ void step_done(sqlite3* db, sqlite3_stmt* statement) {
   }
   sqlite3_reset(statement);
   sqlite3_clear_bindings(statement);
+}
+
+void bind_qualifier(sqlite3_stmt* statement, int index, const std::string& text,
+                    OcelQualifierKind kind, std::string_view column) {
+  if (column == "INTEGER" && kind == OcelQualifierKind::kInt) {
+    errno = 0;
+    char* end = nullptr;
+    const long long value = std::strtoll(text.c_str(), &end, 10);
+    if (errno == 0 && end != text.c_str() && *end == '\0') return bind_integer(statement, index, value);
+  } else if (column == "REAL" && kind == OcelQualifierKind::kFloat) {
+    char* end = nullptr;
+    const double value = std::strtod(text.c_str(), &end);
+    if (end != text.c_str() && *end == '\0') return bind_double(statement, index, value);
+  } else if (kind == OcelQualifierKind::kFloat) {
+    // A float in a TEXT column is SQLite's text of the REAL pandas binds
+    // ("1.0e+20", "9.22337203685478e+18"; observed black-box), spelled as
+    // SQLite 3.45 does on every platform (see sqlite_legacy_real_text).
+    char* end = nullptr;
+    const double value = std::strtod(text.c_str(), &end);
+    if (end != text.c_str() && *end == '\0') return bind_text(statement, index, sqlite_legacy_real_text(value));
+  }
+  bind_text(statement, index, text);
+}
+
+// Round EW: one relation table's qualifier cell as SQLite stores it.
+struct QualifierCell {
+  int type = SQLITE_NULL;
+  std::int64_t integer = 0;
+  double real = 0;
+};
+
+QualifierCell qualifier_cell(sqlite3_stmt* statement, int column) {
+  QualifierCell cell;
+  if (column < 0) return cell;
+  cell.type = sqlite3_column_type(statement, column);
+  if (cell.type == SQLITE_INTEGER) cell.integer = sqlite3_column_int64(statement, column);
+  if (cell.type == SQLITE_FLOAT) cell.real = sqlite3_column_double(statement, column);
+  return cell;
 }
 
 std::string column_string(sqlite3_stmt* statement, int column) {
@@ -164,6 +220,42 @@ std::string column_string(sqlite3_stmt* statement, int column) {
   return value == nullptr
              ? std::string{}
              : std::string(reinterpret_cast<const char*>(value));
+}
+
+// Round EW: read_sql types a relation table's qualifier column as pandas
+// types its cells: a column of ints is int64, ints next to floats or to
+// NULLs are float64 (the ints become floats), and a column with a text
+// keeps each number as an int or float; the NULLs then read as empty texts
+// (observed black-box, probe ew q/wq.py). The qualifier is then the
+// number's Python repr (OcelQualifierKind). An infinite REAL keeps its text.
+template <class Relation>
+void type_sqlite_qualifiers(std::vector<Relation>& rows, std::size_t first,
+                            const std::vector<QualifierCell>& cells) {
+  bool text = false, real = false, integer = false, null = false;
+  for (const auto& cell : cells) {
+    if (cell.type == SQLITE_TEXT || cell.type == SQLITE_BLOB) text = true;
+    else if (cell.type == SQLITE_FLOAT) real = true;
+    else if (cell.type == SQLITE_INTEGER) integer = true;
+    else null = true;
+  }
+  if (!real && !integer) return;
+  const bool float_column = !text && (real || null);
+  for (std::size_t i = 0; i < cells.size() && first + i < rows.size(); ++i) {
+    auto& row = rows[first + i];
+    const auto& cell = cells[i];
+    if (cell.type == SQLITE_INTEGER) {
+      if (float_column) {
+        row.qualifier = ocel_frame::float_repr(static_cast<double>(cell.integer));
+        row.qualifier_kind = OcelQualifierKind::kFloat;
+      } else {
+        row.qualifier = std::to_string(cell.integer);
+        row.qualifier_kind = OcelQualifierKind::kInt;
+      }
+    } else if (cell.type == SQLITE_FLOAT && std::isfinite(cell.real)) {
+      row.qualifier = ocel_frame::float_repr(cell.real);
+      row.qualifier_kind = OcelQualifierKind::kFloat;
+    }
+  }
 }
 
 std::string quote_identifier(std::string_view identifier) {
@@ -1431,11 +1523,14 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
     const int object_column = required_column(statement.get(), "ocel_object_id", "ocel:oid");
     int qualifier_column = result_column(statement.get(), "ocel_qualifier");
     if (qualifier_column < 0) qualifier_column = result_column(statement.get(), "ocel:qualifier");
+    const auto first_relation = log.relations.size();
+    std::vector<QualifierCell> qualifier_cells;
     while (true) {
       const auto status = sqlite3_step(statement.get());
       if (status == SQLITE_DONE) break;
       if (status != SQLITE_ROW)
         throw std::runtime_error("SQLite event-object query failed");
+      qualifier_cells.push_back(qualifier_cell(statement.get(), qualifier_column));
       OcelRelation relation{column_string(statement.get(), event_column),
                             column_string(statement.get(), object_column),
                             qualifier_column < 0 ? std::string() : column_string(statement.get(), qualifier_column)};
@@ -1445,6 +1540,7 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
         throw std::invalid_argument("OCEL SQLite event-object relation references an unknown id");
       log.relations.push_back(std::move(relation));
     }
+    if (qualifier_column >= 0) type_sqlite_qualifiers(log.relations, first_relation, qualifier_cells);
   }
   require_table(db, "object_object");
   // Round ES: its qualifier column is looked up after the change rows
@@ -1459,6 +1555,8 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
     // Round EO: read_sql of a table without rows gives float64 columns
     // (Ocel::untyped_o2o).
     log.untyped_o2o = true;
+    const auto first_link = log.o2o.size();
+    std::vector<QualifierCell> qualifier_cells;
     while (true) {
       const auto status = sqlite3_step(statement.get());
       if (status == SQLITE_DONE) break;
@@ -1472,6 +1570,7 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
         qualifier_missing = qualifier_column < 0;
       }
       log.untyped_o2o = false;
+      qualifier_cells.push_back(qualifier_cell(statement.get(), qualifier_missing ? -1 : qualifier_column));
       OcelO2oRelation relation{column_string(statement.get(), source_column),
                                column_string(statement.get(), target_column),
                                qualifier_missing ? std::string() : column_string(statement.get(), qualifier_column)};
@@ -1481,6 +1580,7 @@ bool read_relations(sqlite3* db, Ocel& log, bool validate_references, bool nativ
         throw std::invalid_argument("OCEL SQLite object-object relation references an unknown id");
       log.o2o.push_back(std::move(relation));
     }
+    if (!qualifier_missing) type_sqlite_qualifiers(log.o2o, first_link, qualifier_cells);
   }
   if (native_tables && table_exists(db, "event_event")) {
     Statement statement(db, "SELECT source_event_id, target_event_id, "
@@ -2282,6 +2382,8 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
                              SQLITE_OPEN_FULLMUTEX);
   sqlite3* db = database.get();
   database.exec("PRAGMA foreign_keys=OFF; BEGIN IMMEDIATE;");
+  const char* relation_qualifier_type = qualifier_column_type(log.relations);
+  const char* o2o_qualifier_type = qualifier_column_type(log.o2o);
   try {
     database.exec(
         "CREATE TABLE event (ocel_id TEXT PRIMARY KEY, ocel_type TEXT NOT NULL);"
@@ -2299,10 +2401,12 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
         "CREATE TABLE object_type_attributes (ocel_type TEXT, attribute_name TEXT, attribute_type TEXT, PRIMARY KEY(ocel_type, attribute_name));"
         + std::string(log.untyped_relations && log.relations.empty()
                           ? "CREATE TABLE event_object (ocel_event_id REAL, ocel_object_id REAL, ocel_qualifier REAL);"
-                          : "CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier TEXT);") +
+                          : std::string("CREATE TABLE event_object (ocel_event_id TEXT, ocel_object_id TEXT, ocel_qualifier ") +
+                                relation_qualifier_type + ");") +
         (log.untyped_o2o && log.o2o.empty()
              ? "CREATE TABLE object_object (ocel_source_id REAL, ocel_target_id REAL, ocel_qualifier REAL);"
-             : "CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier TEXT);") +
+             : std::string("CREATE TABLE object_object (ocel_source_id TEXT, ocel_target_id TEXT, ocel_qualifier ") +
+                   o2o_qualifier_type + ");") +
         "CREATE TABLE event_event (source_event_id TEXT, target_event_id TEXT, qualifier TEXT);"
         "CREATE TABLE event_attributes (ocel_id TEXT, attribute_name TEXT, value_type TEXT, text_value TEXT, integer_value INTEGER, real_value REAL, bool_value INTEGER, ordinal INTEGER);"
         "CREATE TABLE object_attributes (ocel_id TEXT, attribute_name TEXT, value_type TEXT, text_value TEXT, integer_value INTEGER, real_value REAL, bool_value INTEGER, ordinal INTEGER);"
@@ -2767,7 +2871,8 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       for (const auto* relation : relations) {
         bind_text(statement.get(), 1, relation->event_id);
         bind_text(statement.get(), 2, relation->object_id);
-        bind_text(statement.get(), 3, relation->qualifier);
+        bind_qualifier(statement.get(), 3, relation->qualifier, relation->qualifier_kind,
+                       relation_qualifier_type);
         step_done(db, statement.get());
       }
     }
@@ -2778,7 +2883,8 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       for (const auto* relation : relations) {
         bind_text(statement.get(), 1, relation->source_id);
         bind_text(statement.get(), 2, relation->target_id);
-        bind_text(statement.get(), 3, relation->qualifier);
+        bind_qualifier(statement.get(), 3, relation->qualifier, relation->qualifier_kind,
+                       o2o_qualifier_type);
         step_done(db, statement.get());
       }
     }

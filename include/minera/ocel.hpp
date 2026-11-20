@@ -67,16 +67,25 @@ struct OcelObject {
   std::vector<OcelAttribute> attributes;
 };
 
+// Round EW: the Python type of a qualifier. read_ocel2_sqlite keeps a
+// number of a relation table's qualifier column (a column with a numeric
+// affinity) as an int or float, which its JSON writers write as a number
+// and write_ocel2_xml refuses for an O2O link (observed black-box, probe
+// ev q1/qprobe.py). The qualifier text is then the number's Python repr.
+enum class OcelQualifierKind : unsigned char { kStr, kInt, kFloat };
+
 struct OcelRelation {
   std::string event_id;
   std::string object_id;
   std::string qualifier;
+  OcelQualifierKind qualifier_kind = OcelQualifierKind::kStr;
 };
 
 struct OcelO2oRelation {
   std::string source_id;
   std::string target_id;
   std::string qualifier;
+  OcelQualifierKind qualifier_kind = OcelQualifierKind::kStr;
 };
 
 struct OcelE2eRelation {

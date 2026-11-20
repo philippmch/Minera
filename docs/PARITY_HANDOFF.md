@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EV (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–EW (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7825,6 +7825,54 @@ EU's CI run 44685379415 on 1f2909c9: the Linux and macOS ctest, the
 frontend, Python and verifier jobs green; the Windows ctest still ran when
 EV pushed. No source change in EV. The generators, the sweeps, the comparers
 and the probes are in the project files under `review-harness/round-ev/`.
+
+Round EW fixed EV1-2 (Review EW1): number qualifiers in OCEL 2.0 SQLite
+relation tables. The OCEL model holds a qualifier kind per relation and
+O2O row (str, int, float); the SQLite reader types each relation table as
+read_sql does (int64, float64 with NULLs as '', object), the classic
+transport carries the numbers with `"minera:typedQualifiers": true`, the
+JSON writers and the event-object graph print numbers, write_ocel2_xml
+raises lxml's TypeError on an O2O number qualifier, and the SQLite writer
+declares INTEGER, REAL or TEXT as to_sql does (a float in a TEXT column is
+SQLite 3.45's REAL text on every platform). Checked on hand logs
+(`ew/q/wq.py`), EV's probe and two fuzz banks (`ew/q/sgen.py`: s101 of
+150 files from b65, s102 of 120 from b64) with `ew/q/wcmp.py` (four
+writers: 0 differences) and s101 through every sweep (0 differences). EV1-2's
+graph TypeError was the sweep's own sort (xsw.py sorts the edges by repr
+now; rsw3, fsw and fsw2 read native number qualifiers with str). Declared:
+an emptied relation table's column declaration, infinite REAL and BLOB
+qualifiers, and JSON inputs with number, boolean or null qualifiers (native
+still refuses them; next round).
+
+In the suite: `minera_review_ew1_tests`. The full ctest passed 643 of 643,
+the fixture replay gave 2,673 responses unchanged. EU's CI run 44685379415 finished
+green in all six jobs; EV's run 44690434272 had four jobs green and both
+ctest jobs running at EW's push. The generators, the comparers and the
+probes are in the project files under `review-harness/round-ew/`.
+
+Next round (EX) should start by re-reviewing round EW:
+
+- EW's CI run and the rest of EV's (Linux and Windows ctest);
+- EW1-1 on fresh qualifier fuzz banks (other source logs, every affinity,
+  the transport through the filters and enrichments, the SQLite download
+  read back by pm4py);
+- typed qualifiers from the JSON readers: read_ocel2_json and read_ocel_json
+  keep JSON numbers and booleans (pandas types the column from the Python
+  values: an int next to a missing qualifier becomes a float, a bool stays
+  a bool, so a bool kind joins int and float), and a null qualifier in OCEL
+  2.0 JSON reads as ''; probe `ew/q/jq.py`, then the writers as in EW;
+- EV1-1 if a cheap model appears (a day-offset reading in the route
+  parsers only for texts the XML reader kept);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round EW's list, taken in EW: EV's CI, the typed qualifier for SQLite
+inputs (reader, transport, JSON and XML writers, SQLite writer, graph).
+Carried to EX: JSON inputs with number qualifiers, EV1-1, the SQLite
+leftovers, the new Polars dtypes, DW1, the other declared items, the rest
+of the CU list and the open choices.
+
+Previous list for round EW (kept for its older items):
 
 Next round (EW) should start by re-reviewing round EV:
 

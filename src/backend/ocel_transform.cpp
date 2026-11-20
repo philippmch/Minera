@@ -603,6 +603,7 @@ void apply_lifecycle_qualifiers(Ocel& log, const EnrichmentIndex& index) {
     for (const auto row : rows) {
       const auto& role = roles.at(log.relations[row].event_id);
       log.relations[row].qualifier = role.middle ? "other" : role.first ? "creation" : "termination";
+      log.relations[row].qualifier_kind = OcelQualifierKind::kStr;
     }
   }
 }
@@ -883,11 +884,11 @@ OcelHeterogeneousGraph discover_ocel_heterogeneous_graph(
                             : 0));
   for (const auto& relation : log.relations) {
     result.edges.push_back(
-        {relation.event_id, relation.object_id, "E2O", relation.qualifier, {}});
+        {relation.event_id, relation.object_id, "E2O", relation.qualifier, {}, relation.qualifier_kind});
   }
   for (const auto& relation : log.o2o) {
     result.edges.push_back(
-        {relation.source_id, relation.target_id, "O2O", relation.qualifier, {}});
+        {relation.source_id, relation.target_id, "O2O", relation.qualifier, {}, relation.qualifier_kind});
   }
   if (options.include_df) {
     // Keep the first-seen object order, while retaining every relation's
@@ -972,7 +973,10 @@ std::string serialize_ocel_heterogeneous_graph_json(
     write_json_string(out, edge.type);
     if (edge.type == "E2O" || edge.type == "O2O") {
       out << ",\"qualifier\":";
-      write_json_string(out, edge.qualifier);
+      // Round EW: an int or float qualifier (OcelQualifierKind) is the
+      // number pm4py's graph carries.
+      if (edge.qualifier_kind != OcelQualifierKind::kStr) out << edge.qualifier;
+      else write_json_string(out, edge.qualifier);
     } else if (edge.type == "DF") {
       out << ",\"object\":";
       write_json_string(out, edge.object);

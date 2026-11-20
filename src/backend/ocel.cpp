@@ -592,6 +592,11 @@ std::string type_name(const Json& value) {
   return "dict";
 }
 
+// Round EW: a qualifier of a document Minera wrote with
+// "minera:typedQualifiers" may be a JSON int or float (OcelQualifierKind);
+// nullopt for any other non-string value.
+std::optional<std::pair<std::string, OcelQualifierKind>> typed_transport_qualifier(const Json& value);
+
 std::string repr(const Json& value) {
   if (value.is_null()) return "None";
   if (value.is_bool()) return std::get<bool>(value.value) ? "True" : "False";
@@ -615,6 +620,13 @@ std::string repr(const Json& value) {
     out += ocel_frame::python_str_repr(value.keys[i]) + ": " + repr(value.object().at(value.keys[i]));
   }
   return out + "}";
+}
+
+std::optional<std::pair<std::string, OcelQualifierKind>> typed_transport_qualifier(const Json& value) {
+  if (value.is_int() || value.is_uint()) return std::pair{repr(value), OcelQualifierKind::kInt};
+  if (const auto* real = std::get_if<double>(&value.value); real != nullptr && std::isfinite(*real))
+    return std::pair{repr(value), OcelQualifierKind::kFloat};
+  return std::nullopt;
 }
 
 // container[key] for a str key.
@@ -893,7 +905,7 @@ OcelRawTime transport_raw_time(const Json* marker) {
 
 Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, bool lenient_times,
                              bool require_events, bool keep_unrelated, ClassicListing& listing,
-                             bool lenient_change_times = false) {
+                             bool lenient_change_times = false, bool typed_qualifiers = false) {
   using namespace classic_json;
   const auto& root = root_json.object();
   Ocel log;
@@ -1341,13 +1353,16 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
             "' in the objects frame and '" + *relation_type[relation.object] +
             "' in the relations frame (the columns' dtypes differ), which a native OCEL cannot hold");
     std::string qualifier;
+    auto qualifier_kind = OcelQualifierKind::kStr;
     if (relation.qualifier != nullptr && !relation.qualifier->is_null()) {
-      if (!relation.qualifier->is_string())
+      const auto typed = typed_qualifiers ? typed_transport_qualifier(*relation.qualifier) : std::nullopt;
+      if (typed) std::tie(qualifier, qualifier_kind) = *typed;
+      else if (!relation.qualifier->is_string())
         raise("OCEL JSON relation " + event.id + " - " + object.id + ": qualifier " + repr(*relation.qualifier) +
               " is no str, which a native OCEL cannot hold");
-      qualifier = relation.qualifier->string();
+      else qualifier = relation.qualifier->string();
     }
-    log.relations.push_back({event.id, object.id, std::move(qualifier)});
+    log.relations.push_back({event.id, object.id, std::move(qualifier), qualifier_kind});
   }
 
   // Object links: the target column reads as str (an int target 1 names
@@ -1359,13 +1374,16 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
     const auto target = column_str(link.target, targets.kind());
     if (!target || !kept_object_ids.count(link.source) || !kept_object_ids.count(*target)) continue;
     std::string qualifier;
+    auto qualifier_kind = OcelQualifierKind::kStr;
     if (!link.qualifier->is_null()) {
-      if (!link.qualifier->is_string())
+      const auto typed = typed_qualifiers ? typed_transport_qualifier(*link.qualifier) : std::nullopt;
+      if (typed) std::tie(qualifier, qualifier_kind) = *typed;
+      else if (!link.qualifier->is_string())
         raise("OCEL JSON object link " + link.source + " - " + *target + ": qualifier " + repr(*link.qualifier) +
               " is no str, which a native OCEL cannot hold");
-      qualifier = link.qualifier->string();
+      else qualifier = link.qualifier->string();
     }
-    log.o2o.push_back({link.source, *target, std::move(qualifier)});
+    log.o2o.push_back({link.source, *target, std::move(qualifier), qualifier_kind});
   }
   for (auto& change : changes) {
     if (!object_kept[change.object]) continue;
@@ -1421,6 +1439,15 @@ Ocel parse_classic_reference(const Json& root_json, bool repeated_relations, boo
 // The former classic reading, kept for exact filter inputs (literal names).
 Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_relations = false) {
   Ocel log; std::unordered_set<std::string> object_ids, event_ids; std::unordered_map<std::string, std::string> types;
+  // Round EW: int and float qualifiers of a transport (see serialize_ocel_json).
+  const auto* typed_marker = optional(root, "minera:typedQualifiers");
+  const bool typed_qualifiers = typed_marker != nullptr && typed_marker->is_bool() && std::get<bool>(typed_marker->value);
+  const auto qualifier_of = [&](const Json* value) -> std::pair<std::string, OcelQualifierKind> {
+    if (value == nullptr) return {std::string(), OcelQualifierKind::kStr};
+    if (typed_qualifiers)
+      if (const auto typed = classic_json::typed_transport_qualifier(*value)) return *typed;
+    return {str(*value, "ocel:qualifier"), OcelQualifierKind::kStr};
+  };
   parse_classic_type_catalog(optional(root, "ocel:objectTypes"),
                              log.object_type_attributes, "ocel:objectTypes");
   parse_classic_type_catalog(optional(root, "ocel:eventTypes"),
@@ -1433,7 +1460,7 @@ Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_r
     const auto& raw = objects.at(id);
     if (!object_ids.insert(id).second) throw std::invalid_argument("duplicate object id");
     const auto& x = obj(raw, "object"); OcelObject o{id, str(required(x, "ocel:type"), "ocel:type"), {}}; attrs(optional(x, "ocel:ovmap"), o.attributes, "ocel:ovmap"); log.objects.push_back(std::move(o)); log.object_type_attributes.try_emplace(log.objects.back().type); types.emplace(id, log.objects.back().type);
-    if (const auto* rs = optional(x, "ocel:o2o")) { if (!rs->is_array()) throw std::invalid_argument("ocel:o2o must be array"); for (const auto& r : rs->array()) { const auto& rr = obj(r, "ocel:o2o"); log.o2o.push_back({id, str(required(rr, "ocel:oid"), "ocel:oid"), optional(rr, "ocel:qualifier") ? str(*optional(rr, "ocel:qualifier"), "ocel:qualifier") : ""}); } }
+    if (const auto* rs = optional(x, "ocel:o2o")) { if (!rs->is_array()) throw std::invalid_argument("ocel:o2o must be array"); for (const auto& r : rs->array()) { const auto& rr = obj(r, "ocel:o2o"); const auto [qualifier, kind] = qualifier_of(optional(rr, "ocel:qualifier")); log.o2o.push_back({id, str(required(rr, "ocel:oid"), "ocel:oid"), qualifier, kind}); } }
   }
   const auto& events_json = required(root, "ocel:events");
   const auto& events = obj(events_json, "ocel:events");
@@ -1462,15 +1489,15 @@ Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_r
         // A qualifier only qualifies a relation the omap lists; one for any
         // other object is ignored, as the reference reader ignores it.
         if(!seen.count(oid))continue;
-        const auto qualifier=optional(rr,"ocel:qualifier")?str(*optional(rr,"ocel:qualifier"),"ocel:qualifier"):"";
+        const auto [qualifier, kind] = qualifier_of(optional(rr, "ocel:qualifier"));
         if(literal_names || repeated_relations){
           const auto index=assigned[oid]++;
-          if(index<occurrences[oid].size())log.relations[occurrences[oid][index]].qualifier=qualifier;
-          else log.relations.push_back({id,oid,qualifier});
+          if(index<occurrences[oid].size()){log.relations[occurrences[oid][index]].qualifier=qualifier;log.relations[occurrences[oid][index]].qualifier_kind=kind;}
+          else log.relations.push_back({id,oid,qualifier,kind});
         }else{
           // Event ids are unique, so this event's relations to oid are the
           // ones its omap just added (one each without literal names).
-          for(const auto index:occurrences[oid])log.relations[index].qualifier=qualifier;
+          for(const auto index:occurrences[oid]){log.relations[index].qualifier=qualifier;log.relations[index].qualifier_kind=kind;}
         }
       }
     }
@@ -1943,6 +1970,13 @@ void write_standard_type_table(std::ostringstream& out,
   out << ']';
 }
 
+// Round EW: an int or float qualifier (OcelQualifierKind) is a JSON number,
+// as pm4py's JSON writers write it (observed black-box, probe ew q/wq.py).
+void write_qualifier(std::ostringstream& out, const std::string& text, OcelQualifierKind kind) {
+  if (kind != OcelQualifierKind::kStr) out << text;
+  else write_string(out, text);
+}
+
 // `relations` are one source object's o2o relations in log order.
 void write_o2o(std::ostringstream& out, const std::vector<const OcelO2oRelation*>& relations) {
   out << '[';
@@ -1953,7 +1987,7 @@ void write_o2o(std::ostringstream& out, const std::vector<const OcelO2oRelation*
     out << "{\"ocel:oid\":";
     write_string(out, relation->target_id);
     out << ",\"ocel:qualifier\":";
-    write_string(out, relation->qualifier);
+    write_qualifier(out, relation->qualifier, relation->qualifier_kind);
     out << '}';
   }
   out << ']';
@@ -2323,6 +2357,13 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
       throw std::invalid_argument("minera:unreadableEventTimes must be boolean");
     lenient_times = std::get<bool>(marker->value);
   }
+  // Round EW: int and float qualifiers of a transport (see serialize_ocel_json).
+  bool typed_qualifiers = false;
+  if (const auto* marker = optional(r, "minera:typedQualifiers")) {
+    if (!marker->is_bool())
+      throw std::invalid_argument("minera:typedQualifiers must be boolean");
+    typed_qualifiers = std::get<bool>(marker->value);
+  }
   bool lenient_change_times = false;
   if (const auto* marker = optional(r, "minera:unreadableChangeTimes")) {
     if (!marker->is_bool())
@@ -2338,7 +2379,8 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
                 : classic_reference
                     ? parse_classic_reference(root, repeated_relations, lenient_times,
                                               !keep_unrelated_flag && !optional(r, "minera:untypedRelations"),
-                                              keep_unrelated_flag, listing, lenient_change_times)
+                                              keep_unrelated_flag, listing, lenient_change_times,
+                                              typed_qualifiers)
                     : parse_classic(r, literal_names, repeated_relations);
   if (standard && !repeated_relations) {
     std::set<std::pair<std::string, std::string>> seen;
@@ -4303,7 +4345,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << "{\"objectId\":";
       write_string(out, relation->target_id);
       out << ",\"qualifier\":";
-      write_string(out, relation->qualifier);
+      write_qualifier(out, relation->qualifier, relation->qualifier_kind);
       out << '}';
     }
     out << ']';
@@ -4360,7 +4402,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         out << "{\"objectId\":";
         write_string(out, relation->object_id);
         out << ",\"qualifier\":";
-        write_string(out, relation->qualifier);
+        write_qualifier(out, relation->qualifier, relation->qualifier_kind);
         out << '}';
       }
       out << "]}";
@@ -4533,7 +4575,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       out << "{\"ocel:oid\":";
       write_string(out, relation->object_id);
       out << ",\"ocel:qualifier\":";
-      write_string(out, relation->qualifier);
+      write_qualifier(out, relation->qualifier, relation->qualifier_kind);
       out << '}';
     }
     out << "],\"ocel:vmap\":";
@@ -4630,6 +4672,13 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
           }
         }))
       out << ",\"minera:unreadableEventTimes\":true";
+    // Round EW: an int or float qualifier travels as a JSON number, which
+    // parse_ocel_json reads back only from a document that says so.
+    if (std::any_of(log.relations.begin(), log.relations.end(),
+                    [](const OcelRelation& relation) { return relation.qualifier_kind != OcelQualifierKind::kStr; }) ||
+        std::any_of(log.o2o.begin(), log.o2o.end(),
+                    [](const OcelO2oRelation& relation) { return relation.qualifier_kind != OcelQualifierKind::kStr; }))
+      out << ",\"minera:typedQualifiers\":true";
     // Round EJ: a change time read_ocel_json cannot read (the NaT of an
     // OCEL 2.0 JSON change without a time) is kept between routes too.
     if (std::any_of(log.object_changes.begin(), log.object_changes.end(), [](const OcelObjectChange& change) {
