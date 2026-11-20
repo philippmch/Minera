@@ -266,12 +266,22 @@ std::string str(const Json& j, std::string_view field) { if (!j.is_string()) thr
 OcelValue scalar(const Json& j, std::string_view field) {
   if (j.is_null()) return nullptr; if (j.is_bool()) return std::get<bool>(j.value); if (j.is_int()) return std::get<std::int64_t>(j.value); if (std::holds_alternative<double>(j.value)) return std::get<double>(j.value); if (j.is_string()) return j.string(); throw std::invalid_argument("OCEL attribute must be scalar: " + std::string(field));
 }
-void attrs(const Json* j, std::vector<OcelAttribute>& out, std::string_view field) {
+// Round FB: an "ocel:"-prefixed key other than the frame's own columns (a
+// vmap "ocel:activity", "ocel:eid" or "ocel:timestamp", an ovmap
+// "ocel:type" or "ocel:oid") is an attribute column of read_ocel_json's
+// frames (see parse_classic_reference), so the literal reading of the exact
+// filters keeps it too (observed black-box: an OCEL 1.0 XML import's
+// "ocel:d" went missing from every download of an exact filter result).
+void attrs(const Json* j, std::vector<OcelAttribute>& out, std::string_view field,
+           std::initializer_list<std::string_view> reserved) {
   if (!j) return; if (!j->is_object()) throw std::invalid_argument("OCEL attributes must be object: " + std::string(field));
   // Document order, as the reference's dict keeps it (its frame columns
   // follow first appearance).
   const auto& object = j->object();
-  for (const auto& key : j->keys) { if (key.rfind("ocel:", 0) == 0) continue; out.push_back({key, scalar(object.at(key), key)}); }
+  for (const auto& key : j->keys) {
+    if (std::find(reserved.begin(), reserved.end(), key) != reserved.end()) continue;
+    out.push_back({key, scalar(object.at(key), key)});
+  }
 }
 const Json::Object& obj(const Json& j, std::string_view field) { if (!j.is_object()) throw std::invalid_argument("OCEL field must be object: " + std::string(field)); return j.object(); }
 
@@ -1574,7 +1584,7 @@ Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_r
   for (const auto& id : objects_json.keys) {
     const auto& raw = objects.at(id);
     if (!object_ids.insert(id).second) throw std::invalid_argument("duplicate object id");
-    const auto& x = obj(raw, "object"); OcelObject o{id, str(required(x, "ocel:type"), "ocel:type"), {}}; attrs(optional(x, "ocel:ovmap"), o.attributes, "ocel:ovmap"); log.objects.push_back(std::move(o)); log.object_type_attributes.try_emplace(log.objects.back().type); types.emplace(id, log.objects.back().type);
+    const auto& x = obj(raw, "object"); OcelObject o{id, str(required(x, "ocel:type"), "ocel:type"), {}}; attrs(optional(x, "ocel:ovmap"), o.attributes, "ocel:ovmap", {"ocel:type", "ocel:oid"}); log.objects.push_back(std::move(o)); log.object_type_attributes.try_emplace(log.objects.back().type); types.emplace(id, log.objects.back().type);
     if (const auto* rs = optional(x, "ocel:o2o")) { if (!rs->is_array()) throw std::invalid_argument("ocel:o2o must be array"); for (const auto& r : rs->array()) { const auto& rr = obj(r, "ocel:o2o"); const auto [qualifier, kind] = qualifier_of(optional(rr, "ocel:qualifier")); log.o2o.push_back({id, str(required(rr, "ocel:oid"), "ocel:oid"), qualifier, kind}); } }
   }
   const auto& events_json = required(root, "ocel:events");
@@ -1582,7 +1592,7 @@ Ocel parse_classic(const Json::Object& root, bool literal_names, bool repeated_r
   for (const auto& id : events_json.keys) {
     const auto& raw = events.at(id);
     if (!event_ids.insert(id).second) throw std::invalid_argument("duplicate event id");
-    const auto& x = obj(raw, "event"); OcelEvent e{id, str(required(x, "ocel:activity"), "ocel:activity"), str(required(x, "ocel:timestamp"), "ocel:timestamp"), {}}; attrs(optional(x, "ocel:vmap"), e.attributes, "ocel:vmap"); log.events.push_back(std::move(e)); log.event_type_attributes.try_emplace(log.events.back().activity);
+    const auto& x = obj(raw, "event"); OcelEvent e{id, str(required(x, "ocel:activity"), "ocel:activity"), str(required(x, "ocel:timestamp"), "ocel:timestamp"), {}}; attrs(optional(x, "ocel:vmap"), e.attributes, "ocel:vmap", {"ocel:activity", "ocel:eid", "ocel:timestamp"}); log.events.push_back(std::move(e)); log.event_type_attributes.try_emplace(log.events.back().activity);
     const auto* omap = optional(x, "ocel:omap"); if (!omap || !omap->is_array()) throw std::invalid_argument("ocel:omap must be array");
     std::unordered_set<std::string> seen;
     std::map<std::string,std::vector<std::size_t>> occurrences;

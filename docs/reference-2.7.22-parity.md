@@ -35055,3 +35055,130 @@ transports and four writers, write_ocel2_xml's ints of a float64 column).
 The full ctest passed 648 of 648 on the first run, and the fixture replay
 gave 2,673 responses unchanged. Harness: `review-harness/round-fa/` in the project files
 (README).
+
+## Review FB1: prefixed keys in exact filters, windows on attribute columns, naive date columns (2026-11-20)
+
+Round FB checked FA's CI (run 44765194634 on 4071b27: all six jobs green). Observed black-box on
+pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv with fresh
+banks: a new OCEL 1.0 XML generator for FA1-5's change mark on prefixed
+keys, `fb/c3/c3gen.py` (round FA's c2gen with `ocel:`-prefixed event and
+object keys, PFX, and more changes, CHG): c63 of 40 (seed 63) and c65 of
+40 (seed 65, PFX and CHG 0.6); w65s and w65x, pm4py's write_ocel2_sqlite
+and write_ocel2_xml of c65 as read_ocel_xml reads it; a new OCEL 2.0
+generator for FA1-3's rule on OCEL 2.0 inputs, `fb/o2/o2tgen.py`
+(attributes declared "time" whose values mix timestamps with and without
+offsets, date-only and naive ones, texts the readers do not convert
+("hello", "", "2024", "12", "Mon"), numbers, booleans and nulls, object
+changes of them; each log as OCEL 2.0 JSON, XML and SQLite): o71 and o72
+of 60 (seeds 71, 72); `eq/csv/q2gen.py` CSV banks q24 (seed 2401, every
+feature) and q25 (seed 2501, without the declared noid, notype and
+dupeid). New sweeps: `fb/q/xf.py` (the exact event and object attribute
+filters on every column with each distinct value, negated for the first,
+and the exact window with timestamp_key on every event column), round
+FA's chain sweep with chains of three steps (`fb/q/csw.py`, SET=chain3,
+each result posted to the next route as the transport) and rsw3's routes
+on its results (`fb/q/crsw.py`, three-step chains too).
+
+FA's fixes matched: c63 and c65 imports 0 of 40, dsw 0 of 280, esw 0 of
+640, xsw 0 of 520, rsw3 42 and 20 of 1,560 (the declared date fractions
+of the JSON downloads and FA1-7); o71 imports 0, rsw3 on o71's SQLite and
+OCEL 2.0 XML imports 0 of 2,340 and 2,262, dsw 0 of 420 and 406; q25
+imports 0 of 80, csw3 0 of 18,354, crsw 0 of 19,149; q24 only the
+declared CSV classes (11 of 80 imports, dupeid). The chain sweep with
+FA's server found FB1-1 on c63 (972 of 9,135), c65 (948 of 8,456), w65s
+and w65x; o71's OCEL 2.0 JSON imports gave FB1-3 in dsw (6 of 420) and
+rsw3 (27 of 2,340, with the declared fractions), and xf FB1-2 (20 of
+1,159; the window on every event column: c63 74 of 238, c65 86 of 222,
+o71 130, 178 and 176 of 350, 360 and 338). The fixed server's sweeps
+found the rest (FB1-2's null-only column, FB1-4, FB1-5).
+
+Fixed:
+- **FB1-1 The exact filters' literal reading dropped "ocel:"-prefixed
+  attributes.** read_ocel_json keeps a vmap or ovmap key such as
+  `ocel:d` (but the frame's own columns: `ocel:activity`, `ocel:eid`,
+  `ocel:timestamp`; `ocel:type`, `ocel:oid`) as an attribute column, so an
+  exact filter's result keeps it in every download, an exact filter on it
+  selects by its values and the exact window takes it as timestamp_key;
+  the literal reading (round EE, the exact filters' input) skipped every
+  "ocel:" key, so the downloads lost it and the filters on it raised
+  KeyError. It now skips only the frame's own columns.
+- **FB1-2 The exact window on an attribute column compared timestamp
+  texts.** filter_ocel_events_timestamp with timestamp_key compares the
+  events frame's column with aware datetimes: an int64, float64 or bool
+  column raises `TypeError: '>=' not supported between instances of
+  'int' and 'datetime.datetime'` (float, bool), a naive datetime64 one
+  (texts dateutil reads, "02/03/2024") raises `Invalid comparison between
+  dtype=datetime64[us] and datetime`, and an object column compares cell
+  by cell, raising at its first text, number, boolean (their type names)
+  or naive datetime (`can't compare offset-naive and offset-aware
+  datetimes`), missing cells skipped. A column of nulls alone is float64
+  when a row lacks the key (raises 'float') and object when every row
+  holds a null (keeps nothing). Native compared the timestamp texts and
+  skipped the rest. The exact window route now types the column as the
+  frame does (`ocel_frame::event_frame`, the frame hints for dropped rows;
+  `filter_ocel_events_timestamp_exact(..., reference_frame = true)`); the
+  module function keeps its typed contract by default (the chosen column is
+  a datetime column, as in the retained public outcomes of
+  `minera_ocel_event_attributes_module_tests`, whose pandas frames held
+  datetimes).
+- **FB1-3 write_ocel_csv printed a naive datetime column cell by cell.** A
+  column of naive datetimes alone (an OCEL 2.0 JSON time attribute
+  dateutil reads as naive) is datetime64 and printed as a whole: the date
+  alone when every value is a midnight, else one fraction width for the
+  column; native printed each value as an object column's. The CSV
+  writers now print such columns with `pandas_timestamp_column_text`, in
+  the events and the objects table.
+- **FB1-4 The type declarations after a filter.** write_ocel2_json,
+  write_ocel2_xml and write_ocel_json declare a type's attributes with a
+  value in its own objects frame rows first, in that frame's column order,
+  then the ones it holds only by changes, in the changes frame's column
+  order (`@@cumcount` last). After an object attribute filter on o72's
+  o2t72_0006.sqlite (columns z, s; the kept object holds s and changes z)
+  pm4py declares s, z; native declared z first, as the objects frame's
+  column, which only removed rows fill. `reference_type_declarations` now
+  lists the static attributes first.
+- **FB1-5 write_ocel2_sqlite typed a naive date column next to aware
+  changes TIMESTAMP.** read_ocel2_json reads a non-ISO time text naive in
+  the objects frame and aware in the changes frame, and pandas
+  concatenates a naive datetime64 column with an aware one as an object
+  column: the type table's column is TEXT, of isoformats (naive ones
+  without offset). The same holds for an object attribute named
+  `ocel_time` of naive values next to the change times. Native declared
+  TIMESTAMP (o72's o2t72_0025 in every chain's SQLite download).
+
+Results with the fixed server: the window on every event column 0 on c63
+(991), c65 (955), o71's JSON (1,287; windows only: SQLite 360, XML 338)
+and o72's JSON, XML and SQLite (1,190, 1,187, 1,191); dsw 0 on o71's JSON
+CSV downloads (120) and o72's JSON and SQLite imports (420 each); csw3
+(single steps, two- and three-step chains) 0 on c63 (12,334), c65
+(11,137), o71's JSON (19,334) and o72's JSON, XML and SQLite (18,984,
+18,984, 19,313); crsw with three-step chains 0 on w65s and w65x (4,602
+each) and 15 of 6,123 on o72's JSON (the declared date fractions of the
+JSON and XML downloads). c63, c65, o71's JSON and o72's XML ran csw3 on
+the server with FB1-1 to FB1-3; twelve files each of c63 and c65 gave 0 of
+3,626 and 3,360 on the final one.
+
+Sampling: Minera has no route for pm4py's OCEL object and component
+sampling (outside the algo.* scope), so there is nothing to compare.
+
+Declared:
+- EV1-1 stays declared.
+- Carried: the CSV classes (noid, notype, notlisted, dupeid), an event's
+  relation order in OCEL 2.0 JSON (OC1), the date fractions of the JSON
+  downloads, the CSV type column order (hash seed), FA1-7, OC8, list,
+  dict, big int and infinite qualifiers, infinite REAL and BLOB
+  qualifiers. A dateutil reading of a partial text ("2024", "12", "Mon",
+  "1.5") depends on today's date in both (the banks' outcomes match on the
+  same day).
+
+In the suite: `minera_review_fb1_tests` (prefixed keys through the literal
+reading, a CSV download and the exact filters; the window on fourteen
+attribute columns; naive date columns in both CSV tables; the declaration
+order after an object attribute filter in three writers; the SQLite type
+table of naive dates next to aware changes). The full ctest passed 648 of 649 on the first run (40 minutes, -j2):
+`minera_ocel_event_attributes_module_tests`'s retained public timestamp
+outcomes window a column without a date declaration (pm4py's frames held
+datetimes there), so the frame check became the route's
+(`reference_frame`); then the 26 tests of the filter header's callers and
+the server passed. The fixture replay gave 2,673 responses unchanged. Harness:
+`review-harness/round-fb/` in the project files (README).

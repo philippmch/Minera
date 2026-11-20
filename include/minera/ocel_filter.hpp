@@ -34,10 +34,19 @@ enum class OcelEventAttributeColumnKind { kAutomatic, kScalar, kTimestamp };
 // Strings use the public whole-second date format; parsed timestamps represent
 // datetime arguments with their exact fractional instant and timezone state.
 using OcelEventTimestampBound = std::variant<std::string, ParsedExactTimestamp>;
+// Round FB: `reference_frame` true compares a timestamp_key other than
+// ocel:timestamp as pm4py compares the events frame's column with aware
+// datetimes, the column typed as the reference readers build it (catalog
+// date declarations, frame hints): an int, float or bool column, a naive
+// datetime64 one, and an object column's first text, number, boolean or
+// naive datetime raise pm4py's TypeError. The exact window route passes true
+// (its input is a reader's log); false keeps the typed module contract, in
+// which the chosen column is a datetime column.
 [[nodiscard]] Ocel filter_ocel_events_timestamp_exact(
     const Ocel& log, const OcelEventTimestampBound& from,
     const OcelEventTimestampBound& to,
-    std::string_view timestamp_key = "ocel:timestamp");
+    std::string_view timestamp_key = "ocel:timestamp",
+    bool reference_frame = false);
 
 [[nodiscard]] Ocel filter_ocel_object_attribute(
     const Ocel& log, std::string_view attribute_key,

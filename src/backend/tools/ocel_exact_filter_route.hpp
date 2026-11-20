@@ -22,7 +22,9 @@ std::optional<OcelExactFilterDispatch> dispatch_ocel_exact_filter(
     const auto from=minera::parse_ocel_event_timestamp_bound_json(required("from_json"));
     const auto to=minera::parse_ocel_event_timestamp_bound_json(required("to_json"));
     const auto key=request.has_param("timestamp_key")?request.get_param_value("timestamp_key"):"ocel:timestamp";
-    return OcelExactFilterDispatch{minera::filter_ocel_events_timestamp_exact(source,from,to,key),"TIMESTAMP_EXACT"};
+    // Round FB: the route's input is a reader's log, so an attribute column
+    // compares as the reference frame types it.
+    return OcelExactFilterDispatch{minera::filter_ocel_events_timestamp_exact(source,from,to,key,true),"TIMESTAMP_EXACT"};
   }
   if(variant=="activity_type_matching_exact") {
     const auto allowed=minera::parse_ocel_exact_activity_type_correspondence_json(required("allowed_json"));

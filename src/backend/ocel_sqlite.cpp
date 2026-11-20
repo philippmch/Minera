@@ -2729,12 +2729,24 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       // The table's columns: name, SQL type ("" for the change field and
       // time columns).
       std::vector<std::pair<std::string, std::string>> layout;
+      // Round FB: pandas concatenates a naive datetime64 column with an aware
+      // one as an object column, a TEXT one of their isoformats (observed
+      // black-box: o72's o2t72_0025, a "2024" dateutil reads naive in the
+      // objects frame and aware in the changes frame; an ocel_time attribute
+      // of naive values next to the change times too; probe fb t2/p11.py).
+      const auto naive_datetimes = [](const ocel_frame::Columns& frame, const std::string& name) {
+        const auto* stats = frame.stats(name);
+        return frame.dtype(name) == ocel_frame::Dtype::kDatetime && stats != nullptr && stats->has_naive_date;
+      };
       const auto add_attribute = [&](const std::string& name) {
         const bool in_objects = present(object_part, name);
         const bool in_changes = present(change_part, name);
         ocel_frame::Dtype dtype = in_objects ? object_frame.dtype(name) : ocel_frame::Dtype::kEmpty;
         if (has_changes)
           dtype = ocel_frame::concat_dtype(dtype, in_changes ? change_frame.dtype(name) : ocel_frame::Dtype::kEmpty);
+        if (dtype == ocel_frame::Dtype::kDatetime && in_objects && in_changes &&
+            naive_datetimes(object_frame, name) != naive_datetimes(change_frame, name))
+          dtype = ocel_frame::Dtype::kObject;
         ocel_frame::ColumnStats values;
         if (const auto* stats = object_part.stats(name)) values.merge(*stats);
         if (const auto* stats = change_part.stats(name)) values.merge(*stats);
@@ -2766,7 +2778,9 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
           if (const auto* stats = object_part.stats(name)) values.merge(*stats);
           values.has_aware_date = true;
           layout.emplace_back(name, ocel_frame::sql_type(
-                                        ocel_frame::concat_dtype(object_frame.dtype(name), ocel_frame::Dtype::kDatetime),
+                                        naive_datetimes(object_frame, name)
+                                            ? ocel_frame::Dtype::kObject
+                                            : ocel_frame::concat_dtype(object_frame.dtype(name), ocel_frame::Dtype::kDatetime),
                                         values, rows.size() + changes.size()));
           shared_time_column = true;
         } else if (name == "ocel_changed_field" && has_changes) {

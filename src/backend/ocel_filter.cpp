@@ -702,6 +702,73 @@ bool event_filter_timestamp_column(const Ocel& log, const OcelEvent& event,
           attribute->second.find("time") != std::string::npos);
 }
 
+// Round FB: the window on an attribute column compares the events frame's
+// column with two aware datetimes (`series >= lower`), which raises unless
+// every cell the comparison meets is an aware datetime (observed black-box,
+// pandas 3.0.5): an int64, float64 or bool column raises at its first cell
+// (a NaN of a float64 column too), a naive datetime64 one for its dtype;
+// an object column compares cell by cell in frame order, skipping missing
+// cells (None, NaN), and the first text, number, boolean or naive datetime
+// raises. Native compared the timestamp texts and skipped everything else.
+// A date-declared text counts as a datetime as the frame typing reads it
+// (ocel_frame::reference_date_value); the rest of the filter then compares
+// the aware ones as before.
+void check_event_attribute_window_column(const Ocel& log, std::string_view key) {
+  if (log.events.empty()) return;
+  const std::string name(key);
+  const auto frame = ocel_frame::event_frame(log, true);
+  const auto refuse = [](std::string_view type) {
+    throw std::invalid_argument(std::string("TypeError: '>=' not supported between instances of '") +
+                                std::string(type) + "' and 'datetime.datetime'");
+  };
+  const auto naive = [] {
+    throw std::invalid_argument("TypeError: can't compare offset-naive and offset-aware datetimes");
+  };
+  switch (frame.dtype(name)) {
+    case ocel_frame::Dtype::kEmpty: {
+      // A column of nulls alone: pandas builds it float64 when a row lacks
+      // the key (NaN next to None) and object when every row holds a null
+      // (observed black-box: o72's o2t72_0040, one null "d" among four
+      // events, raises 'float'); an all-NULL SQLite table column is object.
+      const auto* stats = frame.stats(name);
+      if (stats != nullptr && stats->has_none) return;
+      const bool every = std::all_of(log.events.begin(), log.events.end(), [&](const OcelEvent& event) {
+        return std::any_of(event.attributes.begin(), event.attributes.end(),
+                           [&](const OcelAttribute& attribute) { return attribute.key == key; });
+      });
+      if (every && log.event_frame_hint.dropped_rows == 0) return;
+      refuse("float");
+      return;
+    }
+    case ocel_frame::Dtype::kInt64: refuse("int"); return;
+    case ocel_frame::Dtype::kFloat64: refuse("float"); return;
+    case ocel_frame::Dtype::kBool: refuse("bool"); return;
+    case ocel_frame::Dtype::kDatetime:
+      if (const auto* stats = frame.stats(name); stats && stats->has_naive_date)
+        throw std::invalid_argument("TypeError: Invalid comparison between dtype=datetime64[us] and datetime");
+      return;
+    case ocel_frame::Dtype::kObject: break;
+  }
+  for (const auto& event : log.events) {
+    const auto found = std::find_if(event.attributes.begin(), event.attributes.end(),
+                                    [&](const OcelAttribute& attribute) { return attribute.key == key; });
+    if (found == event.attributes.end()) continue;
+    const auto* attribute = &*found;
+    const auto& value = attribute->value;
+    if (std::holds_alternative<std::nullptr_t>(value)) continue;
+    if (const auto* real = std::get_if<double>(&value)) {
+      if (std::isnan(*real)) continue;
+      refuse("float");
+    }
+    if (std::holds_alternative<bool>(value)) refuse("bool");
+    if (std::holds_alternative<std::int64_t>(value)) refuse("int");
+    if (!attribute->text && std::get<std::string>(value) == "NaT" &&
+        ocel_frame::declared_date(log.event_type_attributes, event.activity, name)) continue;
+    if (!ocel_frame::reference_date_value(log.event_type_attributes, event.activity, *attribute)) refuse("str");
+    if (ocel_frame::naive_timestamp_text(std::get<std::string>(value))) naive();
+  }
+}
+
 ParsedExactTimestamp event_filter_timestamp_bound(
     const OcelEventTimestampBound& bound) {
   if (const auto* datetime = std::get_if<ParsedExactTimestamp>(&bound)) {
@@ -782,7 +849,7 @@ Ocel filter_ocel_event_attribute_exact(
 
 Ocel filter_ocel_events_timestamp_exact(
     const Ocel& log, const OcelEventTimestampBound& from,
-    const OcelEventTimestampBound& to, std::string_view timestamp_key) {
+    const OcelEventTimestampBound& to, std::string_view timestamp_key, bool reference_frame) {
   const auto lower = event_filter_timestamp_bound(from);
   const auto upper = event_filter_timestamp_bound(to);
   if (!event_filter_column_exists(log, timestamp_key))
@@ -797,6 +864,7 @@ Ocel filter_ocel_events_timestamp_exact(
   if (timestamp_key == "ocel:timestamp" && !log.events.empty() && log.events.front().raw_time != OcelRawTime::kNone)
     throw std::invalid_argument(std::string("TypeError: '>=' not supported between instances of '") +
                                 ocel_raw_time_type(log.events.front().raw_time) + "' and 'datetime.datetime'");
+  if (reference_frame && timestamp_key != "ocel:timestamp") check_event_attribute_window_column(log, timestamp_key);
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
     const auto value = event_filter_scalar(event, timestamp_key);

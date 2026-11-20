@@ -840,9 +840,18 @@ inline void reference_type_declarations(const Ocel& log, TypeDeclarations& objec
     for (const auto& [owner, keys] : present) {
       auto& declarations = table[owner];
       std::unordered_set<std::string> written;
-      for (const auto* columns : order)
-        for (const auto& name : columns->names()) {
-          if (!keys.contains(name) || !written.insert(name).second) continue;
+      for (std::size_t pass = 0; pass < order.size(); ++pass)
+        for (const auto& name : order[pass]->names()) {
+          if (!keys.contains(name) || written.contains(name)) continue;
+          // Round FB: a type lists the attributes its own static rows hold
+          // first, in the objects frame's column order, then those it holds
+          // only by changes, in the changes frame's column order; a column
+          // that other types or filtered-out rows fill does not place a
+          // change-only field among the static ones (observed black-box:
+          // o72's o2t72_0006 filtered on "s", columns z, s with z only
+          // changed, declares s, z, @@cumcount; probe fb t2/p7.py).
+          if (pass + 1 < order.size() && owner_stats(*owners[pass], owner, name) == nullptr) continue;
+          written.insert(name);
           // The static frame's column types a type holding a static value,
           // the changes frame's one holding only changes.
           std::size_t frame = 0;

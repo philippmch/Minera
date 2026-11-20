@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FA (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–FB (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7975,6 +7975,67 @@ In the suite: `minera_review_fa1_tests`. The full ctest passed 648 of 648 on the
 fixture replay gave 2,673 responses unchanged. EZ's CI run
 44744424886 finished green in all six jobs. The generators, the comparers and the probes are in
 the project files under `review-harness/round-fa/`.
+
+Round FB re-reviewed FA (Review FB1). FA's fixes matched on fresh banks
+(the new `fb/c3/c3gen.py` for FA1-5's mark on `ocel:`-prefixed keys: c63,
+c65, and pm4py's OCEL 2.0 SQLite and XML of c65: w65s, w65x; the new
+`fb/o2/o2tgen.py` for FA1-3's rule on OCEL 2.0 inputs, time attributes of
+mixed values as JSON, XML and SQLite: o71, o72; CSV q24, q25): imports,
+dsw, esw, xsw and rsw3 gave only declared classes. The new `fb/q/xf.py`
+(exact attribute filters on every column and value, the exact window on
+every event column) and the chain sweep with three-step chains
+(`fb/q/csw.py` SET=chain3, `fb/q/crsw.py`) found five classes. Fixed:
+FB1-1, the exact filters' literal reading dropped "ocel:"-prefixed vmap
+and ovmap keys that read_ocel_json keeps as columns (only the frame's own
+columns stay out now); FB1-2, the exact window with timestamp_key compared
+timestamp texts where pandas compares the frame's column (int, float and
+bool columns raise, a naive datetime64 one raises for its dtype, an object
+column raises at its first text, number, boolean or naive datetime, a
+null-only column is float64 when a row lacks the key); FB1-3,
+write_ocel_csv prints a column of naive datetimes alone as datetime64
+(dates alone, or one fraction width); FB1-4, the OCEL 2.0 writers and
+write_ocel_json declare a type's static attributes first and the
+change-only ones after (after a filter, a column only removed rows fill
+no longer places a change-only field first); FB1-5, write_ocel2_sqlite
+types a naive date column of the objects frame next to aware changes TEXT
+(pandas' concat of naive and aware datetime64 is an object column).
+Sampling routes: none in Minera (outside algo.*). EV1-1 stays declared.
+
+In the suite: `minera_review_fb1_tests`. The full ctest passed 648 of 649 on the first run (40 minutes, -j2;
+`minera_ocel_event_attributes_module_tests`' typed window contract, so
+FB1-2's frame check is the route's, `reference_frame`), then the 26
+affected tests passed; the fixture replay gave 2,673 responses unchanged.
+FA's CI run 44765194634 finished green in all six jobs. The generators, the
+comparers and the probes are in the project files under
+`review-harness/round-fb/`.
+
+Next round (FC) should start by re-reviewing round FB:
+
+- FB's CI run (FA's run 44765194634 finished green in all six jobs);
+- FB1-1 on the other routes that read their input with literal names
+  (edge metrics, the exact filters' negations and levels, the flattening
+  and OC-DFG of an exact filter result) and on OCEL 2.0 inputs with
+  "ocel:"-prefixed attribute names;
+- FB1-2 on other readers' column kinds (SQLite TEXT and INTEGER cells
+  under TIMESTAMP, CSV, OCEL 1.0 XML), on object-side keys, and on frames
+  with dropped rows (a null-only column after a filter: the window treats
+  it as float64 when the hint shows dropped rows, a guess);
+- FB1-3 on the objects table with changes and on CSV imports read back;
+- FB1-4 with several object types and change-only fields of other types,
+  and FB1-5 on other routes that concatenate the objects and changes
+  frames (the flattening, the object change routes) and on XML and SQLite
+  inputs;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FB's list, taken in FB: FA's CI, FA1-5's mark on more banks (c63,
+c65, w65s, w65x: FB1-1), FA1-3's rule on the event side and on OCEL 2.0
+inputs (o71, o72: FB1-2, FB1-3, FB1-5), three-step chains and CSV through
+crsw (q24, q25, w65, o72: FB1-4), the sampling routes (no native route).
+Carried to FC: EV1-1, the SQLite leftovers, the new Polars dtypes, DW1,
+the other declared items, the rest of the CU list and the open choices.
+
+Previous list for round FB (kept for its older items):
 
 Next round (FB) should start by re-reviewing round FA:
 

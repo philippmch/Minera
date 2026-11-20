@@ -233,6 +233,36 @@ std::string csv_attribute_text(const OcelAttribute& attribute, const OcelTypeCat
   return value_text(attribute.value, dtype == ocel_frame::Dtype::kFloat64);
 }
 
+// Round FB: a column of naive datetimes alone (datetime64[us] in the
+// reference frame, missing cells NaT) prints as to_csv prints such a column:
+// one format for the whole column, the date alone when every value is a
+// midnight (observed black-box: OCEL 2.0 JSON time attributes dateutil reads
+// as naive midnights, "2024" -> "2024-11-20", where native printed
+// "2024-11-20 00:00:00"). Per row: the printed text, or nullopt to print
+// the cell as before.
+template <typename Entry, typename Owner>
+std::vector<std::optional<std::string>> naive_date_column_texts(const std::vector<Entry>& rows,
+                                                                const ocel_frame::Columns& dated,
+                                                                const std::string& key,
+                                                                const OcelTypeCatalog& catalog,
+                                                                Owner owner) {
+  std::vector<std::optional<std::string>> out(rows.size());
+  const auto* stats = dated.stats(key);
+  if (dated.dtype(key) != ocel_frame::Dtype::kDatetime || stats == nullptr || !stats->has_naive_date)
+    return out;
+  std::vector<std::string_view> texts;
+  std::vector<std::size_t> at;
+  for (std::size_t index = 0; index < rows.size(); ++index) {
+    const auto* attr = find_attribute(rows[index].attributes, key);
+    if (attr == nullptr || !ocel_frame::reference_date_value(catalog, owner(rows[index]), *attr)) continue;
+    texts.emplace_back(std::get<std::string>(attr->value));
+    at.push_back(index);
+  }
+  auto printed = ocel_frame::pandas_timestamp_column_text(texts);
+  for (std::size_t index = 0; index < at.size(); ++index) out[at[index]] = std::move(printed[index]);
+  return out;
+}
+
 // Round EO: write_ocel_csv's to_csv quotes as Python's csv module does
 // with QUOTE_MINIMAL: a field holding the delimiter, a quote, CR or LF, not
 // one with leading or trailing blanks (observed black-box: x52_0031's
@@ -458,6 +488,12 @@ void write_event_table(std::ostream& out, const Ocel& log,
   } else {
     timestamps = ocel_frame::pandas_timestamp_column_text(timestamp_texts);
   }
+  const auto dated = ocel_frame::event_frame(log, true);
+  std::vector<std::vector<std::optional<std::string>>> naive_dates;
+  naive_dates.reserve(event_attributes.size());
+  for (const auto& key : event_attributes)
+    naive_dates.push_back(naive_date_column_texts(log.events, dated, key, log.event_type_attributes,
+                                                  [](const OcelEvent& event) -> const std::string& { return event.activity; }));
   for (std::size_t index = 0; index < log.events.size(); ++index) {
     const auto& event = log.events[index];
     Row row;
@@ -469,9 +505,10 @@ void write_event_table(std::ostream& out, const Ocel& log,
         case Cell::kAttribute: {
           const auto& key = event_attributes[at];
           const auto* attr = find_attribute(event.attributes, key);
-          row.push_back(attr == nullptr ? std::string{}
-                                        : csv_attribute_text(*attr, log.event_type_attributes,
-                                                             event.activity, frame.dtype(key)));
+          if (auto& naive = naive_dates[at][index]) row.push_back(std::move(*naive));
+          else row.push_back(attr == nullptr ? std::string{}
+                                             : csv_attribute_text(*attr, log.event_type_attributes,
+                                                                  event.activity, frame.dtype(key)));
           break;
         }
       }
@@ -534,7 +571,13 @@ void write_object_table(std::ostream& out, const Ocel& log,
                      : name == "ocel:type" ? options.object_type_column
                                            : name);
   write_row(out, header, options.delimiter);
-  for (const auto& object : log.objects) {
+  const auto dated = ocel_frame::object_frame(log, true);
+  std::unordered_map<std::string, std::vector<std::optional<std::string>>> naive_dates;
+  for (const auto& key : attributes)
+    naive_dates.emplace(key, naive_date_column_texts(log.objects, dated, key, log.object_type_attributes,
+                                                     [](const OcelObject& object) -> const std::string& { return object.type; }));
+  for (std::size_t index = 0; index < log.objects.size(); ++index) {
+    const auto& object = log.objects[index];
     Row row;
     for (const auto& key : order) {
       if (key == "ocel:oid") {
@@ -546,9 +589,10 @@ void write_object_table(std::ostream& out, const Ocel& log,
         continue;
       }
       const auto* attr = find_attribute(object.attributes, key);
-      row.push_back(attr == nullptr ? std::string{}
-                                    : csv_attribute_text(*attr, log.object_type_attributes,
-                                                         object.type, frame.dtype(key)));
+      if (auto& naive = naive_dates.at(key)[index]) row.push_back(std::move(*naive));
+      else row.push_back(attr == nullptr ? std::string{}
+                                         : csv_attribute_text(*attr, log.object_type_attributes,
+                                                              object.type, frame.dtype(key)));
     }
     write_row(out, row, options.delimiter);
   }
