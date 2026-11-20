@@ -34300,3 +34300,113 @@ Tests:
 
 The full ctest passed 641 of 641 on the first run (40 min at -j2, next to
 the reruns); the fixture replay gave 2,673 responses unchanged.
+
+## Review EU1: re-review of round ET, read_ocel2_xml's event times with offsets of a day or more, edge associations on repeated relation rows (2026-11-20)
+
+Round EU checked ET's CI (run 44672028446 on 6ceb8cdd: six jobs green,
+the Linux, macOS and Windows ctest included). Observed black-box on pm4py
+2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv, on a fresh
+structural SQLite fuzz with ET's mutations and three new ones
+(`eu/sq/hbu.py`: `ocel:field` in place of or next to `ocel_changed_field`
+across several object tables, with time columns dropped or renamed; change
+rows whose value, field or time is missing; event_object and object_object
+rows repeated with another, the same or no qualifier), f89 of 300 files
+(one to three new mutations next to up to two older ones) and f90 of 240
+(only the first two); on OCEL 2.0 JSON logs with event and O2O relations
+repeated (`eu/g/o2dup.py` on b65, d65: 150 JSON logs and pm4py's XML and
+SQLite copies); on an OCEL CSV bank with an id repeated in an event's
+relation cell (`eu/csv/dupgen.py` on q2gen's base904, d904 of 100) and on
+OCEL 1.0 JSON and XML logs whose omap lists repeat ids (`eu/c1/c1dup.py` on
+c1gen's base91, k91 of 120), each next to its base bank, all through
+imports, rsw3, esw, xsw, osw, dsw and fsw (`es/runS.sh`), with fsw2 (object
+filters at levels 2 to 4) on d65, the repeated-relation files of f89, d904,
+base904 and k91; and on the probes `eu/hc/x1` to `x3` (OCEL 2.0 and 1.0
+XML, CSV and SQLite times with offsets of a day or more).
+
+- **EU1-1 Event times with an offset of a day or more in
+  read_ocel2_xml.** The reader reads an event time that fromisoformat
+  refuses through dateutil, which keeps an offset of a day or more
+  (`+24:00`, `+2400`, `+24`, `+23:60`, `+00:1440`, `-25:30`, also with a
+  blank for the `T`, a fraction or no seconds), and builds its events frame
+  of every event it read, also those it drops later (no id, no type, no
+  relation). pandas keeps a time column whose values all share one such
+  offset, and raises the datetime module's "offset must be a timedelta
+  strictly between -timedelta(hours=24) and timedelta(hours=24)." (without
+  fromisoformat's "not ..." part) when the column mixes one with another
+  zone or with naive times; after the errors of the walk over the file and
+  after the error of a file without relations. Date attributes and change
+  times with such offsets read. Native read every such file (probe `x1`:
+  xoff.py, xoff3.py to xoff5.py and xsafe.py, 145 files; the one difference
+  left is native's refusal of a repeated object id, z_dup_ob, declared).
+- **EU1-2 Edge associations on repeated relation rows.**
+  find_associations_per_edge keeps a (source, target, object) triple once
+  per pair of consecutive rows of the object, so an object an event lists
+  three times gives two self-edge triples (and the edge to the object's
+  next event once); the aggregated sets (event couples, event objects) and
+  the performances measured on them keep one. Native kept one triple per
+  distinct triple in `total_objects` (f89: 39 differences in 13 files with
+  repeated event_object rows; d904's d904_0001).
+
+Checked and matching (no change): ET1-1's `ocel:field` alias across
+several object tables, with and without change rows and time columns (f89,
+f90: every import fault in pm4py's order, the differences the comparer's
+spelling); ET1-2's changes without value, field or time through every
+download (f89, f90: only declared classes in osw and dsw); ET1-3's
+repeated relations through the OCEL 2.0 JSON, XML and SQLite downloads and
+the filters (d65), the CSV downloads and filters (d904 against base904),
+and the classic downloads of OCEL 1.0 JSON and XML inputs (k91: the same
+differences as base91); OCEL 1.0 XML event times and attributes with
+offsets of a day or more (both raise the error with its "not
+datetime.timedelta(...)" part, probe `x1` xoff.py); CSV and SQLite times
+with such offsets (probe `x3`).
+
+After the fixes, on the final server: d65's JSON logs: imports 0 of 150,
+rsw3 225 of 5,850 (EK1's fractions, 3 per file), esw 0 of 2,400, xsw 0 of
+1,950, osw 13 of 900 (the CSV type columns' set order), dsw 0 of 1,050,
+fsw 0 of 1,948, fsw2 0 of 2,391; its XML files: imports 0 of 150, rsw3 225
+of 5,850 (EK1), every other sweep 0; its SQLite files: imports 0 of 150 and
+every sweep 0 (5,850, 2,400, 1,950, 900, 1,050, 1,948; fsw2 0 of 2,391).
+The fuzz banks: imports f89 63 of 300 and f90 54 of 240 (the comparer's
+spelling); f89 rsw3 301 of 7,800, esw 90 of 3,200, xsw 78 of 2,600, osw 48
+of 1,200, dsw 102 of 1,400, fsw 170 of 2,576, all in declared classes
+(object tables without a changed-field column, EK1; extra object_object
+columns; numeric event times, EB2-1) but EU1-2's 39 (its 13 files on the
+final server: rsw3 16 of 546 and xsw 2 of 182, all in u89_0282, EK1); f90
+rsw3 216 of 5,577, esw 69 of 2,288, xsw 36 of 1,859, osw 40 of 858, dsw 73
+of 1,001, fsw 114 of 1,866, all in 15 files with declared mutations (EK1
+in 11, extra object_object columns in 2, EB2-1 in 2); fsw2 on the 110 imported
+repeated-relation files of f89 82 of 1,743 (the same classes, and EQ1-2's KeyError
+name in two files). The CSV banks: imports d904 34 of 100 (duplicate event
+ids, an id under two type columns, which native refuses) and base904 15
+of 100; d904 rsw3 499 of 2,574, esw 282 of 1,056, xsw 249 of 858, osw 128
+of 396, dsw 200 of 462, fsw 258 of 840, fsw2 450 of 1,098; against the same
+base904 files 126 differences are new (fsw2 18), all in five files with
+object rows without id or type (pm4py's KeyErrors follow the repeated
+rows: declared). The OCEL 1.0 banks: k91's JSON logs 0 everywhere (imports
+0 of 120, rsw3 0 of 4,680, esw 0 of 1,920, xsw 0 of 1,560, osw 0 of 720,
+dsw 0 of 840, fsw 0 of 1,622) and fsw2 15 of 1,725 (EQ1-2's KeyError
+name); its XML logs: imports 0 of 120, rsw3 38 of 4,485, dsw 10 of 805,
+fsw 32 of 1,570, the other sweeps 0: base91's own differences in three
+files (EO's declared `<date>` next to date text in one OCEL 1.0 XML
+column).
+
+Declared (outside the model), new:
+- day-offset values pm4py keeps (an event-time column sharing one offset,
+  date attributes, change times): its writers raise or print them by their
+  own rules (probe `x2`, dsw on 10 files). A probe that prints such a value
+  (`str()`, `astype(str)`) raises the same error and fakes a read error:
+  `x1/xsafe.py` reads each file in a fresh process and prints fields.
+As before: EK1's fractions and tables without a changed-field column, the
+CSV type columns' set order, EB2-1's numeric SQLite event times, extra
+object_object columns, duplicate CSV event ids, an id under several type
+columns, object rows without id or type, objects named but not listed,
+EQ1-2's KeyError name, EO's `<date>` next to date text in an OCEL 1.0 XML
+column.
+
+Tests:
+- New: `minera_review_eu1_tests` (hand cases of EU1-1 and EU1-2; the
+  pm4py side computed with `eu/hc/x1/xsafe.py` and bank d904).
+
+The full ctest passed 642 of 642 (577 before a container restart, the
+other 65 rerun with `-I`); the fixture replay gave 2,673 responses
+unchanged.

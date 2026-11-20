@@ -3133,6 +3133,42 @@ void check_ocel2_xml_date_text(std::string_view text) {
     throw std::invalid_argument("String does not contain a date: " + std::string(text));
 }
 
+// Round EU: read_ocel2_xml reads a time fromisoformat refuses through
+// dateutil, which keeps an offset of a day or more, and builds its events
+// frame of every event it read (also those it drops later). pandas keeps a
+// time column whose values all share one such offset, and raises the
+// datetime module's own error when the column mixes one with any other
+// zone or with naive times (observed black-box, probes eu x1 xoff*.py and
+// xsafe.py). Date attributes and change times with such offsets read.
+void check_ocel2_xml_event_time_offsets(const Ocel& log) {
+  std::optional<std::int64_t> shared;
+  bool day_offset = false, other = false;
+  for (const auto& event : log.events) {
+    std::optional<std::int64_t> offset;
+    try {
+      (void)iso_wall_microseconds(event.timestamp);
+    } catch (const std::invalid_argument&) {
+      try {
+        const auto reading = pandas_to_datetime::dateutil_parser_parse(event.timestamp, true);
+        if (reading && reading->offset_seconds &&
+            (*reading->offset_seconds >= 86400 || *reading->offset_seconds <= -86400))
+          offset = reading->offset_seconds;
+      } catch (const std::invalid_argument&) {
+      }
+    }
+    if (!offset) {
+      other = true;
+      continue;
+    }
+    day_offset = true;
+    if (shared && *shared != *offset) other = true;
+    shared = offset;
+  }
+  if (day_offset && other)
+    throw std::invalid_argument(
+        "offset must be a timedelta strictly between -timedelta(hours=24) and timedelta(hours=24).");
+}
+
 void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
   // read_ocel2_xml converts a type naming "date" (case-sensitive: "Date",
   // "time" and "timestamp" stay text), read_ocel2_json one naming "date" or

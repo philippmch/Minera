@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–ET (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–EU (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7761,6 +7761,69 @@ The full ctest passed 641 of 641 on the first run (40 min at -j2, next to
 the reruns), the fixture replay gave 2,673 responses unchanged.
 The generators, the sweeps, the comparers and the probes are in the
 project files under `review-harness/round-et/`.
+
+Round EU re-reviewed ET (Review EU1). ET's CI run 44672028446 on 6ceb8cdd:
+six jobs green, the Linux, macOS and Windows ctest included. EU ran a fresh
+structural SQLite fuzz with three new mutations next to ET's (`ocel:field`
+in place of or next to `ocel_changed_field` across several object tables,
+change rows without value, field or time, repeated relation rows:
+`eu/sq/hbu.py`, f89 and f90), OCEL 2.0 JSON logs with repeated event and
+O2O relations and pm4py's XML and SQLite copies (`eu/g/o2dup.py`, d65), a
+CSV bank with ids repeated in relation cells (`eu/csv/dupgen.py`, d904
+next to base904) and OCEL 1.0 JSON and XML logs with repeated omap ids
+(`eu/c1/c1dup.py`, k91 next to base91), all through every sweep and fsw2,
+and the XML day-offset probes (`eu/hc/x1` to `x3`):
+- read_ocel2_xml's events frame (every event read, also those dropped
+  later) raises the datetime module's offset error when its time column
+  mixes an offset of a day or more, which dateutil keeps, with another zone
+  or naive times; one shared offset reads (EU1-1);
+- find_associations_per_edge keeps a triple once per pair of consecutive
+  rows of an object, so an object listed three times by an event gives two
+  self-edge triples; the aggregated sets and performances keep one (EU1-2).
+ET1-1 to ET1-3 matched on the new banks, the OCEL 1.0 XML, CSV and SQLite
+day offsets matched already. After the fixes every bank differs only in
+declared classes and the comparer's spelling. Declared, new: the day-offset
+values pm4py keeps (a uniform event-time column, date attributes, change
+times), whose writers raise or print them by their own rules. Probe pitfall:
+`str()` of such a value raises the same error, so a probe that prints frames
+fakes a read error (`x1/xsafe.py` reads in a fresh process and prints
+fields). `tools/pairdiff.py` diffs a mutated bank against its base bank
+(pass the file prefixes with the underscore: `d904_ q904_`; `SWS=fsw2` for
+the fsw2 outputs).
+
+In the suite: `minera_review_eu1_tests` (hand cases of EU1-1 and EU1-2).
+The full ctest passed 642 of 642 (577 before a container restart, the
+other 65 rerun with `-I`), the fixture replay gave 2,673 responses
+unchanged.
+The generators, the sweeps, the comparers and the probes are in the
+project files under `review-harness/round-eu/`.
+
+Next round (EV) should start by re-reviewing round EU:
+
+- EU's CI run;
+- EU1-1 on OCEL 2.0 XML banks whose event times mix offsets of a day or
+  more with other zones in every reader position (dropped events, events
+  after a walk error, files without relations), and the declared day-offset
+  values through every download if a cheap model appears;
+- EU1-2's repeated triples through the edge-association consumers (OC-DFG
+  performance with business hours, the LLM abstractions of the OC-DFG, the
+  filters' outputs fed back to the statistics) on JSON, XML, SQLite and
+  CSV inputs with repeated relations;
+- repeated relations next to object rows without id or type (d904's five
+  files) if the declared KeyErrors turn out to share one model;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round EU's list, taken in EU: ET's CI, the `ocel:field` alias in a
+structural fuzz across several object tables (f89, f90), NaN and NaT
+changes through every download on SQLite inputs (f89, f90), relations
+repeated with other qualifiers through the CSV, OCEL 2.0 and classic
+downloads and the filters (d65, d904, k91, fsw2), the XML day offsets
+(EU1-1). Carried to EV: the declared `ocel:field` changes (no cheap
+model), the SQLite leftovers, the new Polars dtypes, DW1, the other
+declared items, the rest of the CU list and the open choices.
+
+Previous list for round EU (kept for its older items):
 
 Next round (EU) should start by re-reviewing round ET:
 

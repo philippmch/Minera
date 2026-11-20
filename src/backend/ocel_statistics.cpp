@@ -539,10 +539,12 @@ OcelEdgeAssociations edge_associations(
       metric.event_objects.erase(
           std::unique(metric.event_objects.begin(), metric.event_objects.end()),
           metric.event_objects.end());
+      // Round EU: total_objects is find_associations_per_edge's list, which
+      // keeps a triple once per pair of repeated rows (an object listed
+      // three times by an event gives two self-edges, observed black-box,
+      // bank d904); the performances measure the aggregated set
+      // (event_objects).
       std::sort(metric.total_objects.begin(), metric.total_objects.end());
-      metric.total_objects.erase(
-          std::unique(metric.total_objects.begin(), metric.total_objects.end()),
-          metric.total_objects.end());
       metric.performance.clear();
       metric.performance_event_couples.clear();
       metric.performance_total_objects.clear();
@@ -592,7 +594,7 @@ OcelEdgeAssociations edge_associations(
         if (const auto value = duration(couple.first, couple.second))
           metric.performance_event_couples.push_back(*value);
       }
-      for (const auto& triple : metric.total_objects) {
+      for (const auto& triple : metric.event_objects) {
         if (const auto value = duration(std::get<0>(triple),
                                         std::get<1>(triple)))
           metric.performance_total_objects.push_back(*value);

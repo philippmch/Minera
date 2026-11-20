@@ -26,4 +26,10 @@ struct OcelXmlTime {
 };
 void sort_ocel_xml_events(Ocel& log, const std::vector<OcelXmlTime>& times);
 
+// Round EU: read_ocel2_xml's events frame refuses a time column that mixes
+// an offset of a day or more (read by dateutil) with any other zone or with
+// naive times; one where every time shares one such offset reads. Throws the
+// datetime module's error (defined in ocel.cpp).
+void check_ocel2_xml_event_time_offsets(const Ocel& log);
+
 }  // namespace minera

@@ -1269,6 +1269,9 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   // Round EJ: read_ocel2_xml says "'NoneType' object has no attribute
   // 'index'" (observed black-box); round EO: read_ocel_xml too (bank b56).
   if (log.relations.empty()) throw std::invalid_argument("'NoneType' object has no attribute 'index'");
+  // Round EU: then its events frame, whose time column refuses an offset of
+  // a day or more next to other zones (observed black-box).
+  if (standard) check_ocel2_xml_event_time_offsets(log);
   // The OCEL 2.0 XML reader reads dates leniently, the classic one as ISO.
   if (standard) sort_ocel_events_by_timestamp(log, OcelTimestampReader::kDateutil);
   else sort_ocel_xml_events(log, classic_times);
