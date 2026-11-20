@@ -22,6 +22,15 @@ using OcelValue = std::variant<std::nullptr_t, bool, std::int64_t, double,
 struct OcelAttribute {
   std::string key;
   OcelValue value;
+  // Round EZ: a text the reference frame keeps as a str although its type
+  // declares the key a date. read_ocel_xml types each element (observed
+  // black-box): a <date> becomes a datetime, a <string> (or any other tag)
+  // under the same key and type stays its text, so the type's slice of the
+  // column is object and every writer, filter and the flattening keep the
+  // text where a date-declared timestamp text reads as a datetime (see
+  // ocel_frame::reference_date_value). Both OCEL transports carry it as
+  // "minera:textValues" (the keys of an event's or object's marked values).
+  bool text = false;
 };
 
 // Round EL: pm4py's read_ocel2_sqlite keeps a time column as read_sql gave

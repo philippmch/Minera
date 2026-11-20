@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–EY (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–EZ (2026-11-05 to 2026-11-20, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -7911,6 +7911,63 @@ of 645 and the fixture replay gave 2,673 responses unchanged. EX's CI run 447099
 finished green (ctest on Linux, macOS and Windows). The generators, the
 comparers and the probes are in the project files under
 `review-harness/round-ey/`.
+
+Round EZ re-reviewed EY (Review EZ1). EY's fixes matched on fresh banks
+(`ex/q/jqgen.py`: j5, j6 OCEL 2.0 JSON, k5, k6 classic; `ew/q/sgen.py`:
+s105 SQLite; `eo/c1/c1gen.py`: c58 OCEL 1.0): the emptied-table comparer
+after every filter family (`ez/q/esq2.py`) gave 0 of 7,200 (j5) and 0 of
+5,760 (s105), the sweeps only declared classes on j5, k5 and s105. Fixed:
+EY1-3, a date-like `<string>` next to a `<date>` of the same key and type
+in OCEL 1.0 XML: an attribute carries a per-cell text mark
+(`OcelAttribute::text`) set by the OCEL 1.0 XML reader, honoured by the
+frame typing, the six writers, the attribute filters, the flattening and
+the OC-DFG edge performance, and carried by both transports as
+`"minera:textValues"` (c58 dsw 24, fsw 69, rsw3 94 before, 0 after).
+EZ1-1, found by the new filter and split download sweeps
+(`ez/q/fdsw.py`, `ez/q/ssw.py`) and the split declaration comparer
+(`ez/q/esq3.py`): pm4py's filter and split results select rows of their
+source's frames, so they keep every column, the column order and the
+dtypes; a connected component is a new OCEL built from those rows (a
+float64 O2O frame, so object_object REAL, a new changes frame, empty
+globals). Filter and split results now record the source rows they lack
+in their frame hints (`ocel_frame::hint_subset_rows`, one pass for all
+sublogs), and a component's O2O frame, changes frame and globals are a new
+OCEL's. EV1-1 stays declared.
+
+In the suite: `minera_review_ez1_tests`, `minera_review_ez2_tests`;
+`minera_ocel_exact_filter_controls_tests` expects the filter results' frame
+hints, `minera_ocel_transform_tests` compares the split's rows. The full
+ctest passed 644 of 647 on the first run (those two and a transport date
+declaration in `minera_ocel_tests`, fixed in the transport), then the 191
+OCEL, review, OC, server and JSON tests passed; the fixture replay gave
+2,673 responses unchanged. EY's CI run 44725615359 finished green in all
+six jobs. The generators, the comparers and the probes are in the project
+files under `review-harness/round-ez/`.
+
+Next round (FA) should start by re-reviewing round EZ:
+
+- EZ's CI run (EY's run 44725615359 finished green in all six jobs);
+- EZ1-1 on more banks and transforms: the filter and split download
+  sweeps on the rest of j5, k5, s105 and c58, on CSV and OCEL 2.0 XML and
+  SQLite inputs, the other filter families (attribute values, object type
+  counts, lifecycle, connected components, activity-type matching), the
+  sampling routes, a filter after an enrichment, a filter of a filter
+  result read back through the transport;
+- EY1-3's mark on more OCEL 1.0 XML banks (other seeds of c1gen, events
+  with mixed `<date>` and `<string>` values, a `<string>` that does not
+  read as a date) and through the OCEL 2.0 XML import of a native export;
+- EV1-1 if a cheap model appears;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list and the open choices).
+
+Round EZ's list, taken in EZ: EY's CI, EY1-1 and EY1-2 on fresh banks
+(every filter family, the splits, the enrichments, SQLite NULL and REAL
+qualifiers, classic date catalogs), EY1-3 (fixed), EV1-1 (declared), the
+filter and split result frames (EZ1-1, fixed). Carried to FA: EV1-1, the
+SQLite leftovers, the new Polars dtypes, DW1, the other declared items,
+the rest of the CU list and the open choices.
+
+Previous list for round EZ (kept for its older items):
 
 Next round (EZ) should start by re-reviewing round EY:
 

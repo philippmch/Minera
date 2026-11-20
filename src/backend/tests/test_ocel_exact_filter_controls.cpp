@@ -66,6 +66,10 @@ void actual_http_controls(){
   // imported source rather than dropping its declarations with a fresh export.
   auto expected=parse_ocel_json_literal_names(before);
   expected.events.pop_back();expected.relations.pop_back();expected.e2e.clear();
+  // Round EZ: the result's events frame keeps the dropped e2's row (its int
+  // column) in the frame hint (review EZ2).
+  expected.event_frame_hint.columns={""};expected.event_frame_hint.dropped={{"",kOcelHintInt,1}};
+  expected.event_frame_hint.dropped_rows=1;
   assert(expected.event_type_attributes.contains("B"));
   httplib::Server server;
   server.Post("/api/ocel/filter",[&](const httplib::Request& request,httplib::Response& response){
@@ -140,6 +144,9 @@ void actual_http_matching_controls(){
   std::erase_if(expected.relations,[](const auto& value){return value.event_id=="e2";});
   std::erase_if(expected.o2o,[](const auto& value){return value.target_id=="o2";});
   std::erase_if(expected.e2e,[](const auto& value){return value.target_id=="e2";});
+  // Round EZ: the result's frames count the dropped e2, o2 and "unused" rows
+  // in their frame hints (review EZ2).
+  expected.event_frame_hint.dropped_rows=1;expected.object_frame_hint.dropped_rows=2;
   httplib::Server server;
   server.Post("/api/ocel/filter",[&](const httplib::Request& request,httplib::Response& response){
     try{
@@ -182,6 +189,7 @@ void actual_http_matching_controls(){
   auto cleared=expected;for(auto& relation:cleared.relations)relation.qualifier.clear();
   check({{"allowed_json",R"({"":["A,|&=+"]})"},{"temporary_column","ocel:qualifier"}},cleared);
   auto empty=expected;empty.events.clear();empty.objects.clear();empty.relations.clear();empty.o2o.clear();empty.e2e.clear();
+  empty.event_frame_hint.dropped_rows=2;empty.object_frame_hint.dropped_rows=3;  // round EZ: every row dropped
   check({{"allowed_json","{}"}},empty);
   check({{"allowed_json",R"({"":["A,|&=+"]})"},{"temporary_separator",std::string("X\0",2)}},empty);
   for(const auto& controls:std::vector<httplib::Params>{
@@ -208,6 +216,11 @@ void actual_http_object_controls(){
   std::erase_if(expected.events,[](const auto& value){return value.id=="e2";});
   std::erase_if(expected.relations,[](const auto& value){return value.object_id=="o2";});
   std::erase_if(expected.o2o,[](const auto& value){return value.target_id=="o2";});
+  // Round EZ: the result's frames keep the dropped e2's and o2's rows (o2's
+  // int column) in their frame hints (review EZ2).
+  expected.event_frame_hint.dropped_rows=1;
+  expected.object_frame_hint.columns={""};expected.object_frame_hint.dropped={{"",kOcelHintInt,1}};
+  expected.object_frame_hint.dropped_rows=1;
   std::erase_if(expected.e2e,[](const auto& value){return value.target_id=="e2";});
   httplib::Server server;
   server.Post("/api/ocel/filter",[&](const httplib::Request& request,httplib::Response& response){

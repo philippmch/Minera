@@ -465,11 +465,19 @@ struct ReferenceAttributes {
         throw std::invalid_argument("OCEL XML list values are unsupported");
       if (key == nullptr) continue;
       auto value = reference_value(entry);
-      if (reference_value_kind(entry) == ReferenceValueKind::kDate) dated.insert(*key);
+      const bool date = reference_value_kind(entry) == ReferenceValueKind::kDate;
+      if (date) dated.insert(*key);
       else dated.erase(*key);
+      // Round EZ: a text kept as such, marked until the catalog is known
+      // (see mark_classic_xml_texts).
+      const bool text = !date && std::holds_alternative<std::string>(value);
       const auto [found, fresh] = at.emplace(*key, values.size());
-      if (fresh) values.push_back({*key, std::move(value)});
-      else values[found->second].value = std::move(value);
+      if (fresh) {
+        values.push_back({*key, std::move(value), text});
+      } else {
+        values[found->second].value = std::move(value);
+        values[found->second].text = text;
+      }
     }
   }
 };
@@ -517,8 +525,12 @@ void read_reference_object(const Node& on, Ocel& log, bool reject_lists,
         const auto* entry_key = exact_attr(entry, "key");
         if (entry_key == nullptr) continue;
         if (held.insert(*entry_key).second) {
-          if (reference_value_kind(entry) == ReferenceValueKind::kDate) dated.insert(*entry_key);
-          attributes.push_back({*entry_key, reference_value(entry)});
+          const bool date = reference_value_kind(entry) == ReferenceValueKind::kDate;
+          if (date) dated.insert(*entry_key);
+          auto value = reference_value(entry);
+          // Round EZ: see mark_classic_xml_texts.
+          const bool text = !date && std::holds_alternative<std::string>(value);
+          attributes.push_back({*entry_key, std::move(value), text});
           continue;
         }
         if (*entry_key == "ocel:oid" || *entry_key == "ocel:type") {
@@ -744,6 +756,25 @@ OcelValue standard_xml_value(const Node& node, const std::string* declared_type,
 
 // Returns the typed times of the events, in file order, for
 // sort_ocel_xml_events (a former-dialect event's time is a date).
+// Round EZ: read_ocel_xml types each element (observed black-box): a
+// <date> becomes a datetime, any other tag keeps its text, so a timestamp
+// text under a key a <date> of the same type makes a date stays a str in
+// pm4py's frame. The readers above mark every text value; once the
+// catalogs are complete, a mark stays where it changes the reading (a
+// date-declared key, a timestamp text; see OcelAttribute::text).
+void mark_classic_xml_texts(Ocel& log) {
+  for (auto& event : log.events)
+    for (auto& attribute : event.attributes)
+      if (attribute.text)
+        attribute.text = ocel_frame::reference_date_value(log.event_type_attributes, event.activity, attribute.key,
+                                                          attribute.value);
+  for (auto& object : log.objects)
+    for (auto& attribute : object.attributes)
+      if (attribute.text)
+        attribute.text = ocel_frame::reference_date_value(log.object_type_attributes, object.type, attribute.key,
+                                                          attribute.value);
+}
+
 std::vector<OcelXmlTime> parse_classic(const Node& root, Ocel& log, bool reject_lists,
                                        std::vector<HeldColumnChange>& held_changes,
                                        std::vector<XmlFrameOverride>& overrides) {
@@ -1217,7 +1248,10 @@ Ocel parse_ocel_xml(std::string_view xml, const OcelXmlImportOptions& options) {
   std::vector<HeldColumnChange> held_changes;
   std::vector<XmlFrameOverride> overrides;
   if (standard) parse_standard(root, log, options.reject_unsupported);
-  else classic_times = parse_classic(root, log, options.reject_unsupported, held_changes, overrides);
+  else {
+    classic_times = parse_classic(root, log, options.reject_unsupported, held_changes, overrides);
+    mark_classic_xml_texts(log);
+  }
   // The rows a vmap ocel:* entry drops from the events frame (see
   // XmlFrameOverride): an id other than the own one drops the row unless a
   // relation names it (then it is held).
@@ -1529,8 +1563,7 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
               const auto key = std::string_view(attribute.key).substr(5);
               if (std::holds_alternative<std::nullptr_t>(value)) break;
               if (const auto* real = std::get_if<double>(&value); real != nullptr && std::isnan(*real)) break;
-              const bool date = ocel_frame::reference_date_value(log.event_type_attributes, event.activity,
-                                                                 attribute.key, value);
+              const bool date = ocel_frame::reference_date_value(log.event_type_attributes, event.activity, attribute);
               if (date && !mixed_event_dates.contains(attribute.key)) {
                 write_classic_value(out, value, key, "      ", false, true);
                 break;
@@ -1563,8 +1596,8 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
           if (!reserved_name(attribute->key))
             write_classic_value(out, attribute->value, attribute->key, "        ",
                                 event_frame.dtype(attribute->key) == ocel_frame::Dtype::kFloat64,
-                                ocel_frame::declared_date(log.event_type_attributes,
-                                                          event.activity, attribute->key),
+                                !attribute->text && ocel_frame::declared_date(log.event_type_attributes,
+                                                                              event.activity, attribute->key),
                                 mixed_event_dates.contains(attribute->key),
                                 event_frame.printed_dtype(attribute->key) == ocel_frame::Dtype::kFloat64);
       }, !has_value(event.attributes));
@@ -1584,8 +1617,8 @@ void write_ocel_xml_legacy(std::ostream& out, const Ocel& log, const OcelXmlExpo
           if (!reserved_name(attribute->key))
             write_classic_value(out, attribute->value, attribute->key, "        ",
                                 object_frame.dtype(attribute->key) == ocel_frame::Dtype::kFloat64,
-                                ocel_frame::declared_date(log.object_type_attributes,
-                                                          object.type, attribute->key),
+                                !attribute->text && ocel_frame::declared_date(log.object_type_attributes,
+                                                                              object.type, attribute->key),
                                 mixed_object_dates.contains(attribute->key),
                                 object_frame.printed_dtype(attribute->key) == ocel_frame::Dtype::kFloat64);
       }, !has_value(object.attributes));
@@ -1691,7 +1724,7 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
     };
     for (const auto* attribute : ocel_frame::frame_row(object.attributes, standard_object_frame))
       write_standard_value(attributes, attribute->value, attribute->key, "        ",
-                           "1970-01-01T00:00:00Z", object_date(attribute->key), true);
+                           "1970-01-01T00:00:00Z", !attribute->text && object_date(attribute->key), true);
     // Round EJ: an object's changes in log order, as write_ocel2_xml writes
     // them (observed black-box: not sorted by time).
     const std::vector<const OcelObjectChange*>& object_changes = rows_of(changes, object.id);
@@ -1786,8 +1819,8 @@ void write_ocel_xml(std::ostream& out, const Ocel& input,
     std::ostringstream attributes;
     for (const auto* attribute : ocel_frame::frame_row(event.attributes, standard_event_frame))
       write_standard_value(attributes, attribute->value, attribute->key, "        ", {},
-                           ocel_frame::declared_date(log.event_type_attributes,
-                                                     event.activity, attribute->key),
+                           !attribute->text && ocel_frame::declared_date(log.event_type_attributes,
+                                                                         event.activity, attribute->key),
                            true);
     const auto text = attributes.str();
     if (text.empty()) out << "      <attributes/>\n";

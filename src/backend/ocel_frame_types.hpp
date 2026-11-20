@@ -15,6 +15,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -120,6 +121,12 @@ inline bool reference_date_value(const OcelTypeCatalog& catalog, const std::stri
                                  const std::string& key, const OcelValue& value) {
   return date_value_text(value) != nullptr && declared_date(catalog, owner, key);
 }
+// Round EZ: an attribute's value, unless the attribute is a text the
+// reference keeps as a str under a date declaration (OcelAttribute::text).
+inline bool reference_date_value(const OcelTypeCatalog& catalog, const std::string& owner,
+                                 const OcelAttribute& attribute) {
+  return !attribute.text && reference_date_value(catalog, owner, attribute.key, attribute.value);
+}
 
 // Columns in first-appearance order with their value statistics.
 class Columns {
@@ -143,16 +150,14 @@ class Columns {
                    const std::string& owner) {
     ++rows_;
     for (const auto& attribute : attributes)
-      observe(attribute.key, attribute.value,
-              reference_date_value(catalog, owner, attribute.key, attribute.value));
+      observe(attribute.key, attribute.value, reference_date_value(catalog, owner, attribute));
   }
   void add_rows(std::size_t rows) { rows_ += rows; }
   // Round EN: a change row of `owner` (counts no row): its field's value and
   // its other cells (OcelObjectChange::cells), date values by the catalog.
   void observe_change(const OcelObjectChange& change, const OcelTypeCatalog& catalog, const std::string& owner) {
     observe(change.field, change.value, reference_date_value(catalog, owner, change.field, change.value));
-    for (const auto& cell : change.cells)
-      observe(cell.key, cell.value, reference_date_value(catalog, owner, cell.key, cell.value));
+    for (const auto& cell : change.cells) observe(cell.key, cell.value, reference_date_value(catalog, owner, cell));
   }
   void observe_change(const OcelObjectChange& change) {
     observe(change.field, change.value);
@@ -444,7 +449,7 @@ inline void hint_extra_rows(Ocel& log, const std::vector<HintRow>& extra_events,
         dropped.add_rows(1);
       }
       for (const auto& cell : row.cells) {
-        const bool date = reference_date_value(catalog, row.owner, cell.key, cell.value);
+        const bool date = reference_date_value(catalog, row.owner, cell);
         all.observe(cell.key, cell.value, date);
         dropped.observe(cell.key, cell.value, date);
       }
@@ -557,6 +562,183 @@ void hint_dropped_rows(Ocel& log, DropEvent&& drop_event, DropObject&& drop_obje
     record(log.change_frame_hint, all, dropped, rows);
   }
 }
+
+// Round EZ: pm4py's filters and splits select rows of their source's frames,
+// which keep their columns (in build order) and dtypes (observed black-box,
+// review-harness round-ez q/fdsw.py, q/ssw.py: an attribute column only
+// removed rows held stays in write_ocel_csv's header and the attribute
+// names, an int column with a missing cell in a removed row stays float64).
+// Each of `results` (subsets of `source`'s rows) records the source rows it
+// lacks as dropped rows (see OcelFrameHint, hint_dropped_rows): events and
+// objects by id, changes by object, field and time, each kept row matched
+// once. One pass over the source and the results, however many results.
+inline void hint_subset_rows(const Ocel& source, const std::vector<Ocel*>& results) {
+  static constexpr unsigned char kBits[] = {kOcelHintBool,   kOcelHintInt,       kOcelHintFloat,
+                                            kOcelHintString, kOcelHintNaiveDate, kOcelHintAwareDate};
+  constexpr std::size_t kKinds = sizeof(kBits);
+  struct Counts {
+    std::size_t kinds[kKinds] = {};
+    std::size_t present = 0;
+  };
+  using Frame = std::unordered_map<std::string, Counts>;
+  const auto count = [](Frame& frame, const std::string& key, const OcelValue& value, bool date) {
+    ColumnStats one;
+    one.observe(value, date);
+    if (one.present == 0) return;
+    auto& counts = frame[key];
+    ++counts.present;
+    const bool flags[kKinds] = {one.has_bool,   one.has_int,        one.has_float,
+                                one.has_string, one.has_naive_date, one.has_aware_date};
+    for (std::size_t kind = 0; kind < kKinds; ++kind) counts.kinds[kind] += flags[kind] ? 1 : 0;
+  };
+  // A table: `keys` names each result's rows, `cells` counts a source row's
+  // cells into a frame; hint the results lacking rows.
+  const auto table = [&](OcelFrameHint Ocel::*member, std::size_t rows, const Columns& all,
+                         const std::vector<std::string>& source_keys,
+                         const std::vector<std::vector<std::string>>& result_keys, const auto& cells) {
+    std::unordered_map<std::string_view, std::vector<std::pair<std::size_t, std::size_t>>> keepers;
+    for (std::size_t index = 0; index < results.size(); ++index)
+      for (const auto& key : result_keys[index]) {
+        auto& entries = keepers[key];
+        if (entries.empty() || entries.back().first != index) entries.emplace_back(index, 0);
+        ++entries.back().second;
+      }
+    Frame total;
+    std::vector<Frame> kept(results.size());
+    std::vector<std::size_t> kept_rows(results.size(), 0);
+    for (std::size_t row = 0; row < rows; ++row) {
+      Frame cell_counts;
+      cells(row, cell_counts);
+      const auto add = [&](Frame& frame) {
+        for (const auto& [key, counts] : cell_counts) {
+          auto& into = frame[key];
+          into.present += counts.present;
+          for (std::size_t kind = 0; kind < kKinds; ++kind) into.kinds[kind] += counts.kinds[kind];
+        }
+      };
+      add(total);
+      const auto found = keepers.find(source_keys[row]);
+      if (found == keepers.end()) continue;
+      for (auto& [index, left] : found->second) {
+        if (left == 0) continue;
+        --left;
+        ++kept_rows[index];
+        add(kept[index]);
+      }
+    }
+    const auto& seed = source.*member;
+    for (std::size_t index = 0; index < results.size(); ++index) {
+      if (kept_rows[index] >= rows) continue;
+      OcelFrameHint& hint = results[index]->*member;
+      std::vector<OcelFrameHintColumn> dropped;
+      for (const auto& column : seed.dropped)
+        if (column.present != 0 || (column.kinds & kOcelHintNone)) dropped.push_back(column);
+      for (const auto& name : all.names()) {
+        const auto in_total = total.find(name);
+        if (in_total == total.end()) continue;
+        const auto in_kept = kept[index].find(name);
+        const Counts none;
+        const Counts& kept_counts = in_kept == kept[index].end() ? none : in_kept->second;
+        const auto present = in_total->second.present - kept_counts.present;
+        if (present == 0) continue;
+        unsigned char kinds = 0;
+        for (std::size_t kind = 0; kind < kKinds; ++kind)
+          if (in_total->second.kinds[kind] > kept_counts.kinds[kind]) kinds = static_cast<unsigned char>(kinds | kBits[kind]);
+        const auto at = std::find_if(dropped.begin(), dropped.end(),
+                                     [&](const OcelFrameHintColumn& column) { return column.key == name; });
+        if (at == dropped.end()) {
+          dropped.push_back({name, kinds, present});
+        } else {
+          at->kinds = static_cast<unsigned char>(at->kinds | kinds);
+          at->present += present;
+        }
+      }
+      hint.columns = all.names();
+      hint.dropped = std::move(dropped);
+      hint.dropped_rows = seed.dropped_rows + rows - kept_rows[index];
+    }
+  };
+  const auto ids = [](const auto& rows) {
+    std::vector<std::string> out;
+    out.reserve(rows.size());
+    for (const auto& row : rows) out.push_back(row.id);
+    return out;
+  };
+  const auto change_key = [](const OcelObjectChange& change) {
+    std::string key = change.object_id;
+    key += '\x1f';
+    key += change.field;
+    key += '\x1f';
+    key += change.timestamp;
+    return key;
+  };
+  {
+    Columns all;
+    all.seed(source.event_frame_hint);
+    for (const auto& event : source.events)
+      all.observe_row(event.attributes, source.event_type_attributes, event.activity);
+    std::vector<std::vector<std::string>> keys;
+    for (const auto* result : results) keys.push_back(ids(result->events));
+    table(&Ocel::event_frame_hint, source.events.size(), all, ids(source.events), keys,
+          [&](std::size_t row, Frame& frame) {
+            const auto& event = source.events[row];
+            for (const auto& attribute : event.attributes)
+              count(frame, attribute.key, attribute.value,
+                    reference_date_value(source.event_type_attributes, event.activity, attribute));
+          });
+  }
+  std::unordered_map<std::string_view, std::string_view> type_of;
+  {
+    Columns all;
+    all.seed(source.object_frame_hint);
+    for (const auto& object : source.objects) {
+      type_of.emplace(object.id, object.type);
+      all.observe_row(object.attributes, source.object_type_attributes, object.type);
+    }
+    std::vector<std::vector<std::string>> keys;
+    for (const auto* result : results) keys.push_back(ids(result->objects));
+    table(&Ocel::object_frame_hint, source.objects.size(), all, ids(source.objects), keys,
+          [&](std::size_t row, Frame& frame) {
+            const auto& object = source.objects[row];
+            for (const auto& attribute : object.attributes)
+              count(frame, attribute.key, attribute.value,
+                    reference_date_value(source.object_type_attributes, object.type, attribute));
+          });
+  }
+  {
+    std::vector<std::string> owners;
+    owners.reserve(source.object_changes.size());
+    Columns all;
+    all.seed(source.change_frame_hint);
+    for (const auto& change : source.object_changes) {
+      std::string owner = change.object_type;
+      if (owner.empty())
+        if (const auto found = type_of.find(change.object_id); found != type_of.end()) owner = found->second;
+      all.add_rows(1);
+      all.observe_change(change, source.object_type_attributes, owner);
+      owners.push_back(std::move(owner));
+    }
+    std::vector<std::string> source_keys;
+    source_keys.reserve(source.object_changes.size());
+    for (const auto& change : source.object_changes) source_keys.push_back(change_key(change));
+    std::vector<std::vector<std::string>> keys;
+    for (const auto* result : results) {
+      keys.emplace_back();
+      for (const auto& change : result->object_changes) keys.back().push_back(change_key(change));
+    }
+    table(&Ocel::change_frame_hint, source.object_changes.size(), all, source_keys, keys,
+          [&](std::size_t row, Frame& frame) {
+            const auto& change = source.object_changes[row];
+            const auto& owner = owners[row];
+            count(frame, change.field, change.value,
+                  reference_date_value(source.object_type_attributes, owner, change.field, change.value));
+            for (const auto& cell : change.cells)
+              count(frame, cell.key, cell.value, reference_date_value(source.object_type_attributes, owner, cell));
+          });
+  }
+}
+
+inline void hint_filtered_rows(const Ocel& source, Ocel& result) { hint_subset_rows(source, {&result}); }
 
 // Round EK: a row's attributes as the reference writers print a frame row:
 // in the frame's column order (first appearance over the rows), null cells

@@ -34825,3 +34825,111 @@ file's date declaration as `string`. The full ctest passed 645 of 645
 (39 min at -j2) and the fixture replay gave 2,673 responses unchanged.
 Harness:
 `review-harness/round-ey/` in the project files (README).
+
+## Review EZ1: date-like texts in OCEL 1.0 XML, the frames of filter and split results (2026-11-20)
+
+Round EZ checked EY's CI (run 44725615359 on 69f9f70: the three builds,
+the frontend, Python and verifier jobs green; ctest green on Linux, macOS
+and Windows). Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow)
+in the reference venv with hand-made files (`ez/t/h1.xmlocel`,
+`t/h1ref.py`: a `<date>` and date-like `<string>` elements of one key and
+type; `t2/h3.jsonocel`, `t2/h2ref.py`: columns only removed rows hold
+through a filter and both splits; `p/s1.py` to `s3.py`: the dtypes, O2O
+links and changes of the split sublogs), EY1-1 and EY1-2 on fresh banks
+(`ex/q/jqgen.py`: j5 of 150 OCEL 2.0 JSON files from b65, seed 1501; j6 of
+60 from b64, seed 1601; k5 of 120 classic from b64, seed 1701; k6 of 75
+classic from b65, seed 1801; `ew/q/sgen.py` on b64, seed 105: s105 of 120
+SQLite files; `eo/c1/c1gen.py 58 120`: c58, OCEL 1.0 XML and JSON), and
+three route comparers: `ez/q/esq2.py` (round EY's emptied-table steps
+after every filter family: object types, events, objects, an activity, a
+timestamp window, the end events, the O2O and E2O lifecycle enrichments),
+`ez/q/esq3.py` (the qualifier declarations of both splits' sublogs) and
+the download sweeps of filter and split results (`ez/q/fdsw.py`: six
+filters, `ez/q/ssw.py`: up to three sublogs per split variant, each
+through the seven downloads of round EO's dsw).
+
+EY's fixes matched on the fresh banks: esq2 0 of 7,200 (j5) and 0 of
+5,760 (s105); imports 0 of 150 (j5), 0 of 120 (k5, s105, c58); j5 dsw 0
+of 1,050, esw 0 of 2,400, xsw 0 of 1,950, fsw 0 of 1,948, rsw3 225 of
+5,850 (the JSON downloads' date fractions, declared), osw 21 of 900
+(write_ocel_csv's type column order, declared); k5 and s105 0 in every
+sweep. c58 (OCEL 1.0 XML) gave dsw 24 of 805, fsw 69 of 1,584 and rsw3
+94 of 4,485, all EY1-3. The new comparers found two classes: the split
+sublogs' O2O declarations (esq3 255 of 530 on j5) and the frames of
+filter and split results (fdsw 53 of 420, ssw 32 of 217 on ten j5 files).
+
+Fixed:
+- **EY1-3 A date-like `<string>` next to a `<date>` of the same key and
+  type in OCEL 1.0 XML (EY, declared).** read_ocel_xml types each element:
+  a `<date>` becomes a datetime and a `<string>` under the same key and
+  type stays its text, so the column is object. Every writer keeps the
+  texts as written and prints the datetime in isoformat: write_ocel_json
+  and write_ocel2_json declare the attribute `string`, write_ocel_csv
+  prints the texts, write_ocel2_sqlite declares a TEXT column,
+  write_ocel_xml writes `<string>` elements; filter_ocel_object_attribute
+  and filter_ocel_event_attribute match a datetime only to the datetime
+  and a str only to the text; ocel_flattening keeps the text a str. Native
+  typed dates per type and key, so the texts read as dates (`date`,
+  `2024-02-01 10:00:00+00:00`). An attribute now carries a per-cell text
+  mark (`OcelAttribute::text`): the OCEL 1.0 XML reader sets it on a
+  `<string>` whose type and key a `<date>` declares and which reads as a
+  date, the frame typing, the six writers, the attribute filters, the
+  flattening and the OC-DFG edge performance honour it, and both
+  transports carry it as `"minera:textValues"` (the OCEL 2.0 transport
+  also for a text under a date declaration that its reader would convert).
+- **EZ1-1 Filter and split results keep their source frames.** pm4py's
+  filters select rows of the source's frames, which keep every column (in
+  build order) and its dtype: a column only the removed rows held stays in
+  write_ocel_csv's headers, in write_ocel_json's attribute names and in
+  write_ocel2_sqlite's type tables (`x1`, `q` empty there), an int column
+  with a missing cell or a float in a removed row stays float64 (`1.0`). The
+  connected-components split builds each component from rows of the
+  events, objects and relations frames as a new OCEL (the same columns and
+  dtypes), so its O2O frame is float64 (object_object REAL), its changes
+  frame a new one and its globals empty (the OCEL 1.0 writers print the
+  default global scopes, `__INVALID__`); the ancestors/descendants split
+  selects rows too and keeps the globals. Native typed a result's frames
+  from its own rows (no `x1`, the kept rows' column order, `0` for `0.0`,
+  `string` for `float`), declared a component's links TEXT and kept its
+  globals. Filter and split results now record the source
+  rows they lack in their frame hints (`ocel_frame::hint_subset_rows`, one
+  pass over the source for every sublog: 20,000 components of a 20,000
+  event log split in 1.0 s, 0.8 s before), which the writers and both
+  transports already honour, and a component's O2O frame, changes frame
+  and globals are a new OCEL's.
+
+Results with the fixed server: c58 dsw 0 of 805, esw 0 of 1,840, fsw 0
+of 1,584, osw 0 of 690, rsw3 0 of 4,485, xsw 0 of 1,495 (EY1-3's three
+c57 files: dsw 0 of 21, nine before; rsw3 0 of 117; fsw 0 of 42); fdsw 0
+of 1,260 on 30 files each of j5, k5 and s105, 0 of 1,176 on 30 c58 files,
+0 of 2,520 on 60 more j5 files, 0 of 1,260 on 30 files each of j6 and k6
+(9,996 in all); the other filter families (`ez/q/fdsw2.py`: start events,
+activities of a type, the four connected-component filters, the
+activity-type matching, the object count) 0 of 840 on 15 files each of j5,
+k5, s105 and c58; ssw 0 of 644 (j5), 0 of 637 (k5, s105, j6), 0 of 644
+(k6), 0 of 399 (c58), 0 of 1,267 (60 more j5 files); esq3 0 of 530 on j5
+(255 with EY's server, all the components' object_object REAL), 0 of 413
+on k5 and on s105.
+
+Declared:
+- EV1-1 (routes on XML logs whose event times share an offset of a day or
+  more) stays declared: its model would touch every route parser.
+- Carried: an event's relation order in OCEL 2.0 JSON (OC1), the date
+  fractions of the JSON downloads, the CSV type column order (hash seed),
+  list, dict, big int and infinite qualifiers, infinite REAL and BLOB
+  qualifiers.
+
+In the suite: `minera_review_ez1_tests` (the OCEL 1.0 XML reader's marks,
+both transports, the six writers, the attribute filters, the flattening)
+and `minera_review_ez2_tests` (a filter, the connected-components and
+ancestors/descendants splits: columns, dtypes, O2O declaration, globals).
+`minera_ocel_tests`, `minera_ocel_transform_tests` and
+`minera_ocel_exact_filter_controls_tests` failed on the first full run
+(644 of 647, 42 min at -j2): the OCEL 2.0 transport wrote a column's
+catalog date type where its frame already typed it a date (now only where
+the values type the column otherwise), and the filter and split
+expectations lacked the new frame hints (now part of them; the
+single-pass split contract compares the rows). The 100 OCEL and review
+tests and 91 OC, server and JSON tests then passed, and the fixture replay
+gave 2,673 responses unchanged. Harness: `review-harness/round-ez/` in the
+project files (README).

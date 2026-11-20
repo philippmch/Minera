@@ -226,7 +226,7 @@ std::string value_text(const OcelValue& value, bool float_column = false) {
 // column ("2024-02-01 08:30:00+00:00", value by value).
 std::string csv_attribute_text(const OcelAttribute& attribute, const OcelTypeCatalog& catalog,
                                const std::string& owner, ocel_frame::Dtype dtype) {
-  if (const auto* text = ocel_frame::declared_date(catalog, owner, attribute.key)
+  if (const auto* text = !attribute.text && ocel_frame::declared_date(catalog, owner, attribute.key)
                              ? ocel_frame::date_value_text(attribute.value)
                              : nullptr)
     return ocel_frame::utc_timestamp_text(*text, ' ', "+00:00");

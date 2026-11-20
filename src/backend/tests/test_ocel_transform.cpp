@@ -113,8 +113,13 @@ void connected_components_single_pass_contract() {
       for (const auto& relation : part.relations) selected.insert(relation.object_id);
       assert(!selected.empty());
       for (const auto& id : selected) assert(covered.insert(id).second);
-      assert(minera::serialize_ocel_json(part) ==
-             minera::serialize_ocel_json(per_component_reference(log, selected)));
+      // Round EZ: the rows match; the frame hints (the log's rows the
+      // component lacks) and a new OCEL's O2O frame and globals are the
+      // transport's (review EZ2).
+      assert(minera::serialize_ocel_json(part, minera::OcelJsonFormat::kClassic, false) ==
+             minera::serialize_ocel_json(per_component_reference(log, selected), minera::OcelJsonFormat::kClassic,
+                                         false));
+      assert(part.untyped_o2o && part.globals.empty() && !part.global_event_scope);
     }
   }
 }

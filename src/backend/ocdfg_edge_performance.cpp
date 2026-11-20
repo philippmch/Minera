@@ -48,6 +48,8 @@ bool datetime_column(const Ocel& log,const OcelEvent& event,
                      const std::string& key) {
  if(key=="ocel:timestamp")return true;
  if(key=="ocel:eid"||key=="ocel:activity")return false;
+ // Round EZ: a text the reference keeps as a str (OcelAttribute::text).
+ for(const auto& attribute:event.attributes)if(attribute.key==key&&attribute.text)return false;
  const auto type=log.event_type_attributes.find(event.activity);
  if(type==log.event_type_attributes.end())return false;
  const auto field=type->second.find(key);

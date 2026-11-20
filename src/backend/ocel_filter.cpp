@@ -157,7 +157,7 @@ void clear_all_tables(Ocel& log) {
   log.object_changes.clear();
 }
 
-Ocel propagate_event_filter(Ocel log) {
+Ocel propagate_event_filter_rows(Ocel log) {
   const auto selected_events = ids_of_events(log);
   if (selected_events.empty()) {
     clear_all_tables(log);
@@ -222,7 +222,7 @@ Ocel propagate_event_filter(Ocel log) {
   return log;
 }
 
-Ocel propagate_object_filter(Ocel log) {
+Ocel propagate_object_filter_rows(Ocel log) {
   const auto selected_objects = ids_of_objects(log);
   if (selected_objects.empty()) {
     clear_all_tables(log);
@@ -285,7 +285,7 @@ Ocel propagate_object_filter(Ocel log) {
   return log;
 }
 
-Ocel propagate_relation_filter(Ocel log) {
+Ocel propagate_relation_filter_rows(Ocel log) {
   IdSet selected_events;
   IdSet selected_objects;
   for (const auto& relation : log.relations) {
@@ -358,6 +358,26 @@ Ocel propagate_relation_filter(Ocel log) {
                      }),
       log.object_changes.end());
   return log;
+}
+
+// Round EZ: the filtered log records the source rows it lacks in its frame
+// hints (see ocel_frame::hint_filtered_rows).
+Ocel propagate_event_filter(Ocel log, const Ocel& source) {
+  auto result = propagate_event_filter_rows(std::move(log));
+  ocel_frame::hint_filtered_rows(source, result);
+  return result;
+}
+
+Ocel propagate_object_filter(Ocel log, const Ocel& source) {
+  auto result = propagate_object_filter_rows(std::move(log));
+  ocel_frame::hint_filtered_rows(source, result);
+  return result;
+}
+
+Ocel propagate_relation_filter(Ocel log, const Ocel& source) {
+  auto result = propagate_relation_filter_rows(std::move(log));
+  ocel_frame::hint_filtered_rows(source, result);
+  return result;
 }
 
 template <typename Record, typename Predicate>
@@ -512,7 +532,7 @@ Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key
         : has_attribute_value(event.attributes, attribute_key, column_values, column);
     return positive ? matches : !matches;
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 namespace {
@@ -526,6 +546,15 @@ bool event_filter_column_exists(const Ocel& log, std::string_view key) {
   for (const auto& event : log.events)
     for (const auto& attribute : event.attributes)
       if (attribute.key == key) return true;
+  return false;
+}
+
+// Round EZ: whether the row's value under `key` is a text the reference
+// keeps as a str under a date declaration (OcelAttribute::text): it then
+// compares as a str, never as a datetime.
+bool kept_text_value(const std::vector<OcelAttribute>& attributes, std::string_view key) {
+  for (const auto& attribute : attributes)
+    if (attribute.key == key) return attribute.text;
   return false;
 }
 
@@ -709,7 +738,8 @@ Ocel filter_ocel_event_attribute_exact(
   filter_records(filtered.events, [&](const OcelEvent& event) {
     bool matches = false;
     const auto candidate = event_filter_scalar(event, attribute_key);
-    if (event_filter_timestamp_column(log, event, attribute_key, column_kind)) {
+    if (!kept_text_value(event.attributes, attribute_key) &&
+        event_filter_timestamp_column(log, event, attribute_key, column_kind)) {
       for (const auto& value : values)
         matches = matches || attribute_filter_datetime_equal(candidate, value);
     } else {
@@ -718,7 +748,7 @@ Ocel filter_ocel_event_attribute_exact(
     }
     return matches == positive;
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_events_timestamp_exact(
@@ -749,7 +779,7 @@ Ocel filter_ocel_events_timestamp_exact(
     return !event_filter_instant_less(*instant, lower) &&
            !event_filter_instant_less(upper, *instant);
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_object_attribute(const Ocel& log,
@@ -772,7 +802,7 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
         : has_attribute_value(object.attributes, attribute_key, column_values, column);
     return positive ? matches : !matches;
   });
-  return propagate_object_filter(std::move(filtered));
+  return propagate_object_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_object_attribute_exact(
@@ -784,15 +814,15 @@ Ocel filter_ocel_object_attribute_exact(
   Ocel filtered = log;
   filter_records(filtered.objects, [&](const OcelObject& object) {
     const auto candidate = object_filter_scalar(object, attribute_key);
-    const bool datetime =
-        object_filter_timestamp_column(log, object, attribute_key, column_kind);
+    const bool datetime = !kept_text_value(object.attributes, attribute_key) &&
+                          object_filter_timestamp_column(log, object, attribute_key, column_kind);
     const bool matches = std::any_of(values.begin(), values.end(), [&](const auto& value) {
       return datetime ? attribute_filter_datetime_equal(candidate, value)
                       : event_filter_scalar_equal(candidate, value);
     });
     return matches == positive;
   });
-  return propagate_object_filter(std::move(filtered));
+  return propagate_object_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_object_types(const Ocel& log,
@@ -814,7 +844,7 @@ Ocel filter_ocel_object_types(const Ocel& log,
     const bool matches = selected.count(object.type) != 0;
     return positive ? matches : !matches;
   });
-  return propagate_object_filter(std::move(filtered));
+  return propagate_object_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_objects(const Ocel& log,
@@ -829,7 +859,7 @@ Ocel filter_ocel_objects(const Ocel& log,
     const bool matches = selected.count(object.id) != 0;
     return positive ? matches : !matches;
   });
-  return propagate_object_filter(std::move(filtered));
+  return propagate_object_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_events(const Ocel& log,
@@ -843,7 +873,7 @@ Ocel filter_ocel_events(const Ocel& log,
     const bool matches = selected.count(event.id) != 0;
     return positive ? matches : !matches;
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_events_timestamp(const Ocel& log, std::string_view from,
@@ -878,7 +908,7 @@ Ocel filter_ocel_events_timestamp(const Ocel& log, std::string_view from,
     const auto instant = parse_timestamp(event.timestamp);
     return instant && *instant >= lower && *instant <= upper;
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_activity_type_matching(
@@ -914,7 +944,7 @@ Ocel filter_ocel_activity_type_matching(
     return std::find(allowed_it->second.begin(), allowed_it->second.end(),
                      event_it->second) != allowed_it->second.end();
   });
-  return propagate_relation_filter(std::move(filtered));
+  return propagate_relation_filter(std::move(filtered), log);
 }
 
 std::map<std::string, std::map<std::string, std::size_t>>
@@ -956,7 +986,7 @@ Ocel filter_ocel_events_object_type_counts(
   filter_records(filtered.events, [&](const OcelEvent& event) {
     return selected_events.count(event.id) != 0;
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 namespace {
@@ -997,7 +1027,7 @@ Ocel filter_ocel_events_object_type_counts_exact(
   filter_records(filtered.events, [&](const OcelEvent& event) {
     return selected_events.count(event.id) != 0;
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 namespace {
@@ -1034,7 +1064,7 @@ Ocel filter_ocel_lifecycle_events_per_object_type(const Ocel& log,
   filter_records(filtered.events, [&](const OcelEvent& event) {
     return selected_events.count(event.id) != 0;
   });
-  return propagate_event_filter(std::move(filtered));
+  return propagate_event_filter(std::move(filtered), log);
 }
 
 }  // namespace
@@ -1075,7 +1105,7 @@ Ocel filter_ocel_activities_connected_object_type(
     return event_it != event_activities.end() &&
            activities.count(event_it->second) != 0;
   });
-  return propagate_relation_filter(std::move(filtered));
+  return propagate_relation_filter(std::move(filtered), log);
 }
 
 Ocel filter_ocel_cc_object(const Ocel& log, std::string_view object_id) {

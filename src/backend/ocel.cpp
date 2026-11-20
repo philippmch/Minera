@@ -2351,7 +2351,7 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
       write_string(out, cell.key);
       out << ':';
       if (!transport_markers &&
-          ocel_frame::reference_date_value(log.object_type_attributes, owner, cell.key, cell.value))
+          ocel_frame::reference_date_value(log.object_type_attributes, owner, cell))
         write_string(out, ocel_frame::object_datetime_text(std::get<std::string>(cell.value)));
       else
         write_cell(cell.key, cell.value);
@@ -2374,18 +2374,19 @@ void write_object_changes(std::ostringstream& out, const Ocel& log, bool transpo
 void write_frame_entries(std::ostringstream& out, const std::vector<OcelAttribute>& attrs,
                          const ocel_frame::Columns& frame, const OcelTypeCatalog& catalog,
                          const std::string& owner, bool prefixed) {
-  std::vector<std::pair<std::string_view, const OcelValue*>> ordered;
+  std::vector<const OcelAttribute*> ordered;
   for (const auto* attribute : ocel_frame::frame_row(attrs, frame))
-    if (reference_drops_attribute(attribute->key) == prefixed) ordered.emplace_back(attribute->key, &attribute->value);
+    if (reference_drops_attribute(attribute->key) == prefixed) ordered.push_back(attribute);
   if (!prefixed) out << '{';
   bool first = true;
-  for (const auto& [k, v] : ordered) {
+  for (const auto* attribute : ordered) {
     if (!first || prefixed) out << ',';
     first = false;
-    write_string(out, k);
+    write_string(out, attribute->key);
     out << ':';
-    const std::string key(k);
-    if (ocel_frame::reference_date_value(catalog, owner, key, *v)) {
+    const std::string& key = attribute->key;
+    const OcelValue* v = &attribute->value;
+    if (ocel_frame::reference_date_value(catalog, owner, *attribute)) {
       const auto& text = std::get<std::string>(*v);
       write_string(out, frame.dtype(key) == ocel_frame::Dtype::kDatetime ? ocel_frame::datetime64_json_text(text)
                                                                          : ocel_frame::object_datetime_text(text));
@@ -2684,6 +2685,35 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     for (auto& event : result.events)
       if (const auto found = offset_times.find(event.id); found != offset_times.end())
         event.timestamp = found->second;
+  // Round EZ: values the reference keeps as texts under a date declaration
+  // (see OcelAttribute::text), before the date conversion.
+  if (const auto* marker = optional(r, "minera:textValues")) {
+    const auto refuse = [] {
+      throw std::invalid_argument("minera:textValues must map events and objects to ids and their keys");
+    };
+    if (!marker->is_object()) refuse();
+    for (const auto& [scope, ids] : marker->object()) {
+      if ((scope != "events" && scope != "objects") || !ids.is_object()) refuse();
+      std::unordered_map<std::string, std::unordered_set<std::string>> keys;
+      for (const auto& [id, names] : ids.object()) {
+        if (!names.is_array()) refuse();
+        for (const auto& name : names.array()) {
+          if (!name.is_string()) refuse();
+          keys[id].insert(name.string());
+        }
+      }
+      const auto mark = [&](const std::string& id, std::vector<OcelAttribute>& attributes) {
+        const auto found = keys.find(id);
+        if (found == keys.end()) return;
+        for (auto& attribute : attributes)
+          if (found->second.count(attribute.key)) attribute.text = true;
+      };
+      if (scope == "events")
+        for (auto& event : result.events) mark(event.id, event.attributes);
+      else
+        for (auto& object : result.objects) mark(object.id, object.attributes);
+    }
+  }
   // read_ocel2_json converts declared date values (a text it cannot read
   // stays); read_ocel_json keeps them as text.
   if (standard) convert_ocel_date_attributes(result, OcelTimestampReader::kIsoFormatOrFileOrder);
@@ -3457,15 +3487,16 @@ void convert_ocel_date_attributes(Ocel& log, OcelTimestampReader reader) {
   const auto convert = [reader](OcelValue& value, bool change) {
     convert_ocel_date_value(value, reader, change);
   };
+  // Round EZ: a value the reference keeps as a text stays (OcelAttribute::text).
   for (auto& event : log.events)
     for (auto& attribute : event.attributes)
-      if (declared(log.event_type_attributes, event.activity, attribute.key))
+      if (!attribute.text && declared(log.event_type_attributes, event.activity, attribute.key))
         convert(attribute.value, false);
   std::unordered_map<std::string_view, std::string_view> object_types;
   for (auto& object : log.objects) {
     object_types.emplace(object.id, object.type);
     for (auto& attribute : object.attributes)
-      if (declared(log.object_type_attributes, object.type, attribute.key))
+      if (!attribute.text && declared(log.object_type_attributes, object.type, attribute.key))
         convert(attribute.value, false);
   }
   // read_ocel2_json stamps a field's naive change values UTC only when the
@@ -4235,6 +4266,70 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
                     [](const OcelO2oRelation& relation) { return relation.qualifier_kind != OcelQualifierKind::kStr; }))
       out << ",\"minera:typedQualifiers\":true";
   };
+  // Round EZ: the keys of each event's and object's values the reference
+  // keeps as texts under a date declaration (OcelAttribute::text), by id,
+  // in either form.
+  // The OCEL 2.0 form, whose reader converts the declared dates, marks
+  // every other text under a date declaration that its reader would
+  // convert too (see the type table below), so it reads back as written.
+  const auto write_text_values = [&](bool standard_form) {
+    const auto kept = [&](const OcelAttribute& attribute, const OcelTypeCatalog& catalog, const std::string& owner) {
+      if (attribute.text) return true;
+      if (!standard_form || !std::holds_alternative<std::string>(attribute.value) ||
+          !ocel_frame::declared_date(catalog, owner, attribute.key) ||
+          ocel_frame::reference_date_value(catalog, owner, attribute))
+        return false;
+      OcelValue converted = attribute.value;
+      try {
+        convert_ocel_date_value(converted, OcelTimestampReader::kIsoFormatOrFileOrder);
+      } catch (const std::exception&) {
+        return true;
+      }
+      return converted != attribute.value;
+    };
+    const auto marked = [&](const std::vector<OcelAttribute>& attributes, const OcelTypeCatalog& catalog,
+                            const std::string& owner) {
+      return std::any_of(attributes.begin(), attributes.end(),
+                         [&](const OcelAttribute& attribute) { return kept(attribute, catalog, owner); });
+    };
+    const bool events_marked = std::any_of(log.events.begin(), log.events.end(), [&](const OcelEvent& event) {
+      return marked(event.attributes, log.event_type_attributes, event.activity);
+    });
+    const bool objects_marked = std::any_of(log.objects.begin(), log.objects.end(), [&](const OcelObject& object) {
+      return marked(object.attributes, log.object_type_attributes, object.type);
+    });
+    if (!events_marked && !objects_marked) return;
+    const auto write_scope = [&](const char* name, const auto& rows, const OcelTypeCatalog& catalog,
+                                 const auto& owner_of) {
+      out << '"' << name << "\":{";
+      std::set<std::string> written;
+      bool first_row = true;
+      for (const auto& row : rows) {
+        const std::string& owner = owner_of(row);
+        if (!marked(row.attributes, catalog, owner) || !written.insert(row.id).second) continue;
+        if (!first_row) out << ',';
+        first_row = false;
+        write_string(out, row.id);
+        out << ":[";
+        bool first_key = true;
+        for (const auto& attribute : row.attributes) {
+          if (!kept(attribute, catalog, owner)) continue;
+          if (!first_key) out << ',';
+          first_key = false;
+          write_string(out, attribute.key);
+        }
+        out << ']';
+      }
+      out << '}';
+    };
+    out << ",\"minera:textValues\":{";
+    write_scope("events", log.events, log.event_type_attributes,
+                [](const OcelEvent& event) -> const std::string& { return event.activity; });
+    out << ',';
+    write_scope("objects", log.objects, log.object_type_attributes,
+                [](const OcelObject& object) -> const std::string& { return object.type; });
+    out << '}';
+  };
   const auto write_untyped_relations = [&] {
     if (log.relations.empty())
       out << ",\"minera:untypedRelations\":" << (log.untyped_relations ? "true" : "false");
@@ -4582,8 +4677,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
       write_string(out, attribute->key);
       out << ",\"value\":";
       write_frame_value(out, attribute->value, event_frame.printed_dtype(attribute->key),
-                        ocel_frame::reference_date_value(log.event_type_attributes, owner, attribute->key,
-                                                         attribute->value));
+                        ocel_frame::reference_date_value(log.event_type_attributes, owner, *attribute));
       out << '}';
     }
     out << ']';
@@ -4629,6 +4723,22 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     StandardTypeTable object_types;
     StandardTypeTable event_types;
     collect_standard_types(log, object_types, event_types, transport_markers);
+    // Round EZ: the transport keeps a date declaration where the values
+    // type the column otherwise (dates next to texts, which then carry
+    // "minera:textValues"), so the dates read back as dates.
+    if (transport_markers) {
+      const auto keep_dates = [](StandardTypeTable& table, const OcelTypeCatalog& catalog) {
+        for (auto& [owner, declarations] : table)
+          for (auto& [name, declared] : declarations) {
+            std::string lowered = declared;
+            for (auto& ch : lowered) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+            const bool date_type = lowered.find("date") != std::string::npos || lowered.find("time") != std::string::npos;
+            if (!date_type && ocel_frame::declared_date(catalog, owner, name)) declared = catalog.at(owner).at(name);
+          }
+      };
+      keep_dates(object_types, log.object_type_attributes);
+      keep_dates(event_types, log.event_type_attributes);
+    }
     out << "{\"ocelVersion\":\"2.0\",\"objectTypes\":";
     write_standard_type_table(out, object_types);
     out << ",\"eventTypes\":";
@@ -4684,8 +4794,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         out << ",\"time\":\"1970-01-01T00:00:00Z\"";
         out << ",\"value\":";
         write_frame_value(out, attribute->value, object_frame.printed_dtype(attribute->key),
-                          ocel_frame::reference_date_value(log.object_type_attributes, object->type,
-                                                           attribute->key, attribute->value));
+                          ocel_frame::reference_date_value(log.object_type_attributes, object->type, *attribute));
         out << '}';
       }
       std::vector<const OcelObjectChange*> changes;
@@ -4752,6 +4861,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
     if (transport_markers) {
       write_untyped_relations();
       write_typed_qualifiers();
+      write_text_values(true);
       write_naive_event_times();
       write_frame_hints();
       write_nanoseconds();
@@ -4910,6 +5020,7 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   write_keep_unrelated();
   if (transport_markers) {
     write_untyped_relations();
+    write_text_values(false);
     // Round EY: see read_classic_dates_as_texts.
     if (declares_dates(log)) out << ",\"minera:declaredDates\":true";
     write_naive_event_times();

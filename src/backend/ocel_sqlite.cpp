@@ -506,11 +506,11 @@ std::string declared_sql_type(std::string value) {
   return "TEXT";
 }
 
-std::map<std::string, const OcelValue*> attribute_values(
+std::map<std::string, const OcelAttribute*> attribute_values(
     const std::vector<OcelAttribute>& attributes) {
-  std::map<std::string, const OcelValue*> result;
+  std::map<std::string, const OcelAttribute*> result;
   for (const auto& attribute : attributes) {
-    if (!attribute.key.empty()) result[attribute.key] = &attribute.value;
+    if (!attribute.key.empty()) result[attribute.key] = &attribute;
   }
   return result;
 }
@@ -521,13 +521,17 @@ std::map<std::string, const OcelValue*> attribute_values(
 // Round EK: a datetime of an object column (dates next to other values, a
 // TEXT column) is its isoformat, as the reference writes an object column
 // (observed black-box); `catalog` and `owner` tell the date values.
+// Round EZ: a value the reference keeps as a text (OcelAttribute::text) is
+// bound as written.
 void bind_type_value(sqlite3_stmt* statement, int position, const std::string& name,
-                     const std::string& sql_type, const OcelValue* value,
+                     const std::string& sql_type, const OcelAttribute* attribute,
                      const OcelTypeCatalog& catalog, const std::string& owner) {
+  const OcelValue* value = attribute == nullptr ? nullptr : &attribute->value;
+  const bool kept_text = attribute != nullptr && attribute->text;
   if (value == nullptr) bind_null(statement, position);
-  else if (const auto* text = sql_type == "TIMESTAMP" ? ocel_frame::date_value_text(*value) : nullptr)
+  else if (const auto* text = sql_type == "TIMESTAMP" && !kept_text ? ocel_frame::date_value_text(*value) : nullptr)
     bind_text(statement, position, ocel_frame::utc_timestamp_text(*text, ' ', "+00:00", true));
-  else if (ocel_frame::reference_date_value(catalog, owner, name, *value))
+  else if (!kept_text && ocel_frame::reference_date_value(catalog, owner, name, *value))
     bind_text(statement, position,
               ocel_frame::utc_timestamp_text(std::get<std::string>(*value), 'T', "+00:00", true));
   else bind_scalar(statement, position, *value);
@@ -2810,8 +2814,8 @@ void export_ocel_sqlite(const Ocel& input, const std::filesystem::path& path,
       Statement statement(db, create_table_sql(database, table, bound, order));
       const auto bind_row = [&](const std::string& id, const std::vector<OcelAttribute>& cells,
                                 const OcelObjectChange* change) {
-        std::unordered_map<std::string_view, const OcelValue*> values;
-        for (const auto& cell : cells) values.try_emplace(cell.key, &cell.value);
+        std::unordered_map<std::string_view, const OcelAttribute*> values;
+        for (const auto& cell : cells) values.try_emplace(cell.key, &cell);
         bind_text(statement.get(), 1, id);
         for (std::size_t index = 0; index < layout.size(); ++index) {
           const int position = static_cast<int>(index) + 2;
