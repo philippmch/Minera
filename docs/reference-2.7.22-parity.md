@@ -36548,3 +36548,115 @@ In the suite: `minera_passed_time_tests`, `minera_network_analysis_tests`
 (`review_fo_log_variant`) carry FO1's reference values. The full ctest
 passed 659 of 659, the Python script tests 406 of 406, the fixture replay
 gave 2,673 responses unchanged.
+
+## Review FP1: resource profiles with nanosecond times on uploads and with lifecycle transitions on raw logs, root cause on nanosecond CSV logs, SNA and roles on raw logs (2026-11-21)
+
+Round FP re-reviewed round FO on fresh banks and swept new areas. FO's CI
+run 44919992483 (2fb822c) finished green in all six jobs.
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, SciPy
+1.17.1, no pyarrow), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3
+X86_V4 AVX512_ICL AVX512_SPR"` and exact float comparison. Access orders
+and sums were read with instrumented pandas methods and Python spies
+(`Series.mean`, `statistics.mean`), not from pm4py's code.
+
+Re-review of FO (fresh seeds 3000-3079, `fo/rlw.py` banks with offsets,
+nanoseconds and a start column): network analysis on CSV raw logs
+(orgnaA: 193 equal, 41 raised in both, 6 the declared extra date column
+sorted as text) and XES raw logs (orgnaB: 225 equal, 15 raised alike);
+passed time (rlwA: 210 equal, 30 raised alike; rlwB: 215 and 25);
+resource profiles (rpswA: 456 equal, 108 raised alike, 76 with the
+message only (FP1-4); rpswB: 508, 59 and 73). With a lifecycle column
+(start, complete, schedule and other transitions in any case, seeds
+3100-3179): passed time equal (rlwL: 154 equal, 86 raised alike; rlwM:
+160 and 80); resource profiles showed FP1-2 (rpswL and rpswM: 11
+values differed and 30 of pm4py's IndexErrors were missing, beside
+FP1-4's messages).
+
+Fixed:
+
+- **FP1-1. Resource profiles on uploads (the frame path) with nanosecond
+  times.** (a) The window compares the frame's datetime64 cells with the
+  bounds exactly, so a time a nanosecond before t1 is outside although
+  its epoch double equals t1's (and two nanoseconds before t2 inside);
+  the view of a timestamp keeps its nanoseconds. (b)
+  `average_duration_activity` is pandas' `Series.mean` of the exact
+  `Timedelta.total_seconds` durations: numpy's pairwise sum (in order
+  below 8 values, 8 accumulators up to 128, halving above) over the
+  count, a NaT start a zero in the sum that does not count; without a
+  start column a row starts at the previous timestamp of its case and the
+  rows sort by start, timestamp and position, with one they keep the
+  frame's order. (c) `average_case_duration` is `statistics.mean` of the
+  exact durations (where Minera summed doubles). Before the fix 46 of
+  1,200 (rpnearA), 61 of 1,800 (rpnearC), 23 of 1,200 (rpxA, XES) and 5
+  of 1,200 (rpframeB) results differed, by an ulp to a microsecond.
+- **FP1-2. Lifecycle transitions in the log variant's interval metrics**
+  (`average_duration_activity`, `average_workload`, `multitasking` on an
+  EventLog). When the first event of the sorted log lacks the start key
+  (`start_timestamp` without one), pm4py converts the log to intervals
+  first: each `complete` event, or one without a transition, pairs with
+  the oldest pending `start` of its activity (transitions compared
+  case-insensitively; any other transition drops the event) and starts
+  there, or at its own time when none is pending; each case's intervals
+  sort by start. Without a start key an interval then starts at the
+  previous interval's end (the first at its own), with one at its paired
+  start. Without a start key a case that the conversion empties (only
+  starts or schedules) raises `IndexError: list index out of range` in
+  all three metrics (after the KeyError of a missing timestamp, before
+  any TypeError); an empty case does not. When the first sorted event has
+  the start key nothing is converted (FO1-3 (f)). Minera kept every event
+  with the previous-event rule (B complete@0, D start@10, D complete@58
+  gave D 58 where Minera gave 48).
+- **FP1-3. Root cause features on CSV logs keep nanoseconds.** A CSV
+  log's dates are pandas Timestamps in datetime64[ns] columns, and the
+  categorical feature `event:key@value` takes `str(Timestamp)`: nine
+  fraction digits when the time has nanoseconds, else six when it has
+  microseconds (`2020-01-03 01:10:00.000000517+00:00`). Minera cut them
+  to microseconds (48 of 911 model comparisons on two banks differed, in the names
+  and in the one-hot data). An XES log's dates pass through Python
+  datetimes and keep microseconds (rcxnsA: 312 equal, 21 raised alike,
+  unchanged).
+- **FP1-4. StatisticsError named.** The empty averages of the log
+  variant and the frame's `average_case_duration` raise
+  `StatisticsError: mean requires at least one data point` (pm4py's
+  text); the frame's `average_duration_activity`, whose pandas mean is
+  NaN, keeps the declared message without the class name.
+
+Declared or unchanged:
+
+- SNA and roles on raw logs (new sweep `orgsna.py`: handover, working
+  together, subcontracting and joint activities log variants with random
+  beta, n and normalization, role discovery with random thresholds) are
+  equal apart from two items declared before: joint-activities weights a
+  few ulps off (SciPy's `pearsonr` rounding; new candidate formulas,
+  scaled, extended precision and BLAS norms, still matched only about
+  half of 1,900 random vectors) and networks without connections, where
+  pm4py raises `zero-size array to reduction operation maximum` and
+  Minera returns the empty network as not computed.
+- The interval conversion reads `lifecycle:transition`; pm4py's
+  `transition_key` parameter is not exposed, and a non-text transition
+  (pm4py: `AttributeError: 'int' object has no attribute 'lower'`) is
+  read as its text.
+- The decision workbench has no pm4py counterpart at the route level
+  (native trees), so nothing was swept for it on nanosecond CSV logs.
+- Unchanged: the declared items of FO1 and before.
+
+Results after the fixes (exact): resource profiles on the lifecycle
+banks (rpswL2: 362 equal, 278 raised alike; rpswM2: 420 and 220) and on
+fresh lifecycle banks (seeds 3200-3279, rpswN: 417 equal, 223 raised alike; rpswO, XES: 414 and
+226), on the
+FO banks (rpswA2: 336 and 144; rpswB2: 375 and 105, every error text
+pm4py's), on uploads (rpnearA3: 1,075 equal, 97 raised alike, 28
+declared NaN; rpnearC4: 1,082, 85 and 33; rpxA3, XES: 1,071, 99 and 30; rpframeB4:
+784, 132 and 44); root cause on nanosecond CSV logs (rcnsA2 and rcnsC: 456 equal, 3
+raised alike each); passed time on the fresh lifecycle banks (rlwN: 153
+equal, 87 raised alike; rlwO: 158 and 82); SNA and roles (orgsna on rlN:
+228 equal, 39 declared ulps, 53 declared empty networks, roles 80 of 80;
+on rlA: 232 equal, 38 and 49 declared; on rlO, XES: 228 equal, 40 and
+51 declared; one call raised alike in each).
+
+In the suite: `minera_resource_profiles_tests` (`review_fp_frame_exact`,
+`review_fp_log_lifecycle`, and the older lifecycle contracts on EventLogs
+now at the log variant's values), `minera_token_replay_root_cause_tests`
+(`csv_frame_nanosecond_dates`) and `minera_review_bc1_tests` carry FP1's
+reference values. The full ctest passed 659 of 659, the Python script
+tests 406 of 406, the fixture replay gave 2,673 responses unchanged.

@@ -3,6 +3,7 @@
 #include <cassert>
 #include <functional>
 #include <map>
+#include <optional>
 #include <sstream>
 #include <cmath>
 #include <cstdio>
@@ -77,10 +78,11 @@ static void reference_audit_contracts() {
   // the previous kept event: B gets 10s..15s, A's completion a zero interval.
   const auto mixed = one_case({timed("A", "r", 0, "start"), timed("A", "r", 10, "complete"), timed("B", "r", 15)});
   assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 5.0);
-  // average_duration_activity follows the reference DataFrame path (CSV/XES
-  // inputs): every event takes part, so A start@0 gives 0s and A complete@10
-  // 10s (PM4Py 2.7.22 pandas variant: 5.0; the EventLog variant gives 0.0).
-  assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "A")) == 5.0);
+  // An EventLog follows pm4py's log variant, which pairs the transitions
+  // (round FP): A's interval is 0s..10s, and without a start key it starts
+  // at its own end, as the first of the case (PM4Py 2.7.22 EventLog variant:
+  // 0.0; the pandas variant of a frame, where every event takes part, 5.0).
+  assert(only_value(query(mixed, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "A")) == 0.0);
   assert(only_value(query(mixed, ResourceProfileMetric::kMultitasking, 0, 20, "r")) == 1.0);
   const auto upper = one_case({timed("A", "r", 0, "START"), timed("A", "r", 10, "COMPLETE"), timed("B", "r", 15, "COMPLETE")});
   assert(only_value(query(upper, ResourceProfileMetric::kAverageDurationActivity, 0, 20, "r", "B")) == 5.0);
@@ -486,7 +488,145 @@ static void review_fo_log_variant() {
   assert(only_value(discover_resource_profiles(l2, pair)) == 0.0);
 }
 
+// Review FP2 (pm4py's log variant with lifecycle transitions, observed
+// black-box): when the first event of the sorted log lacks the start key
+// ("start_timestamp" without one), the log becomes intervals first: each
+// complete (or unmarked) event pairs with the oldest pending start of its
+// activity (transitions case-insensitive, others dropped), each case sorted
+// by start; without a start key an interval starts at the previous one's
+// end and a case the conversion empties raises IndexError.
+static void review_fp_log_lifecycle() {
+  using M = ResourceProfileMetric;
+  const auto at = [](int seconds) {
+    const int day = seconds < 0 ? 5 : 6;
+    const int s = seconds < 0 ? seconds + 86400 : seconds;
+    char text[64];
+    std::snprintf(text, sizeof text, "2020-01-%02d %02d:%02d:%02d+00:00", day, s / 3600, s / 60 % 60, s % 60);
+    return std::string(text);
+  };
+  struct E { std::string act; int t; std::string lc; std::optional<int> st; };
+  const auto make = [&](std::vector<std::vector<E>> traces) {
+    EventLog log;
+    for (std::size_t i = 0; i < traces.size(); ++i) {
+      Trace trace; trace.case_id = "c" + std::to_string(i);
+      for (const auto& x : traces[i]) {
+        Event e{trace.case_id, x.act, at(x.t), "r1", 0, {}, ""};
+        if (!x.lc.empty()) e.attributes.push_back({"lifecycle:transition", x.lc});
+        if (x.st) e.attributes.push_back({"st", at(*x.st)});
+        trace.events.push_back(e);
+      }
+      log.traces.push_back(std::move(trace));
+    }
+    return log;
+  };
+  const auto run = [](const EventLog& log, M metric, std::string start = "") {
+    ResourceProfilesOptions o; o.metric = metric; o.resource = "r1";
+    o.t1 = "2020-01-01 00:00:00"; o.t2 = "2021-01-01 00:00:00";
+    if (metric == M::kAverageDurationActivity) o.activity = "A";
+    o.start_timestamp_attribute = std::move(start);
+    return discover_resource_profiles(log, o);
+  };
+  const auto ada = [&](std::vector<std::vector<E>> traces, std::string start) {
+    return only_value(run(make(std::move(traces)), M::kAverageDurationActivity, std::move(start)));
+  };
+  const std::optional<int> none;
+  // A start and its complete pair; the previous interval's end wins without a key.
+  assert(ada({{{"A", 0, "start", none}, {"A", 100, "complete", none}}}, "") == 0.0);
+  assert(ada({{{"A", 0, "start", none}, {"A", 100, "complete", none}}}, "st") == 100.0);
+  assert(ada({{{"A", 0, "START", none}, {"A", 100, "COMPLETE", none}}}, "st") == 100.0);
+  // An unpaired complete starts at its own time, whatever its start key.
+  assert(ada({{{"Z", -50, "complete", none}, {"A", 100, "complete", 50}}}, "") == 150.0);
+  assert(ada({{{"Z", -50, "complete", none}, {"A", 100, "complete", 50}}}, "st") == 0.0);
+  assert(ada({{{"Z", -50, "start", none}, {"A", 100, "", 50}}}, "") == 0.0);
+  // Pairs per activity, oldest start first, sorted by start.
+  assert(ada({{{"A", 0, "start", none}, {"B", 10, "start", none}, {"A", 100, "complete", none}, {"B", 200, "complete", none}}}, "st") == 100.0);
+  assert(ada({{{"A", 0, "start", none}, {"A", 10, "start", none}, {"A", 100, "complete", none}, {"A", 200, "complete", none}}}, "") == 50.0);
+  assert(ada({{{"A", 0, "start", none}, {"A", 10, "start", none}, {"A", 100, "complete", none}, {"A", 200, "complete", none}}}, "st") == 145.0);
+  assert(ada({{{"A", 0, "schedule", none}, {"A", 100, "complete", none}}}, "st") == 0.0);
+  // The start key on the first sorted event: no conversion, so the complete
+  // event without it is pm4py's KeyError.
+  assert(ada({{{"A", 0, "start", -40}, {"A", 100, "complete", none}}}, "") == 0.0);
+  assert(raises_text([&] { (void)run(make({{{"A", 0, "start", -40}, {"A", 100, "complete", none}}}), M::kAverageDurationActivity, "st"); },
+                     "KeyError: 'st'"));
+  // A case the conversion empties raises without a start key (an empty case
+  // does not); the first sorted event decides the conversion.
+  const auto starts_only = make({{{"A", 100, "complete", 50}}, {{"B", 0, "start", none}}});
+  for (const auto metric : {M::kAverageDurationActivity, M::kMultitasking, M::kAverageWorkload})
+    assert(raises_text([&] { (void)run(starts_only, metric); }, "IndexError: list index out of range"));
+  assert(raises_text([&] { (void)run(make({{{"A", 100, "complete", 50}}, {{"B", 0, "schedule", none}}}), M::kAverageWorkload); },
+                     "IndexError: list index out of range"));
+  assert(only_value(run(starts_only, M::kAverageDurationActivity, "st")) == 0.0);
+  assert(only_value(run(starts_only, M::kMultitasking, "st")) == 0.0);
+  const auto late_start = make({{{"A", 100, "complete", 50}}, {{"B", 200, "start", none}}});
+  assert(only_value(run(late_start, M::kAverageDurationActivity, "st")) == 50.0);
+  assert(raises_text([&] { (void)run(late_start, M::kMultitasking, "st"); }, "KeyError: 'st'"));
+  assert(ada({{{"A", 100, "complete", 50}}, {}}, "") == 0.0);
+}
+
+// Review FP1 (pm4py's pandas variant on a CSV frame with nanosecond times,
+// observed black-box): the window compares the datetime64 cells exactly (a
+// time a nanosecond before t1 is out, two before t2 in), the view keeps the
+// nanoseconds, average_duration_activity is pandas' mean of the exact
+// Timedelta seconds (sorted by start, timestamp and position without a start
+// column, the frame's order with one, a NaT start a zero that does not
+// count), average_case_duration statistics.mean of the exact durations.
+static void review_fp_frame_exact() {
+  using M = ResourceProfileMetric;
+  const auto log = au_csv(
+      "cid,act,ts,who,st\n"
+      "c0,a,2020-01-10 04:07:14.439589176,R,2020-01-10 04:06:45.598385933\n"
+      "c0,b,2020-01-10 04:17:55.960338225,R,2020-01-10 04:15:57.554655321\n"
+      "c0,a,2020-01-10 04:25:37.384332940,R,2020-01-10 04:23:28.496265830\n"
+      "c0,b,2020-01-10 04:35:59.410926396,R,2020-01-10 04:35:25.937392936\n"
+      "c0,a,2020-01-10 04:40:04.122078729,R,2020-01-10 04:38:47.244949619\n"
+      "c0,b,2020-01-10 04:49:57.447136430,R,2020-01-10 04:49:00.623808871\n"
+      "c0,a,2020-01-10 04:51:42.125786802,R,2020-01-10 04:47:10.145715038\n"
+      "c1,a,2020-01-10 05:14:12.240019583,R,2020-01-10 05:09:57.725111887\n"
+      "c1,b,2020-01-10 05:18:44.110448685,R,2020-01-10 05:17:01.112389170\n"
+      "c1,a,2020-01-10 05:24:12.995094237,R,2020-01-10 05:19:40.552813590\n"
+      "c1,b,2020-01-10 05:32:25.754309630,R,\n"
+      "c1,a,2020-01-10 05:43:32.710923783,R,2020-01-10 05:42:49.030960887\n"
+      "c1,b,2020-01-10 05:46:34.895374064,R,2020-01-10 05:43:26.162026862\n"
+      "c1,a,2020-01-10 05:47:59.369717953,R,2020-01-10 05:44:53.404886066\n"
+      "c2,a,2020-01-10 06:09:08.013645774,R,2020-01-10 06:08:31.161371344\n"
+      "c2,b,2020-01-10 06:14:08.423763621,R,2020-01-10 06:13:31.907153775\n"
+      "c2,a,2020-01-10 06:24:42.563353383,R,2020-01-10 06:20:34.712950793\n"
+      "c2,b,2020-01-10 06:31:11.093376186,R,2020-01-10 06:26:40.876051898\n"
+      "c2,a,2020-01-10 06:36:27.925524348,R,2020-01-10 06:32:52.599855820\n"
+      "c2,b,2020-01-10 06:39:28.660244836,R,2020-01-10 06:35:47.976563027\n"
+      "c2,a,2020-01-10 06:42:02.778204862,R,2020-01-10 06:38:03.822195385\n"
+      "c3,a,2020-01-10 03:59:59.999999999,S,\n"
+      "c3,b,2020-01-10 08:59:59.999999998,S,\n");
+  const auto run = [&](M metric, const std::string& resource, const std::string& activity = "",
+                       const std::string& start = "") {
+    ResourceProfilesOptions o;
+    o.metric = metric;
+    o.resource_attribute = "who";
+    o.t1 = "2020-01-10 04:00:00";
+    o.t2 = "2020-01-10 09:00:00";
+    o.resource = resource;
+    o.resource_given = true;
+    if (!activity.empty()) { o.activity = activity; o.activity_given = true; }
+    o.start_timestamp_attribute = start;
+    const auto result = discover_resource_profiles(log, o);
+    assert(result.rows.size() == 1);
+    return result.rows.front().value;
+  };
+  assert(run(M::kAverageDurationActivity, "R", "a") == 249.6849249136667);
+  assert(run(M::kAverageDurationActivity, "R", "b") == 408.15126179111115);
+  assert(run(M::kAverageDurationActivity, "R", "a", "st") == 166.84773411483334);
+  assert(run(M::kAverageDurationActivity, "R", "b", "st") == 128.481445822875);
+  assert(run(M::kAverageCaseDuration, "R") == 2223.193485028);
+  assert(run(M::kAverageCaseDuration, "S") == 17999.999999999);
+  assert(run(M::kActivityCompletions, "S") == 1.0);
+  assert(run(M::kDistinctActivities, "S") == 1.0);
+  assert(run(M::kMultitasking, "R") == 1.0);
+  assert(run(M::kAverageWorkload, "R") == 0.0);
+}
+
 int main() {
+  review_fp_log_lifecycle();
+  review_fp_frame_exact();
   review_fo_log_variant();
   reference_audit_contracts();
   frame_path_reads_pm4py_frame();
@@ -560,18 +700,22 @@ int main() {
   duration.resource = "alice";
   duration.activity = "A";
   const auto durations = discover_resource_profiles(log, duration);
-  // Reference DataFrame path (PM4Py 2.7.22 pandas variant): A complete@10
-  // follows A start@0 (10s) in case a and is first in case b (0s), so 5s.
-  assert(durations.rows.size() == 1 && durations.rows[0].value == 5.0);
+  // pm4py's log variant (PM4Py 2.7.22 EventLog variant, round FP): the
+  // conversion pairs A start@0 with A complete@10, and without a start key
+  // the first interval of a case starts at its own end (0s in case a and in
+  // case b). The pandas variant of a frame gives 5s.
+  assert(durations.rows.size() == 1 && durations.rows[0].value == 0.0);
   {
     // Overlapping lifecycle intervals: B complete@0, D start@10 (r2),
-    // C complete@50, D complete@58 (x). DataFrame path: 8; without C: 48.
+    // C complete@50, D complete@58 (x). The converted intervals sort by
+    // start (B, D from 10, C), so D follows B: 58 with or without C (the
+    // pandas variant of a frame: 8 and 48).
     const auto overlap = one_case({timed("B", "r2", 0, "complete"), timed("D", "r2", 10, "start"),
                                    timed("C", "r1", 50, "complete"), timed("D", "x", 58, "complete")});
-    assert(only_value(query(overlap, ResourceProfileMetric::kAverageDurationActivity, 0, 59, "x", "D")) == 8.0);
+    assert(only_value(query(overlap, ResourceProfileMetric::kAverageDurationActivity, 0, 59, "x", "D")) == 58.0);
     const auto csc = one_case({timed("B", "r2", 0, "complete"), timed("D", "r2", 10, "start"),
                                timed("D", "x", 58, "complete")});
-    assert(only_value(query(csc, ResourceProfileMetric::kAverageDurationActivity, 0, 59, "x", "D")) == 48.0);
+    assert(only_value(query(csc, ResourceProfileMetric::kAverageDurationActivity, 0, 59, "x", "D")) == 58.0);
   }
 
   ResourceProfilesOptions activity_completions;
@@ -628,11 +772,11 @@ int main() {
   workload.metric = ResourceProfileMetric::kAverageWorkload;
   workload.t2 = "2024-01-01T00:00:10Z";
   const auto average_workload = discover_resource_profiles(overlap, workload);
-  // Reference DataFrame path (the path imported logs follow): every event
-  // spans from the previous event of its case, so the A complete@10 interval
-  // [5,10] ends at t2 = 10s and counts (3.0); the EventLog path pairs
-  // lifecycles and gives 0.0. Both give 2.0 at 12s.
-  assert(only_value(average_workload) == 3.0);
+  // pm4py's log variant pairs the transitions (round FP): no interval
+  // starts before 10s and ends at or after it, so 0.0 (PM4Py 2.7.22
+  // EventLog variant; the pandas variant of a frame, where the A
+  // complete@10 interval spans [5,10], gives 3.0). Both give 2.0 at 12s.
+  assert(only_value(average_workload) == 0.0);
   workload.t2 = "2024-01-01T00:00:12Z";
   assert(only_value(discover_resource_profiles(overlap, workload)) == 2.0);
   {

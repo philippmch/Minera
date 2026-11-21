@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FO (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FP (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8434,6 +8434,65 @@ finished green in all six jobs. The Mac was not reachable this round
 generators, the comparers and the probes are in the project files under
 `review-harness/round-fo/`.
 
+Round FP re-reviewed FO on fresh raw-log banks and swept new areas
+(Review FP1). FO's fixes held (network analysis, passed time, resource
+profiles on CSV and XES raw logs, also with lifecycle columns, apart
+from the items fixed below). Fixed: FP1-1, resource profiles on uploads
+with nanosecond times (the frame path compares its datetime64 cells with
+the window exactly, keeps the nanoseconds in its view, takes pandas'
+pairwise mean of the exact `Timedelta` seconds in
+`average_duration_activity` and `statistics.mean` of the exact durations
+in `average_case_duration`; 135 of 5,400 frame results were an ulp to a
+microsecond off); FP1-2, the log variant's interval metrics on logs with
+lifecycle transitions (pm4py converts the log to intervals when the
+first sorted event lacks the start key: FIFO start/complete pairing per
+activity, other transitions dropped, intervals sorted by start, and
+`IndexError: list index out of range` when, without a start key, a case
+converts to nothing); FP1-3, root cause features of a CSV log's dates
+keep `str(Timestamp)`'s nanoseconds (XES logs keep microseconds, as
+before); FP1-4, the empty averages name pm4py's `StatisticsError`. New
+areas: SNA (four log variants) and roles on raw logs with offsets,
+nanoseconds and lifecycles are equal apart from the declared joint
+activities ulps and networks without connections; root cause on
+nanosecond XES logs was already equal; the decision workbench has no
+pm4py route counterpart. After the fixes every resource-profile,
+root cause, passed time and SNA sweep agrees where pm4py answers, with
+pm4py's error texts, on fresh banks too.
+
+In the suite: the resource profiles, token replay root cause and BC1
+review tests carry FP1's reference values (four older lifecycle
+contracts on EventLogs moved to the log variant's values). The full
+ctest passed 659 of 659 on the first run (40 minutes, -j2); the Python
+script tests 406 of 406 (the 13 query runtime tests in a venv with
+duckdb); the fixture replay gave 2,673 responses unchanged. FO's CI run
+44919992483 finished green in all six jobs. The Mac was not reachable
+this round (no folder access), so no newer reviewer handoff was read.
+The generators, the comparers and the probes are in the project files
+under `review-harness/round-fp/`.
+
+Next round (FQ) should start by re-reviewing round FP:
+
+- FP's CI run;
+- FP1-1 to FP1-4 on fresh banks: the frame path with nanosecond times
+  (`rpframe.py` with `NEAR=1` and new seeds, `rpframex.py` for XES), the
+  log variant with lifecycle columns (`rlwl.py` on new seeds, then
+  `org/rpsweep.py` with `PLAIN=1`, `RAWDT=1` for XES; also logs whose
+  first sorted event has `start_timestamp`), root cause on nanosecond CSV
+  logs (`rcns.py` on new seeds, also with the multiplier, numeric date
+  columns and the unknown-activity form);
+- new areas: the other routes that print a CSV log's dates through
+  `str(Timestamp)` (the attribute value lists and filters, the features
+  and one-hot encodings, the case attributes in the trace explorer) on
+  nanosecond CSV logs; other pm4py functions that convert a log to
+  intervals by lifecycle (the interval features, the temporal profile and
+  the cycle time with lifecycles) on raw logs with lifecycle columns;
+  local diagnostics on raw logs with a group column; the SNA pandas
+  variants on CSV uploads with offsets and nanoseconds;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FP (kept for its older items):
+
 Next round (FP) should start by re-reviewing round FO:
 
 - FO's CI run;
@@ -8449,6 +8508,16 @@ Next round (FP) should start by re-reviewing round FO:
   SNA, local diagnostics) on raw logs with offsets;
 - the carried items below (the SQLite leftovers, the new Polars dtypes,
   DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FP's list, taken in FP: FO's CI (six green); FO1-1 to FO1-3 on fresh CSV and XES raw-log banks, also
+with lifecycle columns (0 outside FP1-2 and FP1-4); the frame path's
+durations with nanosecond times (fixed as FP1-1); root cause on
+nanosecond CSV logs (fixed as FP1-3; XES 0) and the decision workbench
+(native, no pm4py route); the log variant with lifecycles (fixed as
+FP1-2); SNA and roles on raw logs (0 outside the declared items); local
+diagnostics not swept (the banks have no group column). Carried to FQ:
+EV1-1, the SQLite leftovers, the new Polars dtypes, DW1, the other
+declared items, the rest of the CU list and the open choices.
 
 Previous list for round FO (kept for its older items):
 

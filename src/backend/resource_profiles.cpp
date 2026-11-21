@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <deque>
 #include <iomanip>
 #include <map>
 #include <numeric>
@@ -19,6 +20,7 @@
 #include "minera/dataframe_columns.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
+#include "numpy_pairwise_sum.hpp"
 #include "python_scalar.hpp"
 #include "reference_activity_selector.hpp"
 
@@ -81,11 +83,6 @@ bool exact_in(const std::optional<ParsedExactTimestamp>& t, const ExactBounds& b
     if (closed ? order > 0 : order >= 0) return false;
   }
   return true;
-}
-
-bool in_slot(std::optional<double> t, const Bounds& b) {
-  if (!t || !std::isfinite(*t)) return false;
-  return (!b.lo || *t >= *b.lo) && (!b.hi || *t < *b.hi);
 }
 
 const char* metric_name(ResourceProfileMetric m) {
@@ -160,8 +157,9 @@ std::optional<double> explicit_start_of(const Event& e,
   if (o.start_timestamp_attribute.empty()) return std::nullopt;
   const auto* text = e.attribute(o.start_timestamp_attribute);
   if (!text) return std::nullopt;
-  const auto start = parse_timestamp(*text);
+  auto start = parse_timestamp(*text);
   if (!start || !std::isfinite(*start)) return std::nullopt;
+  if (const auto exact = parse_timestamp_exact(*text)) start = frame_times::epoch_seconds(*exact);
   return *start;
 }
 
@@ -205,8 +203,76 @@ std::string log_time_key(const ResourceProfilesOptions& o) {
 // average_duration_activity: without a start key each event starts at the
 // previous event of its (time-sorted) case; with one, every event's interval
 // is (start key, timestamp key) when the first event of the sorted log has
-// the start key, and otherwise every interval starts at its own timestamp.
+// the start key, and otherwise every interval starts at its paired start.
 enum class StartMode { kPrevious, kAttribute, kOwn };
+
+// Whether the log variant converts the log to intervals first (round FP):
+// it does when the first event of the sorted log lacks the start key (or
+// "start_timestamp" without one). The conversion pairs each "complete" (or
+// unmarked) event with the oldest pending "start" of its activity
+// (case-insensitive transitions; any other transition drops the event), the
+// interval starting there or at its own time, and sorts each case's
+// intervals by start. Without a start key each interval then starts at the
+// previous one's end; with one, at its paired start.
+struct LogStart {
+  StartMode mode = StartMode::kPrevious;
+  bool convert = false;
+};
+
+enum class Transition { kStart, kComplete, kOther };
+
+Transition log_transition(const Event& e) {
+  const std::string* text = nullptr;
+  for (const auto& attribute : e.attributes)
+    if (attribute.key == "lifecycle:transition") {
+      if (attribute.is_null) return Transition::kOther;  // str(None).lower()
+      text = &attribute.value;
+      break;
+    }
+  if (!text) text = reference_selected_field(e, "lifecycle:transition");
+  if (!text)
+    return e.lifecycle_state == FirstClassAttributeState::kNull &&
+                   (e.lifecycle_source_key.empty() || e.lifecycle_source_key == "lifecycle:transition")
+               ? Transition::kOther
+               : Transition::kComplete;
+  std::string lower = *text;
+  std::transform(lower.begin(), lower.end(), lower.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  return lower == "start" ? Transition::kStart : lower == "complete" ? Transition::kComplete : Transition::kOther;
+}
+
+struct ConvertedEvent {
+  const Event* event;
+  std::optional<ParsedExactTimestamp> start, time;
+};
+
+// One case's converted events, from its events in time order.
+std::vector<ConvertedEvent> log_variant_converted(const std::vector<const Event*>& events,
+                                                  const ResourceProfilesOptions& o) {
+  std::map<std::optional<std::string>, std::deque<std::optional<ParsedExactTimestamp>>> pending;
+  std::vector<ConvertedEvent> out;
+  for (const auto* e : events) {
+    const auto transition = log_transition(*e);
+    if (transition == Transition::kOther) continue;
+    const auto time = log_time(*e, o);
+    auto& queue = pending[activity_of(*e, o)];
+    if (transition == Transition::kStart) {
+      queue.push_back(time);
+      continue;
+    }
+    auto start = time;
+    if (!queue.empty()) {
+      start = queue.front();
+      queue.pop_front();
+    }
+    out.push_back({e, start, time});
+  }
+  std::stable_sort(out.begin(), out.end(), [](const ConvertedEvent& a, const ConvertedEvent& b) {
+    if (!a.start || !b.start) return a.start.has_value() && !b.start;
+    return exact_order(*a.start, *b.start) < 0;
+  });
+  return out;
+}
 
 // The log sorted as pm4py sorts it before the intervals: each trace's events
 // by time (stable), then the traces by their first event (stable).
@@ -239,12 +305,12 @@ std::vector<std::vector<const Event*>> log_variant_sorted(const EventLog& log, c
   return out;
 }
 
-StartMode log_variant_start_mode(const EventLog& log, const ResourceProfilesOptions& o) {
-  if (o.start_timestamp_attribute.empty()) return StartMode::kPrevious;
+LogStart log_variant_start_mode(const EventLog& log, const ResourceProfilesOptions& o) {
   const auto sorted = log_variant_sorted(log, o);
-  if (sorted.empty()) return StartMode::kOwn;
-  return reference_selected_field(*sorted.front().front(), o.start_timestamp_attribute) ? StartMode::kAttribute
-                                                                                        : StartMode::kOwn;
+  const auto key = o.start_timestamp_attribute.empty() ? std::string("start_timestamp") : o.start_timestamp_attribute;
+  const bool has_key = !sorted.empty() && reference_selected_field(*sorted.front().front(), key);
+  if (o.start_timestamp_attribute.empty()) return {StartMode::kPrevious, !has_key};
+  return has_key ? LogStart{StartMode::kAttribute, false} : LogStart{StartMode::kOwn, true};
 }
 
 // The first error the log variant raises: KeyError for a key an event it
@@ -253,7 +319,8 @@ StartMode log_variant_start_mode(const EventLog& log, const ResourceProfilesOpti
 // Timestamp has nanoseconds (it then compares as a Timestamp, else as a
 // datetime).
 void log_variant_checks(const EventLog& log, const ResourceProfilesOptions& o, const ExactBounds& b,
-                        StartMode mode) {
+                        const LogStart& start) {
+  const auto mode = start.mode;
   const auto key = log_time_key(o);
   const auto key_error = [](const std::string& k) { log_variant_fail("KeyError: '" + k + "'"); };
   const auto comparable = [&](const std::string& text, const char* op) {
@@ -327,8 +394,26 @@ void log_variant_checks(const EventLog& log, const ResourceProfilesOptions& o, c
       // every start key.
       for (const auto& trace : log.traces)
         for (const auto& e : trace.events) (void)required(e);
+      const auto sorted = log_variant_sorted(log, o);
+      if (start.convert) {
+        // Without a start key, a case the conversion empties raises.
+        if (o.start_timestamp_attribute.empty())
+          for (const auto& events : sorted)
+            if (log_variant_converted(events, o).empty()) log_variant_fail("IndexError: list index out of range");
+        // The converted events carry the start key; only the window remains.
+        if (o.metric != ResourceProfileMetric::kAverageDurationActivity) break;
+        for (const auto& events : sorted)
+          for (const auto& converted : log_variant_converted(events, o)) {
+            const auto& e = *converted.event;
+            const auto resource = resource_of(e, o);
+            if (!resource || !resource_matches(*resource, o)) continue;
+            if (!activity_matches(activity_of(e, o).value_or(std::string{}), o)) continue;
+            comparable(required(e), first_op);
+          }
+        break;
+      }
       const bool duration = o.metric == ResourceProfileMetric::kAverageDurationActivity;
-      for (const auto& events : log_variant_sorted(log, o))
+      for (const auto& events : sorted)
         for (const auto* e : events) {
           const auto resource = resource_of(*e, o);
           if (!resource || !resource_matches(*resource, o)) continue;
@@ -359,7 +444,8 @@ void log_variant_checks(const EventLog& log, const ResourceProfilesOptions& o, c
 // pairs lifecycles and gives 100).
 std::vector<Interval> lifecycle_intervals(
     const Trace& trace, const ResourceProfilesOptions& o,
-    bool every_transition = false, bool frame = true, StartMode mode = StartMode::kPrevious) {
+    bool every_transition = false, bool frame = true, LogStart log_start = {}) {
+  const auto mode = log_start.mode;
   const auto complete_or_unmarked = [](const std::string& lifecycle) {
     if (lifecycle.empty()) return true;
     std::string lower = lifecycle;
@@ -372,17 +458,42 @@ std::vector<Interval> lifecycle_intervals(
   for (const auto& e : trace.events) {
     std::optional<ParsedExactTimestamp> exact;
     std::optional<double> t;
-    if (frame) t = parse_timestamp(timestamp_of(e, o));
-    else t = log_seconds(exact = log_time(e, o));
+    if (frame) {
+      // The interval metrics read Timestamp.timestamp() on the frame too
+      // (nanoseconds rounded to the microsecond, round FP).
+      t = parse_timestamp(timestamp_of(e, o));
+      if (t && std::isfinite(*t)) {
+        exact = parse_timestamp_exact(timestamp_of(e, o));
+        if (exact) t = frame_times::epoch_seconds(*exact);
+      }
+    } else {
+      t = log_seconds(exact = log_time(e, o));
+    }
     if (!t || !std::isfinite(*t) || (!every_transition && !complete_or_unmarked(e.lifecycle))) continue;
     kept.push_back({*t, &e, exact});
   }
-  if (frame)
-    std::stable_sort(kept.begin(), kept.end(), [](const Kept& a, const Kept& b) { return a.time < b.time; });
-  else
-    std::stable_sort(kept.begin(), kept.end(),
-                     [](const Kept& a, const Kept& b) { return exact_order(*a.exact, *b.exact) < 0; });
+  // Both variants sort by the exact instants (the frame's datetime64 sort
+  // too, round FP).
+  std::stable_sort(kept.begin(), kept.end(), [](const Kept& a, const Kept& b) {
+    if (a.exact && b.exact) return exact_order(*a.exact, *b.exact) < 0;
+    return a.time < b.time;
+  });
   std::vector<Interval> out;
+  if (!frame && every_transition && log_start.convert) {
+    std::vector<const Event*> events;
+    for (const auto& k : kept) events.push_back(k.event);
+    const auto converted = log_variant_converted(events, o);
+    for (std::size_t i = 0; i < converted.size(); ++i) {
+      const auto& c = converted[i];
+      const auto resource = resource_of(*c.event, o);
+      if (!resource) continue;
+      const double end = *log_seconds(c.time);
+      const double start = mode == StartMode::kPrevious ? (i ? *log_seconds(converted[i - 1].time) : end)
+                                                        : *log_seconds(c.start);
+      out.push_back({*resource, activity_of(*c.event, o).value_or(std::string{}), start, end, c.time});
+    }
+    return out;
+  }
   for (std::size_t i = 0; i < kept.size(); ++i) {
     const auto& e = *kept[i].event;
     const auto resource = resource_of(e, o);
@@ -485,12 +596,14 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
   std::map<std::string, bool> case_completed;
   // An EventLog without frame columns follows pm4py's log variant (round
   // FO): exact comparisons with the bounds, Timestamp.timestamp() seconds,
-  // statistics.mean, its errors and its interval starts.
-  const ExactBounds eb = frame ? ExactBounds{} : exact_bounds(o);
+  // statistics.mean, its errors and its interval starts. The frame compares
+  // its datetime64 cells with the bounds exactly too (round FP: a time a
+  // nanosecond before t1 is outside, though its epoch double equals t1's).
+  const ExactBounds eb = exact_bounds(o);
   const bool interval_metric = o.metric == ResourceProfileMetric::kAverageDurationActivity ||
                                o.metric == ResourceProfileMetric::kAverageWorkload ||
                                o.metric == ResourceProfileMetric::kMultitasking;
-  StartMode mode = StartMode::kPrevious;
+  LogStart mode;
   if (!frame) {
     if (interval_metric) {
       // The sort reads every event's time before anything else.
@@ -514,14 +627,18 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
       const auto activity = activity_of(e, o).value_or(std::string{});
       std::optional<ParsedExactTimestamp> exact;
       std::optional<double> t;
-      if (frame) t = parse_timestamp(timestamp_of(e, o));
-      else t = log_seconds(exact = log_time(e, o));
+      if (frame) {
+        t = parse_timestamp(timestamp_of(e, o));
+        if (t && std::isfinite(*t)) exact = parse_timestamp_exact(timestamp_of(e, o));
+      } else {
+        t = log_seconds(exact = log_time(e, o));
+      }
       if (t && std::isfinite(*t)) {
         if (!first) { first = *t; first_exact = exact; }
         last = *t; last_exact = exact;
       }
       if (resource) tr_resources.insert(*resource);
-      const bool slot = frame ? in_slot(t, b) : exact_in(exact, eb, false);
+      const bool slot = exact_in(exact, eb, false);
       // On the frame a case is in the slot whatever its events' resources;
       // the log variant's social position closes the window (ev <= t2).
       if (frame && !resource && slot) slot_cases.insert(case_id);
@@ -549,22 +666,18 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
       case_start[case_id] = *first; case_end[case_id] = *last;
       // A case counts toward a window when either endpoint lies in the closed
       // window or the case spans all of it.
-      if (frame) {
-        const auto inside = [&](double t) { return (!b.lo || t >= *b.lo) && (!b.hi || t <= *b.hi); };
-        case_intersects[case_id] =
-            inside(*first) || inside(*last) || ((!b.lo || *first <= *b.lo) && (!b.hi || *last >= *b.hi));
-      } else {
-        const auto inside = [&](const ParsedExactTimestamp& t) {
-          return (!eb.lo || exact_order(t, *eb.lo) >= 0) && (!eb.hi || exact_order(t, *eb.hi) <= 0);
-        };
-        const auto first_wall = *wall_clock(first_exact), last_wall = *wall_clock(last_exact);
-        case_intersects[case_id] = inside(first_wall) || inside(last_wall) ||
-                                   ((!eb.lo || exact_order(first_wall, *eb.lo) <= 0) &&
-                                    (!eb.hi || exact_order(last_wall, *eb.hi) >= 0));
-      }
+      const auto inside = [&](const ParsedExactTimestamp& t) {
+        return (!eb.lo || exact_order(t, *eb.lo) >= 0) && (!eb.hi || exact_order(t, *eb.hi) <= 0);
+      };
+      // The log variant compares wall clocks; the frame its UTC instants.
+      const auto first_at = frame ? *first_exact : *wall_clock(first_exact);
+      const auto last_at = frame ? *last_exact : *wall_clock(last_exact);
+      case_intersects[case_id] = inside(first_at) || inside(last_at) ||
+                                 ((!eb.lo || exact_order(first_at, *eb.lo) <= 0) &&
+                                  (!eb.hi || exact_order(last_at, *eb.hi) >= 0));
     }
     case_resources[case_id].insert(tr_resources.begin(), tr_resources.end());
-    const bool completed = frame ? last && in_slot(last, b) : last && exact_in(last_exact, eb, false);
+    const bool completed = last && exact_in(last_exact, eb, false);
     if (first && last) case_completed[case_id] = completed;
     if (completed) {
       all_completed_cases.insert(case_id);
@@ -618,7 +731,7 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
       break;
     case ResourceProfileMetric::kAverageDurationActivity: {
       std::map<Key, std::vector<double>> activity_durations;
-      for (const auto& i : intervals) if (resource_matches(i.resource, o) && activity_matches(i.activity, o) && (frame ? in_slot(i.end,b) : exact_in(i.end_exact, eb, false))) { activity_duration_sum[{i.resource,i.activity}] += i.end-i.start; ++activity_duration_n[{i.resource,i.activity}]; activity_durations[{i.resource,i.activity}].push_back(i.end-i.start); }
+      for (const auto& i : intervals) if (resource_matches(i.resource, o) && activity_matches(i.activity, o) && exact_in(i.end_exact, eb, false)) { activity_duration_sum[{i.resource,i.activity}] += i.end-i.start; ++activity_duration_n[{i.resource,i.activity}]; activity_durations[{i.resource,i.activity}].push_back(i.end-i.start); }
       // The log variant averages with statistics.mean (exact).
       for (const auto& [k,v] : activity_duration_sum) add_row(result,{k.first,k.second,"",frame ? v/activity_duration_n[k] : detail::exact_mean(activity_durations[k]),activity_duration_n[k]},o.max_rows);
       break; }
@@ -693,9 +806,14 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
   // A query for one resource with no observation: the reference averages
   // raise StatisticsError and every other metric returns zero.
   if (result.rows.empty() && (!o.resource.empty() || o.resource_given)) {
+    // statistics.mean raises StatisticsError; the frame's
+    // average_duration_activity takes a pandas mean, whose NaN a row cannot
+    // hold (declared), so it raises without the class name.
+    if (frame && o.metric == ResourceProfileMetric::kAverageDurationActivity)
+      throw std::invalid_argument("resource profiles: mean requires at least one data point");
     if (o.metric == ResourceProfileMetric::kAverageDurationActivity ||
         o.metric == ResourceProfileMetric::kAverageCaseDuration)
-      throw std::invalid_argument("resource profiles: mean requires at least one data point");
+      throw std::invalid_argument("resource profiles: StatisticsError: mean requires at least one data point");
     if (o.metric != ResourceProfileMetric::kInteractionTwoResources &&
         o.metric != ResourceProfileMetric::kSocialPosition) {
       const bool by_activity = o.metric == ResourceProfileMetric::kActivityFrequency;
@@ -753,10 +871,10 @@ std::optional<std::string> non_date_type(const EventLog& frame, const std::strin
   return std::string("float");
 }
 
-std::string utc_text(const python::Scalar& date) {
-  return format_timestamp_microseconds(static_cast<double>(date.date.seconds) +
-                                       static_cast<double>(date.date.nanoseconds) / 1e9);
-}
+// A date cell as the view's UTC text, its nanoseconds kept (round FP: a
+// text rounded to the microsecond moved a time a nanosecond before t2 onto
+// t2, out of the window).
+std::string utc_text(const python::Scalar& date) { return frame_times::utc_text(date.date); }
 
 // average_case_duration on the frame: the cases (case:concept:name) with
 // an event of the resource (an isin match, so a text argument matches text
@@ -789,12 +907,14 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
       row.time = std::move(cell);
     rows.push_back(std::move(row));
   }
-  const auto seconds = [](const python::Scalar& date) {
-    return static_cast<double>(date.date.seconds) + static_cast<double>(date.date.nanoseconds) / 1e9;
-  };
-  const auto duration = [](const python::Scalar& from, const python::Scalar& to) {
-    return static_cast<double>(to.date.seconds - from.date.seconds) +
-           (static_cast<double>(to.date.nanoseconds) - static_cast<double>(from.date.nanoseconds)) / 1e9;
+  // The datetime64 cells compare exactly; a duration is the Timedelta's
+  // total seconds (frame_times::total_seconds) and the durations average
+  // with statistics.mean, exactly (round FP, observed black-box: the cases
+  // sorted by their start, then statistics.mean of their durations).
+  (void)b;
+  const ExactBounds eb = exact_bounds(o);
+  const auto before = [](const python::Scalar& x, const python::Scalar& y) {
+    return exact_order(x.date, y.date) < 0;
   };
   // Each case's rows and each resource's cases (first seen first), so one
   // resource costs the rows of its cases only.
@@ -826,8 +946,8 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
           auto& span = it->second;
           span.first = std::min(span.first, i);
           span.last = std::max(span.last, i);
-          if (seconds(*row.time) < seconds(*rows[span.least].time)) span.least = i;
-          if (seconds(*row.time) > seconds(*rows[span.greatest].time)) span.greatest = i;
+          if (before(*row.time, *rows[span.least].time)) span.least = i;
+          if (before(*rows[span.greatest].time, *row.time)) span.greatest = i;
         }
       }
     std::vector<Span> ordered;
@@ -836,8 +956,7 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
       ordered.push_back(span);
     }
     std::sort(ordered.begin(), ordered.end(), [](const Span& x, const Span& y) { return x.first < y.first; });
-    double sum = 0.0;
-    std::uint64_t count = 0;
+    std::vector<double> durations;
     // pm4py's pandas variant keeps a group only when its least timestamp
     // lies before t2 and its greatest after t1, both strictly (observed
     // black-box: a case ending at t1 or starting at t2 is outside, so is a
@@ -845,13 +964,13 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
     // rows' order, in an unsorted XES case), unlike the closed window of
     // the EventLog one. The duration runs from the first row to the last.
     for (const auto& span : ordered) {
-      const double least = seconds(*rows[span.least].time), greatest = seconds(*rows[span.greatest].time);
-      if (!((!b.hi || least < *b.hi) && (!b.lo || greatest > *b.lo))) continue;
-      sum += duration(*rows[span.first].time, *rows[span.last].time);
-      ++count;
+      const auto& least = rows[span.least].time->date;
+      const auto& greatest = rows[span.greatest].time->date;
+      if (!((!eb.hi || exact_order(least, *eb.hi) < 0) && (!eb.lo || exact_order(greatest, *eb.lo) > 0))) continue;
+      durations.push_back(frame_times::total_seconds(rows[span.first].time->date, rows[span.last].time->date));
     }
-    if (count == 0) return std::nullopt;
-    return std::make_pair(sum / static_cast<double>(count), count);
+    if (durations.empty()) return std::nullopt;
+    return std::make_pair(detail::exact_mean(durations), static_cast<std::uint64_t>(durations.size()));
   };
   ResourceProfilesResult result;
   result.metric = o.metric;
@@ -863,7 +982,7 @@ ResourceProfilesResult frame_average_case_duration(const EventLog& frame, const 
   result.diagnostics.computed = true;
   if (!o.resource.empty() || o.resource_given) {
     const auto value = profile(python::identity(python::text(o.resource)));
-    if (!value) throw std::invalid_argument("resource profiles: mean requires at least one data point");
+    if (!value) throw std::invalid_argument("resource profiles: StatisticsError: mean requires at least one data point");
     add_row(result, {o.resource, "", "", value->first, value->second}, o.max_rows);
     return result;
   }
@@ -889,6 +1008,7 @@ void require_duration_rows(const EventLog& frame, const ResourceProfilesOptions&
                            const std::optional<std::string>& resource, const std::string& r,
                            const std::string& a, const std::string& c, const std::string& t,
                            const std::string& s, bool uses_start) {
+  (void)b;  // the window is compared exactly (exact_bounds), round FP
   const auto fail = [](const std::string& message) {
     throw std::invalid_argument("resource profiles: " + message);
   };
@@ -942,8 +1062,7 @@ void require_duration_rows(const EventLog& frame, const ResourceProfilesOptions&
     if (!activity_cell || (activity && python::identity(*activity_cell) != *activity)) continue;
     const auto time = frame_row_scalar(frame, trace, event, t);
     if (!time || time->kind != python::Scalar::Kind::kDate) continue;
-    if (!in_slot(static_cast<double>(time->date.seconds) + static_cast<double>(time->date.nanoseconds) / 1e9, b))
-      continue;
+    if (!exact_in(time->date, exact_bounds(o), false)) continue;
     starts.push_back(uses_start ? frame_row_scalar(frame, trace, event, s)
                                 : std::optional<python::Scalar>{});
   }
@@ -1038,6 +1157,7 @@ void require_duration_column(const EventLog& frame, const ResourceProfilesOption
 std::uint64_t frame_interaction_count(const EventLog& frame, const ResourceProfilesOptions& o, const Bounds& b,
                                       const std::vector<std::string>& selection, const std::string& r,
                                       const std::string& c, const std::string& t) {
+  (void)b;  // the window is compared exactly (exact_bounds), round FP
   const auto fail = [](const std::string& message) {
     throw std::invalid_argument("resource profiles: " + message);
   };
@@ -1100,9 +1220,91 @@ std::uint64_t frame_interaction_count(const EventLog& frame, const ResourceProfi
   if (named(t) > 1) fail("ValueError: cannot reindex on an axis with duplicate labels");
   std::uint64_t count = 0;
   for (const auto& last : lasts)
-    if (last && in_slot(static_cast<double>(last->date.seconds) + static_cast<double>(last->date.nanoseconds) / 1e9, b))
-      ++count;
+    if (last && exact_in(last->date, exact_bounds(o), false)) ++count;
   return count;
+}
+
+// average_duration_activity's means on the frame (round FP, observed
+// black-box on pandas 3.0.5): each selected row (the resource, the
+// activity, its timestamp in the window, compared exactly) lasts the
+// Timedelta from its start to its timestamp, in total seconds
+// (frame_times::total_seconds); the mean is pandas' Series.mean, numpy's
+// pairwise sum of the durations over their count, a NaN duration (a start
+// that is NaT) a zero in the sum that does not count. With a start column
+// the rows keep the frame's order; without one a row starts at the previous
+// timestamp of its case (the case's rows by time, a missing time last; the
+// first row, or a row without a case, at its own timestamp) and the rows
+// sort by start, then timestamp, then position. Keyed by the identities of
+// the resource and activity cells; each value is (mean, count).
+std::map<std::pair<std::string, std::string>, std::pair<double, std::uint64_t>> frame_duration_means(
+    const EventLog& frame, const ResourceProfilesOptions& o, const std::string& r, const std::string& a,
+    const std::string& c, const std::string& t, const std::string& s, bool uses_start) {
+  struct Row {
+    std::size_t position = 0;
+    std::optional<std::string> case_key, resource, activity;
+    std::optional<ParsedExactTimestamp> time, start;
+  };
+  std::vector<Row> rows;
+  for (const auto& frame_row : frame_rows(frame)) {
+    const Trace& trace = frame_row.trace;
+    const Event& event = frame_row.event;
+    Row row;
+    row.position = rows.size();
+    if (const auto cell = frame_row_scalar(frame, trace, event, c)) row.case_key = python::identity(*cell);
+    if (const auto cell = frame_row_scalar(frame, trace, event, r)) row.resource = python::identity(*cell);
+    if (const auto cell = frame_row_scalar(frame, trace, event, a)) row.activity = python::identity(*cell);
+    if (const auto cell = frame_row_scalar(frame, trace, event, t); cell && cell->kind == python::Scalar::Kind::kDate)
+      row.time = cell->date;
+    if (uses_start)
+      if (const auto cell = frame_row_scalar(frame, trace, event, s); cell && cell->kind == python::Scalar::Kind::kDate)
+        row.start = cell->date;
+    rows.push_back(std::move(row));
+  }
+  if (!uses_start) {
+    std::map<std::string, std::vector<std::size_t>> cases;
+    for (auto& row : rows) {
+      if (row.case_key) cases[*row.case_key].push_back(row.position);
+      else row.start = row.time;  // no case: its own timestamp
+    }
+    for (auto& [key, members] : cases) {
+      (void)key;
+      std::stable_sort(members.begin(), members.end(), [&](std::size_t x, std::size_t y) {
+        const auto& tx = rows[x].time;
+        const auto& ty = rows[y].time;
+        if (!tx || !ty) return tx.has_value() && !ty;
+        return exact_order(*tx, *ty) < 0;
+      });
+      for (std::size_t i = 0; i < members.size(); ++i) {
+        auto& row = rows[members[i]];
+        const auto& previous = i ? rows[members[i - 1]].time : std::optional<ParsedExactTimestamp>{};
+        row.start = previous ? previous : row.time;
+      }
+    }
+  }
+  const ExactBounds eb = exact_bounds(o);
+  std::vector<const Row*> selected;
+  for (const auto& row : rows)
+    if (row.resource && row.activity && row.time && exact_in(row.time, eb, false)) selected.push_back(&row);
+  if (!uses_start)
+    std::stable_sort(selected.begin(), selected.end(), [](const Row* x, const Row* y) {
+      if (const int order = exact_order(*x->start, *y->start)) return order < 0;
+      if (const int order = exact_order(*x->time, *y->time)) return order < 0;
+      return x->position < y->position;
+    });
+  std::map<std::pair<std::string, std::string>, std::pair<std::vector<double>, std::uint64_t>> groups;
+  for (const auto* row : selected) {
+    auto& [values, count] = groups[{*row->resource, *row->activity}];
+    if (row->start) {
+      values.push_back(frame_times::total_seconds(*row->start, *row->time));
+      ++count;
+    } else {
+      values.push_back(0.0);
+    }
+  }
+  std::map<std::pair<std::string, std::string>, std::pair<double, std::uint64_t>> means;
+  for (const auto& [key, group] : groups)
+    if (group.second) means[key] = {detail::numpy_pairwise_sum(group.first) / static_cast<double>(group.second), group.second};
+  return means;
 }
 
 // pm4py's resource_profiles functions on a DataFrame (CSV and XES uploads):
@@ -1819,6 +2021,14 @@ ResourceProfilesResult frame_resource_profiles(const EventLog& input, const Reso
     result = frame_average_case_duration(frame, o, b, r, c, t, resource_names);
   } else {
     result = compute_resource_profiles(view, native, b, true);
+  }
+  if (metric == ResourceProfileMetric::kAverageDurationActivity) {
+    // The view's intervals choose the rows; their means are pandas'.
+    const auto means = frame_duration_means(frame, o, r, a, c, t, s, uses_start);
+    for (auto& row : result.rows)
+      if (const auto found = means.find({row.resource, row.activity});
+          found != means.end() && found->second.second == row.count)
+        row.value = found->second.first;
   }
   if (interaction_count)
     for (auto& row : result.rows) {

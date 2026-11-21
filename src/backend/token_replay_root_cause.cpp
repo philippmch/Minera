@@ -1,5 +1,6 @@
 #include "minera/conformance.hpp"
 #include "minera/dataframe_columns.hpp"
+#include "root_cause_dates.hpp"
 #include "root_cause_trace_key.hpp"
 #include "token_replay_context.hpp"
 
@@ -162,6 +163,7 @@ bool contains_key(const Trace& trace, const ActivityKeyIndex& keys,
 std::vector<TokenReplayTransitionRootCauseDiagnostics> token_replay_transition_root_cause_diagnostics(
     const EventLog& log, const std::vector<TokenReplayTransitionRootCauseCohort>& cohorts,
     const RootCauseOptions& options) {
+  const detail::RootCauseNanosecondDates dates(log.dataframe_columns && log.dataframe_columns->csv_text);
   std::vector<TokenReplayTransitionRootCauseDiagnostics> result;
   TraceCohortIndex index(log);
   for (const auto& cohort : cohorts) {
@@ -184,6 +186,7 @@ std::vector<TokenReplayTransitionRootCauseDiagnostics> token_replay_transition_r
 std::vector<TokenReplayUnknownRootCauseDiagnostics> token_replay_unknown_root_cause_diagnostics(
     const EventLog& log, const std::vector<TokenReplayUnknownRootCauseCohort>& cohorts,
     const TokenReplayOptions& options) {
+  const detail::RootCauseNanosecondDates dates(log.dataframe_columns && log.dataframe_columns->csv_text);
   const auto selector = options.activity_attribute.empty() ? std::string("concept:name") : options.activity_attribute;
   ActivityKeyIndex keys;
   for (const auto& cohort : cohorts)

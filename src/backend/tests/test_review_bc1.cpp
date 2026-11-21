@@ -318,7 +318,7 @@ int object_columns() {
       // and greatest timestamps, the duration its last less its first.
       {"average_case_duration", "E_R,D_R,G_R", "", "R", "2019-01-01 00:00:00", "2020-05-01 00:00:00", -7948800.0, ""},
       {"average_case_duration", "E_R,D_R,G_R", "", "R", "2020-04-01 00:00:00", kWindow2, -7948800.0, ""},
-      {"average_case_duration", "E_R,D_R,G_R", "", "R", "2020-07-01 00:00:00", kWindow2, 0, "resource profiles: mean requires at least one data point"},
+      {"average_case_duration", "E_R,D_R,G_R", "", "R", "2020-07-01 00:00:00", kWindow2, 0, "resource profiles: StatisticsError: mean requires at least one data point"},
       // Two object columns subtract cell by cell over the resource's rows.
       {"average_duration_activity", "DIR,SDS", "ms", "R", kWindow1, kWindow2, 0, "resource profiles: TypeError: unsupported operand type(s) for -: 'datetime.datetime' and 'int'"},
       {"average_duration_activity", "DDR,SDS", "ms", "R", kWindow1, kWindow2, 0, "resource profiles: TypeError: cannot subtract DatetimeArray from ndarray[object]"},

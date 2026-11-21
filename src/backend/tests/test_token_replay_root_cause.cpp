@@ -720,7 +720,54 @@ void csv_frame_cell_contracts() {
   }
 }
 
+// A CSV frame's dates are pandas Timestamps in datetime64[ns] columns: the
+// categorical features keep str(Timestamp)'s nanoseconds (nine digits when
+// there are any, else six when there are microseconds), round FP. Expected
+// values observed on pm4py 2.7.22 with this log and an a, b, c sequence net.
+void csv_frame_nanosecond_dates() {
+  const std::string csv =
+      "case:concept:name,concept:name,time:timestamp,when\n"
+      "c1,a,2020-01-01 00:00:00.000000517,2020-01-05 10:00:00.123456789\n"
+      "c1,b,2020-01-01 00:01:00.5,2020-01-05 10:00:00\n"
+      "c1,c,2020-01-01 00:02:00.999999001,2020-01-05 10:00:00.000001\n"
+      "c2,a,2020-01-02 00:00:00.123456,2020-01-05 10:00:00.1\n"
+      "c2,c,2020-01-02 00:01:00.000000001,2020-01-05 10:00:00.000000999\n"
+      "c3,a,2020-01-03 00:00:00,2020-01-05 10:00:00\n"
+      "c3,b,2020-01-03 00:01:00,2020-01-05 10:00:00.25\n"
+      "c3,c,2020-01-03 00:02:00.000001,2020-01-05 10:00:00.5\n";
+  CsvImportOptions import;
+  import.case_id_column = "case:concept:name";
+  import.activity_column = "concept:name";
+  import.timestamp_column = "time:timestamp";
+  std::istringstream input(csv);
+  const auto log = import_csv_event_log(input, import);
+  PetriNet net;
+  net.set_activities({"a", "b", "c"});
+  const auto p0 = net.add_place(), p1 = net.add_place(), p2 = net.add_place(), p3 = net.add_place();
+  net.set_source(p0); net.set_sink(p3);
+  net.add_transition(0, {p0}, {p1});
+  net.add_transition(1, {p1}, {p2});
+  net.add_transition(2, {p2}, {p3});
+  TokenReplayOptions options;
+  options.include_root_cause_diagnostics = true;
+  options.root_cause.string_attributes = {"time:timestamp", "when"};
+  const auto result = check_conformance(log, net, options);
+  const auto& rows = result.root_cause_diagnostics->transitions;
+  require(rows.size() == 1 && rows[0].transition_index == 2, "nanosecond CSV: underfed c");
+  require(rows[0].feature_names == std::vector<std::string>({
+              "event:time:timestamp@2020-01-01 00:02:00.999999001+00:00",
+              "event:time:timestamp@2020-01-02 00:01:00.000000001+00:00",
+              "event:time:timestamp@2020-01-03 00:02:00.000001+00:00",
+              "event:when@2020-01-05 10:00:00.000000999+00:00",
+              "event:when@2020-01-05 10:00:00.000001+00:00",
+              "event:when@2020-01-05 10:00:00.500000+00:00"}), "nanosecond CSV feature names");
+  require(rows[0].data == std::vector<std::vector<double>>({
+              {1, 0, 0, 0, 1, 0}, {0, 0, 1, 0, 0, 1}, {0, 1, 0, 1, 0, 0}}), "nanosecond CSV data");
+  require(rows[0].target == std::vector<int>({0, 0, 1}), "nanosecond CSV targets");
+}
+
 int main() try {
+  csv_frame_nanosecond_dates();
   csv_frame_cell_contracts();
   set_key_contracts();
   byte_key_contracts();

@@ -1,5 +1,6 @@
 #include "minera/root_cause.hpp"
 #include "minera/timestamp.hpp"
+#include "root_cause_dates.hpp"
 #include "root_cause_unicode.hpp"
 #include "root_cause_trace_key.hpp"
 
@@ -16,6 +17,18 @@
 #include <utility>
 
 namespace minera {
+namespace detail {
+namespace {
+thread_local bool nanosecond_dates = false;
+}  // namespace
+
+RootCauseNanosecondDates::RootCauseNanosecondDates(bool enabled) : saved_(nanosecond_dates) {
+  nanosecond_dates = enabled;
+}
+
+RootCauseNanosecondDates::~RootCauseNanosecondDates() { nanosecond_dates = saved_; }
+}  // namespace detail
+
 namespace {
 
 std::string real_category(double value) {
@@ -159,7 +172,7 @@ std::string date_category(std::string text, bool nested) {
   };
   const int year = field(0, 4), month = field(5, 2), day = field(8, 2);
   if (year == 0) throw std::invalid_argument("root cause: invalid categorical date year");
-  int hour = 0, minute = 0, second = 0, microsecond = 0;
+  int hour = 0, minute = 0, second = 0, microsecond = 0, nanosecond = 0;
   std::size_t position = 10;
   if (position < text.size()) {
     hour = field(11, 2);
@@ -174,10 +187,13 @@ std::string date_category(std::string text, bool nested) {
       int places = 0;
       while (position < text.size() && text[position] >= '0' && text[position] <= '9') {
         if (places < 6) microsecond = microsecond * 10 + (text[position] - '0');
+        else if (places < 9) nanosecond = nanosecond * 10 + (text[position] - '0');
         ++places;
         ++position;
       }
-      while (places++ < 6) microsecond *= 10;
+      while (places < 6) { microsecond *= 10; ++places; }
+      while (places++ < 9) nanosecond *= 10;
+      if (!detail::nanosecond_dates) nanosecond = 0;
     }
   }
   const bool has_offset = position < text.size();
@@ -228,7 +244,8 @@ std::string date_category(std::string text, bool nested) {
   };
   if (!nested) {
     std::string result = text.substr(0, 10) + " " + pad(hour, 2) + ":" + pad(minute, 2) + ":" + pad(second, 2);
-    if (microsecond != 0) result += "." + pad(microsecond, 6);
+    if (nanosecond != 0) result += "." + pad(microsecond, 6) + pad(nanosecond, 3);
+    else if (microsecond != 0) result += "." + pad(microsecond, 6);
     if (has_offset) {
       const auto magnitude = std::abs(offset);
       result += std::string(offset < 0 ? "-" : "+") + pad(static_cast<int>(magnitude / 3600000000LL), 2) + ":" + pad(static_cast<int>(magnitude / 60000000 % 60), 2);
