@@ -89,6 +89,53 @@ int main() {
   assert(single_json.find("\"arrival_average\":null,\"dispersion_average\":null") !=
          std::string::npos);
 
+  {
+    // Round FN: pm4py keeps only traces whose first event has the timestamp
+    // key (`timestamp_key in trace[0]`) for the starts and the ends; the
+    // second trace's first event has no 'st', so its last event is skipped
+    // too: one gap of 7200 s each way.
+    const auto with_st = [](std::string first, std::string last, bool first_has) {
+      auto value = trace(first, last);
+      if (first_has) value.events[0].attributes.push_back({"st", first, minera::AttributeKind::kDate});
+      value.events[1].attributes.push_back({"st", last, minera::AttributeKind::kDate});
+      return value;
+    };
+    minera::EventLog partial;
+    partial.traces = {with_st("2024-01-01T08:00:00Z", "2024-01-01T09:00:00Z", true),
+                      with_st("2024-01-01T09:00:00Z", "2024-01-01T09:30:00Z", false),
+                      with_st("2024-01-01T10:00:00Z", "2024-01-01T11:00:00Z", true)};
+    minera::CaseArrivalOptions st;
+    st.timestamp_key = "st";
+    const auto kept = minera::discover_case_arrival(partial, st);
+    assert(kept.timed_starts == 2 && kept.timed_ends == 2);
+    assert(kept.arrival_average == 7200.0 && kept.dispersion_average == 7200.0);
+    // A kept trace whose last event lacks the key raises (pm4py's KeyError).
+    partial.traces[0].events[1].attributes.clear();
+    bool missing = false;
+    try { (void)minera::discover_case_arrival(partial, st); }
+    catch (const std::invalid_argument&) { missing = true; }
+    assert(missing);
+    // No trace kept: both averages are 0.0.
+    partial.traces = {with_st("2024-01-01T09:00:00Z", "2024-01-01T09:30:00Z", false)};
+    const auto none = minera::discover_case_arrival(partial, st);
+    assert(none.timed_starts == 0 && none.arrival_average == 0.0 && none.dispersion_average == 0.0);
+  }
+  {
+    // Round FN: pm4py's BusinessHours unifies slots when the previous end
+    // is at least the next start less one second, so (0, 3600) and
+    // (3600.5, 7200) become one slot and the half second between them
+    // counts: 7200 s from Monday 00:00 to 02:00 (7199.5 apart).
+    minera::EventLog monday;
+    monday.traces = {trace("2024-01-01T00:00:00", "2024-01-01T00:00:00"),
+                     trace("2024-01-01T02:00:00", "2024-01-01T02:00:00")};
+    minera::CaseArrivalOptions slots;
+    slots.use_business_hours = true;
+    slots.business_hour_slots = {{0.0, 3600.0}, {3600.5, 7200.0}};
+    assert(minera::discover_case_arrival(monday, slots).arrival_average == 7200.0);
+    slots.business_hour_slots = {{0.0, 3600.0}, {3601.5, 7200.0}};
+    assert(minera::discover_case_arrival(monday, slots).arrival_average == 7198.5);
+  }
+
   bool rejected = false;
   try {
     minera::EventLog invalid;

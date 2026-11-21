@@ -59,7 +59,7 @@ std::vector<BusinessHourSlot> normalized_business_slots(
   });
   std::vector<BusinessHourSlot> merged;
   for (const auto& slot : slots) {
-    if (!merged.empty() && slot.start_seconds <= merged.back().end_seconds) {
+    if (!merged.empty() && merged.back().end_seconds >= slot.start_seconds - 1.0) {
       merged.back().end_seconds =
           std::max(merged.back().end_seconds, slot.end_seconds);
     } else {

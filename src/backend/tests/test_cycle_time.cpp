@@ -64,5 +64,19 @@ int main() {
     rejected = true;
   }
   assert(rejected);
+  {
+    // Round FN: each event's Timestamp.timestamp() rounds the nanoseconds
+    // to the microsecond (pm4py 2.7.22 reference: 0.061728477478027344, the
+    // first interval .000000500 to .123456789 read as .0 to .123457 over two
+    // cases).
+    minera::EventLog nanos;
+    minera::Trace first_case, second_case;
+    first_case.events = {event("2024-01-01T00:00:00.123456789+02:00", "2024-01-01T00:00:00.000000500+02:00")};
+    second_case.events = {event("2024-01-01T00:00:01.999999500+02:00", "2024-01-01T00:00:01.000000499+02:00")};
+    nanos.traces = {std::move(first_case), std::move(second_case)};
+    minera::CycleTimeOptions started;
+    started.start_timestamp_key = "started_at";
+    assert(minera::discover_cycle_time(nanos, started).cycle_time == 0.061728477478027344);
+  }
   std::cout << "Cycle-time tests passed\n";
 }

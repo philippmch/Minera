@@ -52,7 +52,10 @@ double required_timestamp(const Event& event, std::string_view key,
                                 std::string(label) + " attribute '" +
                                 std::string(key) + "'");
   }
-  const auto parsed = parse_timestamp(value);
+  // Round FN: Timestamp.timestamp(), round(ns / 1e9, 6), so nanosecond
+  // texts give pm4py's EventLog seconds, not the nearest double of the instant.
+  const auto exact = parse_timestamp_exact(value);
+  const auto parsed = exact ? std::optional<double>{frame_times::epoch_seconds(*exact)} : std::nullopt;
   if (!parsed || !std::isfinite(*parsed))
     throw std::invalid_argument("service time: invalid " + std::string(label) +
                                 " timestamp");
@@ -83,7 +86,7 @@ std::vector<BusinessHourSlot> normalized_slots(
   });
   std::vector<BusinessHourSlot> merged;
   for (const auto& slot : slots) {
-    if (!merged.empty() && slot.start_seconds <= merged.back().end_seconds)
+    if (!merged.empty() && merged.back().end_seconds >= slot.start_seconds - 1.0)
       merged.back().end_seconds =
           std::max(merged.back().end_seconds, slot.end_seconds);
     else
@@ -158,8 +161,9 @@ double aggregate(std::vector<double> values,
                ? (values[middle - 1] + values[middle]) / 2.0
                : values[middle];
   }
-  return std::accumulate(values.begin(), values.end(), 0.0) /
-         static_cast<double>(values.size());
+  // The EventLog path's statistics.mean: the exact sum over the count,
+  // rounded once (round FN).
+  return detail::exact_mean(values);
 }
 
 // pm4py's DataFrame service time (service_time.pandas.get.apply) on an
@@ -265,9 +269,11 @@ const char* service_time_aggregation_name(
 
 ServiceTimeResult discover_service_time(const EventLog& log,
                                         const ServiceTimeOptions& options) {
-  if (!scalar_aggregation(options.aggregation))
-    throw std::invalid_argument(
-        "service time: aggregation must be mean, median, min, max, or sum");
+  // Round FN: both pm4py variants test the measure against "median", "min",
+  // "max" and "sum" and take the mean otherwise, so a stdev, raw-values or
+  // all request is answered with the mean (and reported as MEAN).
+  const auto aggregation =
+      scalar_aggregation(options.aggregation) ? options.aggregation : DfgPerformanceAggregation::kMean;
   const auto slots = options.use_business_hours
                          ? normalized_slots(options)
                          : std::vector<BusinessHourSlot>{};
@@ -308,9 +314,9 @@ ServiceTimeResult discover_service_time(const EventLog& log,
     }
   }
   ServiceTimeResult result;
-  result.aggregation = options.aggregation;
+  result.aggregation = aggregation;
   for (auto& [activity, values] : durations)
-    result.values.emplace(activity, aggregate(std::move(values), options.aggregation,
+    result.values.emplace(activity, aggregate(std::move(values), aggregation,
                                               log.dataframe_columns != nullptr));
   return result;
 }

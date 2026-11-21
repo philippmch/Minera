@@ -56,11 +56,38 @@ int main() {
   options.aggregation = minera::DfgPerformanceAggregation::kMedian;
   const auto median = minera::discover_service_time(log, options);
   assert(std::abs(median.values.at("B") - 2100.0) < 1e-9);
-  options.aggregation = minera::DfgPerformanceAggregation::kRawValues;
-  bool rejected = false;
-  try { (void)minera::discover_service_time(log, options); }
-  catch (const std::invalid_argument&) { rejected = true; }
-  assert(rejected);
+  // Round FN: pm4py takes the mean for any measure other than median, min,
+  // max and sum (its else branch), so raw values, stdev and all give the mean.
+  for (const auto other : {minera::DfgPerformanceAggregation::kRawValues,
+                           minera::DfgPerformanceAggregation::kStandardDeviation,
+                           minera::DfgPerformanceAggregation::kAll}) {
+    options.aggregation = other;
+    const auto fallback = minera::discover_service_time(log, options);
+    assert(fallback.values == result.values);
+    assert(std::string(minera::service_time_aggregation_name(fallback.aggregation)) == "MEAN");
+  }
+  {
+    // statistics.mean: 0.1, 0.2 and 0.3 seconds average to exactly 0.2 (a
+    // left-to-right sum over three gives 0.20000000000000004).
+    minera::EventLog tenths;
+    minera::Trace trace;
+    trace.events = {event("A", "1970-01-01T00:00:00", "1970-01-01T00:00:00.100000"),
+                    event("A", "1970-01-01T00:00:00", "1970-01-01T00:00:00.200000"),
+                    event("A", "1970-01-01T00:00:00", "1970-01-01T00:00:00.300000")};
+    tenths.traces = {std::move(trace)};
+    minera::ServiceTimeOptions mean;
+    mean.start_timestamp_key = "started_at";
+    assert(minera::discover_service_time(tenths, mean).values.at("A") == 0.2);
+    // Timestamp.timestamp() rounds a nanosecond time to the microsecond:
+    // .1234565 and .0000005 become .123456 and 0.0 (round half even of the
+    // quotient), so the duration is 0.123456 less a rounding of the epoch.
+    minera::EventLog nanos;
+    minera::Trace one;
+    one.events = {event("A", "2024-01-01T00:00:00.000000500", "2024-01-01T00:00:00.123456500")};
+    nanos.traces = {std::move(one)};
+    const double start = 1704067200.0, finish = 1704067200.123456;
+    assert(minera::discover_service_time(nanos, mean).values.at("A") == finish - start);
+  }
   // Review V2-1: one CSV row starting 06:30+02:00 and ending 08:00+02:00 on a
   // Monday. pm4py's DataFrame service time with business hours counts the
   // UTC clock (04:30 -> 06:00): 0; the wall clock would count 3600.

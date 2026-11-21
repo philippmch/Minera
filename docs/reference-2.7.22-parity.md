@@ -36293,3 +36293,144 @@ No code changed in this round, so FL's results stand (the full ctest 659
 of 659, the Python script tests 406 of 406, the fixture replay 2,673
 responses unchanged); `verify-reference-parity` still passes with
 `--require-complete`.
+
+## Review FN1: the raw-log workbenches against pm4py's EventLog variants (offsets, nanoseconds, non-default business-hour slots), the Polars DFG with business hours (2026-11-21)
+
+Round FN checked FM's CI (run 44901772965 on a2a3375: green in all six
+jobs, the Windows ctest among them) and FL's Windows job (run
+44897815468: green, so FL's run is green in all six jobs too).
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, Polars
+1.44.1, no pyarrow) in the reference venv, every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` and exact
+float comparison (`EXACT=1`).
+
+Banks: `fn/rlw.py` generates logs with offsets (naive, one per log, one
+per row, Z), fractions of 0, 3, 6 and 9 digits and a start column `st`,
+writes them as CSV and as hand-written XES, imports each through the
+discovery workbench (its `prepared_log.json` is the raw log) and posts the
+raw log to the time analysis workbench (case statistics, service time,
+cycle time, case arrival, passed time) with and without business hours:
+the default slots or random ones (`SLOTMODE` plain, adjacent within a
+second, crossing the week's end, overlapping, fractional; a repeated
+slot). `fn/rlt.py` posts the same raw logs to the temporal workbench
+(EventLog temporal profile and conformance, business hours on random
+slots), `fn/rlp.py` to the timing workbench (EventLog performance
+spectrum, connected and disconnected, and batches). The reference is
+pm4py's EventLog variant on the raw log's own times: a CSV bank's events
+hold `pd.Timestamp(text)` (what `convert_to_event_log` of the formatted
+frame holds: offsets and nanoseconds kept), an XES bank's the datetimes
+`pm4py.read_xes` gives (`RAWDT=1`; the raw texts are its wall clocks as
+UTC, in microseconds). `fn/rlpd.py` posts CSV uploads to
+`/api/dfg-dataframe` with `dfg_backend=polars`, measure performance and
+business hours (default or random slots, optional start column) against
+pm4py's Polars adapter (`df_statistics.get_dfg_graph`) on the formatted
+frame converted to a Polars LazyFrame column by column (as
+`pl.from_pandas(nan_to_null=True)`; no pyarrow), `perf_aggregation_key`
+"all".
+
+Found and fixed:
+
+- **FN1-1. Nanosecond times on the EventLog case statistics and service
+  time.** pm4py reads `Timestamp.timestamp()`, the nanoseconds over 1e9
+  rounded to six decimals, and subtracts those floats; Minera read the
+  nearest double of the instant, so a nine-digit fraction moved the start,
+  the end and the duration (rl1: 6 case statistics and 4 service time
+  results off by more than 1e-9 relative). Both now take
+  `frame_times::epoch_seconds` of the exact parse.
+- **FN1-2. Passed time with the start key naming the log's own time.**
+  With the timestamp key on another attribute (`st`) and the start key
+  `time:timestamp`, pm4py measures the next event's `time:timestamp` less
+  this event's `st`; Minera's projection had replaced each event's time by
+  `st` first, so the start read `st` too (12 of 180 results on rl1). The
+  projection keeps the original time under a private attribute for the
+  DFG's start selector. The native empty start key still means the
+  timestamp key.
+- **FN1-3. Case arrival skips traces whose first event lacks the key.**
+  pm4py keeps a trace for the starts and for the ends only when its first
+  event has the timestamp key (`timestamp_key in trace[0]`); the last event
+  of a kept trace still needs it (KeyError). Minera raised on the first
+  trace without it (rl1: 5, rl3: 9 results).
+- **FN1-4. Service time with stdev, raw values or all.** Both pm4py
+  variants test the measure against "median", "min", "max" and "sum" and
+  take the mean otherwise; Minera rejected the three (rl1: 25 results).
+  They now give the mean, reported as MEAN, and the EventLog mean is
+  `statistics.mean` (the exact sum over the count, rounded once).
+- **FN1-5. Business-hour slots within a second of each other.** pm4py's
+  `BusinessHours` unifies the sorted slots when the previous end is at
+  least the next start less one second (`unified[-1][1] >= begin - 1`),
+  so the gap between them counts. Six consumers merged only overlapping
+  slots (case arrival, case statistics, service time, temporal profile,
+  OCEL statistics, network analysis) and four compared `start <= end + 1`
+  (a different rounding); all ten now use pm4py's expression (rl3: 9 case
+  arrival results with adjacent slots). The pandas case filter also sorts
+  slots by start and end, as `sorted()` does.
+- **FN1-6. Nanosecond times on the EventLog cycle time.** pm4py reads
+  each event's `Timestamp.timestamp()` too (rl5 and rl7 exact: 27 of 240
+  each, by up to 3e-7 s).
+- **FN1-7. The Polars DFG with business hours.** pm4py's Polars adapter
+  computes business time with `map_elements(..., return_dtype=pl.Float64)`
+  on the frame's UTC Datetime column: (a) business time runs on the UTC
+  clock (from the datetimes Polars hands over, truncated to the
+  microsecond), where Minera read each text's own wall clock; (b) Polars
+  refuses a Python int there (SchemaError "unexpected value while building
+  Series of type Float64; found value of type Int64: N" with its context
+  and expression lines), and `BusinessHours` returns an int whenever the
+  case moves forward, every unified slot bound is an int and neither end
+  falls inside a slot after its start and up to its end (round CQ's rule);
+  Minera computed those. Which int the message names follows Polars'
+  evaluation order, which varies between runs (probed: the same call named
+  0 or 36000). A slot bound given as a whole number counts as an int (the
+  route reads numbers; the default slots are ints). Also, on every Polars
+  DFG (with or without business hours): (c) the group-by std is Welford's
+  running variance in row order (a two-pass sum of squares was an ulp off
+  in about a fifth of the groups; 12 of 60 bank results without business
+  hours), and (d) the median is the linear quantile, lower + (upper -
+  lower) * 0.5 (an ulp off (a + b) / 2 in about 2% of even groups of
+  fractional values).
+
+Results after the fixes (exact): the time analysis workbench on CSV raw
+logs, rl5 (80 logs, three requests each, business hours at random) and
+rl7 (80 more, business hours always, random slot modes): every result
+equal wherever pm4py returns one (case statistics 215 and 208, service
+time 202 and 196, cycle time 202 and 196, case arrival 231 and 236,
+passed time 217 and 213; the rest raise in both); on XES raw logs (rl6,
+80 logs): 204, 192, 192, 224 and 209 equal, the rest raise in both. The
+temporal workbench (rlt1 CSV, rlt2 XES: profile 151 and 146 equal,
+conformance 151 and 146 equal, the rest raise in both) and the timing
+workbench (rlp1, rlp2: spectrum and disconnected spectrum 166 and 161
+equal each, batches 154 and 137) were equal before the fixes. The Polars
+DFG: rlpd3 (60 CSV uploads, business hours at random) 128 equal and 49
+raised alike, rlpd4 (80 uploads, business hours always) 139 equal and 95
+raised alike, and 9 more equal on the three uploads with whole-second
+times the harness first failed to convert (before: 88 equal, 43
+different, 46 raised by pm4py only).
+
+Other Polars variants with business hours: the Polars case filter's
+performance filter raises NotImplementedError in pm4py and in Minera
+alike; pm4py's Polars service time, passed time, case statistics and
+eventually-follows statistics are reached only through `pm4py.stats` on a
+LazyFrame, which Minera does not expose (its routes take the EventLog and
+DataFrame variants).
+
+Declared:
+
+- **FN1-8. EventLog gaps on raw logs from CSV.** The raw transport does
+  not say whether a log's times were pandas Timestamps (a CSV read through
+  `convert_to_event_log`) or datetimes (`pm4py.read_xes`). Minera's
+  EventLog gap arithmetic is datetime's (`timedelta.total_seconds`: the
+  gap in microseconds over 10**6), which is exact for XES logs; pandas'
+  scalar `Timedelta.total_seconds` adds the seconds and the microseconds
+  over 1e6 separately and drops nanoseconds, which is an ulp off for about
+  0.5% of gaps (none showed in rl5 and rl7). Business hours on a raw log
+  read each text's own wall clock, as an XES read does; a CSV read's frame
+  is in UTC, so a raw log built from a CSV with offsets counts business
+  time on the texts' clocks.
+- Unchanged: the declared items of FM1.
+
+In the suite: `minera_service_time_tests`, `minera_case_statistics_tests`,
+`minera_case_arrival_tests`, `minera_passed_time_tests`,
+`minera_cycle_time_tests` and `minera_dfg_dataframe_tests` cover the
+reference values of FN1-1 to FN1-7. The full ctest passed 659 of 659, the
+Python script tests 406 of 406, the fixture replay gave 2,673 responses
+unchanged; `verify-reference-parity` still passes with
+`--require-complete`.

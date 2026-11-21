@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FM (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FN (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8362,6 +8362,66 @@ had five of six jobs green at handoff (the Windows ctest still running:
 check it first in FN). The Mac was not reachable this round (no folder access), so no
 newer reviewer handoff was read. The generators, the comparers and the
 probes are in the project files under `review-harness/round-fm/`.
+
+Round FN reviewed new areas (Review FN1): the raw-log workbenches against
+pm4py's EventLog variants on CSV and XES logs with offsets and nanosecond
+fractions, non-default business-hour slots, and the Polars DFG with
+business hours. Fixed: FN1-1 and FN1-6, the EventLog case statistics,
+service time and cycle time read `Timestamp.timestamp()` (nanoseconds
+rounded to the microsecond); FN1-2, passed time with the start key
+naming the log's own time while the timestamp key names another
+attribute; FN1-3, case arrival skips traces whose first event lacks the
+key; FN1-4, service time answers stdev, raw values and all with the mean
+(`statistics.mean` on the EventLog path); FN1-5, business-hour slots
+within a second of each other are one slot, with pm4py's exact merge
+expression in all ten consumers; FN1-7, the Polars DFG counts business
+time on the UTC clock, raises pm4py's SchemaError where `BusinessHours`
+returns an int (whole-number slot bounds count as ints), and takes
+Polars' Welford std and linear median on every Polars DFG. Declared:
+FN1-8, the raw transport cannot tell a CSV read's pandas Timestamps from
+an XES read's datetimes (Minera's EventLog gaps are datetime's; pandas'
+scalar total_seconds is an ulp off for about 0.5% of gaps; business
+hours read each text's own clock). After the fixes the time analysis,
+temporal and timing workbenches agree on every CSV and XES raw-log bank
+(exact) and the Polars DFG agrees or raises alike on 140 uploads.
+
+In the suite: the unit tests of service time, case statistics, case
+arrival, passed time, cycle time and the DFG tables carry FN1's
+reference values. The full ctest passed 659 of 659 on the first run (35
+minutes, -j2); the Python script tests 406 of 406 (the 13 query runtime
+tests in a venv with duckdb); the fixture replay gave 2,673 responses
+unchanged. FL's CI run 44897815468 and FM's run
+44901772965 finished green in all six jobs. The Mac was not reachable this round (no
+folder access), so no newer reviewer handoff was read. The generators,
+the comparers and the probes are in the project files under
+`review-harness/round-fn/`.
+
+Next round (FO) should start by re-reviewing round FN:
+
+- FN's CI run;
+- FN1-1 to FN1-7 on fresh raw-log banks (other seeds and slot modes,
+  `rlw.py`, `rlt.py`, `rlp.py` with `RAWDT=1` for XES) and on fresh
+  Polars DFG uploads (`rlpd.py`, also with `dfg_measure=both`, keep once
+  per case and a window above one);
+- new areas: the heuristics miner and the OC-DFG with non-default
+  business-hour slots (the merge rule of FN1-5 reached the OC-DFG edge
+  performance and the network analysis without a sweep of their own);
+  the other raw-log workbenches (organizational, root cause, decision)
+  on nanosecond CSV logs; the Polars batches and minimum self-distance
+  on uploads with offsets;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FN's list, taken in FN: FM's CI and FL's Windows job (green); the raw-log workbenches on CSV and XES logs
+with offsets and more than six fraction digits (the time analysis,
+temporal and timing workbenches: FN1-1 to FN1-6), non-default slots
+through the same consumers (FN1-5), the Polars variants with business
+hours (FN1-7 on the DFG; the case filter raises like pm4py; the other
+Polars statistics are not exposed). Carried to FO: EV1-1, the SQLite
+leftovers, the new Polars dtypes, DW1, the other declared items, the
+rest of the CU list and the open choices.
+
+Previous list for round FN (kept for its older items):
 
 Next round (FN) should start by re-reviewing round FM:
 

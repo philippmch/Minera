@@ -98,7 +98,7 @@ inline std::vector<BusinessHourSlot> normalize_business_hour_slots(
     // Slots with gaps of at most one second are merged, including fractional
     // gaps, to match the event-log and dataframe DFG variants.
     if (!merged.empty() &&
-        slot.start_seconds <= merged.back().end_seconds + 1.0) {
+        merged.back().end_seconds >= slot.start_seconds - 1.0) {
       merged.back().end_seconds =
           std::max(merged.back().end_seconds, slot.end_seconds);
     } else {

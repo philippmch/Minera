@@ -159,5 +159,29 @@ int main() {
   const auto utc = minera::discover_passed_time(offset, business);
   assert(utc.pre.size() == 1 && utc.pre.front().performance == 0.0);
 
+  {
+    // Round FN: timestamp key 'st' with the start key naming the log's own
+    // time: pm4py measures B's time:timestamp less A's st (02:00 - 00:30 =
+    // 5400 s); B's st less A's st would give 1800.
+    minera::EventLog keys;
+    minera::Trace both;
+    both.case_id = "c1";
+    both.events = {event("A", "2024-01-01T00:00:00Z"), event("B", "2024-01-01T02:00:00Z")};
+    both.events[0].attributes.push_back({"st", "2024-01-01T00:30:00Z", minera::AttributeKind::kDate});
+    both.events[1].attributes.push_back({"st", "2024-01-01T01:00:00Z", minera::AttributeKind::kDate});
+    keys.traces = {std::move(both)};
+    minera::PassedTimeOptions st;
+    st.activity = "B";
+    st.timestamp_key = "st";
+    for (const auto* start : {"time:timestamp", "timestamp"}) {
+      st.start_timestamp_key = start;
+      const auto measured = minera::discover_passed_time(keys, st);
+      assert(measured.pre.size() == 1 && measured.pre.front().performance == 5400.0);
+    }
+    // The native empty start key keeps meaning the timestamp key.
+    st.start_timestamp_key.clear();
+    assert(minera::discover_passed_time(keys, st).pre.front().performance == 1800.0);
+  }
+
   std::cout << "Passed-time tests passed\n";
 }

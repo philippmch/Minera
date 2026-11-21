@@ -21,7 +21,7 @@ std::vector<BusinessHourSlot> slots(const OcdfgBusinessHourSlots& value){
  for(const auto& slot:result)if(!std::isfinite(slot.start_seconds)||!std::isfinite(slot.end_seconds))throw OcdfgPerformanceError("ValueError","business-hour slot endpoints must be finite");
  std::sort(result.begin(),result.end(),[](const auto& a,const auto& b){return std::tie(a.start_seconds,a.end_seconds)<std::tie(b.start_seconds,b.end_seconds);});
  std::vector<BusinessHourSlot> merged;
- for(const auto& slot:result){if(!merged.empty()&&slot.start_seconds<=merged.back().end_seconds+1.0)merged.back().end_seconds=std::max(merged.back().end_seconds,slot.end_seconds);else merged.push_back(slot);}
+ for(const auto& slot:result){if(!merged.empty()&&merged.back().end_seconds>=slot.start_seconds-1.0)merged.back().end_seconds=std::max(merged.back().end_seconds,slot.end_seconds);else merged.push_back(slot);}
  return merged;
 }
 std::int64_t wall_microseconds(const ParsedExactTimestamp& value){return value.seconds*1000000+static_cast<std::int64_t>(value.offset_minutes)*60000000+value.nanoseconds/1000;}

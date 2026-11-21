@@ -41,7 +41,10 @@ double required_timestamp(const Event& event, std::string_view key,
                                 std::string(label) + " timestamp attribute '" +
                                 std::string(key) + "'");
   }
-  const auto parsed = parse_timestamp(value);
+  // Round FN: Timestamp.timestamp(), round(ns / 1e9, 6), so nanosecond
+  // texts give pm4py's EventLog seconds, not the nearest double of the instant.
+  const auto exact = parse_timestamp_exact(value);
+  const auto parsed = exact ? std::optional<double>{frame_times::epoch_seconds(*exact)} : std::nullopt;
   if (!parsed || !std::isfinite(*parsed))
     throw std::invalid_argument("case statistics: invalid " + std::string(label) +
                                 " timestamp");
@@ -81,7 +84,7 @@ std::vector<BusinessHourSlot> normalized_slots(
   });
   std::vector<BusinessHourSlot> merged;
   for (const auto& slot : slots) {
-    if (!merged.empty() && slot.start_seconds <= merged.back().end_seconds)
+    if (!merged.empty() && merged.back().end_seconds >= slot.start_seconds - 1.0)
       merged.back().end_seconds =
           std::max(merged.back().end_seconds, slot.end_seconds);
     else

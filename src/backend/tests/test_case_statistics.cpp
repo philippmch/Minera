@@ -79,5 +79,34 @@ int main() {
   business.dataframe = true;
   assert(minera::discover_case_statistics(offset, business)
              .cases.front().case_duration == 0.0);
+  {
+    // Round FN: the EventLog path's times are Timestamp.timestamp(), the
+    // nanoseconds over 1e9 rounded to six decimals (pandas 2.7.22 reference:
+    // 1704060000.123457 for .123456789+02:00), and the duration is the
+    // difference of those two floats.
+    minera::EventLog nanos;
+    nanos.traces = {trace("n", "2024-01-01T00:00:00.000000500+02:00",
+                          "2024-01-01T00:00:00.123456789+02:00")};
+    const auto value = minera::discover_case_statistics(nanos).cases.at(0);
+    assert(value.start_time == 1704060000.0);
+    assert(value.end_time == 1704060000.123457);
+    assert(value.case_duration == 1704060000.123457 - 1704060000.0);
+  }
+  {
+    // Round FN: slots within a second of each other are one slot, as
+    // pm4py's BusinessHours unifies them (previous end >= next start - 1):
+    // Monday 00:00 to 02:00 counts the half second between (0, 3600) and
+    // (3600.5, 7200).
+    minera::EventLog monday;
+    monday.traces = {trace("m", "2024-01-01T00:00:00", "2024-01-01T02:00:00")};
+    minera::CaseStatisticsOptions slots;
+    slots.use_business_hours = true;
+    slots.business_hour_slots = {{3600.5, 7200.0}, {0.0, 3600.0}};
+    assert(minera::discover_case_statistics(monday, slots).cases.at(0).case_duration == 7200.0);
+    slots.business_hour_slots = {{0.0, 3600.0}, {3601.0, 7200.0}};
+    assert(minera::discover_case_statistics(monday, slots).cases.at(0).case_duration == 7200.0);
+    slots.business_hour_slots = {{0.0, 3600.0}, {3601.25, 7200.0}};
+    assert(minera::discover_case_statistics(monday, slots).cases.at(0).case_duration == 7198.75);
+  }
   std::cout << "Case-statistics tests passed\n";
 }

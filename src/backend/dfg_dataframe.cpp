@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <initializer_list>
 #include <limits>
 #include <map>
@@ -782,7 +783,7 @@ std::vector<BusinessHourSlot> normalized_slots(const DfgTableOptions& options) {
   });
   std::vector<BusinessHourSlot> merged;
   for (const auto& slot : slots) {
-    if (!merged.empty() && slot.start_seconds <= merged.back().end_seconds + 1.0) {
+    if (!merged.empty() && merged.back().end_seconds >= slot.start_seconds - 1.0) {
       merged.back().end_seconds =
           std::max(merged.back().end_seconds, slot.end_seconds);
     } else {
@@ -792,24 +793,36 @@ std::vector<BusinessHourSlot> normalized_slots(const DfgTableOptions& options) {
   return merged;
 }
 
-std::optional<double> local_wall_timestamp(const std::string& text) {
-  // Round FL: the wall clock in whole microseconds, floored, as pm4py's
-  // BusinessHours reads a Timestamp with nanoseconds (a CSV or XES time
-  // with more than six fraction digits; rounding the epoch double moved
-  // .1234567 up to .123457).
-  const auto micros = detail::local_wall_timestamp_microseconds(text);
-  if (!micros) return std::nullopt;
-  return detail::epoch_seconds_from_microseconds(*micros);
+// Round FN: pm4py's Polars adapter computes business time with
+// map_elements(..., return_dtype=pl.Float64), and Polars refuses a Python int
+// there (SchemaError). BusinessHours returns an int when the case moves
+// forward, every unified slot bound is an int (here: a whole number, as the
+// default slots are) and neither end falls inside a slot, after its start and
+// up to its end (detail::business_elapsed_is_float; round CQ). Observed
+// black-box on Polars 1.44.1: which int the message names follows Polars'
+// evaluation order, which varies between runs.
+bool polars_business_int(std::int64_t start, std::int64_t end,
+                         const std::vector<BusinessHourSlot>& slots) {
+  for (const auto& slot : slots)
+    if (std::trunc(slot.start_seconds) != slot.start_seconds ||
+        std::trunc(slot.end_seconds) != slot.end_seconds)
+      return false;
+  return !detail::business_elapsed_is_float(start, end, slots);
 }
 
-// pm4py's BusinessHours on microsecond wall clocks
-// (detail::business_elapsed_seconds_microseconds); an epoch double holds its
-// microsecond exactly enough for rounding to recover it (review AY1).
-double business_elapsed(double begin, double end,
-                        const std::vector<BusinessHourSlot>& slots) {
-  return detail::business_elapsed_seconds_microseconds(std::llround(begin * 1e6),
-                                                       std::llround(end * 1e6), slots);
+std::string polars_business_schema_error(const DfgTableOptions& options, double seconds) {
+  const auto& timestamp = options.timestamp_attribute;
+  const auto start = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
+                         ? *options.start_timestamp_attribute
+                         : std::string("start_timestamp");
+  char value[32];
+  std::snprintf(value, sizeof(value), "%lld", static_cast<long long>(std::llround(seconds)));
+  return "unexpected value while building Series of type Float64; found value of type Int64: " +
+         std::string(value) + "\n\nThis error occurred with the following context stack:\n\t[1] while constructing Series '" +
+         timestamp + "'\n\n\nThis error occurred in the following expression:\n\tas_struct(\"" + timestamp + "\", \"" +
+         start + "_2\").python_udf()\n";
 }
+
 
 // Polars measures a flow in whole seconds: Duration.total_seconds() truncates
 // the exact nanosecond difference toward zero.
@@ -906,32 +919,24 @@ double flow_time(const TableRow& source, const TableRow& target,
         return detail::dataframe_gap_seconds(*gap);
     return target_start - *source.completion;
   }
-  if (!polars) {
-    // pandas holds UTC timestamps (a CSV offset is converted), so business
-    // time runs on the UTC clock, from exact microseconds.
-    const auto source_utc = source.completion_text
-                                ? parse_timestamp_microseconds(*source.completion_text)
-                                : std::nullopt;
-    const auto target_utc = target_start_text
-                                ? parse_timestamp_microseconds(*target_start_text)
-                                : std::nullopt;
-    if (!source_utc || !target_utc)
-      throw std::invalid_argument(
-          "DFG table discovery: invalid business-hours timestamp");
-    return detail::business_elapsed_microseconds(*source_utc, *target_utc,
-                                                 normalized_slots(options));
-  }
-  const auto source_local = source.completion_text
-                                ? local_wall_timestamp(*source.completion_text)
-                                : std::nullopt;
-  const auto target_local = target_start_text
-                                ? local_wall_timestamp(*target_start_text)
-                                : std::nullopt;
-  if (!source_local || !target_local)
+  // pandas holds UTC timestamps (a CSV offset is converted), so business
+  // time runs on the UTC clock, from exact microseconds. Round FN: so does
+  // the Polars frame (pl.from_pandas of that frame: a UTC Datetime column,
+  // which map_elements hands over as datetimes truncated to the microsecond).
+  const auto source_utc = source.completion_text
+                              ? parse_timestamp_microseconds(*source.completion_text)
+                              : std::nullopt;
+  const auto target_utc = target_start_text
+                              ? parse_timestamp_microseconds(*target_start_text)
+                              : std::nullopt;
+  if (!source_utc || !target_utc)
     throw std::invalid_argument(
         "DFG table discovery: invalid business-hours timestamp");
-  return business_elapsed(*source_local, *target_local,
-                          normalized_slots(options));
+  const auto slots = normalized_slots(options);
+  const double seconds = detail::business_elapsed_microseconds(*source_utc, *target_utc, slots);
+  if (polars && polars_business_int(*source_utc, *target_utc, slots))
+    throw std::invalid_argument(polars_business_schema_error(options, seconds));
+  return seconds;
 }
 
 DfgPerformanceSummary summarize_values(const std::vector<double>& values,
@@ -961,14 +966,21 @@ DfgPerformanceSummary summarize_values(const std::vector<double>& values,
   auto ordered = values;
   std::sort(ordered.begin(), ordered.end());
   const auto middle = ordered.size() / 2;
+  // Round FN: Polars' median is the linear quantile, lower + (upper -
+  // lower) * 0.5 (an ulp off (a + b) / 2 in about 2% of even groups).
   result.median = ordered.size() % 2 == 0
-                      ? (ordered[middle - 1] + ordered[middle]) / 2.0
+                      ? ordered[middle - 1] + (ordered[middle] - ordered[middle - 1]) * 0.5
                       : ordered[middle];
   if (values.size() > 1) {
-    double square_sum = 0.0;
+    // Round FN: Polars' group-by std is Welford's running variance in row
+    // order (observed black-box on Polars 1.44.1; a two-pass sum of squares
+    // was an ulp off in about a fifth of the groups).
+    double weight = 0.0, running_mean = 0.0, square_sum = 0.0;
     for (const auto value : values) {
-      const double delta = value - result.mean;
-      square_sum += delta * delta;
+      weight += 1.0;
+      const double delta = value - running_mean;
+      running_mean += delta / weight;
+      square_sum += delta * (value - running_mean);
     }
     result.standard_deviation =
         std::sqrt(square_sum / static_cast<double>(values.size() - 1));

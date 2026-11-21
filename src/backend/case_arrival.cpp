@@ -81,7 +81,7 @@ std::vector<BusinessHourSlot> normalized_slots(
   });
   std::vector<BusinessHourSlot> merged;
   for (const auto& slot : slots) {
-    if (!merged.empty() && slot.start_seconds <= merged.back().end_seconds)
+    if (!merged.empty() && merged.back().end_seconds >= slot.start_seconds - 1.0)
       merged.back().end_seconds =
           std::max(merged.back().end_seconds, slot.end_seconds);
     else
@@ -287,6 +287,11 @@ CaseArrivalResult discover_case_arrival(const EventLog& log,
     if (trace.events.empty()) continue;
     const auto& first = trace.events.front();
     const auto& last = trace.events.back();
+    // Round FN: pm4py keeps a trace only when its first event has the key
+    // (`if trace and timestamp_key in trace[0]`), for the starts and the
+    // ends alike; the last event of a kept trace still needs it (KeyError).
+    if (!builtin_timestamp_key(options.timestamp_key) && first.attribute(options.timestamp_key) == nullptr)
+      continue;
     const double start = required_timestamp(first, options.timestamp_key, "start");
     const double end = required_timestamp(last, options.timestamp_key, "end");
     starts.emplace_back(start, timestamp_text(first, options.timestamp_key, "start"));

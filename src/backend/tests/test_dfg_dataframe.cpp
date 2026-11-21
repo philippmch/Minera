@@ -768,6 +768,72 @@ void pandas_performance_arithmetic_contract() {
   assert(discover_pandas_dfg(offset, options).performance.at({"A", "B"}).summary.mean == 0.0);
 }
 
+// Round FN: pm4py's Polars adapter on pl.from_pandas of the formatted frame
+// (pm4py 2.7.22, Polars 1.44.1 reference values).
+void polars_business_hours_contract() {
+  // Business time runs on the UTC clock: 06:00+05:00 to 09:00+05:00 is
+  // Monday 01:00 to 04:00 UTC, 10799.5 s inside the slot (3600.5, 14400);
+  // the wall clock (06:00 to 09:00) would count none.
+  const auto offset = make_table(
+      {"case:concept:name", "concept:name", "time:timestamp"},
+      {row({value("case:concept:name", "c"), value("concept:name", "A"),
+            value("time:timestamp", "2024-01-01T06:00:00+05:00")}),
+       row({value("case:concept:name", "c"), value("concept:name", "B"),
+            value("time:timestamp", "2024-01-01T09:00:00+05:00")})});
+  DfgTableOptions options;
+  options.measure = DfgTableMeasure::kPerformance;
+  options.performance_aggregation = DfgPerformanceAggregation::kAll;
+  options.business_hours = true;
+  options.business_hour_slots = std::vector<BusinessHourSlot>{{3600.5, 14400.0}};
+  const auto lazy = LazyEventTable::from_table(offset);
+  assert(discover_polars_dfg(lazy, options).performance.at({"A", "B"}).summary.mean == 10799.5);
+  // On the default slots both ends lie outside business hours: BusinessHours
+  // returns the int 0, which map_elements(return_dtype=pl.Float64) refuses.
+  options.business_hour_slots.reset();
+  bool refused = false;
+  try {
+    (void)discover_polars_dfg(lazy, options);
+  } catch (const std::invalid_argument& error) {
+    refused = std::string(error.what()) ==
+              "unexpected value while building Series of type Float64; found value of type Int64: 0\n\n"
+              "This error occurred with the following context stack:\n\t[1] while constructing Series 'time:timestamp'\n\n\n"
+              "This error occurred in the following expression:\n\tas_struct(\"time:timestamp\", \"start_timestamp_2\").python_udf()\n";
+  }
+  assert(refused);
+  // The frequency graph computes no business time.
+  options.measure = DfgTableMeasure::kFrequency;
+  assert(discover_polars_dfg(lazy, options).frequency.at({"A", "B"}) == 1);
+  // 08:00 to 09:00 UTC lies inside Monday's slot: 3600.0, a float.
+  const auto inside = make_table(
+      {"case:concept:name", "concept:name", "time:timestamp"},
+      {row({value("case:concept:name", "c"), value("concept:name", "A"),
+            value("time:timestamp", "2024-01-01T08:00:00Z")}),
+       row({value("case:concept:name", "c"), value("concept:name", "B"),
+            value("time:timestamp", "2024-01-01T09:00:00Z")})});
+  options.measure = DfgTableMeasure::kPerformance;
+  assert(discover_polars_dfg(LazyEventTable::from_table(inside), options)
+             .performance.at({"A", "B"}).summary.mean == 3600.0);
+  // The group-by std is Welford's running variance: flows 532085, 225128 and
+  // 39318 s give 248853.1267762841 (a two-pass sum of squares ...413).
+  std::vector<EventTable::Row> rows;
+  const char* ends[] = {"2024-01-07T03:48:05Z", "2024-01-03T14:32:08Z", "2024-01-01T10:55:18Z"};
+  for (int i = 0; i < 3; ++i) {
+    const std::string id = "c" + std::to_string(i);
+    rows.push_back(row({value("case:concept:name", id), value("concept:name", "A"),
+                        value("time:timestamp", "2024-01-01T00:00:00Z")}));
+    rows.push_back(row({value("case:concept:name", id), value("concept:name", "B"),
+                        value("time:timestamp", ends[i])}));
+  }
+  DfgTableOptions plain;
+  plain.measure = DfgTableMeasure::kPerformance;
+  plain.performance_aggregation = DfgPerformanceAggregation::kAll;
+  const auto spread = discover_polars_dfg(
+      LazyEventTable::from_table(make_table({"case:concept:name", "concept:name", "time:timestamp"}, rows)), plain);
+  const auto& summary = spread.performance.at({"A", "B"}).summary;
+  assert(summary.sum == 796531.0 && summary.median == 225128.0);
+  assert(summary.standard_deviation == 248853.1267762841);
+}
+
 // Regression: event_from_row once read the selected activity and timestamp
 // cells through a pointer into a destroyed temporary row (heap-use-after-free
 // under ASan). Heap-allocated (non-SSO) cell strings make the read observable.
@@ -801,6 +867,7 @@ int main() {
   event_log_projection_selector_contract();
   polars_null_and_aggregation_contract();
   pandas_performance_arithmetic_contract();
+  polars_business_hours_contract();
   selected_cells_outlive_row_lookup();
   return 0;
 }

@@ -498,9 +498,19 @@ PassedTimeResult discover_passed_time(const EventLog& log,
   }
   if (log.dataframe_columns) return frame_passed_time(log, options);
 
+  // Round FN: an explicit start key naming the log's own timestamp while the
+  // timestamp key names another attribute reads each event's original time
+  // (pm4py's t[i][start_timestamp_key]), which the projection below replaces;
+  // it is kept under a private attribute for the DFG's start selector.
+  static constexpr std::string_view kOriginalTimestamp = "\x1fminera:passed_time:original_timestamp";
+  const bool keep_original = !options.start_timestamp_key.empty() &&
+                             builtin_timestamp_key(options.start_timestamp_key) &&
+                             !builtin_timestamp_key(options.timestamp_key);
   EventLog projected = log;
   for (auto& trace : projected.traces) {
     for (auto& event : trace.events) {
+      if (keep_original && trace.events.size() > 1)
+        event.attributes.push_back({std::string(kOriginalTimestamp), event.timestamp, AttributeKind::kDate});
       event.activity = required_activity(event, options.activity_key);
       // The performance calculation only reads timestamps for adjacent
       // pairs. A singleton trace contributes no edge and therefore does not
@@ -524,8 +534,10 @@ PassedTimeResult discover_passed_time(const EventLog& log,
   dfg_options.use_business_hours = options.use_business_hours;
   dfg_options.business_hour_slots = options.business_hour_slots;
   dfg_options.business_hours_utc_clock = options.dataframe;
-  if (!options.start_timestamp_key.empty() &&
-      !builtin_timestamp_key(options.start_timestamp_key)) {
+  if (keep_original) {
+    dfg_options.start_timestamp_attribute = std::string(kOriginalTimestamp);
+  } else if (!options.start_timestamp_key.empty() &&
+             !builtin_timestamp_key(options.start_timestamp_key)) {
     dfg_options.start_timestamp_attribute = options.start_timestamp_key;
   } else {
     dfg_options.start_timestamp_attribute.clear();

@@ -31,7 +31,10 @@ double required_timestamp(const Event& event, std::string_view key,
                                 std::string(label) + " attribute '" +
                                 std::string(key) + "'");
   }
-  const auto parsed = parse_timestamp(value);
+  // Round FN: pm4py reads each event's Timestamp.timestamp(), round(ns / 1e9,
+  // 6), so a nanosecond text gives its seconds rounded to the microsecond.
+  const auto exact = parse_timestamp_exact(value);
+  const auto parsed = exact ? std::optional<double>{frame_times::epoch_seconds(*exact)} : std::nullopt;
   if (!parsed || !std::isfinite(*parsed))
     throw std::invalid_argument("cycle time: invalid " + std::string(label) +
                                 " timestamp");

@@ -8,6 +8,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <tuple>
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
 #include "business_hours.hpp"
@@ -313,9 +314,9 @@ std::vector<BusinessHourSlot> business_slots(const EventAttribute& value){
   if(!numeric(pair.children[0])||!numeric(pair.children[1]))error("TypeError","unsupported operand type(s) for -: '"+type_name(pair.children[1])+"' and '"+type_name(pair.children[0])+"'");
   result.push_back({native_attribute_number(pair.children[0]),native_attribute_number(pair.children[1])});
  }
- std::sort(result.begin(),result.end(),[](auto a,auto b){return a.start_seconds<b.start_seconds;});
+ std::sort(result.begin(),result.end(),[](const auto& a,const auto& b){return std::tie(a.start_seconds,a.end_seconds)<std::tie(b.start_seconds,b.end_seconds);});
  std::vector<BusinessHourSlot> merged;
- for(const auto& slot:result){if(!merged.empty()&&slot.start_seconds<=merged.back().end_seconds+1)merged.back().end_seconds=std::max(merged.back().end_seconds,slot.end_seconds);else merged.push_back(slot);}
+ for(const auto& slot:result){if(!merged.empty()&&merged.back().end_seconds>=slot.start_seconds-1.0)merged.back().end_seconds=std::max(merged.back().end_seconds,slot.end_seconds);else merged.push_back(slot);}
  return merged;
 }
 double duration(const Group& g,bool business,const std::vector<BusinessHourSlot>& slots,bool nanosecond_column=true,bool* fractional=nullptr){
