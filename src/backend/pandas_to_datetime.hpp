@@ -137,5 +137,8 @@ std::optional<std::vector<std::optional<UtcInstant>>> to_datetime_utc_mixed(cons
                                                                             Date today);
 // Today is the host's local date.
 std::optional<std::vector<std::optional<UtcInstant>>> to_datetime_utc_mixed(const std::vector<Cell>& cells);
+// Round FK: whether the cell alone makes that column datetime64[ns, UTC]: a
+// number, or a text read at nanoseconds (more than six fraction digits).
+bool utc_mixed_nanosecond_cell(const Cell& cell);
 
 }  // namespace minera::pandas_to_datetime

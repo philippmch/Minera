@@ -281,6 +281,15 @@ struct Ocel {
   // enrichment keep it; the OCEL transport carries it as
   // "minera:naiveEventTimes" (the texts as written).
   std::string naive_event_time_unit;
+  // Round FK: an aware reference events frame at nanoseconds,
+  // datetime64[ns, tz]: an OCEL CSV file with an offset or an OCEL SQLite
+  // file (pd.to_datetime(utc=True, format="mixed")) where any time of the
+  // column, dropped rows included, has more than six fraction digits (or is
+  // a number, SQLite). The unit stays when filters, splits and enrichment
+  // remove those rows, so the exact filters' converted value array keeps
+  // its nanoseconds (observed black-box, fk t1/h1.csv, t2/d1.sqlite). The
+  // OCEL transport carries it as "minera:nanosecondEventTimes".
+  bool nanosecond_event_times = false;
   // Round EH: an OCEL 1.0 XML file none of whose events has a timestamp
   // element reads in pm4py as an object column of None rather than NaT
   // (observed black-box), so the routes that use the times raise Python's

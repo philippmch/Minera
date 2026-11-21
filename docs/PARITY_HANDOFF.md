@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FJ (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FK (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8265,6 +8265,70 @@ green in all six jobs. The Mac was not reachable this round (no folder
 access), so no newer reviewer handoff was read. The generators, the
 comparers and the probes are in the project files under
 `review-harness/round-fj/`.
+
+Round FK re-reviewed FJ (Review FK1). FJ's fixes matched on fresh banks
+(o98 from `fg/o5/o5gen.py 98 60` as JSON, SQLite and XML; c99 and c100
+from `fg/c6/c6gen.py 99 60` and `fi/c7/c7gen.py 100 60`; q43 from
+`eq/csv/q2gen.py 2813 60` with q39's features) and four new ones: o102m
+(`fk/o6/o6gen.py`, OCEL 2.0 JSON files whose frame has an object column
+mixing naive and aware datetimes), o103 (`fk/gen/o7gen.py`, nanosecond
+event and attribute times in all three OCEL 2.0 formats), c104
+(`fk/gen/c8gen.py`, OCEL 1.0 event times with nanoseconds) and q44
+(`fk/gen/q3gen.py`, CSV logs with date-only times, nanoseconds on every
+event or one, microseconds and mixed fraction lengths). The chains'
+exact filters with xe3's and xe4's lists (`q/onchain2.py`), the mixed
+object columns, the non-exact filters after the pre steps, on SQLite's
+all-NULL columns and on OCEL 1.0 XML dates, a naive CSV column without
+any time and the writers' nanosecond texts (`w/wtx.py`) agree. Two
+classes, both fixed: FK1-1, an aware nanosecond time column (CSV with an
+offset, SQLite) keeps its unit after the rows that made it so are gone
+(dropped by the reader, filtered, split away), so the exact filters'
+converted value array keeps its nanoseconds (`Ocel::nanosecond_event_times`,
+transport marker `"minera:nanosecondEventTimes"`); FK1-2, found by
+running every OCEL route on the nanosecond banks (rsw, xsw, esw, dsw: 0
+elsewhere), the edge metrics with business hours read each time at its
+microsecond, floored, as pm4py's BusinessHours does (native rounded).
+Declared, unchanged: the JSON and OCEL 1.0 XML writers' time spellings
+and dropped fractions, 'nocol', the CSV declared features, the edge
+metrics' typed and missing labels, the first failing pair's hash-seed
+order, the string family's set order.
+
+In the suite: `minera_review_fk1_tests`. The full ctest passed 658 of 658
+on the first run (35 minutes, -j2); the fixture replay gave 2,673
+responses unchanged. FJ's CI run
+44883332593 finished green in all six jobs. The Mac was not reachable
+this round (no folder access), so no newer reviewer handoff was read. The
+generators, the comparers and the probes are in the project files under
+`review-harness/round-fk/`.
+
+Next round (FL) should start by re-reviewing round FK:
+
+- FK's CI run;
+- FK1-1 on the other places that keep or rebuild a log's frames: the
+  enrichments (O2O, lifecycle), the type matching, the connected
+  components and ancestor splits with the nanosecond row in another
+  component, a SQLite log whose nanosecond time sits on a repeated id,
+  and an OCEL 2.0 SQLite file written by Minera from such a log;
+- FK1-2 on the other business-hours consumers on nanosecond inputs: the
+  OC-DFG's own business hours (0 here), and the traditional event log
+  routes that convert epoch doubles with llround (case statistics, case
+  arrival, the DataFrame DFG, the heuristics miner) on CSV or XES logs
+  whose times have more than six fraction digits;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FK's list, taken in FK: FJ's CI (six green); FJ1-1 on the chains'
+exact filters after splits and windows (0), an object column holding
+naive and aware datetimes next to NaT (0) and declared attribute types
+that change a column's kind (0); FJ1-2 after the pre steps, on SQLite's
+all-NULL columns and on OCEL 1.0 XML dates (0); FJ1-3 on the other time
+units (a naive CSV column without any time 0, the writers 0, OCEL 1.0
+times read at microseconds 0; an aware CSV or SQLite column at
+nanoseconds through the chains fixed as FK1-1). Carried to FL: EV1-1,
+the SQLite leftovers, the new Polars dtypes, DW1, the other declared
+items, the rest of the CU list and the open choices.
+
+Previous list for round FK (kept for its older items):
 
 Next round (FK) should start by re-reviewing round FJ:
 

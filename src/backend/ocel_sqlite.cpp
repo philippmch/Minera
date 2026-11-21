@@ -832,6 +832,24 @@ class TypeTableRows {
         texts = texts || type == SQLITE_TEXT;
         blobs = blobs || type == SQLITE_BLOB;
         numbers = numbers || type == SQLITE_INTEGER || type == SQLITE_FLOAT;
+        // Round FK: every row's time takes part in the column's unit
+        // (Ocel::nanosecond_event_times), dropped and repeated rows too.
+        if (!nanosecond_times_ && type != SQLITE_NULL && type != SQLITE_BLOB) {
+          pandas_to_datetime::Cell cell;
+          if (type == SQLITE_INTEGER) {
+            cell.kind = pandas_to_datetime::Cell::Kind::kInteger;
+            cell.integer = sqlite3_column_int64(row, time_index);
+          } else if (type == SQLITE_FLOAT) {
+            cell.kind = pandas_to_datetime::Cell::Kind::kReal;
+            cell.real = sqlite3_column_double(row, time_index);
+          } else {
+            const auto* text = reinterpret_cast<const char*>(sqlite3_column_text(row, time_index));
+            cell.kind = pandas_to_datetime::Cell::Kind::kText;
+            cell.text = text ? std::string_view(text, static_cast<std::size_t>(sqlite3_column_bytes(row, time_index)))
+                             : std::string_view();
+          }
+          nanosecond_times_ = pandas_to_datetime::utc_mixed_nanosecond_cell(cell);
+        }
       }
       // Round EO: read_ocel2_sqlite splits the type tables' union by
       // ocel_changed_field, so a row without a changed field (an object's,
@@ -953,6 +971,8 @@ class TypeTableRows {
 
   bool exists() const { return exists_; }
   bool has_time() const { return has_time_; }
+  // Round FK: whether a row's time makes the column nanoseconds (see the row loop).
+  bool nanosecond_times() const { return nanosecond_times_; }
   // Every row of the table, NULL ids and repeated ids too.
   std::size_t row_count() const { return row_count_; }
   // read_sql's dtype of the time column (with rows): int64, float64 or object.
@@ -987,6 +1007,7 @@ class TypeTableRows {
   std::vector<std::string> null_columns_;
   bool exists_ = false;
   bool has_time_ = false;
+  bool nanosecond_times_ = false;
   std::size_t row_count_ = 0;
   OcelSqliteTimeColumn time_column_ = OcelSqliteTimeColumn::kObject;
   std::unordered_map<std::string, TypeTableRow> rows_;
@@ -1901,6 +1922,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   // frame's columns (round ER: after the object tables and their
   // concatenation, observed black-box, probe er hb4.py).
   bool events_untimed = false;
+  bool nanosecond_times = false;  // round FK: Ocel::nanosecond_event_times
   {
     std::unordered_set<std::string> read;
     std::size_t type_rank = 0;
@@ -1933,6 +1955,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
         add_column(event_order, own_name(name, true));
       }
       timed = timed || rows.has_time();
+      nanosecond_times = nanosecond_times || rows.nanosecond_times();
       if (rows.row_count() > 0) {
         any_rows = true;
         if (!rows.has_time()) time_column.reset();
@@ -2252,6 +2275,7 @@ Ocel import_ocel_sqlite(const std::filesystem::path& path,
   }
   if (time_column) sort_ocel2_sqlite_events(log, event_times, *time_column);
   else sort_ocel_events_by_timestamp(log, true);
+  log.nanosecond_event_times = nanosecond_times;
   // Round EM: the frames' hints of the rows read but not kept, then of the
   // drops below.
   if (!attribute_tables) {

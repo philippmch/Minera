@@ -2109,4 +2109,34 @@ std::optional<std::vector<std::optional<UtcInstant>>> to_datetime_utc_mixed(cons
   return to_datetime_utc_mixed(cells, local_today());
 }
 
+// Round FK: whether a cell makes to_datetime_utc_mixed's column nanoseconds
+// (a number, or a text read at nanoseconds; see the column flag there).
+bool utc_mixed_nanosecond_cell(const Cell& cell) {
+  switch (cell.kind) {
+    case Cell::Kind::kInteger: return cell.integer != std::numeric_limits<std::int64_t>::min();
+    case Cell::Kind::kReal:
+      return !std::isnan(cell.real) && cell.real < 9223372036854775808.0 && cell.real > -9223372036854775808.0;
+    case Cell::Kind::kText: {
+      const auto t = cell.text;
+      // Only a run of seven or more digits after a dot can read so.
+      bool run = false;
+      for (std::size_t dot = t.find('.'); dot != std::string_view::npos && !run; dot = t.find('.', dot + 1)) {
+        std::size_t digits = 0;
+        while (dot + 1 + digits < t.size() && t[dot + 1 + digits] >= '0' && t[dot + 1 + digits] <= '9') ++digits;
+        run = digits > 6;
+      }
+      if (!run || !in_domain(t)) return false;
+      const auto today = local_today();
+      current_year_value = today.year;
+      today_value = today;
+      try {
+        return element(t).nanoseconds;
+      } catch (...) {
+        return false;
+      }
+    }
+    default: return false;
+  }
+}
+
 }  // namespace minera::pandas_to_datetime

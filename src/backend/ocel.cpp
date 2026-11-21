@@ -2886,6 +2886,11 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
     if (!marker->is_bool()) throw std::invalid_argument("minera:noneEventTimes must be boolean");
     result.none_event_times = std::get<bool>(marker->value);
   }
+  // Round FK: see Ocel::nanosecond_event_times.
+  if (const auto* marker = optional(r, "minera:nanosecondEventTimes")) {
+    if (!marker->is_bool()) throw std::invalid_argument("minera:nanosecondEventTimes must be boolean");
+    result.nanosecond_event_times = std::get<bool>(marker->value);
+  }
   // Round EM: see Ocel::event_frame_hint (written by serialize_ocel_json).
   if (const auto* marker = optional(r, "minera:frameHints")) {
     const auto& hints = obj(*marker, "minera:frameHints");
@@ -4462,6 +4467,9 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
   const auto write_naive_event_times = [&] {
     // Round EH: see Ocel::none_event_times.
     if (log.none_event_times) out << ",\"minera:noneEventTimes\":true";
+    // Round FK: see Ocel::nanosecond_event_times.
+    if (log.nanosecond_event_times && log.naive_event_time_unit.empty())
+      out << ",\"minera:nanosecondEventTimes\":true";
     if (log.naive_event_time_unit.empty()) return;
     out << ",\"minera:naiveEventTimes\":";
     write_string(out, log.naive_event_time_unit);

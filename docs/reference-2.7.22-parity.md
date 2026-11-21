@@ -35999,3 +35999,98 @@ NaT alone as controls; None on datetime64, float64 and str columns and a
 time's text in the non-exact filters; a finer datetime alone, next to
 None, floored not rounded, on the time column and the objects' filter,
 and a list of both kinds keeping the nanoseconds).
+
+
+## Review FK1: an aware nanosecond time column keeps its unit after its nanosecond rows are gone, business hours at the microsecond (2026-11-21)
+
+Round FK checked FJ's CI (run 44883332593 on 72d6ddd: all six jobs
+green). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference
+venv with fresh banks: o98 (`fg/o5/o5gen.py 98 60`, OCEL 2.0 JSON, SQLite
+and XML), c99 and c100 (`fg/c6/c6gen.py 99 60`, `fi/c7/c7gen.py 100 60`,
+OCEL 1.0 JSON and XML), q43 (`eq/csv/q2gen.py 2813 60` with q39's
+features) and four new ones: o102m (`fk/o6/o6gen.py 102
+600`, o5gen with time attributes and the mixed mode drawn more often,
+keeping the 28 JSON files whose frame has an object column mixing naive
+and aware datetimes; the SQLite and XML readers never mix them), o103
+(`fk/gen/o7gen.py 103 60`, nanosecond event and attribute times), c104
+(`fk/gen/c8gen.py 104 60`, OCEL 1.0 event times with nanoseconds) and q44
+(`fk/gen/q3gen.py 2814 60`, q39's features with date-only times,
+nanoseconds on every event or on one, microseconds and mixed fraction
+lengths). New sweeps: `q/onchain2.py` (the chain step, then xe3, xe4, xn2
+or xn on each chain result: FJ1-1 and FJ1-3 after filters, splits and
+windows) and `w/wtx.py` (the event time texts of pm4py's six writers
+against the native downloads, on the file and after two filters, with
+the time column's dtype after reading each written file back); FJ's
+`xn2` and `xn` run after the four pre steps. Hand-made: `t1/h1.csv` to
+`h3.csv` (aware UTC, naive and +02:00 CSV logs where one event alone has
+nanoseconds), `t2/mk.py` (SQLite logs whose only nanosecond time sits on
+a row the reader drops).
+
+FJ's fixes matched outside the class below. FJ1-1 on the other value
+lists: the chains' exact filters with xe3's lists after splits, windows
+and filters agree (0 of 64,880 and 39,248 on o98's JSON and SQLite, 0 of
+14,564 and 8,976 on c99's and c100's XML), an object column holding naive
+and aware datetimes next to the nulls compares value by value as pandas
+does (o102m: xe3 0 of 7,124, xe4 0 of 8,600), and declared attribute types
+that change a column's kind (o98, o102m) agree. FJ1-2 after the pre steps
+(0 of 15,696 and 9,760 on o98's JSON and SQLite; None on every column 0 of
+5,112 and 5,296), on SQLite's all-NULL columns (o98's null-only
+attributes) and on OCEL 1.0 XML date elements (xn2, xn and both after the
+pre steps: 0 of 5,007 on c99 and c100). FJ1-3 on the other time units:
+the OCEL 2.0 JSON and XML and both OCEL 1.0 readers keep microseconds
+(o103, c104: xe4 0 of 8,000, 2,550, 5,600 and 1,550), a naive CSV column
+keeps its own unit through the chains, and the writers agree on the
+nanosecond texts and on the dtype they read back (wtx: CSV and SQLite
+equal, the JSON and OCEL 1.0 XML writers' dropped fractions declared as
+before).
+
+Fixed:
+- **FK1-1 An aware nanosecond time column after its nanosecond rows are
+  gone.** pandas parses an OCEL CSV time column with an offset, and an
+  OCEL SQLite one (`pd.to_datetime(utc=True, format="mixed")`), at
+  nanoseconds when any of its times has more than six fraction digits (or
+  is a number, SQLite), rows the reader drops included (an event without
+  relations, a type-table row whose id the event table does not list), and
+  the frame keeps that unit through filters, splits and
+  enrichment. FJ1-3's converted value array is at that unit, so a finer
+  datetime next to NaT (or alone) keeps its nanoseconds. Native took the
+  unit from the events left and floored the value to microseconds once
+  the nanosecond rows were gone (o103's SQLite xe4 36 of 4,950 on two
+  files whose nanosecond events have no relation, the chains' xe4 1,674 of
+  42,100; q44's chains 234 of 29,000; `t1/h1.csv`: the activity filter,
+  then `[11:00:00.5000005, NaT]` kept e1 and e3 natively, e3 in pm4py).
+  The log now records the unit (`Ocel::nanosecond_event_times`, set by
+  the CSV and SQLite readers over every row, carried by filters, splits
+  and both transports as `"minera:nanosecondEventTimes"`).
+- **FK1-2 Business hours at the microsecond in the edge metrics.** Found
+  by running every OCEL route on the nanosecond banks (rsw, xsw, esw and
+  dsw: 0 of 1,950, 650, 800 and 350 elsewhere): pm4py's BusinessHours reads
+  a Timestamp with nanoseconds at its microsecond, floored, so two times
+  within one microsecond measure 0 and `14:57:26.123456789` to 17:00
+  measures 7,353.876544 seconds (`t4/b1.csv`). The edge metrics with
+  business hours rounded each epoch time to the nearest microsecond (o103's
+  SQLite 8 of 390, q44 2 of 260, the sixth decimal). They now floor the
+  exact wall clock, as the OC-DFG's own business hours already did.
+
+Declared, unchanged: the JSON and OCEL 1.0 XML writers' time spellings
+and dropped fractions, the type matching's 'nocol' reading, the CSV
+declared features, the edge metrics' typed and missing labels, the first
+failing pair's hash-seed order, the string family's set order.
+
+Results with the fixed server: o103's SQLite xe4 0 of 4,950 and the
+chains' xe4 0 of 42,100, q44's chains 0 of 29,000, o103's XML xe4 0 of
+2,550 and chains 0 of 22,700, the time-based routes (xsw) 0 of 780 on
+o103's SQLite and 2 of 546 on q44 (the order of the columns pm4py's
+KeyError names for a log without relations, which follows the hash seed:
+seed 5 of 0 to 7 gives the other order); FJ's sweeps on q43 (xe3 0 of 4,160, xe4 0 of
+5,750, xn2 0 of 2,020, ocd2 0 of 556). The full ctest passes 658 of 658
+and the fixture replay gives 2,673 responses unchanged.
+
+In the suite: `minera_review_fk1_tests` (an aware CSV column with one
+nanosecond time: the activity filter keeps the unit, a finer datetime
+next to NaT and alone, the cell's own datetime, the transport round trip,
+an offset of +02:00; SQLite logs whose nanosecond time is on an event
+without relations or on an unlisted id; microsecond and naive controls;
+the edge metrics with business hours on nanosecond times: floored, within
+one microsecond, across one).

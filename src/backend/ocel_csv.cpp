@@ -1236,6 +1236,10 @@ Ocel parse_tables(const Table& event_table, const Table* object_table,
   }
   if (!any_aware)
     log.naive_event_time_unit = !any_time ? "s" : nanoseconds ? "ns" : "us";
+  // Round FK: an aware column at nanoseconds keeps that unit when filters
+  // remove those rows (Ocel::nanosecond_event_times).
+  else
+    log.nanosecond_event_times = nanoseconds;
   // Round DV: a file whose rows (dropped ones included) name no object, not
   // even None, gets a relations frame with only ocel:qualifier, where nearly
   // every later function raises KeyError (black-box; see

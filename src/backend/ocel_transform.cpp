@@ -152,6 +152,7 @@ Ocel empty_like(const Ocel& log) {
   result.relation_qualifier_dtype = log.relation_qualifier_dtype;
   result.o2o_qualifier_dtype = log.o2o_qualifier_dtype;
   result.naive_event_time_unit = log.naive_event_time_unit;
+  result.nanosecond_event_times = log.nanosecond_event_times;
   result.none_event_times = log.none_event_times;
   // Round EM: the rows the reader dropped still type the frames.
   result.event_frame_hint = log.event_frame_hint;

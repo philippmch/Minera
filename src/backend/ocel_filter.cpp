@@ -740,6 +740,9 @@ std::uint32_t event_time_step(const Ocel& log) {
   if (log.naive_event_time_unit == "ns") return 1;
   if (log.naive_event_time_unit == "s") return 1000000000;
   if (log.naive_event_time_unit == "us") return 1000;
+  // Round FK: an aware column at nanoseconds keeps its unit after the rows
+  // that made it so are gone (dropped by the reader, filtered, split away).
+  if (log.nanosecond_event_times) return 1;
   for (const auto& event : log.events)
     if (nanosecond_text(event.timestamp)) return 1;
   return 1000;

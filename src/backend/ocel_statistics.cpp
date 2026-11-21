@@ -81,6 +81,25 @@ std::optional<double> local_wall_instant(std::string_view text) {
   return parse_timestamp(text.substr(0, end));
 }
 
+// Round FK: the wall clock above in whole microseconds, floored: pm4py's
+// BusinessHours reads a Timestamp with nanoseconds at its microsecond (an
+// OCEL SQLite or CSV time at nanoseconds; observed black-box, fk
+// BusinessHours probe: 10:00:00.0000001 to .0000009 measures 0, .0000009
+// to .0000011 one microsecond). nullopt where the exact reading fails.
+std::optional<std::int64_t> local_wall_microseconds(std::string_view text) {
+  if (!parse_timestamp(text)) return std::nullopt;
+  std::size_t end = text.size();
+  while (end > 0 &&
+         std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
+    --end;
+  }
+  const auto timezone = text.substr(0, end).find_first_of("Zz+-", 10);
+  if (timezone != std::string_view::npos) end = timezone;
+  const auto exact = parse_timestamp_exact(text.substr(0, end));
+  if (!exact) return std::nullopt;
+  return exact->seconds * 1000000 + static_cast<std::int64_t>(exact->nanoseconds / 1000);
+}
+
 // pm4py's BusinessHours on microsecond wall clocks
 // (detail::business_elapsed_seconds_microseconds); an epoch double holds its
 // microsecond exactly enough for rounding to recover it (review AY1).
@@ -600,6 +619,10 @@ OcelEdgeAssociations edge_associations(
           if (exact_from && exact_to) return ocdfg_elapsed_seconds(*exact_from, *exact_to);
           return *to - *from;
         }
+        const auto wall_from = local_wall_microseconds(source_it->second->timestamp);
+        const auto wall_to = local_wall_microseconds(target_it->second->timestamp);
+        if (wall_from && wall_to)
+          return detail::business_elapsed_seconds_microseconds(*wall_from, *wall_to, business_slots);
         return business_elapsed(*from, *to, business_slots);
       };
       for (const auto& couple : metric.event_couples) {
