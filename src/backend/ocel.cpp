@@ -926,7 +926,7 @@ void apply_transport_frame_hint(const Json* hints, const char* name, AttributeRo
   std::unordered_map<std::string, std::pair<std::int64_t, std::int64_t>> dropped;  // kinds, present
   if (const auto* list = optional(hint->object(), "dropped"); list != nullptr && list->is_array())
     for (const auto& item : list->array())
-      if (item.is_array() && item.array().size() == 3 && item.array()[0].is_string() &&
+      if (item.is_array() && (item.array().size() == 3 || item.array().size() == 4) && item.array()[0].is_string() &&
           item.array()[1].is_int() && item.array()[2].is_int())
         dropped[item.array()[0].string()] = {std::get<std::int64_t>(item.array()[1].value),
                                              std::get<std::int64_t>(item.array()[2].value)};
@@ -2903,12 +2903,14 @@ static Ocel parse_ocel_json_names(std::string_view json, const OcelJsonLimits& l
       if (const auto* dropped = optional(entry, "dropped")) {
         if (!dropped->is_array()) throw std::invalid_argument("minera:frameHints dropped must be array");
         for (const auto& item : dropped->array()) {
-          if (!item.is_array() || item.array().size() != 3 || !item.array()[0].is_string())
-            throw std::invalid_argument("minera:frameHints dropped entries must be [key, kinds, present]");
+          if (!item.is_array() || (item.array().size() != 3 && item.array().size() != 4) ||
+              !item.array()[0].is_string())
+            throw std::invalid_argument("minera:frameHints dropped entries must be [key, kinds, present(, nulls)]");
           const auto kinds = count(item.array()[1], "kinds");
           if (kinds > 127) throw std::invalid_argument("minera:frameHints kinds must be below 128");
           hint.dropped.push_back({item.array()[0].string(), static_cast<unsigned char>(kinds),
-                                  count(item.array()[2], "present")});
+                                  count(item.array()[2], "present"),
+                                  item.array().size() == 4 ? count(item.array()[3], "nulls") : 0});
         }
       }
       if (const auto* rows = optional(entry, "rows")) hint.dropped_rows = count(*rows, "rows");
@@ -4487,7 +4489,9 @@ std::string serialize_ocel_json(const Ocel& input, OcelJsonFormat format,
         if (i) out << ',';
         out << '[';
         write_string(out, hint.dropped[i].key);
-        out << ',' << static_cast<unsigned>(hint.dropped[i].kinds) << ',' << hint.dropped[i].present << ']';
+        out << ',' << static_cast<unsigned>(hint.dropped[i].kinds) << ',' << hint.dropped[i].present;
+        if (hint.dropped[i].nulls != 0) out << ',' << hint.dropped[i].nulls;
+        out << ']';
       }
       out << "],\"rows\":" << hint.dropped_rows;
       if (hint.field_at && hint.time_at) out << ",\"field\":" << *hint.field_at << ",\"time\":" << *hint.time_at;

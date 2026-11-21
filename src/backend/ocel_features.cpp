@@ -5,6 +5,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <iomanip>
 #include <limits>
 #include <map>
@@ -21,6 +22,7 @@
 #include "minera/timestamp.hpp"
 #include "frame_times.hpp"
 #include "ocel_frame_types.hpp"
+#include "python_float_text.hpp"
 
 namespace minera {
 namespace {
@@ -124,6 +126,403 @@ std::vector<std::string> ordered_unique(std::vector<std::string> values) {
 std::vector<std::string> sorted_unique(std::vector<std::string> values) {
   std::sort(values.begin(), values.end());
   values.erase(std::unique(values.begin(), values.end()), values.end());
+  return values;
+}
+
+// Round FG: pm4py's attribute features (event_str_attributes,
+// event_num_attributes, object_str_attributes, object_num_attributes) read
+// the frame's Python cells (observed black-box, probes fg t1/p5.py to
+// p11.py): a datetime64 column holds Timestamps, a date read into an object
+// column is a datetime.datetime, an int of a float64 column is a float, an
+// OCEL CSV read's columns hold texts; a missing cell (NaN, None, NaT) is
+// null.
+struct FeatureCell {
+  enum class Kind { kNull, kStr, kInt, kFloat, kBool, kTimestamp, kDatetime } kind = Kind::kNull;
+  std::string text;          // kStr: the text; kTimestamp, kDatetime: its timestamp text
+  std::int64_t integer = 0;  // kInt
+  double real = 0.0;         // kFloat
+  bool flag = false;         // kBool
+};
+
+const char* feature_cell_type(const FeatureCell& cell) {
+  switch (cell.kind) {
+    case FeatureCell::Kind::kStr: return "str";
+    case FeatureCell::Kind::kInt: return "int";
+    case FeatureCell::Kind::kBool: return "bool";
+    case FeatureCell::Kind::kTimestamp: return "Timestamp";
+    case FeatureCell::Kind::kDatetime: return "datetime.datetime";
+    case FeatureCell::Kind::kNull: return "NoneType";
+    default: return "float";
+  }
+}
+
+// str() of a cell: a datetime as pandas and Python print it (UTC, or at the
+// offset an OCEL CSV read's event times share), a float as its repr.
+std::string feature_cell_str(const FeatureCell& cell, std::optional<std::int32_t> offset) {
+  switch (cell.kind) {
+    case FeatureCell::Kind::kStr: return cell.text;
+    case FeatureCell::Kind::kInt: return std::to_string(cell.integer);
+    case FeatureCell::Kind::kBool: return cell.flag ? "True" : "False";
+    case FeatureCell::Kind::kFloat: return ocel_frame::float_repr(cell.real);
+    case FeatureCell::Kind::kTimestamp:
+    case FeatureCell::Kind::kDatetime: return ocel_frame::offset_timestamp_text(cell.text, ' ', offset, std::nullopt);
+    default: return "None";
+  }
+}
+
+std::string python_key_error_text(const std::string& message) {
+  return "KeyError: " + ocel_frame::python_str_repr(message);
+}
+
+// The frame's columns: pm4py subsets the frame by each listed key in turn,
+// so the first one it lacks raises KeyError "['key'] not in index".
+void require_feature_columns(const Ocel& log, bool events, const std::vector<std::string>& keys) {
+  std::set<std::string> columns;
+  const auto& declared = events ? log.table_columns.events : log.table_columns.objects;
+  if (declared) {
+    columns.insert(declared->begin(), declared->end());
+  } else {
+    if (events) columns = {"ocel:eid", "ocel:timestamp", "ocel:activity"};
+    else columns = {"ocel:oid", "ocel:type"};
+    const auto frame = events ? ocel_frame::event_frame(log) : ocel_frame::object_frame(log);
+    columns.insert(frame.names().begin(), frame.names().end());
+  }
+  for (const auto& key : keys)
+    if (!columns.contains(key))
+      throw std::invalid_argument(python_key_error_text("[" + ocel_frame::python_str_repr(key) + "] not in index"));
+}
+
+std::vector<FeatureCell> feature_column(const Ocel& log, bool events, const std::string& key) {
+  using Kind = FeatureCell::Kind;
+  const std::size_t rows = events ? log.events.size() : log.objects.size();
+  std::vector<FeatureCell> cells(rows);
+  const auto text_cell = [](const std::string& text) {
+    FeatureCell cell;
+    cell.kind = Kind::kStr;
+    cell.text = text;
+    return cell;
+  };
+  if (events && (key == "ocel:eid" || key == "ocel:activity")) {
+    for (std::size_t row = 0; row < rows; ++row)
+      cells[row] = text_cell(key == "ocel:eid" ? log.events[row].id : log.events[row].activity);
+    return cells;
+  }
+  if (!events && (key == "ocel:oid" || key == "ocel:type")) {
+    for (std::size_t row = 0; row < rows; ++row)
+      cells[row] = text_cell(key == "ocel:oid" ? log.objects[row].id : log.objects[row].type);
+    return cells;
+  }
+  if (events && key == "ocel:timestamp") {
+    for (std::size_t row = 0; row < rows; ++row) {
+      const auto& event = log.events[row];
+      auto& cell = cells[row];
+      switch (event.raw_time) {
+        case OcelRawTime::kNone:
+          if (!ocel_frame::nat_time_text(event.timestamp)) {
+            cell.kind = Kind::kTimestamp;
+            cell.text = event.timestamp;
+          }
+          break;
+        case OcelRawTime::kStr: cell = text_cell(event.timestamp); break;
+        case OcelRawTime::kInt:
+          cell.kind = Kind::kInt;
+          cell.integer = std::strtoll(event.timestamp.c_str(), nullptr, 10);
+          break;
+        case OcelRawTime::kFloat:
+          cell.kind = Kind::kFloat;
+          cell.real = std::strtod(event.timestamp.c_str(), nullptr);
+          break;
+        default: break;
+      }
+    }
+    return cells;
+  }
+  const bool csv = log.event_frame_hint.str_columns;
+  const auto frame = events ? ocel_frame::event_frame(log, true) : ocel_frame::object_frame(log, true);
+  const auto dtype = frame.dtype(key);
+  const auto& catalog = events ? log.event_type_attributes : log.object_type_attributes;
+  for (std::size_t row = 0; row < rows; ++row) {
+    const auto& attributes = events ? log.events[row].attributes : log.objects[row].attributes;
+    const auto& owner = events ? log.events[row].activity : log.objects[row].type;
+    const auto* found = find_attribute(attributes, key);
+    if (found == nullptr || std::holds_alternative<std::nullptr_t>(found->value)) continue;
+    auto& cell = cells[row];
+    const auto& value = found->value;
+    if (csv) {
+      cell = text_cell(ocel_frame::python_str(value));
+    } else if (const auto* text = std::get_if<std::string>(&value)) {
+      if (ocel_frame::reference_date_value(catalog, owner, *found)) {
+        cell.kind = dtype == ocel_frame::Dtype::kDatetime ? Kind::kTimestamp : Kind::kDatetime;
+        cell.text = *text;
+      } else {
+        cell = text_cell(*text);
+      }
+    } else if (const auto* boolean = std::get_if<bool>(&value)) {
+      cell.kind = Kind::kBool;
+      cell.flag = *boolean;
+    } else if (const auto* integer = std::get_if<std::int64_t>(&value)) {
+      if (dtype == ocel_frame::Dtype::kFloat64) {
+        cell.kind = Kind::kFloat;
+        cell.real = static_cast<double>(*integer);
+      } else {
+        cell.kind = Kind::kInt;
+        cell.integer = *integer;
+      }
+    } else if (const auto* real = std::get_if<double>(&value); real && !std::isnan(*real)) {
+      cell.kind = Kind::kFloat;
+      cell.real = *real;
+    }
+  }
+  return cells;
+}
+
+// The offset an OCEL CSV read's event times share (their str() prints it).
+std::optional<std::int32_t> event_time_offset(const Ocel& log) {
+  std::vector<std::string_view> texts;
+  texts.reserve(log.events.size());
+  for (const auto& event : log.events)
+    if (event.raw_time == OcelRawTime::kNone) texts.emplace_back(event.timestamp);
+  return ocel_frame::shared_nonzero_offset(texts);
+}
+
+// CPython 3.11's hash of a number (bool, int, float): the int modulo
+// 2**61 - 1 with its sign, a float by its binary digits (an integral float
+// as its int), -1 as -2.
+constexpr std::uint64_t kPyHashModulus = (std::uint64_t{1} << 61) - 1;
+std::int64_t python_int_hash(std::int64_t value) {
+  const bool negative = value < 0;
+  const std::uint64_t magnitude = negative ? std::uint64_t(0) - static_cast<std::uint64_t>(value)
+                                           : static_cast<std::uint64_t>(value);
+  auto hash = static_cast<std::int64_t>(magnitude % kPyHashModulus);
+  if (negative) hash = -hash;
+  return hash == -1 ? -2 : hash;
+}
+std::int64_t python_float_hash(double value) {
+  if (std::isinf(value)) return value > 0 ? 314159 : -314159;
+  int exponent = 0;
+  double mantissa = std::frexp(value, &exponent);
+  int sign = 1;
+  if (mantissa < 0) {
+    sign = -1;
+    mantissa = -mantissa;
+  }
+  std::uint64_t x = 0;
+  while (mantissa != 0.0) {
+    x = ((x << 28) & kPyHashModulus) | x >> (61 - 28);
+    mantissa *= 268435456.0;
+    exponent -= 28;
+    const auto y = static_cast<std::uint64_t>(mantissa);
+    mantissa -= static_cast<double>(y);
+    x += y;
+    if (x >= kPyHashModulus) x -= kPyHashModulus;
+  }
+  exponent = exponent >= 0 ? exponent % 61 : 61 - 1 - ((-1 - exponent) % 61);
+  x = ((x << exponent) & kPyHashModulus) | x >> (61 - exponent);
+  auto hash = static_cast<std::int64_t>(x) * sign;
+  return hash == -1 ? -2 : hash;
+}
+
+// Round FG: the cell whose value comes first when pm4py iterates the set of
+// a column's non-null values (CPython 3.11's set: values inserted in row
+// order, equal numbers kept once as the first, a table of 8 slots grown
+// fourfold past 60 % fill, linear probing of 9 slots, then perturbation).
+// Texts and datetimes hash by the seed (PYTHONHASHSEED), so they count
+// towards the table's size but take no slot here: where one would push a
+// number aside the order follows the seed (declared).
+std::optional<std::size_t> python_set_first(const std::vector<FeatureCell>& cells,
+                                            const std::function<bool(const FeatureCell&)>& wanted) {
+  using Kind = FeatureCell::Kind;
+  struct Entry { std::size_t row; std::uint64_t hash; };
+  std::vector<std::optional<Entry>> table(8);
+  std::size_t used = 0;
+  std::set<std::string> texts, times;
+  std::vector<std::pair<double, std::size_t>> numbers;  // value, row (dedup by ==)
+  const auto place = [](std::vector<std::optional<Entry>>& slots, const Entry& entry) {
+    const std::size_t mask = slots.size() - 1;
+    std::size_t perturb = entry.hash;
+    std::size_t at = entry.hash & mask;
+    while (true) {
+      const std::size_t probes = at + 9 <= mask ? 9 : 0;
+      for (std::size_t step = 0; step <= probes; ++step) {
+        if (!slots[at + step]) {
+          slots[at + step] = entry;
+          return;
+        }
+      }
+      perturb >>= 5;
+      at = (at * 5 + 1 + perturb) & mask;
+    }
+  };
+  const auto grow = [&] {
+    if (used * 5 < (table.size() - 1) * 3) return;
+    std::size_t size = 8;
+    while (size <= used * 4) size <<= 1;
+    std::vector<std::optional<Entry>> larger(size);
+    for (const auto& entry : table)
+      if (entry) place(larger, *entry);
+    table = std::move(larger);
+  };
+  for (std::size_t row = 0; row < cells.size(); ++row) {
+    const auto& cell = cells[row];
+    if (cell.kind == Kind::kNull) continue;
+    if (cell.kind == Kind::kStr) {
+      if (texts.insert(cell.text).second) {
+        ++used;
+        grow();
+      }
+      continue;
+    }
+    if (cell.kind == Kind::kTimestamp || cell.kind == Kind::kDatetime) {
+      const auto parsed = parse_timestamp_exact(cell.text);
+      const auto key = parsed ? std::to_string(parsed->timezone_aware) + ":" + std::to_string(parsed->seconds) + ":" +
+                                    std::to_string(parsed->nanoseconds)
+                              : cell.text;
+      if (times.insert(key).second) {
+        ++used;
+        grow();
+      }
+      continue;
+    }
+    const double value = cell.kind == Kind::kInt   ? static_cast<double>(cell.integer)
+                         : cell.kind == Kind::kBool ? (cell.flag ? 1.0 : 0.0)
+                                                    : cell.real;
+    const bool exact = cell.kind != Kind::kInt ||
+                       static_cast<std::int64_t>(static_cast<double>(cell.integer)) == cell.integer;
+    if (exact && std::any_of(numbers.begin(), numbers.end(), [&](const auto& seen) { return seen.first == value; }))
+      continue;
+    numbers.emplace_back(value, row);
+    std::int64_t hash = 0;
+    if (cell.kind == Kind::kInt) hash = python_int_hash(cell.integer);
+    else if (cell.kind == Kind::kBool) hash = cell.flag ? 1 : 0;
+    else hash = python_float_hash(cell.real);
+    place(table, Entry{row, static_cast<std::uint64_t>(hash)});
+    ++used;
+    grow();
+  }
+  for (const auto& entry : table)
+    if (entry && wanted(cells[entry->row])) return entry->row;
+  // A wanted text or datetime sits wherever the seed puts it: the first in
+  // row order stands for it.
+  for (std::size_t row = 0; row < cells.size(); ++row)
+    if (cells[row].kind != Kind::kNull && wanted(cells[row])) return row;
+  return std::nullopt;
+}
+
+// pm4py's {id: value} of a column's non-null cells (dropna, then a dict by
+// the event or object id): a repeated id holds its last non-null row's
+// cell, the ids in first appearance order; every row of the id reads that
+// cell (pm4py's feature code, observed black-box with a repeated id).
+struct IdCells {
+  std::vector<std::optional<std::size_t>> by_row;  // the row whose cell the row's id holds
+  std::vector<FeatureCell> values;                  // the dict's values in its order
+};
+IdCells id_cells(const Ocel& log, bool events, const std::vector<FeatureCell>& cells) {
+  const auto id_of = [&](std::size_t row) -> const std::string& {
+    return events ? log.events[row].id : log.objects[row].id;
+  };
+  std::unordered_map<std::string_view, std::size_t> slot;
+  std::vector<std::size_t> holder;
+  for (std::size_t row = 0; row < cells.size(); ++row) {
+    if (cells[row].kind == FeatureCell::Kind::kNull) continue;
+    const auto [at, added] = slot.try_emplace(id_of(row), holder.size());
+    if (added) holder.push_back(row);
+    else holder[at->second] = row;
+  }
+  IdCells result;
+  result.by_row.resize(cells.size());
+  for (std::size_t row = 0; row < cells.size(); ++row)
+    if (const auto found = slot.find(id_of(row)); found != slot.end()) result.by_row[row] = holder[found->second];
+  result.values.reserve(holder.size());
+  for (const auto row : holder) result.values.push_back(cells[row]);
+  return result;
+}
+
+// The str attributes: one column per distinct str() of a non-null cell (in
+// pm4py's set order, which follows the hash seed; native sorts them), 1.0
+// where the row's cell prints so. The objects' family concatenates the raw
+// value to the name, so a value that is no str raises TypeError (keys in
+// order, the first value of the column's set; see python_set_first).
+struct StrAttributeColumn {
+  std::string name;
+  std::vector<double> values;
+};
+std::vector<StrAttributeColumn> compatibility_str_attributes(const Ocel& log, bool events,
+                                                             const std::vector<std::string>& keys) {
+  require_feature_columns(log, events, keys);
+  const auto offset = events ? event_time_offset(log) : std::nullopt;
+  std::vector<StrAttributeColumn> result;
+  // A repeated key is one entry of pm4py's dict of columns.
+  std::set<std::string> done;
+  for (const auto& key : keys) {
+    if (!done.insert(key).second) continue;
+    const auto cells = feature_column(log, events, key);
+    const auto time_offset = key == "ocel:timestamp" ? offset : std::nullopt;
+    const auto ids = id_cells(log, events, cells);
+    std::vector<std::optional<std::string>> printed(cells.size());
+    std::set<std::string> categories;
+    if (!events)
+      if (const auto at = python_set_first(ids.values, [](const FeatureCell& cell) { return cell.kind != FeatureCell::Kind::kStr; }))
+        throw std::invalid_argument(std::string("TypeError: can only concatenate str (not \"") +
+                                    feature_cell_type(ids.values[*at]) + "\") to str");
+    for (std::size_t row = 0; row < cells.size(); ++row) {
+      if (!ids.by_row[row]) continue;
+      printed[row] = feature_cell_str(cells[*ids.by_row[row]], time_offset);
+      categories.insert(*printed[row]);
+    }
+    for (const auto& category : categories) {
+      StrAttributeColumn column{(events ? "@@event_attr_value_" : "@@object_attr_value_") + key + "_" + category,
+                                std::vector<double>(cells.size(), 0.0)};
+      for (std::size_t row = 0; row < cells.size(); ++row)
+        if (printed[row] && *printed[row] == category) column.values[row] = 1.0;
+      result.push_back(std::move(column));
+    }
+  }
+  return result;
+}
+
+// The num attributes: float() of each cell, rows in order and keys in order
+// within a row, a null cell 0 (fillna); a text float() cannot read raises
+// ValueError, a datetime TypeError. Both families name the column
+// "@@event_num_<key>" (the objects' one too).
+std::vector<std::vector<double>> compatibility_num_attributes(const Ocel& log, bool events,
+                                                              const std::vector<std::string>& keys) {
+  require_feature_columns(log, events, keys);
+  std::vector<std::vector<FeatureCell>> columns;
+  std::vector<IdCells> ids;
+  columns.reserve(keys.size());
+  ids.reserve(keys.size());
+  for (const auto& key : keys) {
+    columns.push_back(feature_column(log, events, key));
+    ids.push_back(id_cells(log, events, columns.back()));
+  }
+  const std::size_t rows = events ? log.events.size() : log.objects.size();
+  std::vector<std::vector<double>> values(keys.size(), std::vector<double>(rows, 0.0));
+  const FeatureCell null_cell;
+  for (std::size_t row = 0; row < rows; ++row) {
+    for (std::size_t at = 0; at < keys.size(); ++at) {
+      const auto holder = ids[at].by_row[row];
+      const auto& cell = holder ? columns[at][*holder] : null_cell;
+      double& value = values[at][row];
+      switch (cell.kind) {
+        case FeatureCell::Kind::kNull: value = 0.0; break;
+        case FeatureCell::Kind::kInt: value = static_cast<double>(cell.integer); break;
+        case FeatureCell::Kind::kFloat: value = cell.real; break;
+        case FeatureCell::Kind::kBool: value = cell.flag ? 1.0 : 0.0; break;
+        case FeatureCell::Kind::kStr: {
+          const auto parsed = detail::parse_python_float_text(cell.text);
+          if (!parsed)
+            throw std::invalid_argument("ValueError: could not convert string to float: " +
+                                        ocel_frame::python_str_repr(cell.text));
+          value = *parsed;
+          break;
+        }
+        default:
+          throw std::invalid_argument(
+              std::string("TypeError: float() argument must be a string or a real number, not '") +
+              feature_cell_type(cell) + "'");
+      }
+    }
+  }
   return values;
 }
 
@@ -457,6 +856,16 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       builder.add("@@event_num_e2e_in", std::move(incoming));
     }
   }
+  // Round FG: pm4py's str attribute family runs before its num one (a key
+  // the frame lacks raises there first), both between the relation counts
+  // and the endpoints (observed black-box, probes fg t1/p5.py to p11.py).
+  if (compatibility_names) {
+    for (auto& column : compatibility_str_attributes(log, true, options.string_event_attributes))
+      builder.add(std::move(column.name), std::move(column.values));
+    auto numbers = compatibility_num_attributes(log, true, options.numeric_event_attributes);
+    for (std::size_t at = 0; at < numbers.size(); ++at)
+      builder.add("@@event_num_" + options.numeric_event_attributes[at], std::move(numbers[at]));
+  }
   const bool include_event_start_ot = options.include_event_start_ot_features.value_or(
       options.include_endpoint_features);
   const bool include_event_end_ot = options.include_event_end_ot_features.value_or(
@@ -538,9 +947,9 @@ void add_event_columns(TableBuilder& builder, const Ocel& log,
       builder.add("@@event_num_" + key, std::move(values));
     }
   };
-  add_numeric_attributes(options.numeric_event_attributes);
+  if (!compatibility_names) add_numeric_attributes(options.numeric_event_attributes);
 
-  for (const auto& key : options.string_event_attributes) {
+  for (const auto& key : compatibility_names ? std::vector<std::string>{} : options.string_event_attributes) {
     std::vector<std::string> values;
     for (const auto& event : log.events)
       if (const auto* attr = find_attribute(event.attributes, key))
@@ -777,8 +1186,20 @@ void add_object_columns(TableBuilder& builder, const Ocel& log,
       builder.add("@@object_num_" + key, std::move(values));
     }
   };
-  add_numeric_attributes(options.numeric_object_attributes);
-  for (const auto& key : options.string_object_attributes) {
+  // Round FG: pm4py's str attribute family runs first (its KeyError and
+  // TypeError come before the num family's), and the num family names its
+  // columns "@@event_num_<key>" (observed black-box, probes fg t1/p5.py to
+  // p11.py).
+  if (compatibility_names) {
+    for (auto& column : compatibility_str_attributes(log, false, options.string_object_attributes))
+      builder.add(std::move(column.name), std::move(column.values));
+    auto numbers = compatibility_num_attributes(log, false, options.numeric_object_attributes);
+    for (std::size_t at = 0; at < numbers.size(); ++at)
+      builder.add("@@event_num_" + options.numeric_object_attributes[at], std::move(numbers[at]));
+  } else {
+    add_numeric_attributes(options.numeric_object_attributes);
+  }
+  for (const auto& key : compatibility_names ? std::vector<std::string>{} : options.string_object_attributes) {
     std::vector<std::string> values;
     for (const auto& object : log.objects)
       if (const auto* attr = find_attribute(object.attributes, key))
@@ -1464,10 +1885,21 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
     const bool endpoints =
         options.include_event_start_ot_features.value_or(options.include_endpoint_features) ||
         options.include_event_end_ot_features.value_or(options.include_endpoint_features);
-    const auto event_family_errors = [&] {
+    // Round FG: the attribute families (str, then num) come between the
+    // relation counts and the endpoints of the events, between the
+    // lifecycle activities and the interactions by type of the objects
+    // (observed black-box: q33's ValueError before the endpoints' KeyError).
+    const auto attribute_family_errors = [&](bool events) {
+      (void)compatibility_str_attributes(log, events,
+                                         events ? options.string_event_attributes : options.string_object_attributes);
+      (void)compatibility_num_attributes(log, events,
+                                         events ? options.numeric_event_attributes : options.numeric_object_attributes);
+    };
+    const auto event_family_errors = [&](bool attributes) {
       if (options.include_timestamp_features && raw_times && !log.events.empty()) throw raw_error(0);
       if (options.include_timestamp_features && nat_event) throw nat_error();
       if (relation_counts && first_event) throw key_error(log.events[*first_event].id);
+      if (attributes) attribute_family_errors(true);
       if (endpoints && first_object) throw key_error(log.objects[*first_object].id);
     };
     const auto default_object_family_errors = [&] {
@@ -1476,7 +1908,7 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       if (first_event) throw key_error(log.events[*first_event].id);
     };
     if (variant == OcelFeatureVariant::kEvents) {
-      event_family_errors();
+      event_family_errors(true);
       if (options.include_related_objects_features) default_object_family_errors();
     } else if (variant == OcelFeatureVariant::kObjects) {
       const bool lifecycle = options.include_lifecycle_features.value_or(true);
@@ -1492,11 +1924,12 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
         if (options.include_cobirth_features.value_or(all)) throw key_error(log.events[*first_event].id);
         if (options.include_codeath_features.value_or(all)) throw key_error(log.events[*last_event].id);
       }
+      attribute_family_errors(false);
       if (lifecycle && options.include_lifecycle_wip_features.value_or(false) && first_object_event)
         throw raw_error(*first_object_event);
       if (lifecycle && options.include_lifecycle_wip_features.value_or(false) && nat_object) throw nat_error();
       if (options.include_related_events_features || options.include_related_activities_features)
-        event_family_errors();
+        event_family_errors(false);
       if (options.include_obj_con_in_graph_features) default_object_family_errors();
     }
   }

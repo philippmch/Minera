@@ -53,11 +53,17 @@ struct ColumnStats {
   // column then, see kOcelHintNone).
   bool has_none = false;
   std::size_t present = 0;
+  // Round FG: cells holding an explicit null (no value of their own; see
+  // all_nulls).
+  std::size_t nulls = 0;
 
   void observe(const OcelValue& value) { observe(value, false); }
   // `date`: the value is a datetime in the reference frame.
   void observe(const OcelValue& value, bool date) {
-    if (std::holds_alternative<std::nullptr_t>(value)) return;
+    if (std::holds_alternative<std::nullptr_t>(value)) {
+      ++nulls;
+      return;
+    }
     ++present;
     if (std::holds_alternative<bool>(value)) has_bool = true;
     else if (std::holds_alternative<std::int64_t>(value)) has_int = true;
@@ -74,6 +80,7 @@ struct ColumnStats {
     has_aware_date = has_aware_date || other.has_aware_date;
     has_none = has_none || other.has_none;
     present += other.present;
+    nulls += other.nulls;
   }
   [[nodiscard]] bool has_date() const { return has_naive_date || has_aware_date; }
 
@@ -185,6 +192,7 @@ class Columns {
       stats.has_aware_date = stats.has_aware_date || (column.kinds & kOcelHintAwareDate);
       stats.has_none = stats.has_none || (column.kinds & kOcelHintNone);
       stats.present += column.present;
+      stats.nulls += column.nulls;
     }
     rows_ += hint.dropped_rows;
     seeded_rows_ += hint.dropped_rows;
@@ -204,6 +212,18 @@ class Columns {
   [[nodiscard]] Dtype dtype(const std::string& key) const {
     const auto* found = stats(key);
     return found == nullptr ? Dtype::kEmpty : found->dtype(rows_);
+  }
+  // Round FF/FG: whether the column, without a value of its own, is an
+  // object one of None: pandas builds read_ocel2_json's and read_ocel_json's
+  // frames from records, so explicit nulls make it object only when every
+  // row holds one, the rows the reader dropped afterwards included (a row
+  // lacking the attribute makes it float64 NaN), or when an all-NULL
+  // SQLite column took part (observed black-box, probes ff t1/jnull.py and
+  // fg t2/k6.json: events without relations dropped after the build).
+  [[nodiscard]] bool all_nulls(const std::string& key) const {
+    const auto* found = stats(key);
+    if (found == nullptr || found->present != 0) return false;
+    return found->has_none || (found->nulls > 0 && found->nulls == rows_);
   }
   // Round EO: the dtype write_ocel_json, write_ocel2_json and write_ocel_xml
   // print an events or objects frame column's cells as: an object column
@@ -464,8 +484,8 @@ inline void hint_extra_rows(Ocel& log, const std::vector<HintRow>& extra_events,
     hint.dropped.clear();
     for (const auto& name : dropped.names()) {
       const auto* stats = dropped.stats(name);
-      if (stats == nullptr || (stats->present == 0 && !stats->has_none)) continue;
-      hint.dropped.push_back({name, kinds_of(*stats), stats->present});
+      if (stats == nullptr || (stats->present == 0 && !stats->has_none && stats->nulls == 0)) continue;
+      hint.dropped.push_back({name, kinds_of(*stats), stats->present, stats->nulls});
     }
     hint.dropped_rows = dropped.rows();
   };
@@ -490,7 +510,7 @@ inline void hint_none_columns(OcelFrameHint& hint, const std::vector<std::string
     const auto found = std::find_if(hint.dropped.begin(), hint.dropped.end(),
                                     [&](const OcelFrameHintColumn& column) { return column.key == key; });
     if (found != hint.dropped.end()) found->kinds = static_cast<unsigned char>(found->kinds | kOcelHintNone);
-    else hint.dropped.push_back({key, kOcelHintNone, 0});
+    else hint.dropped.push_back({key, kOcelHintNone, 0, 0});
   }
 }
 
@@ -516,8 +536,8 @@ void hint_dropped_rows(Ocel& log, DropEvent&& drop_event, DropObject&& drop_obje
     hint.dropped.clear();
     for (const auto& name : dropped.names()) {
       const auto* stats = dropped.stats(name);
-      if (stats == nullptr || (stats->present == 0 && !stats->has_none)) continue;
-      hint.dropped.push_back({name, kinds_of(*stats), stats->present});
+      if (stats == nullptr || (stats->present == 0 && !stats->has_none && stats->nulls == 0)) continue;
+      hint.dropped.push_back({name, kinds_of(*stats), stats->present, stats->nulls});
     }
     hint.dropped_rows = dropped.rows();
   };
@@ -585,12 +605,16 @@ inline void hint_subset_rows(const Ocel& source, const std::vector<Ocel*>& resul
   struct Counts {
     std::size_t kinds[kKinds] = {};
     std::size_t present = 0;
+    std::size_t nulls = 0;
   };
   using Frame = std::unordered_map<std::string, Counts>;
   const auto count = [](Frame& frame, const std::string& key, const OcelValue& value, bool date) {
     ColumnStats one;
     one.observe(value, date);
-    if (one.present == 0) return;
+    if (one.present == 0) {
+      if (one.nulls != 0) ++frame[key].nulls;
+      return;
+    }
     auto& counts = frame[key];
     ++counts.present;
     const bool flags[kKinds] = {one.has_bool,   one.has_int,        one.has_float,
@@ -619,6 +643,7 @@ inline void hint_subset_rows(const Ocel& source, const std::vector<Ocel*>& resul
         for (const auto& [key, counts] : cell_counts) {
           auto& into = frame[key];
           into.present += counts.present;
+          into.nulls += counts.nulls;
           for (std::size_t kind = 0; kind < kKinds; ++kind) into.kinds[kind] += counts.kinds[kind];
         }
       };
@@ -638,7 +663,7 @@ inline void hint_subset_rows(const Ocel& source, const std::vector<Ocel*>& resul
       OcelFrameHint& hint = results[index]->*member;
       std::vector<OcelFrameHintColumn> dropped;
       for (const auto& column : seed.dropped)
-        if (column.present != 0 || (column.kinds & kOcelHintNone)) dropped.push_back(column);
+        if (column.present != 0 || (column.kinds & kOcelHintNone) || column.nulls != 0) dropped.push_back(column);
       for (const auto& name : all.names()) {
         const auto in_total = total.find(name);
         if (in_total == total.end()) continue;
@@ -646,17 +671,19 @@ inline void hint_subset_rows(const Ocel& source, const std::vector<Ocel*>& resul
         const Counts none;
         const Counts& kept_counts = in_kept == kept[index].end() ? none : in_kept->second;
         const auto present = in_total->second.present - kept_counts.present;
-        if (present == 0) continue;
+        const auto nulls = in_total->second.nulls - kept_counts.nulls;
+        if (present == 0 && nulls == 0) continue;
         unsigned char kinds = 0;
         for (std::size_t kind = 0; kind < kKinds; ++kind)
           if (in_total->second.kinds[kind] > kept_counts.kinds[kind]) kinds = static_cast<unsigned char>(kinds | kBits[kind]);
         const auto at = std::find_if(dropped.begin(), dropped.end(),
                                      [&](const OcelFrameHintColumn& column) { return column.key == name; });
         if (at == dropped.end()) {
-          dropped.push_back({name, kinds, present});
+          dropped.push_back({name, kinds, present, nulls});
         } else {
           at->kinds = static_cast<unsigned char>(at->kinds | kinds);
           at->present += present;
+          at->nulls += nulls;
         }
       }
       hint.columns = all.names();

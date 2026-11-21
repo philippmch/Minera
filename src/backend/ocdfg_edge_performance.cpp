@@ -127,14 +127,8 @@ std::vector<double> attribute_performance(const Ocel& log,const std::vector<std:
  const bool csv=log.event_frame_hint.str_columns;
  const bool str_column=csv||(dtype==ocel_frame::Dtype::kObject&&stats&&stats->has_string&&!stats->has_bool&&!stats->has_int&&
                        !stats->has_float&&!stats->has_date()&&!stats->has_none);
- bool nan_nulls=false;
- if(!csv&&(stats==nullptr||stats->present==0)&&!(stats&&stats->has_none)){
-  std::size_t nulls=0;
-  for(const auto& source:log.events)
-   for(const auto& attribute:source.attributes)
-    if(attribute.key==time_key&&std::holds_alternative<std::nullptr_t>(attribute.value))++nulls;
-  nan_nulls=nulls!=frame.rows();
- }
+ // Round FG: the dropped rows' nulls count too (Columns::all_nulls).
+ const bool nan_nulls=!csv&&(stats==nullptr||stats->present==0)&&!frame.all_nulls(time_key);
  std::map<std::string,TimeCell> cells;
  for(const auto& source:log.events){
   const auto identifier=selected_string(source,id_key);

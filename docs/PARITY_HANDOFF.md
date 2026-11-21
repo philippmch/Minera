@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FF (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FG (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8138,6 +8138,68 @@ In the suite: `minera_review_ff1_tests`. FE's CI run 44840037435: five
 jobs green, macOS stopped in `actions/checkout` on a network timeout before
 building. The generators, the comparers and the probes are in the project
 files under `review-harness/round-ff/`.
+
+Round FG re-reviewed FF (Review FG1). FF's fixes matched on fresh banks
+(o86 from `fg/o5/o5gen.py 86 60`, round FF's OCEL 2.0 generator with
+null-only attributes and instants respelled, as JSON, SQLite and XML; c87
+and c88 from `fg/c6/c6gen.py`, round EO's OCEL 1.0 generator with the same
+knobs; q33 from `eq/csv/q2gen.py 2805 60`): the flattening, the exact
+filters, the routes and the edge metrics agree outside the declared items
+on columns whose nulls share them with missing cells only, the time keys
+keep one group per instant on hand-made logs, and q33's NaT times agree in
+the OC-DFG's start and end activities and the flattening. A new sweep of
+the OCEL features with attribute lists (`q/fat.py`) and probes found three
+classes. Fixed: FG1-1, the four attribute lists under pm4py's feature
+names follow pm4py's families (float() of each cell with its ValueError and
+TypeError, one column per str() of a cell, the objects' TypeError for a
+value that is no str in Python set order, the `{id: value}` dicts, the
+families' place between the relation counts and the endpoints); FG1-2, a
+column of explicit nulls whose events without relations the reader
+dropped stays object None when the dropped rows hold nulls (the frame hint
+now records them, the transport as a fourth entry); FG1-3, a missing cell
+of a datetime64 activity or type column is the edge metrics' label NaT.
+Declared, unchanged: the edge metrics' typed and missing labels, the first
+failing pair's hash-seed order (every OC-DFG difference one of pm4py's
+outcomes under seeds 0 to 39), the download date fractions, the string
+family's column order (pm4py's set order).
+
+In the suite: `minera_review_fg1_tests`. The full ctest passed 654 of 654
+on the first run (29 minutes, -j2); the fixture replay gave 2,673
+responses unchanged. FF's CI run 44850626080 finished green in all six
+jobs, macOS included. The generators, the comparers and
+the probes are in the project files under `review-harness/round-fg/`.
+
+Next round (FH) should start by re-reviewing round FG:
+
+- FG's CI run;
+- FG1-1 on the other places that read the attribute lists: the features'
+  related-objects family of the events and the objects' related events
+  with attribute lists, `filter_per_type`, the native names style next to
+  the compatibility one, OCEL CSV logs with the declared CSV features
+  (repeated event ids), and a text pushing a number aside in the objects'
+  set (declared, but worth a count);
+- FG1-2 on the other routes that read a frame after rows were dropped: a
+  filter or split dropping the rows that hold a null-only column's nulls
+  and then the OC-DFG timing or an exact null filter, the OCEL 1.0 JSON
+  reader's dropped events and objects with nulls, the SQLite reader's
+  unrelated events, and transports written before FG (three entries);
+- FG1-3 on the edge metrics' event id key of a datetime64 column (both
+  raise KeyError on a missing column; a present one with a missing cell
+  is untested) and on the object type key of an object time column with a
+  missing value next to respelled instants;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FG's list, taken in FG: FF's CI (six green, macOS built), FF1-1 on
+the other routes (the flattening, exact filters, routes, edge metrics 0
+outside the declared items; the features drop nulls; the dropped rows'
+nulls fixed as FG1-2), FF1-2 on the other time keys (the flattening and
+edge metrics agree; the type matching and the split never group by a
+time), FF1-3 on CSV NaT times (ocd and fl 0 outside the hash-seed pair).
+Carried to FH: EV1-1, the SQLite leftovers, the new Polars dtypes, DW1,
+the other declared items, the rest of the CU list and the open choices.
+
+Previous list for round FG (kept for its older items):
 
 Next round (FG) should start by re-reviewing round FF:
 

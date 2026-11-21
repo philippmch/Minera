@@ -159,6 +159,11 @@ struct OcelFrameHintColumn {
   std::string key;
   unsigned char kinds = 0;  // OcelFrameHintKind bits of the dropped values
   std::size_t present = 0;  // dropped rows holding a value (not null)
+  // Round FG: dropped rows holding an explicit null (a JSON null): pandas
+  // types a column of nulls alone over every row, so a dropped row's null
+  // keeps such a column object (None) as a kept row's does. The transport
+  // writes it as a fourth entry when it is not 0.
+  std::size_t nulls = 0;
 };
 
 struct OcelFrameHint {

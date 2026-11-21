@@ -678,16 +678,11 @@ std::optional<NullValue> null_value(const OcelEventAttributeFilterValue& value) 
   return std::nullopt;
 }
 template <typename Records>
-NullColumn null_column(const ocel_frame::Columns& frame, const Records& records, const std::string& key) {
+NullColumn null_column(const ocel_frame::Columns& frame, const Records& /*records*/, const std::string& key) {
   const auto* stats = frame.stats(key);
-  if (stats == nullptr || stats->present == 0) {
-    std::size_t nulls = 0;
-    for (const auto& record : records)
-      for (const auto& attribute : record.attributes)
-        if (attribute.key == key && std::holds_alternative<std::nullptr_t>(attribute.value)) ++nulls;
-    return (stats != nullptr && stats->has_none) || (nulls > 0 && nulls == frame.rows()) ? NullColumn::kObject
-                                                                                         : NullColumn::kFloat;
-  }
+  // Round FG: the dropped rows' nulls count too (Columns::all_nulls).
+  if (stats == nullptr || stats->present == 0)
+    return frame.all_nulls(key) ? NullColumn::kObject : NullColumn::kFloat;
   switch (stats->dtype(frame.rows())) {
     case ocel_frame::Dtype::kDatetime: return NullColumn::kDatetime;
     case ocel_frame::Dtype::kFloat64: return NullColumn::kFloat;

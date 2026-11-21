@@ -251,6 +251,9 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
     // bank q30, ff q/emr.py).
     if (activity == kTimestamp && label_cell.kind == Cell::Kind::kText && label_cell.text.empty())
       label_cell = Cell(std::string("NaT"));
+    // Round FG: so is a datetime64 attribute column's missing cell (observed
+    // black-box, probe fg t1/p12.py on t1/g3.json).
+    if (activity_reading.date_column && label_cell.missing()) label_cell = Cell(std::string("NaT"));
     if (const auto* key = group_key(identifiers.back(), eid))
       activities.try_emplace(*key, std::move(label_cell));
   }
@@ -273,6 +276,7 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
   for (const auto& object : log.objects) {
     const auto key = object_cell(object, oid, oid_reading);
     auto type_cell = type_instants(object_cell(object, type, type_reading));
+    if (type_reading.date_column && type_cell.missing()) type_cell = Cell(std::string("NaT"));
     if (const auto* group = group_key(key, oid)) objtypes.try_emplace(*group, std::move(type_cell));
   }
 

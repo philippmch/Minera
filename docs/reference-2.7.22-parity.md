@@ -35595,3 +35595,109 @@ In the suite: `minera_review_ff1_tests` (the OC-DFG timed by a column of
 nulls next to missing cells, nulls alone, a number and a boolean; an OCEL
 1.0 log with one instant spelled twice through the OC-DFG and the edge
 metrics; a CSV log with a NaT time as the edge metrics' activity).
+
+## Review FG1: the OCEL features' attribute families in pm4py's names, the nulls of dropped rows, a NaT label of a datetime64 activity (2026-11-21)
+
+Round FG checked FF's CI (run 44850626080 on f8baeeb: all six jobs green,
+macOS built this time, 44 minutes of build and 15 of ctest). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv
+with fresh banks: o86 (`fg/o5/o5gen.py 86 60`, round FF's OCEL 2.0
+generator with `NO=0.4`, an attribute whose every drawn value is null so
+its column holds nulls next to missing cells only, and `DUPT=0.3`, an
+event time or aware value reusing an earlier instant spelled another way;
+JSON, SQLite and XML), c87 and c88 (`fg/c6/c6gen.py`, round EO's OCEL 1.0
+generator with the same two knobs; an XML key null-only as no element, an
+empty string or an empty typed value) and q33 (`eq/csv/q2gen.py 2805 60`).
+New sweep: `q/fat.py`, the OCEL features with attribute lists
+(`numeric_event_attributes`, `string_event_attributes` on each events
+column and on all of them, the objects' two lists on each objects column
+and on all, under `feature_name_style=compatibility`), never swept before.
+Hand-made: `t1/g2.json`, `t1/g3.json` (one instant spelled three ways as
+event times, values and object values), `t2/k*.json` (a column of nulls
+with events the reader drops), `t3/d*.json` (repeated event and object
+ids), `t4/l*.json` (the suite's logs).
+
+FF's fixes matched. FF1-1 on the other routes: the flattening (0 of 2,211,
+2,239 and 990 on o86's JSON, SQLite and XML, 0 of 2,583 and 2,795 on c87
+and c88, 0 of 2,481 on q33), the exact filters (xe 0 of 4,752, 4,340 and
+2,632; 0 of 5,460 and 6,248), the routes (rsw3 0 save o86's JSON 28 of
+2,340, every one the declared date fractions of the downloads) and the
+edge metrics (emg: the declared typed and missing labels alone) agree on
+banks whose nulls share a column with missing cells only; the features
+drop nulls (dropna) before they read a cell, so their None and NaN agree.
+FF1-2 on the other time keys: the flattening's `concept:name` and case
+attributes of a time column and the edge metrics' activity, event id and
+object type keep one group per instant on `t1/g2.json` and `g3.json` (the
+labels as the log spells them, declared). The type matching's object type
+key reaches the relations frame only, whose one time column raises
+(round FC), and the split groups by the object type column, so neither
+groups by a time. FF1-3: q33 holds NaT times in 19 of 60 files and offsets
+in 22; the OC-DFG with its start and end activities (ocd 1 of 1,050, the
+hash-seed pair) and the flattening (0 of 2,481) agree. The OC-DFG timing
+differences on o86 (7 of 1,334 JSON, 13 of 1,367 SQLite, 10 of 600 XML)
+are each one of pm4py's outcomes under seeds 0 to 39 (`probe/hs3.py`, now
+reading CSV too).
+
+Fixed:
+- **FG1-1 The attribute families of the OCEL features in pm4py's names.**
+  Under `feature_name_style=compatibility` the four attribute lists now
+  give pm4py's events and objects features (FF's server: 323 of 390 cases
+  on o86's first 30 JSON files differed). The numeric family is `float()`
+  of each row's cell, a null 0, every column named `@@event_num_<key>`
+  (the objects' too); a text `float()` cannot read raises `ValueError:
+  could not convert string to float: '<text>'`, a datetime `TypeError:
+  float() argument must be a string or a real number, not 'Timestamp'`
+  (`datetime.datetime` for a date-read text of an object column). The
+  string family is one column `@@event_attr_value_<key>_<str>` (objects:
+  `@@object_attr_value_`) per distinct `str()` of a non-null cell; the
+  objects' family concatenates the raw value, so one that is no str
+  raises `TypeError: can only concatenate str (not "<type>") to str` for
+  the first such value of the column's Python set (numbers placed by
+  CPython 3.11's set of hashes; a text pushing a number aside follows the
+  hash seed, declared). Both read pm4py's `{id: value}` of the non-null
+  cells (a repeated id holds its last non-null cell, every row of the id
+  reads it), a repeated key is one string family and two numeric columns,
+  a missing key raises `KeyError: "['key'] not in index"`, and the families
+  run after the relation counts and before the endpoints of the events
+  (q33: a text's ValueError before an unrelated object's KeyError), after
+  the lifecycle checks of the objects.
+- **FG1-2 The nulls of the rows a reader dropped.** `read_ocel2_json`
+  builds the events frame from every listed event and drops the events
+  without relations afterwards, so a column of explicit nulls stays object
+  (None) when the dropped rows hold nulls too, and turns float64 (NaN)
+  when one of them lacks the attribute (`t2/k6.json`, `k9.json`; a
+  boolean there keeps it object). Native counted the kept rows' nulls
+  against every row, so the OC-DFG timed by such a column measured as NaN
+  (o86's JSON 2 cases: 0 where pm4py raises on `'NoneType' and
+  'NoneType'`, and `'float' object has no attribute 'replace'` where it
+  names `'NoneType'`). The frame hint now records the dropped rows'
+  nulls (`OcelFrameHintColumn::nulls`; the transport writes a fourth entry
+  `[key, kinds, present, nulls]` when it is not 0 and reads three or
+  four), and the OC-DFG timing and the exact filters' null column read
+  `Columns::all_nulls`.
+- **FG1-3 A missing cell of a datetime64 activity or type column in the
+  edge metrics.** pm4py keys the associations per edge with NaT there; the
+  label is now `NaT` (native refused it: `OCDFG string association row is
+  missing cell: d`), for the activity and the object type keys alike.
+
+Declared, unchanged: the edge metrics' typed and missing labels (o86 187
+of 668, 233 of 687 and 50 of 298; c87 266 of 690, c88 218 of 689, q33 105
+of 534), the first failing pair's hash-seed order, the download date
+fractions, the order of the string family's columns (pm4py's set order;
+native sorts them), the time labels' spelling. The exact filters' `winnone`
+pre step on q33 (38 of 4,607) is the comparer's: a naive CSV time column
+against pm4py's UTC bound raises `Invalid comparison between
+dtype=datetime64[us] and datetime` in both, and the comparer records the
+native error before it runs pm4py.
+
+Results with the fixed server: fat 0 of 816, 866 and 344 on o86, 0 of 844
+and 862 on c87 and c88, 0 of 470 on q33; the hand-made `t3/d*.json` 36 of
+36 and `t2/k*.json` as above. The fixture replay gives 2,673 responses
+unchanged.
+
+In the suite: `minera_review_fg1_tests` (the numeric and string families
+of the events, a repeated key, ValueError and KeyError, the objects' set
+order TypeError and numeric name, the family order on a CSV log with an
+unrelated object; a column of nulls with a dropped event holding a null,
+through the transport, and lacking the attribute; the NaT label of a
+datetime64 activity).
