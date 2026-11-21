@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FL (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FM (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8335,6 +8335,62 @@ CI run 44891057199 finished green in all six jobs. The Mac was not
 reachable this round (no folder access), so no newer reviewer handoff was
 read. The generators, the comparers and the probes are in the project
 files under `review-harness/round-fl/`.
+
+Round FM re-reviewed FL (Review FM1). FL's fixes matched and no new class
+turned up. FL2-1 and FL2-2 on the other business-hours consumers of an
+upload's times: the organizational workbench's network analysis on CSV
+uploads with one offset per log or per row and on XES (720 uploads, equal
+outside 3 rejected by both), the time analysis routes on 450 XES uploads
+whose dates carry their own offsets (equal wherever pm4py returns), the
+pandas case filter's performance filter (2,715 cases equal), `/api/mine`'s
+DFG performance (250 uploads equal) and the temporal conformance route
+(132 logs equal to both variants); pm4py's streaming temporal conformance
+and the token replay duration diagnostics count no business hours. FL2-4
+on fresh banks whose objects are listed out of id order (o106: OCEL 2.0
+JSON, XML and SQLite; c107: OCEL 1.0 JSON and XML; q48: CSV): the
+imports, the route sweeps rsw, esw, xsw, dsw and osw and onchain3's
+chains show only the declared writers' dropped fractions and
+write_ocel_csv's hash-seed type columns. Declared, unchanged: the JSON
+and OCEL 1.0 XML writers' time spellings and dropped fractions,
+write_ocel_csv's type columns, the CSV declared features, BK, AP, the
+connected components' hash-seed order, 'nocol', the edge metrics' typed
+and missing labels, the first failing pair's hash-seed order, the string
+family's set order.
+
+No code changed, so FL's suite results stand. FL's CI run 44897815468
+had five of six jobs green at handoff (the Windows ctest still running:
+check it first in FN). The Mac was not reachable this round (no folder access), so no
+newer reviewer handoff was read. The generators, the comparers and the
+probes are in the project files under `review-harness/round-fm/`.
+
+Next round (FN) should start by re-reviewing round FM:
+
+- FM's CI run (a docs-only commit);
+- new areas, since FM found no new class: the raw-log workbenches (the
+  original_* routes and the JSON event-log transport) against pm4py's
+  EventLog variants on logs read from XES and CSV with offsets and with
+  more than six fraction digits (case statistics, DFG performance,
+  temporal profile and conformance, heuristics miner, with and without
+  business hours); non-default business-hour slots (overlapping, adjacent
+  within a second, fractional, crossing the week's end) through the same
+  consumers; the Polars variants with business hours (case filter,
+  passed time, service time, case statistics, eventually-follows, the
+  Polars DFG) on CSV uploads with offsets and nanoseconds;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FM's list, taken in FM: FL's CI (five green, Windows
+still running); FL2-1 and FL2-2 on the
+network analysis, the time analysis routes on XES offsets, the pandas
+case filter, the DFG performance and the temporal conformance (0; the
+streaming temporal conformance and the replay duration diagnostics have
+no business hours); FL2-4 on OCEL 2.0 JSON, XML and SQLite, OCEL 1.0 and
+CSV banks listed out of id order through the imports, the route sweeps
+and the chains (0 outside the declared items). Carried to FN: EV1-1, the
+SQLite leftovers, the new Polars dtypes, DW1, the other declared items,
+the rest of the CU list and the open choices.
+
+Previous list for round FM (kept for its older items):
 
 Next round (FM) should start by re-reviewing round FL:
 

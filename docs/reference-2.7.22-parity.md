@@ -36219,3 +36219,77 @@ heuristics miner's performance with and without business hours on both;
 the EventLog path's case statistics, case arrival and service time with
 business hours on b2's times; s1.csv's ancestors split uncapped and
 capped at two objects).
+
+## Review FM1: business hours on the other upload consumers, the objects table's order on banks listed out of id order (2026-11-21)
+
+Round FM checked FL's CI (run 44897815468 on 9e192cc: five of six jobs
+green, the Linux and macOS ctest among them; the Windows ctest was still
+running at handoff).
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, no
+pyarrow) in the reference venv, every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` (without
+it, numpy's SIMD argsort orders ties differently, which showed as two
+case-statistics "differences" in pm4py itself). Fresh banks: o106
+(`fm/gen/o9gen.py 106 60` with `DUPID=0`: o8gen's nanosecond OCEL 2.0 logs
+with random object ids listed out of id order in the JSON, the XML and
+the SQLite object and type tables), c107 (`fm/gen/c9gen.py 107 40`:
+c8gen's OCEL 1.0 JSON and XML logs with the objects listed out of order),
+q48 (`fk/gen/q3gen.py 2817 40` with q39's features, whose objects files
+list the ids out of order, no declared CSV feature) and q47 (seed 2816,
+all features, for the declared CSV features), and uploads from AY's
+generators with new modes: `na/naba2.py` (network analysis with business
+hours; `MIXOFF=1` gives each row its own offset, `--xes` writes the same
+rows as XES), `bh/bhx.py` (bhsweep's XES uploads with every date moved to
+a random offset at the same instant), `bh/dfgbh.py` (`/api/mine`'s DFG
+performance with business hours against pm4py's DataFrame DFG),
+`bh/tcr.py` (the temporal conformance route with business hours against
+both variants), and `pcf/pcf.cpp` with `pcf/pcfsweep.py` (the pandas case
+filter's performance filter with business hours on frames whose time
+column pandas typed naive, UTC or with an offset).
+
+FL's fixes matched; no new class. FL2-1 and FL2-2 on the other
+business-hours consumers that read an upload's times: the organizational
+workbench's network analysis on CSV uploads with one offset per log
+(177 equal, 3 rejected by both), an offset per row (180) and as XES
+(180 and 180), fractions of zero, three, six and nine digits; the time
+analysis routes (service time, cycle time, case arrival, case statistics,
+passed time) on 450 XES uploads whose dates carry their own offsets:
+equal wherever pm4py returns a result (92, 92, 169, 163 and 230; the rest
+raise in both); the pandas case filter's performance filter with business
+hours on 2,715 cases (equal); `/api/mine`'s DFG performance with business
+hours on 150 mixed-offset and 100 nanosecond uploads (equal); the temporal
+conformance route with business hours on 132 logs (equal to both pm4py
+variants; 8 more have no profile). pm4py's streaming temporal conformance
+and the token replay duration diagnostics count no business hours (plain
+epoch and datetime differences), and the raw-log workbenches read each
+time's wall clock, as pm4py's EventLog variants do on an XES read, so FL2-2's
+UTC clock does not apply there.
+
+FL2-4 on the other outputs in the objects table's order, with the objects
+listed out of id order: o106's imports (30 of 30 each for JSON, XML and
+SQLite), the route sweeps (object statistics, summaries, graphs, the
+lifecycle and O2O enrichments, the splits and their central objects, the
+writers) rsw 0 of 1,170 (SQLite) and 0 of 546 (XML) and, on JSON, 17 of
+1,170, all the JSON and OCEL 1.0 XML writers' dropped fractions
+(declared); esw 0 of 480, 480 and 224; xsw 0 of 390; dsw 0 of 210; osw 5
+of 180, all write_ocel_csv's type columns in hash-seed order (declared in
+Review EP1); the chains after filters and enrichments (onchain3) on JSON:
+ce 0 of 6,080 and cr 152 of 14,820, all dropped fractions; on SQLite: xe4
+on each chain result 0 of 33,550 and cr 0 of 14,820. c107: imports 20 of
+20 in each format, rsw 0 of 780 and 117, esw 0 of 320 and 48. q48: 25
+imports equal (15 more files rejected by both, pm4py's format inference
+error spelled with its exception name by Minera), rsw 0 of 975, esw 0 of
+400, xsw 0 of 325, dsw 0 of 175, osw 0 of 150, chains xe4 on each chain
+result 0 of 31,000 and cr 0 of 18,447.
+
+Declared, unchanged: the JSON and OCEL 1.0 XML writers' time spellings and
+dropped fractions, write_ocel_csv's type columns in hash-seed order, the
+CSV declared features (q47), BK's business-hours DataFrame profile without
+pairs, AP's repeated SQLite ids, the connected components' hash-seed
+order, 'nocol', the edge metrics' typed and missing labels, the first
+failing pair's hash-seed order, the string family's set order.
+
+No code changed in this round, so FL's results stand (the full ctest 659
+of 659, the Python script tests 406 of 406, the fixture replay 2,673
+responses unchanged); `verify-reference-parity` still passes with
+`--require-complete`.
