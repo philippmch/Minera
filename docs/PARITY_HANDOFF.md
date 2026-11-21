@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FK (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FL (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8300,6 +8300,72 @@ responses unchanged. FJ's CI run
 this round (no folder access), so no newer reviewer handoff was read. The
 generators, the comparers and the probes are in the project files under
 `review-harness/round-fk/`.
+
+Round FL re-reviewed FK (Review FL1). FK's fixes matched on fresh banks:
+o105 (`fl/gen/o8gen.py 105 60` with `DUPID=0`: nanosecond OCEL 2.0 logs
+whose objects form two connected components, the nanosecond times on one
+component's events only) and q46 (`fk/gen/q3gen.py 2815 60`, CSV logs with
+nanoseconds and offsets whose objects files list the ids out of order),
+through `q/onchain3.py` (onchain2 with the enrichments, the type matching
+and every part of the connected components and ancestors splits as chain
+steps, then xe4 and the route sweeps), SQLite logs whose nanosecond time
+sits on a repeated id or an unlisted row (`t3/mk2.py`) and SQLite files
+written by Minera. Four classes, all fixed, three of them found on the
+traditional routes with business hours: FL2-1, business hours at the
+floored microsecond in the temporal profile, its conformance and the
+EventLog statistics (case statistics, service time, case arrival); FL2-2,
+an upload's temporal profile with business hours on pm4py's DataFrame
+arithmetic, counted on the frame's UTC clock for a CSV upload
+(format_dataframe converts an offset), in both behavior route variants and
+the conformance too; FL2-3, the heuristics miner's performance with
+business hours on that clock (classic and plusplus); FL2-4, found by the
+capped ancestors split on q46, the ancestors/descendants split walks the
+objects table's order (native took ids in sorted order, so `max_objects`
+kept other objects). Declared, unchanged: BK's business-hours DataFrame
+profile without pairs (pm4py's ValueError, Minera's empty profile), AP's
+repeated SQLite ids, the connected components' hash-seed order, the JSON
+and OCEL 1.0 XML writers' time spellings and dropped fractions, 'nocol',
+the CSV declared features, the edge metrics' typed and missing labels,
+the first failing pair's hash-seed order, the string family's set order.
+
+In the suite: `minera_review_fl1_tests`. The full ctest passed 659 of 659
+on the first run (31 minutes, -j2, next to a sweep); the Python script
+tests 406 of 406; the fixture replay gave 2,673 responses unchanged. FK's
+CI run 44891057199 finished green in all six jobs. The Mac was not
+reachable this round (no folder access), so no newer reviewer handoff was
+read. The generators, the comparers and the probes are in the project
+files under `review-harness/round-fl/`.
+
+Next round (FM) should start by re-reviewing round FL:
+
+- FL's CI run;
+- FL2-1 and FL2-2 on the other business-hours consumers that read an
+  upload's times: the temporal workbench and the time analysis workbench
+  routes, the streaming temporal profile and conformance, the table and
+  pandas case filters with business hours, the organizational workbench
+  and the token replay durations, on CSV uploads with offsets and with
+  more than six fraction digits, and on XES uploads;
+- FL2-4 on the other outputs that follow pm4py's objects table order: the
+  OCEL 2.0 JSON, XML and SQLite banks with the objects listed out of id
+  order (the o-generators write them sorted), through the object
+  statistics, summaries, graphs, the lifecycle enrichment and the split's
+  central objects after filters and enrichments;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FL's list, taken in FL: FK's CI (six green); FK1-1 on the
+enrichments, the type matching and the connected components and
+ancestors splits with the nanosecond row in another component (0 outside
+FL2-4), a SQLite log whose nanosecond time sits on a repeated id (the
+unit agrees; the duplicated event is AP's declared difference) and a
+SQLite file written by Minera (0); FK1-2 on the OC-DFG's own business
+hours (0) and the traditional routes (the frame paths 0; the temporal
+profile, its conformance, the heuristics miner and the EventLog
+statistics fixed as FL2-1 to FL2-3). Carried to FM: EV1-1, the SQLite
+leftovers, the new Polars dtypes, DW1, the other declared items, the rest
+of the CU list and the open choices.
+
+Previous list for round FL (kept for its older items):
 
 Next round (FL) should start by re-reviewing round FK:
 

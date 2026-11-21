@@ -36094,3 +36094,128 @@ an offset of +02:00; SQLite logs whose nanosecond time is on an event
 without relations or on an unlisted id; microsecond and naive controls;
 the edge metrics with business hours on nanosecond times: floored, within
 one microsecond, across one).
+
+## Review FL1: business hours at the floored microsecond on the traditional routes, an upload's temporal profile on the frame's clock, the ancestors split in the objects' order (2026-11-21)
+
+Round FL checked FK's CI (run 44891057199 on 89b5ecd: all six jobs
+green). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference
+venv with fresh banks: o105 (`fl/gen/o8gen.py 105 60` with `DUPID=0`:
+o7gen's nanosecond OCEL 2.0 logs with the objects in two connected
+components and the nanosecond times on one component's events only, type
+table rows of unlisted ids with nanoseconds; no repeated ids, which keep
+AP's declared difference) and q46
+(`fk/gen/q3gen.py 2815 60`, CSV logs with nanoseconds, offsets and mixed
+fraction lengths), and CSV and XES uploads from AY's `bhsweep.py`
+generator (mixed shapes with offsets) and FL's `bh/bhns.py` (times with
+seven to nine fraction digits). New sweeps: `q/onchain3.py` (onchain2
+with the enrichments, the type matching and the split parts as chain
+steps, then xe4, xe3 or the route sweeps rsw, xsw, esw, dsw, osw on each
+result), `bh/tpsweep.py` (`/api/mine`'s temporal profile with business
+hours against pm4py's DataFrame and EventLog profiles), `bh/bhbtp.py` and
+`bh/bhbtc.py` (the behavior route's temporal profile and conformance, both
+variants), `bh/heusweep.py` and `bh/heupp.py` (the heuristics miner's
+performance with business hours, classic and plusplus). Hand-made:
+`t2/b2.csv` (times with seven fraction digits), `t4/c1.csv` and
+`t4/x1.xes` (the same wall clocks with +02:00 and -05:00), `t3/mk2.py`
+(SQLite logs whose nanosecond time sits on a repeated id, a dropped row
+or an unlisted type).
+
+FK's fixes matched. FK1-1 on the other places that keep or rebuild a
+log's frames: the chains with the enrichments (O2O, lifecycle), the type
+matching and the connected components and ancestor splits, with the
+nanosecond row in another component (o105's SQLite: xe4 on each chain
+result 0 of 104,850, the route sweeps rsw 0 of 44,694 and xsw 0 of 14,898;
+q46: xe4 0 of 43,100 after FL2-4's fix); the SQLite reader's
+unit marker equals pandas' unit in all seven `t3/mk2.py` logs, a repeated
+id included (its second event is AP's declared difference); a log written
+by Minera as OCEL 2.0 SQLite reads back with the same events and times in
+both (pm4py's own SQLite writer writes microsecond texts too), and the
+writers' time texts agree (`w/wtx.py` 0 of 72). FK1-2 on the OC-DFG's own
+business hours (0) and on the traditional routes over CSV and XES uploads
+with more than six fraction digits: the service time, cycle time, case
+arrival, case statistics and passed time on the frame (150 CSV, 100 XES:
+0), the DataFrame DFG and `/api/mine`'s DFG performance (0); three
+classes elsewhere, fixed below, and one more in the chains on q46 (FL2-4).
+
+Fixed:
+- **FL2-1 Business hours at the floored microsecond in the temporal
+  profile and the EventLog statistics.** pm4py's BusinessHours reads a
+  Timestamp with nanoseconds at its microsecond, floored. The temporal
+  profile (discovery and conformance) and the EventLog path of the case
+  statistics, the service time and the case arrival rounded the epoch
+  double to the nearest microsecond: on `t2/b2.csv` the profile's (a, b)
+  read 3600.076543 for pm4py's 3600.076544, (b, c) 40500.500001 for
+  40500.5, and the case durations, gaps and service times moved in the
+  sixth decimal. They now floor the exact wall clock (the same helper as
+  FK1-2's edge metrics); the DataFrame DFG's helper too.
+- **FL2-2 An upload's temporal profile with business hours, on the
+  frame's clock.** pm4py discovers an upload's profile on the DataFrame
+  with business hours as well: business seconds between the floored
+  microseconds of each pair, then BH1-2's compensated mean and Welford's
+  deviation. `/api/mine`'s `temporal_profile` section and the behavior
+  route's DataFrame variant kept the EventLog algorithm whenever business
+  hours were set (BI1-3 applied only without them), which differs in the
+  last digits; they now use the frame arithmetic with business hours too.
+  And a CSV upload's frame holds UTC Timestamps (format_dataframe converts
+  an offset), so pm4py counts business hours on the UTC clock there, in
+  the DataFrame variant and in the EventLog converted from it, while an
+  XES read keeps each time's wall clock: on `t4/c1.csv` (09:00 to 16:30 at
+  +02:00, 06:30 to 16:45 at -05:00) pm4py's (a, b) is 23,400 seconds with
+  deviation 5,091.168824543142, native counted the wall clocks (31,050 and
+  5,727.564927611035, which is right for `t4/x1.xes`). The profile, both
+  of the behavior route's variants and the conformance now count the UTC
+  clock on a CSV upload (`DataFrameColumns::csv_text`), so the conformance
+  on c1 with (a, b) = (20,000, 1,000) and zeta 1 flags c1 alone (27,000
+  business seconds, distance 7), as pm4py does. Before: `/api/mine`'s
+  profile differed on 52 of 120 nanosecond CSV uploads and 33 of 80 XES
+  round trips, the behavior route's variants on 15 and 19 of 30, the
+  conformance on 13 of 30 nanosecond and 2 of 40 mixed uploads.
+- **FL2-3 The heuristics miner's performance with business hours on a CSV
+  upload.** Classic and plusplus count the business seconds between a
+  pair's times on the same clock as FL2-2: the UTC clock on a CSV upload
+  (pm4py 23,400 on `t4/c1.csv` for both variants, on the frame and on its
+  EventLog; native 31,050), the wall clock on an XES upload (31,050).
+  Before: 4 of 30 classic and 2 of 40 plusplus mixed uploads differed.
+- **FL2-4 The ancestors/descendants split in the objects table's order.**
+  Found by onchain3's capped split (`subad2`, `max_objs=2`) on q46, whose
+  objects files list the ids out of order: pm4py takes the objects of the
+  type in the objects table's order (one per row), stops after `max_objs`
+  and returns the parts in that order, with each part's central object.
+  Native took the objects in id order, so a capped split kept other
+  objects (`t5/s1.csv`, objects listed t3, t2, u0, t0, t1: pm4py's two parts
+  are t3's and t2's, native gave t0's and t1's) and an uncapped one listed
+  the parts in another order (q46: 8 of 28 per-type splits on the first
+  twenty files). The split now walks the objects table. The connected
+  components keep their hash-seed order (declared in Review BY1); a
+  repeated object id is one row in both readers.
+
+Declared, unchanged: a business-hours DataFrame profile of a frame without
+pairs, where pm4py raises `Cannot set a DataFrame with multiple columns to
+the single column @@flow_time` and Minera returns an empty profile (BK);
+the SQLite reader's repeated type-table ids (AP); the JSON and OCEL 1.0
+XML writers' time spellings and dropped fractions, the type matching's
+'nocol' reading, the CSV declared features, the edge metrics' typed and
+missing labels, the first failing pair's hash-seed order, the string
+family's set order.
+
+Results with the fixed server: `/api/mine`'s profile equal to pm4py's
+DataFrame profile on 96 of 96 nanosecond CSV uploads, 114 and 97 of 114
+and 97 mixed ones and 77 of 77 XES round trips (the other uploads raise
+BK's declared ValueError in pm4py); the behavior route's profile 180 of
+180 (EventLog variant) and 171 of 171 (DataFrame variant, 9 more BK's
+ValueError), its conformance 171 of 171 in each variant; the heuristics
+miner 150 mixed and 100 nanosecond uploads (classic), 120 and 80
+(plusplus); the ancestors/descendants split's parts in pm4py's order on
+q46 (80 of 80 per-type splits; the connected components 35 of 37 in order,
+2 in another hash-seed order). The full ctest passes 659 of 659, the
+Python script tests 406 of 406, and the fixture replay gives 2,673
+responses unchanged.
+
+In the suite: `minera_review_fl1_tests` (b2.csv's profile with business
+hours on the upload and through the EventLog algorithm; c1.csv's profile
+and conformance on the UTC clock and x1.xes's on the wall clock; the
+heuristics miner's performance with and without business hours on both;
+the EventLog path's case statistics, case arrival and service time with
+business hours on b2's times; s1.csv's ancestors split uncapped and
+capped at two objects).

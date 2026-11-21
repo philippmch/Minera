@@ -182,10 +182,16 @@ std::optional<double> event_instant(const Event& event,
   return instant;
 }
 
+// `utc_clock` (round FL): a CSV upload, whose frame holds UTC Timestamps
+// (an offset is converted), so pm4py's BusinessHours reads the UTC clock
+// there, in the DataFrame and in the converted EventLog alike (observed
+// black-box, fl t4/c1.csv); else the text's own wall clock (an XES file
+// read by pm4py keeps it).
 std::optional<double> event_local_instant(const Event& event,
                                           const std::string& primary,
                                           const std::string& alias,
-                                          bool strict_attributes) {
+                                          bool strict_attributes,
+                                          bool utc_clock = false) {
   const auto& attribute_name = configured_attribute(primary, alias);
   const auto* value = selected_event_value(event, attribute_name, "timestamp");
   if (value == nullptr) {
@@ -195,7 +201,12 @@ std::optional<double> event_local_instant(const Event& event,
     }
     return std::nullopt;
   }
-  const auto instant = local_wall_instant(*value);
+  std::optional<double> instant;
+  if (!utc_clock) {
+    instant = local_wall_instant(*value);
+  } else if (const auto micros = parse_timestamp_microseconds(*value)) {
+    instant = detail::epoch_seconds_from_microseconds(*micros);
+  }
   if (!instant && strict_attributes) {
     throw std::invalid_argument(
         "temporal profile: selected timestamp attribute is invalid");
@@ -207,18 +218,13 @@ std::optional<double> event_local_instant(const Event& event,
 // offsets are validated but ignored when selecting the weekday and clock
 // time. Ordinary durations continue to use the absolute UTC instants above.
 std::optional<double> local_wall_instant(std::string_view text) {
-  // Validate the full instant first, then remove only its timezone suffix and
-  // parse the remaining wall-clock fields as if they were UTC. This preserves
-  // the local weekday/time without duplicating the ISO-8601 parser.
-  if (!parse_timestamp(text)) return std::nullopt;
-  std::size_t end = text.size();
-  while (end > 0 &&
-         std::isspace(static_cast<unsigned char>(text[end - 1])) != 0) {
-    --end;
-  }
-  const auto timezone = text.substr(0, end).find_first_of("Zz+-", 10);
-  if (timezone != std::string_view::npos) end = timezone;
-  return parse_timestamp(text.substr(0, end));
+  // Round FL: the wall clock in whole microseconds, floored, as pm4py's
+  // BusinessHours reads a Timestamp with nanoseconds (a CSV or XES time
+  // with more than six fraction digits; rounding the epoch double moved
+  // .1234567 up to .123457).
+  const auto micros = detail::local_wall_timestamp_microseconds(text);
+  if (!micros) return std::nullopt;
+  return detail::epoch_seconds_from_microseconds(*micros);
 }
 
 // pm4py's BusinessHours on microsecond wall clocks
@@ -614,7 +620,7 @@ std::pair<std::int64_t, std::uint32_t> target_of(const FrameProfileRow& row) {
 
 TemporalProfile frame_arithmetic_profile(
     std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>>& ordered,
-    const std::function<bool()>& cancelled);
+    const std::function<bool()>& cancelled, const std::vector<BusinessHourSlot>* slots = nullptr);
 
 }  // namespace
 
@@ -665,6 +671,7 @@ TemporalProfile discover_temporal_profile_ranked(
   validate_slots(options);
   const auto slots = options.use_business_hours ? normalized_slots(options)
                                                 : std::vector<BusinessHourSlot>{};
+  const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
   const auto& source_attribute = configured_attribute(
       options.source_timestamp_attribute,
       options.source_completion_timestamp_attribute);
@@ -740,7 +747,7 @@ TemporalProfile discover_temporal_profile_ranked(
       const auto source_local =
           options.use_business_hours
               ? event_local_instant(trace.events[i], source_attribute, "",
-                                    options.strict_attributes)
+                                    options.strict_attributes, utc_clock)
               : source_time;
       if (!source_local) continue;
       const std::uint32_t source_id = intern(*source_activity);
@@ -762,7 +769,7 @@ TemporalProfile discover_temporal_profile_ranked(
         if (!target.activity) continue;
         if (options.use_business_hours && !target.local_read) {
           target.local = event_local_instant(trace.events[j], target_attribute, "",
-                                             options.strict_attributes);
+                                             options.strict_attributes, utc_clock);
           target.local_read = true;
         }
         const auto& target_local =
@@ -818,7 +825,12 @@ TemporalProfile discover_temporal_profile_dataframe(
   // temporal_table_to_log already orders both); with a separate start
   // column, each row's completion against the later rows' starts (round BK).
   const auto columns = temporal_table_columns(table, options);
-  if (!options.use_business_hours) {
+  // Round FL: with business hours the same pairs, each measured with
+  // BusinessHours on the frame's UTC Timestamps at their microsecond.
+  validate_slots(options);
+  const auto slots = options.use_business_hours ? normalized_slots(options)
+                                                : std::vector<BusinessHourSlot>{};
+  {
     const bool split = columns.source_timestamp != columns.target_timestamp;
     std::vector<std::vector<FrameProfileRow>> rows(log.traces.size());
     std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>> ordered;
@@ -842,7 +854,7 @@ TemporalProfile discover_temporal_profile_dataframe(
       }
       ordered.push_back({&log.traces[t].case_id, &rows[t]});
     }
-    if (exact) return frame_arithmetic_profile(ordered, {});
+    if (exact) return frame_arithmetic_profile(ordered, {}, options.use_business_hours ? &slots : nullptr);
   }
   return discover_temporal_profile_ranked(log, normalized_table_options(options), {},
                                           ranks.empty() ? nullptr : &ranks, false);
@@ -910,6 +922,9 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
   validate_slots(options);
   const auto slots = options.use_business_hours ? normalized_slots(options)
                                                 : std::vector<BusinessHourSlot>{};
+  // Round FL: the DataFrame conformance (timedelta) reads the frame's UTC
+  // Timestamps, as does the EventLog of a CSV upload.
+  const bool utc_clock = timedelta || (log.dataframe_columns && log.dataframe_columns->csv_text);
   const auto& source_attribute = configured_attribute(
       options.source_timestamp_attribute,
       options.source_completion_timestamp_attribute);
@@ -946,7 +961,7 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
       const auto source_local =
           options.use_business_hours
               ? event_local_instant(trace.events[i], source_attribute, "",
-                                    options.strict_attributes)
+                                    options.strict_attributes, utc_clock)
               : source_time;
       if (!source_local) continue;
       for (std::size_t j = rank ? 0 : i + 1; j < trace.events.size(); ++j) {
@@ -969,7 +984,7 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
         const auto target_local =
             options.use_business_hours
                 ? event_local_instant(trace.events[j], target_attribute, "",
-                                      options.strict_attributes)
+                                      options.strict_attributes, utc_clock)
                 : target_time;
         if (!target_local) continue;
         const double duration =
@@ -1117,7 +1132,8 @@ std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>> frame_
 // timestamp (pm4py raises there). A row without an activity leaves the
 // groups (round BL).
 std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& frame,
-                                                      const std::function<bool()>& cancelled) {
+                                                      const std::function<bool()>& cancelled,
+                                                      const std::vector<BusinessHourSlot>* slots = nullptr) {
   FrameCases cases;
   for (const auto& row : frame_rows(frame.log())) {
     const auto date = frame.date(row.trace, row.event, "time:timestamp");
@@ -1126,7 +1142,7 @@ std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& 
     cases[frame_case(frame, row)].push_back({date->seconds, date->nanoseconds, &row.event.activity, std::nullopt});
   }
   auto ordered = frame_cases_ordered(cases);
-  return frame_arithmetic_profile(ordered, cancelled);
+  return frame_arithmetic_profile(ordered, cancelled, slots);
 }
 
 // The same with other columns: the activity from `activity_key` (text or
@@ -1139,12 +1155,13 @@ std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& 
                                                       const std::string& activity_key,
                                                       const std::string& source_key,
                                                       const std::string& target_key,
-                                                      const std::function<bool()>& cancelled) {
+                                                      const std::function<bool()>& cancelled,
+                                                      const std::vector<BusinessHourSlot>* slots = nullptr) {
   if (!frame.has(activity_key) || !frame.has(source_key)) return std::nullopt;
   // No start column: the completion column serves (round BL, as
   // temporal_table_columns).
   if (!frame.has(target_key))
-    return frame_temporal_profile(frame, activity_key, source_key, source_key, cancelled);
+    return frame_temporal_profile(frame, activity_key, source_key, source_key, cancelled, slots);
   // One name per activity group: pandas groups values that are == (1, 1.0
   // and True alike), named by str() of the first (pm4py's key, round BL).
   std::map<std::string, std::string> activities;
@@ -1184,7 +1201,7 @@ std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& 
                                  source.has_value(), source_key == target_key || target.has_value(), index});
   }
   auto ordered = frame_cases_ordered(cases);
-  auto profile = frame_arithmetic_profile(ordered, cancelled);
+  auto profile = frame_arithmetic_profile(ordered, cancelled, slots);
   // pandas groups the pairs by the source and the target activity, sorting
   // each level's values: a date beside a number there raises (round BL,
   // observed black-box), and the EventLog algorithm answers instead.
@@ -1205,7 +1222,7 @@ std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& 
 
 TemporalProfile frame_arithmetic_profile(
     std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>>& ordered,
-    const std::function<bool()>& cancelled) {
+    const std::function<bool()>& cancelled, const std::vector<BusinessHourSlot>* slots) {
   using Row = FrameProfileRow;
   struct Sums {
     std::uint64_t count = 0;
@@ -1247,9 +1264,16 @@ TemporalProfile frame_arithmetic_profile(
           --whole;
         }
         // Timedelta: days * 86400 + seconds (an int), + microseconds * 1e-6,
-        // + nanoseconds * 1e-9, left to right.
-        const double value = static_cast<double>(whole) + static_cast<double>(fraction / 1000) * 1e-6 +
-                             static_cast<double>(fraction % 1000) * 1e-9;
+        // + nanoseconds * 1e-9, left to right. With business hours (round
+        // FL): BusinessHours on the frame's Timestamps, UTC on a CSV upload
+        // (an offset is converted, observed black-box fl t4/c1.csv), each
+        // read at its microsecond, floored.
+        const double value =
+            slots ? detail::business_elapsed_seconds_microseconds(
+                        source.seconds * detail::kMicrosecondsPerSecond + source.nanoseconds / 1000,
+                        target_seconds * detail::kMicrosecondsPerSecond + target_nanoseconds / 1000, *slots)
+                  : static_cast<double>(whole) + static_cast<double>(fraction / 1000) * 1e-6 +
+                        static_cast<double>(fraction % 1000) * 1e-9;
         auto& sums = pairs[{*source.activity, *(*rows)[j].activity}];
         ++sums.count;
         const double y = value - sums.compensation;
@@ -1299,15 +1323,20 @@ TemporalProfile discover_temporal_profile_as_uploaded(const EventLog& log,
   };
   const bool defaults = options.activity_attribute == "concept:name" &&
                         canonical(options.source_timestamp_attribute, options.source_completion_timestamp_attribute) &&
-                        canonical(options.target_timestamp_attribute, options.target_start_timestamp_attribute) &&
-                        !options.use_business_hours;
+                        canonical(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
+  // Round FL: with business hours pm4py's DataFrame discovery pairs the rows
+  // as without them and measures each pair with BusinessHours on the frame's
+  // Timestamps (UTC on a CSV upload; the EventLog algorithm read each text's
+  // own wall clock), then takes the same mean and deviation.
+  std::vector<BusinessHourSlot> slots;
+  if (options.use_business_hours) slots = normalized_slots(options);
+  const auto* business = options.use_business_hours ? &slots : nullptr;
   if (log.dataframe_columns && defaults)
-    if (auto profile = frame_temporal_profile(frame_times::Frame(log), cancelled)) return std::move(*profile);
+    if (auto profile = frame_temporal_profile(frame_times::Frame(log), cancelled, business)) return std::move(*profile);
   // Other columns on an upload: pm4py's DataFrame discovery on them, unless
   // a cell is missing or of another type (round BK; BJ1 kept the EventLog
   // algorithm here).
-  if (log.dataframe_columns && !defaults && !options.use_business_hours &&
-      !options.activity_attribute.empty()) {
+  if (log.dataframe_columns && !defaults && !options.activity_attribute.empty()) {
     const auto key = [](const std::string& primary, const std::string& alias) {
       const auto& configured = primary.empty() ? alias : primary;
       return configured.empty() ? std::string("time:timestamp") : configured;
@@ -1315,7 +1344,7 @@ TemporalProfile discover_temporal_profile_as_uploaded(const EventLog& log,
     if (auto profile = frame_temporal_profile(
             frame_times::Frame(log), options.activity_attribute,
             key(options.source_timestamp_attribute, options.source_completion_timestamp_attribute),
-            key(options.target_timestamp_attribute, options.target_start_timestamp_attribute), cancelled))
+            key(options.target_timestamp_attribute, options.target_start_timestamp_attribute), cancelled, business))
       return std::move(*profile);
   }
   return discover_temporal_profile(log, options, cancelled);

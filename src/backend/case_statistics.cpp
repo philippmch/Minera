@@ -91,14 +91,13 @@ std::vector<BusinessHourSlot> normalized_slots(
 }
 
 std::optional<double> local_wall_timestamp(std::string_view text) {
-  if (!parse_timestamp(text)) return std::nullopt;
-  std::size_t end = text.size();
-  while (end > 0 &&
-         std::isspace(static_cast<unsigned char>(text[end - 1])) != 0)
-    --end;
-  const auto timezone = text.substr(0, end).find_first_of("Zz+-", 10);
-  if (timezone != std::string_view::npos) end = timezone;
-  return parse_timestamp(text.substr(0, end));
+  // Round FL: the wall clock in whole microseconds, floored, as pm4py's
+  // BusinessHours reads a Timestamp with nanoseconds (a CSV or XES time
+  // with more than six fraction digits; rounding the epoch double moved
+  // .1234567 up to .123457).
+  const auto micros = detail::local_wall_timestamp_microseconds(text);
+  if (!micros) return std::nullopt;
+  return detail::epoch_seconds_from_microseconds(*micros);
 }
 
 // pm4py's BusinessHours on microsecond wall clocks
@@ -397,7 +396,11 @@ CaseStatisticsResult discover_case_statistics(
     double duration = end - start;
     if (!slots.empty()) {
       const auto clock = [&](std::string_view text) {
-        return options.dataframe ? parse_timestamp(text) : local_wall_timestamp(text);
+        if (!options.dataframe) return local_wall_timestamp(text);
+        // Round FL: the UTC clock in whole microseconds, floored, too.
+        const auto micros = parse_timestamp_microseconds(text);
+        return micros ? std::optional<double>{detail::epoch_seconds_from_microseconds(*micros)}
+                      : std::nullopt;
       };
       const auto local_start =
           clock(timestamp_text(first, options.timestamp_key, "start"));

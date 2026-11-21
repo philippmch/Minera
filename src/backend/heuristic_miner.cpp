@@ -381,9 +381,13 @@ std::int64_t required_timestamp_microseconds(
   return *parsed;
 }
 
+// `utc_clock` (round FL): a CSV upload, whose frame holds UTC Timestamps (an
+// offset is converted), so pm4py's BusinessHours reads the UTC clock there
+// (observed black-box, fl t4/c1.csv); else the text's own wall clock.
 std::int64_t required_business_timestamp_microseconds(
-    std::string_view value, std::string_view description) {
-  const auto local = detail::local_wall_timestamp_microseconds(value);
+    std::string_view value, std::string_view description, bool utc_clock = false) {
+  const auto local = utc_clock ? parse_timestamp_microseconds(value)
+                               : detail::local_wall_timestamp_microseconds(value);
   if (!local)
     throw std::invalid_argument(
         "Heuristics Miner: invalid business-hours " + std::string(description) +
@@ -398,7 +402,7 @@ struct IntervalTrace {
 
 IntervalTrace to_intervals(const Trace& trace,
                            const HeuristicMinerOptions& options,
-                           bool pre_interval_mode) {
+                           bool pre_interval_mode, bool utc_clock) {
   using LifecycleKey = std::pair<std::string, std::string>;
   struct PendingStart {
     std::string timestamp_text;
@@ -416,8 +420,7 @@ IntervalTrace to_intervals(const Trace& trace,
       const auto business_complete =
           options.use_business_hours
               ? std::optional<std::int64_t>{
-                    required_business_timestamp_microseconds(timestamp_text,
-                                                             "event")}
+                    required_business_timestamp_microseconds(timestamp_text, "event", utc_clock)}
               : std::optional<std::int64_t>{};
       const auto* value = selected_start_timestamp(event, options, true);
       if (value == nullptr)
@@ -431,7 +434,7 @@ IntervalTrace to_intervals(const Trace& trace,
       const auto business_start =
           options.use_business_hours
               ? std::optional<std::int64_t>{
-                    required_business_timestamp_microseconds(*value, "start")}
+                    required_business_timestamp_microseconds(*value, "start", utc_clock)}
               : std::optional<std::int64_t>{};
       intervals.push_back({activity,
                           start,
@@ -471,8 +474,7 @@ IntervalTrace to_intervals(const Trace& trace,
     const auto business_complete =
         options.use_business_hours
             ? std::optional<std::int64_t>{
-                  required_business_timestamp_microseconds(timestamp_text,
-                                                           "event")}
+                  required_business_timestamp_microseconds(timestamp_text, "event", utc_clock)}
             : std::optional<std::int64_t>{};
     auto start_microseconds = timestamp_microseconds;
     double start = timestamp;
@@ -484,7 +486,7 @@ IntervalTrace to_intervals(const Trace& trace,
       start = detail::epoch_seconds_from_microseconds(start_microseconds);
       if (options.use_business_hours) {
         business_start = required_business_timestamp_microseconds(
-            pending->second.front().timestamp_text, "start");
+            pending->second.front().timestamp_text, "start", utc_clock);
       }
       pending->second.pop_front();
     }
@@ -521,9 +523,10 @@ PlusAbstraction build_plus_abstraction(
       !log.traces.empty() && !log.traces.front().events.empty() &&
       selected_start_timestamp(log.traces.front().events.front(), options,
                                true) != nullptr;
+  const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
   for (const auto& trace : log.traces) {
     const auto converted =
-        to_intervals(trace, options, pre_interval_mode);
+        to_intervals(trace, options, pre_interval_mode, utc_clock);
     const auto& intervals = converted.sorted;
     if (intervals.empty()) continue;
     // In pre-interval mode discovery preserves trace order for start/end/attribute
@@ -1105,6 +1108,7 @@ std::vector<HeuristicBundle> plus_bundles(
 HeuristicClassicDfgInput build_classic_input(
     const EventLog& log, const HeuristicMinerOptions& options) {
   HeuristicClassicDfgInput input;
+  const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
   const auto business_slots =
       options.use_business_hours
           ? detail::normalize_business_hour_slots(
@@ -1162,9 +1166,9 @@ HeuristicClassicDfgInput build_classic_input(
         if (options.use_business_hours) {
           const auto previous_local =
               required_business_timestamp_microseconds(
-                  selected_timestamp(trace.events[i - 1], options), "event");
+                  selected_timestamp(trace.events[i - 1], options), "event", utc_clock);
           const auto current_local =
-              required_business_timestamp_microseconds(start_text, "start");
+              required_business_timestamp_microseconds(start_text, "start", utc_clock);
           elapsed = detail::business_elapsed_seconds_microseconds(
               previous_local, current_local, business_slots);
         }

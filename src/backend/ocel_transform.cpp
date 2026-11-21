@@ -347,9 +347,17 @@ std::vector<std::pair<std::string, ObjectIds>> ancestors_descendants(
   const auto events = events_by_id(log);
   const auto edges = interaction_edges(log, types);
   const auto starts = object_start_order(log, types, events);
+  // Round FL: the objects of the type in the objects table's order (a row
+  // each), as pm4py lists them and caps them at max_objs; native took them
+  // in id order, so a capped split kept other objects and the parts came in
+  // another order (observed black-box, fl t5/order.py: an OCEL CSV objects
+  // file lists t3, t2, t0, t1).
+  std::vector<std::string> center_order;
   ObjectIds centers;
-  for (const auto& [object, type] : types) {
-    if (type == options.object_type) centers.insert(object);
+  for (const auto& object : log.objects) {
+    if (object.type != options.object_type) continue;
+    center_order.push_back(object.id);
+    centers.insert(object.id);
   }
   std::map<std::string, std::set<std::string>> directed;
   for (const auto& [left, right] : edges) {
@@ -386,7 +394,7 @@ std::vector<std::pair<std::string, ObjectIds>> ancestors_descendants(
   }
 
   std::vector<std::pair<std::string, ObjectIds>> result;
-  for (const auto& center : centers) {
+  for (const auto& center : center_order) {
     if (result.size() >= options.max_objects) break;
     ObjectIds selected{center};
     std::vector<std::string> forward{center};
