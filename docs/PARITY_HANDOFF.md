@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FN (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FO (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8395,6 +8395,62 @@ unchanged. FL's CI run 44897815468 and FM's run
 folder access), so no newer reviewer handoff was read. The generators,
 the comparers and the probes are in the project files under
 `review-harness/round-fn/`.
+
+Round FO re-reviewed FN on fresh raw-log banks (the time analysis,
+temporal and timing workbenches, CSV and XES) and on fresh Polars DFG
+uploads (`dfg_measure=both`, keep once per case, windows above one), and
+swept new areas (Review FO1): the heuristics miner and the OC-DFG with
+random non-default business-hour slots, the Polars, pandas and EventLog
+batches and minimum self-distance on uploads with offsets (all equal),
+and the organizational workbench on raw logs against pm4py's EventLog
+variants. Fixed: FO1-1, passed time on an EventLog defaults the start
+key to `time:timestamp` and needs no timestamp key on a trace's last
+event when the start key is another field; FO1-2, network analysis on an
+EventLog follows the frame pm4py converts it to (exact durations; a
+missing time is NaT, so business hours raise; zones that differ make an
+object column with no `.dt` accessor, or NaN floats without `.replace`);
+FO1-3, resource profiles on an EventLog follow the log variant (exact
+window comparisons, social position's closed window, wall clocks in
+social position and average case duration, TypeError on naive
+Timestamps worded by their nanoseconds, KeyError where a metric reads a
+missing key, `Timestamp.timestamp()` durations and `statistics.mean`,
+the start-key interval rule of the first sorted event), and t1 at or
+after t2 is an empty window on both paths. Declared: FO1-4, pm4py's
+Polars keep-once dedup order varies between runs (std last ulp); a raw
+log's CSV extra date column sorts as text in network analysis; lifecycle
+pairing in the log variant's interval metrics (carried). Found and
+carried: the frame path's `average_duration_activity` with nanosecond
+times (doubles subtracted) and an ulp in some `average_case_duration`
+means. After the fixes the organizational workbench agrees on every CSV
+and XES raw-log bank where pm4py answers, with pm4py's error texts.
+
+In the suite: the passed time, network analysis and resource profiles
+unit tests carry FO1's reference values. The full ctest passed 659 of 659
+on the first run (43 minutes, -j2, beside the fixture replay); the Python
+script tests 406 of 406 (the 13 query runtime tests in a venv with
+duckdb); the fixture replay gave 2,673 responses unchanged. FN's CI run 44909410735
+finished green in all six jobs. The Mac was not reachable this round
+(no folder access), so no newer reviewer handoff was read. The
+generators, the comparers and the probes are in the project files under
+`review-harness/round-fo/`.
+
+Next round (FP) should start by re-reviewing round FO:
+
+- FO's CI run;
+- FO1-1 to FO1-3 on fresh raw-log banks (`org/orgna.py`,
+  `org/rpsweep.py` with `PLAIN=1`, `rlw.py --only passed`, `RAWDT=1` for
+  XES), also with lifecycle columns;
+- the frame path's resource-profile durations with nanosecond times
+  (`org/rpframe.py`: `average_duration_activity` subtracts doubles,
+  `average_case_duration` means an ulp off);
+- new areas: the root cause and decision workbenches on nanosecond CSV
+  logs (not reached in FO); the log variant's interval metrics on logs
+  with lifecycle transitions; the other organizational routes (roles,
+  SNA, local diagnostics) on raw logs with offsets;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FO (kept for its older items):
 
 Next round (FO) should start by re-reviewing round FN:
 

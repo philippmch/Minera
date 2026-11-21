@@ -211,7 +211,51 @@ static void review_au_frame_paths() {
   assert(edges[1].source == "2" && edges[1].target == "R" && edges[1].activity == "a");
 }
 
+// Round FO: pm4py converts an EventLog (a raw log) to a frame before the
+// analysis; values from pm4py 2.7.22 on the same EventLogs (CSV-read
+// Timestamps).
+static void review_fo_eventlog_frame() {
+  const auto log_of = [](std::vector<Event> events) {
+    EventLog log; Trace t; t.case_id = "c1";
+    for (auto& e : events) t.events.push_back(std::move(e));
+    log.traces.push_back(std::move(t)); return log;
+  };
+  const auto with_st = [](Event e, std::string st) { e.attributes.push_back({"st", std::move(st)}); return e; };
+  NetworkAnalysisOptions o; o.include_performance = true;
+  // The frame's dates subtract exactly (Timedelta.total_seconds).
+  auto one = log_of({with_st(event("c1", "A", "r1", "2020-01-10 01:00:00.123456789+05:30"), "2020-01-10 01:00:00+05:30"),
+                     event("c1", "B", "r2", "2020-01-10 01:00:01.042456789+05:30"),
+                     with_st(event("c1", "C", "r3", "2020-01-10 03:00:00+05:30"), "2020-01-10 04:00:00+05:30")});
+  const auto exact = discover_network_analysis(one, o);
+  assert(exact.edges.size() == 2 && exact.edges[0].performance == std::vector<double>{0.9189999999999999} &&
+         exact.edges[1].performance == std::vector<double>{7198.9575432110005});
+  // A key some events lack is a date column with NaT: NaN durations, and
+  // BusinessHours fails on them.
+  o.timestamp_attribute = "st";
+  const auto nat = discover_network_analysis(one, o);
+  assert(nat.edges.size() == 2 && nat.edges[0].performance.size() == 1 && std::isnan(nat.edges[0].performance[0]));
+  o.business_hours = true;
+  try { (void)discover_network_analysis(one, o); assert(false); }
+  catch (const std::invalid_argument& e) { assert(std::string(e.what()).find("cannot convert float NaN to integer") != std::string::npos); }
+  // Time zones that differ make an object column: no .dt accessor without
+  // business hours, a NaN float without .replace with them.
+  auto mixed = log_of({event("c1", "A", "r1", "2020-01-10 01:00:00+05:30"), event("c1", "B", "r2", "2020-01-10 02:00:00+01:00")});
+  o.timestamp_attribute = "time:timestamp"; o.business_hours = false;
+  try { (void)discover_network_analysis(mixed, o); assert(false); }
+  catch (const std::invalid_argument& e) { assert(std::string(e.what()).find("Can only use .dt accessor") != std::string::npos); }
+  o.business_hours = true;
+  const auto wall = discover_network_analysis(mixed, o);
+  assert(wall.edges.size() == 1 && wall.edges[0].performance == std::vector<double>{0.0});
+  auto mixed_st = log_of({with_st(event("c1", "A", "r1", "2020-01-10 01:00:00Z"), "2020-01-10 01:00:00+05:30"),
+                          event("c1", "B", "r2", "2020-01-10 02:00:00Z"),
+                          with_st(event("c1", "C", "r3", "2020-01-10 03:00:00Z"), "2020-01-10 01:00:00+01:00")});
+  o.timestamp_attribute = "st";
+  try { (void)discover_network_analysis(mixed_st, o); assert(false); }
+  catch (const std::invalid_argument& e) { assert(std::string(e.what()).find("'float' object has no attribute 'replace'") != std::string::npos); }
+}
+
 int main() {
+  review_fo_eventlog_frame();
   reference_audit_contracts();
   frame_path_reads_pm4py_frame();
   review_au_frame_paths();

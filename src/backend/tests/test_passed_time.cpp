@@ -178,9 +178,31 @@ int main() {
       const auto measured = minera::discover_passed_time(keys, st);
       assert(measured.pre.size() == 1 && measured.pre.front().performance == 5400.0);
     }
-    // The native empty start key keeps meaning the timestamp key.
+    // Round FO: an empty start key is pm4py's EventLog default,
+    // time:timestamp (5400 s); the pandas variant's default, the timestamp
+    // key, gives B's st less A's st (1800 s).
     st.start_timestamp_key.clear();
+    assert(minera::discover_passed_time(keys, st).pre.front().performance == 5400.0);
+    st.dataframe = true;
     assert(minera::discover_passed_time(keys, st).pre.front().performance == 1800.0);
+    st.dataframe = false;
+    // The last event of a trace needs no timestamp key when the start key is
+    // another field: pm4py answers 5400 s where B lacks st, and raises
+    // KeyError where A (an earlier event) lacks it.
+    auto last_missing = keys;
+    last_missing.traces[0].events[1].attributes.clear();
+    for (const auto* start : {"", "time:timestamp"}) {
+      st.start_timestamp_key = start;
+      assert(minera::discover_passed_time(last_missing, st).pre.front().performance == 5400.0);
+    }
+    st.start_timestamp_key = "st";
+    try { (void)minera::discover_passed_time(last_missing, st); assert(false); }
+    catch (const std::invalid_argument&) {}
+    auto first_missing = keys;
+    first_missing.traces[0].events[0].attributes.clear();
+    st.start_timestamp_key.clear();
+    try { (void)minera::discover_passed_time(first_missing, st); assert(false); }
+    catch (const std::invalid_argument&) {}
   }
 
   std::cout << "Passed-time tests passed\n";

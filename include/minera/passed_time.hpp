@@ -27,8 +27,10 @@ struct PassedTimeOptions {
   std::string activity_key = "activity";
   // Empty, "timestamp", and "time:timestamp" select Event::timestamp.
   std::string timestamp_key = "timestamp";
-  // Empty uses timestamp_key for the start of the current event. Otherwise
-  // the named event attribute supplies the start timestamp.
+  // Empty: the start of the current event is time:timestamp on the EventLog
+  // path (pm4py's EventLog variant) and timestamp_key on a frame log or with
+  // `dataframe` (its pandas variant). Otherwise the named event attribute
+  // supplies the start timestamp.
   std::string start_timestamp_key;
   DfgPerformanceAggregation performance_aggregation =
       DfgPerformanceAggregation::kMean;
@@ -36,7 +38,7 @@ struct PassedTimeOptions {
   std::vector<BusinessHourSlot> business_hour_slots;
   // Business-hour clock: false counts each timestamp's own wall clock (the
   // EventLog path); true counts the UTC clock of pm4py's DataFrame path.
-  // Only the business-hour clock follows it; the arithmetic is unchanged.
+  // The business-hour clock and the default start key follow it.
   bool dataframe = false;
 };
 

@@ -36434,3 +36434,117 @@ reference values of FN1-1 to FN1-7. The full ctest passed 659 of 659, the
 Python script tests 406 of 406, the fixture replay gave 2,673 responses
 unchanged; `verify-reference-parity` still passes with
 `--require-complete`.
+
+## Review FO1: the organizational workbench on raw logs against pm4py's EventLog variants, the heuristics miner and OC-DFG with non-default slots, Polars batches and minimum self-distance on uploads with offsets (2026-11-21)
+
+Round FO re-reviewed round FN on fresh banks and swept new areas. FN's CI
+run 44909410735 (29d1dde) finished green in all six jobs.
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, Polars
+1.44.1, no pyarrow), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3
+X86_V4 AVX512_ICL AVX512_SPR"` and exact float comparison. Access orders
+were read with instrumented timestamps (a `datetime` subclass that logs
+each comparison, subtraction and `.timestamp()` call), not from pm4py's
+code.
+
+Re-review of FN (all on fresh seeds 1000-1079): the time analysis
+workbench on CSV raw logs (rlwA: case statistics 202, service time 186,
+cycle time 186, case arrival 223, passed time 201 equal, the rest raised
+in both) and XES raw logs (rlwB: 204, 194, 194, 227, 207 equal) differed
+only in passed time (FO1-1) and one FN1-8-class ulp; the temporal (rltA:
+197 and 197) and timing workbenches (rlpA: 220, 220, 194) were equal;
+the Polars DFG with `dfg_measure=both`, keep once per case and windows
+above one (rlpdA: 186 equal, 51 raised alike) differed only in FO1-4.
+New areas, equal throughout: the heuristics miner (classic and plusplus)
+with random non-default business-hour slots (120 requests), the OC-DFG
+edge performance with random slots (540), and the Polars, pandas and
+EventLog batches (180) and minimum self-distance (240) on uploads with
+offsets and nanoseconds.
+
+Fixed:
+
+- **FO1-1. Passed time on an EventLog: the default start key and the
+  last event.** pm4py's EventLog variant defaults the start key to
+  `time:timestamp` (its pandas variant to the timestamp key), so with a
+  timestamp key `st` and no start key a pair measures the later event's
+  own time less the earlier event's `st` (Minera took `st` less `st`). A
+  pair reads the timestamp key of its earlier event only, so when the
+  start key is another field the last event of a trace needs no
+  timestamp key (pm4py answers where Minera raised). The empty start key
+  keeps meaning the timestamp key on frame logs and with `dataframe`.
+- **FO1-2. Network analysis on an EventLog.** pm4py converts the EventLog
+  to a frame first: (a) the durations are the frame's exact differences
+  (`Timedelta.total_seconds`), not differences of the nearest doubles
+  (78 of 240 bank results were ulps to microseconds off); (b) timestamps
+  of one time zone make a date column (a missing value is NaT; with
+  business hours `BusinessHours` then fails with "cannot convert float
+  NaN to integer", where Minera skipped the pair); (c) zones that differ
+  (one offset per row, or naive beside aware) make an object column,
+  which has no `.dt` accessor without business hours ("Can only use .dt
+  accessor with datetimelike values") and whose missing values are NaN
+  floats without `.replace` with them.
+- **FO1-3. Resource profiles on an EventLog (the log variant).** (a) The
+  window compares each event's Timestamp exactly (nanoseconds) as `ev >=
+  t1 and ev < t2`; social position closes it (`ev <= t2`). (b) Social
+  position and `average_case_duration` compare the events' wall clocks
+  (offset dropped, nanoseconds kept) with the naive bounds, so a log with
+  offsets counts its local times there (a case at 03:00+05:30 is inside
+  00:00-04:00) and a naive log does not raise. (c) The other comparisons
+  raise TypeError on a naive Timestamp (the bounds are UTC-aware), worded
+  "Cannot compare tz-naive and tz-aware timestamps" when the compared
+  Timestamp has nanoseconds and "can't compare offset-naive and
+  offset-aware datetimes" otherwise; the compared event is each metric's
+  first: every event in log order (distinct activities, activity
+  frequency and completions), each case's last event (case completions
+  and their fraction, after every event's key is read), the last event of
+  the cases holding both resources (interaction), the end of the
+  resource's events for that activity in the sorted log (average duration
+  of an activity). (d) A key an event lacks is KeyError where the metric
+  reads it (the interval metrics sort the whole log first). (e)
+  Durations are `Timestamp.timestamp()` differences (nanoseconds rounded
+  to the microsecond) averaged with `statistics.mean` (exact). (f) With a
+  start key, every interval is (start key, timestamp key) when the first
+  event of the sorted log (traces sorted by their first event) has the
+  start key, the resource's events without it raising KeyError;
+  otherwise every interval starts at its own timestamp (a start key
+  naming the log's own time gives intervals of no length). Without one,
+  each event starts at the previous event of its case, as before. (g) t1
+  at or after t2 is an empty window in both variants (zero counts;
+  `average_workload` reads t2 only), where Minera raised.
+
+Declared:
+
+- **FO1-4. Polars keep once per case.** pm4py's Polars DFG deduplicates
+  the pairs of a case in an order that varies from run to run, so its
+  group std differs in the last ulp between runs of the same call (3 of
+  240 results; Minera's value is one of pm4py's outcomes, probed by
+  repeating the call).
+- Network analysis on a raw log sorts a CSV log's extra date column (a
+  text in the raw transport, as declared for FN1-8) as text; pm4py sorts
+  its Timestamps, so the joined pairs differ on 3 of 240 results with
+  business hours (without them both raise).
+- Resource profiles on a log with lifecycle transitions: the interval
+  metrics keep the previous-event rule; pm4py's log variant then pairs
+  the transitions (not swept, carried).
+- Unchanged: `t1`/`t2` accept ISO forms on both paths (pm4py takes
+  `%Y-%m-%d %H:%M:%S` only), the declared items of FN1 and before.
+
+Found and carried to round FP: on uploads (the frame path)
+`average_duration_activity` with nanosecond times is off by up to a
+microsecond (it subtracts doubles, pm4py `Timedelta.total_seconds`) and
+`average_case_duration` is an ulp off in some means (5 of 640 frame
+results: 3 durations, 2 means; `org/rpframe.py`).
+
+Results after the fixes (exact): network analysis on CSV raw logs
+(orgnaC: 189 equal, 48 raised alike, 3 declared) and XES raw logs
+(orgnaD: 227 equal, 13 raised alike); resource profiles on CSV raw logs
+(rpC1 and rpC2: 301 and 596 equal, 179 and 364 raised alike, every
+TypeError and KeyError text pm4py's) and XES raw logs (rpB3: 362 equal,
+118 raised alike); passed time on CSV and XES raw logs (rlwC: 281 equal,
+39 raised alike; rlwD: 272 and 48); the frame path with reversed and
+equal windows (rpframeA: 186 and 193 equal, plus 177 normal windows).
+
+In the suite: `minera_passed_time_tests`, `minera_network_analysis_tests`
+(`review_fo_eventlog_frame`) and `minera_resource_profiles_tests`
+(`review_fo_log_variant`) carry FO1's reference values. The full ctest
+passed 659 of 659, the Python script tests 406 of 406, the fixture replay
+gave 2,673 responses unchanged.

@@ -503,19 +503,31 @@ PassedTimeResult discover_passed_time(const EventLog& log,
   // (pm4py's t[i][start_timestamp_key]), which the projection below replaces;
   // it is kept under a private attribute for the DFG's start selector.
   static constexpr std::string_view kOriginalTimestamp = "\x1fminera:passed_time:original_timestamp";
-  const bool keep_original = !options.start_timestamp_key.empty() &&
-                             builtin_timestamp_key(options.start_timestamp_key) &&
+  // Round FO: pm4py's EventLog variant defaults the start key to
+  // time:timestamp (its pandas variant to the timestamp key), so a timestamp
+  // key naming another attribute measures each pair from the earlier event's
+  // key to the later event's own time.
+  const std::string start_key = options.start_timestamp_key.empty() && !options.dataframe
+                                    ? std::string("time:timestamp")
+                                    : options.start_timestamp_key;
+  const bool keep_original = !start_key.empty() && builtin_timestamp_key(start_key) &&
                              !builtin_timestamp_key(options.timestamp_key);
+  // With a start selector of its own, a pair reads the timestamp key of its
+  // earlier event only: the last event of a trace needs none (observed
+  // black-box, pm4py answers where that event lacks the key).
+  const bool separate_start = keep_original || !builtin_timestamp_key(start_key);
   EventLog projected = log;
   for (auto& trace : projected.traces) {
-    for (auto& event : trace.events) {
+    for (std::size_t index = 0; index < trace.events.size(); ++index) {
+      auto& event = trace.events[index];
       if (keep_original && trace.events.size() > 1)
         event.attributes.push_back({std::string(kOriginalTimestamp), event.timestamp, AttributeKind::kDate});
       event.activity = required_activity(event, options.activity_key);
       // The performance calculation only reads timestamps for adjacent
       // pairs. A singleton trace contributes no edge and therefore does not
       // require a timestamp, matching the underlying DFG statistic.
-      if (trace.events.size() > 1) {
+      const bool last = index + 1 == trace.events.size();
+      if (trace.events.size() > 1 && !(last && separate_start)) {
         event.timestamp = required_timestamp(event, options.timestamp_key,
                                              "timestamp");
       } else if (builtin_timestamp_key(options.timestamp_key)) {
@@ -536,9 +548,8 @@ PassedTimeResult discover_passed_time(const EventLog& log,
   dfg_options.business_hours_utc_clock = options.dataframe;
   if (keep_original) {
     dfg_options.start_timestamp_attribute = std::string(kOriginalTimestamp);
-  } else if (!options.start_timestamp_key.empty() &&
-             !builtin_timestamp_key(options.start_timestamp_key)) {
-    dfg_options.start_timestamp_attribute = options.start_timestamp_key;
+  } else if (!start_key.empty() && !builtin_timestamp_key(start_key)) {
+    dfg_options.start_timestamp_attribute = start_key;
   } else {
     dfg_options.start_timestamp_attribute.clear();
   }

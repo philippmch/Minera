@@ -13,7 +13,9 @@
 #include <tuple>
 #include <unordered_map>
 
+#include "exact_mean.hpp"
 #include "frame_cells.hpp"
+#include "frame_times.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
@@ -38,9 +40,47 @@ Bounds bounds(const ResourceProfilesOptions& o) {
     throw std::invalid_argument("resource_profiles timestamp is invalid");
   if (b.lo && !std::isfinite(*b.lo) || b.hi && !std::isfinite(*b.hi))
     throw std::invalid_argument("resource_profiles timestamp must be finite");
-  if (b.lo && b.hi && !(*b.lo < *b.hi))
-    throw std::invalid_argument("resource_profiles requires t1 < t2");
+  // Round FO: pm4py takes t1 >= t2 too (an empty window: zero counts, or
+  // average_workload, which reads t2 only, as usual).
   return b;
+}
+
+// The bounds as the instants pm4py's log variant compares with each event's
+// Timestamp (round FO): exact to the nanosecond, a naive text in UTC.
+struct ExactBounds {
+  std::optional<ParsedExactTimestamp> lo, hi;
+};
+
+ExactBounds exact_bounds(const ResourceProfilesOptions& o) {
+  ExactBounds b;
+  if (!o.t1.empty()) b.lo = parse_timestamp_exact(o.t1);
+  if (!o.t2.empty()) b.hi = parse_timestamp_exact(o.t2);
+  return b;
+}
+
+int exact_order(const ParsedExactTimestamp& a, const ParsedExactTimestamp& b) {
+  if (a.seconds != b.seconds) return a.seconds < b.seconds ? -1 : 1;
+  if (a.nanoseconds != b.nanoseconds) return a.nanoseconds < b.nanoseconds ? -1 : 1;
+  return 0;
+}
+
+// The wall clock of a Timestamp, its offset dropped (ev.replace(tzinfo=None)):
+// social position and average_case_duration compare it with the naive
+// bounds (round FO, observed black-box), so they never raise TypeError.
+std::optional<ParsedExactTimestamp> wall_clock(std::optional<ParsedExactTimestamp> t) {
+  if (t && t->timezone_aware) t->seconds += std::int64_t{t->offset_minutes} * 60;
+  return t;
+}
+
+// ev >= t1 and ev < t2; social position closes the window (ev <= t2).
+bool exact_in(const std::optional<ParsedExactTimestamp>& t, const ExactBounds& b, bool closed) {
+  if (!t) return false;
+  if (b.lo && exact_order(*t, *b.lo) < 0) return false;
+  if (b.hi) {
+    const int order = exact_order(*t, *b.hi);
+    if (closed ? order > 0 : order >= 0) return false;
+  }
+  return true;
 }
 
 bool in_slot(std::optional<double> t, const Bounds& b) {
@@ -128,7 +168,182 @@ std::optional<double> explicit_start_of(const Event& e,
 struct Interval {
   std::string resource, activity;
   double start = 0, end = 0;
+  std::optional<ParsedExactTimestamp> end_exact;  // the log variant's window test
 };
+
+// --- pm4py's log variant (an EventLog without frame columns), round FO ---
+// Observed black-box with instrumented timestamps: which event values each
+// metric reads, in which order, and with which operation.
+
+// The timestamp key's text on one event; nullptr when the event lacks it.
+const std::string* log_time_text(const Event& e, const ResourceProfilesOptions& o) {
+  if (o.timestamp_attribute.empty())
+    return e.timestamp.empty() || e.timestamp_state == FirstClassAttributeState::kNull ? nullptr : &e.timestamp;
+  return reference_selected_field(e, o.timestamp_attribute);
+}
+
+std::optional<ParsedExactTimestamp> log_time(const Event& e, const ResourceProfilesOptions& o) {
+  const auto* text = log_time_text(e, o);
+  return text ? parse_timestamp_exact(*text) : std::nullopt;
+}
+
+// Timestamp.timestamp(): nanoseconds rounded to the microsecond.
+std::optional<double> log_seconds(const std::optional<ParsedExactTimestamp>& t) {
+  if (!t) return std::nullopt;
+  return frame_times::epoch_seconds(*t);
+}
+
+[[noreturn]] void log_variant_fail(const std::string& message) {
+  throw std::invalid_argument("resource profiles: " + message);
+}
+
+std::string log_time_key(const ResourceProfilesOptions& o) {
+  return o.timestamp_attribute.empty() ? std::string("time:timestamp") : o.timestamp_attribute;
+}
+
+// The interval starts of average_workload, multitasking and
+// average_duration_activity: without a start key each event starts at the
+// previous event of its (time-sorted) case; with one, every event's interval
+// is (start key, timestamp key) when the first event of the sorted log has
+// the start key, and otherwise every interval starts at its own timestamp.
+enum class StartMode { kPrevious, kAttribute, kOwn };
+
+// The log sorted as pm4py sorts it before the intervals: each trace's events
+// by time (stable), then the traces by their first event (stable).
+std::vector<std::vector<const Event*>> log_variant_sorted(const EventLog& log, const ResourceProfilesOptions& o) {
+  struct Row { std::optional<ParsedExactTimestamp> time; const Event* event; };
+  std::vector<std::vector<Row>> traces;
+  for (const auto& trace : log.traces) {
+    if (trace.events.empty()) continue;
+    std::vector<Row> rows;
+    for (const auto& e : trace.events) rows.push_back({log_time(e, o), &e});
+    // A row without a time (pm4py's sort raised on it already) goes last.
+    std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
+      if (!a.time || !b.time) return a.time.has_value() && !b.time;
+      return exact_order(*a.time, *b.time) < 0;
+    });
+    traces.push_back(std::move(rows));
+  }
+  std::stable_sort(traces.begin(), traces.end(), [](const std::vector<Row>& a, const std::vector<Row>& b) {
+    const auto& x = a.front().time;
+    const auto& y = b.front().time;
+    if (!x || !y) return x.has_value() && !y;
+    return exact_order(*x, *y) < 0;
+  });
+  std::vector<std::vector<const Event*>> out;
+  for (const auto& rows : traces) {
+    std::vector<const Event*> events;
+    for (const auto& row : rows) events.push_back(row.event);
+    out.push_back(std::move(events));
+  }
+  return out;
+}
+
+StartMode log_variant_start_mode(const EventLog& log, const ResourceProfilesOptions& o) {
+  if (o.start_timestamp_attribute.empty()) return StartMode::kPrevious;
+  const auto sorted = log_variant_sorted(log, o);
+  if (sorted.empty()) return StartMode::kOwn;
+  return reference_selected_field(*sorted.front().front(), o.start_timestamp_attribute) ? StartMode::kAttribute
+                                                                                        : StartMode::kOwn;
+}
+
+// The first error the log variant raises: KeyError for a key an event it
+// reads lacks, TypeError for a naive Timestamp compared with the bounds
+// (which get_dt_from_string makes UTC-aware); pandas words it by whether the
+// Timestamp has nanoseconds (it then compares as a Timestamp, else as a
+// datetime).
+void log_variant_checks(const EventLog& log, const ResourceProfilesOptions& o, const ExactBounds& b,
+                        StartMode mode) {
+  const auto key = log_time_key(o);
+  const auto key_error = [](const std::string& k) { log_variant_fail("KeyError: '" + k + "'"); };
+  const auto comparable = [&](const std::string& text, const char* op) {
+    if (!b.lo && !b.hi) return;
+    const auto t = parse_timestamp_exact(text);
+    if (!t)
+      log_variant_fail(std::string("TypeError: '") + op + "' not supported between instances of 'str' and 'datetime.datetime'");
+    if (!t->timezone_aware)
+      log_variant_fail(t->nanoseconds % 1000 != 0 ? "TypeError: Cannot compare tz-naive and tz-aware timestamps"
+                                                  : "TypeError: can't compare offset-naive and offset-aware datetimes");
+  };
+  const auto required = [&](const Event& e) -> const std::string& {
+    const auto* text = log_time_text(e, o);
+    if (!text) key_error(key);
+    return *text;
+  };
+  const char* first_op = b.lo ? ">=" : "<";
+  switch (o.metric) {
+    case ResourceProfileMetric::kDistinctActivities:
+    case ResourceProfileMetric::kActivityFrequency:
+    case ResourceProfileMetric::kActivityCompletions:
+      // Every event in log order: its time, then ev >= t1 (and ev < t2).
+      for (const auto& trace : log.traces)
+        for (const auto& e : trace.events) comparable(required(e), first_op);
+      break;
+    case ResourceProfileMetric::kSocialPosition:
+      // Every event's wall clock (no TypeError).
+      for (const auto& trace : log.traces)
+        for (const auto& e : trace.events) (void)required(e);
+      break;
+    case ResourceProfileMetric::kCaseCompletions:
+    case ResourceProfileMetric::kFractionCaseCompletions:
+      // Every event's time first, then each case's last event.
+      for (const auto& trace : log.traces)
+        for (const auto& e : trace.events) (void)required(e);
+      for (const auto& trace : log.traces)
+        if (!trace.events.empty()) comparable(required(trace.events.back()), first_op);
+      break;
+    case ResourceProfileMetric::kInteractionTwoResources:
+      // The last event of each case holding both resources, in log order.
+      for (const auto& trace : log.traces) {
+        if (trace.events.empty()) continue;
+        bool first = false, second = false;
+        for (const auto& e : trace.events)
+          if (const auto resource = resource_of(e, o)) {
+            first = first || *resource == o.resource;
+            second = second || *resource == o.resource2;
+          }
+        if (first && second) comparable(required(trace.events.back()), first_op);
+      }
+      break;
+    case ResourceProfileMetric::kAverageCaseDuration:
+      // The cases of the resource, in log order: the first event's and the
+      // last event's wall clocks (no TypeError).
+      for (const auto& trace : log.traces) {
+        if (trace.events.empty()) continue;
+        bool has = false;
+        for (const auto& e : trace.events)
+          if (const auto resource = resource_of(e, o); resource && resource_matches(*resource, o)) has = true;
+        if (!has) continue;
+        (void)required(trace.events.front());
+        (void)required(trace.events.back());
+      }
+      break;
+    case ResourceProfileMetric::kAverageDurationActivity:
+    case ResourceProfileMetric::kAverageWorkload:
+    case ResourceProfileMetric::kMultitasking: {
+      // The sort reads every event's time; then the resource's events in the
+      // sorted log: average_duration_activity compares each end with the
+      // window and reads the start key of those inside it, the other two read
+      // every start key.
+      for (const auto& trace : log.traces)
+        for (const auto& e : trace.events) (void)required(e);
+      const bool duration = o.metric == ResourceProfileMetric::kAverageDurationActivity;
+      for (const auto& events : log_variant_sorted(log, o))
+        for (const auto* e : events) {
+          const auto resource = resource_of(*e, o);
+          if (!resource || !resource_matches(*resource, o)) continue;
+          if (duration && !activity_matches(activity_of(*e, o).value_or(std::string{}), o)) continue;
+          if (duration) {
+            comparable(required(*e), first_op);
+            if (!exact_in(log_time(*e, o), b, false)) continue;
+          }
+          if (mode == StartMode::kAttribute && !reference_selected_field(*e, o.start_timestamp_attribute))
+            key_error(o.start_timestamp_attribute);
+        }
+      break;
+    }
+  }
+}
 
 // Activity intervals as the reference forms them: only events with no
 // lifecycle or a (case-insensitive) "complete" transition take part, sorted by
@@ -144,7 +359,7 @@ struct Interval {
 // pairs lifecycles and gives 100).
 std::vector<Interval> lifecycle_intervals(
     const Trace& trace, const ResourceProfilesOptions& o,
-    bool every_transition = false) {
+    bool every_transition = false, bool frame = true, StartMode mode = StartMode::kPrevious) {
   const auto complete_or_unmarked = [](const std::string& lifecycle) {
     if (lifecycle.empty()) return true;
     std::string lower = lifecycle;
@@ -152,22 +367,38 @@ std::vector<Interval> lifecycle_intervals(
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lower == "complete";
   };
-  struct Kept { double time; const Event* event; };
+  struct Kept { double time; const Event* event; std::optional<ParsedExactTimestamp> exact; };
   std::vector<Kept> kept;
   for (const auto& e : trace.events) {
-    const auto t = parse_timestamp(timestamp_of(e, o));
+    std::optional<ParsedExactTimestamp> exact;
+    std::optional<double> t;
+    if (frame) t = parse_timestamp(timestamp_of(e, o));
+    else t = log_seconds(exact = log_time(e, o));
     if (!t || !std::isfinite(*t) || (!every_transition && !complete_or_unmarked(e.lifecycle))) continue;
-    kept.push_back({*t, &e});
+    kept.push_back({*t, &e, exact});
   }
-  std::stable_sort(kept.begin(), kept.end(), [](const Kept& a, const Kept& b) { return a.time < b.time; });
+  if (frame)
+    std::stable_sort(kept.begin(), kept.end(), [](const Kept& a, const Kept& b) { return a.time < b.time; });
+  else
+    std::stable_sort(kept.begin(), kept.end(),
+                     [](const Kept& a, const Kept& b) { return exact_order(*a.exact, *b.exact) < 0; });
   std::vector<Interval> out;
   for (std::size_t i = 0; i < kept.size(); ++i) {
     const auto& e = *kept[i].event;
     const auto resource = resource_of(e, o);
     if (!resource) continue;
     double start = i ? kept[i - 1].time : kept[i].time;
-    if (const auto explicit_start = explicit_start_of(e, o)) start = *explicit_start;
-    out.push_back({*resource, activity_of(e, o).value_or(std::string{}), start, kept[i].time});
+    if (frame) {
+      if (const auto explicit_start = explicit_start_of(e, o)) start = *explicit_start;
+    } else if (mode == StartMode::kOwn) {
+      start = kept[i].time;
+    } else if (mode == StartMode::kAttribute) {
+      // A missing start key raised already where the metric reads it.
+      const auto* text = reference_selected_field(e, o.start_timestamp_attribute);
+      const auto exact = text ? parse_timestamp_exact(*text) : std::nullopt;
+      start = exact ? frame_times::epoch_seconds(*exact) : kept[i].time;
+    }
+    out.push_back({*resource, activity_of(e, o).value_or(std::string{}), start, kept[i].time, kept[i].exact});
   }
   return out;
 }
@@ -251,24 +482,58 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
   std::map<std::string, double> case_start, case_end;
   std::map<std::string, std::set<std::string>> case_resources;
   std::map<std::string, bool> case_intersects;
+  std::map<std::string, bool> case_completed;
+  // An EventLog without frame columns follows pm4py's log variant (round
+  // FO): exact comparisons with the bounds, Timestamp.timestamp() seconds,
+  // statistics.mean, its errors and its interval starts.
+  const ExactBounds eb = frame ? ExactBounds{} : exact_bounds(o);
+  const bool interval_metric = o.metric == ResourceProfileMetric::kAverageDurationActivity ||
+                               o.metric == ResourceProfileMetric::kAverageWorkload ||
+                               o.metric == ResourceProfileMetric::kMultitasking;
+  StartMode mode = StartMode::kPrevious;
+  if (!frame) {
+    if (interval_metric) {
+      // The sort reads every event's time before anything else.
+      for (const auto& tr : log.traces)
+        for (const auto& e : tr.events)
+          if (!log_time_text(e, o)) log_variant_fail("KeyError: '" + log_time_key(o) + "'");
+      mode = log_variant_start_mode(log, o);
+    }
+    log_variant_checks(log, o, eb, mode);
+  }
 
   for (const auto& tr : log.traces) {
     const auto case_id = case_id_of(tr, tr.events.empty() ? Event{} : tr.events.front(), o);
     // The case runs from its first to its last event in the supplied order,
     // as in the reference; an unsorted trace can have a negative duration.
     std::optional<double> first, last;
+    std::optional<ParsedExactTimestamp> first_exact, last_exact;
     std::set<std::string> tr_resources;
     for (const auto& e : tr.events) {
       const auto resource = resource_of(e, o);
       const auto activity = activity_of(e, o).value_or(std::string{});
-      const auto t = parse_timestamp(timestamp_of(e, o));
-      if (t && std::isfinite(*t)) { if (!first) first = *t; last = *t; }
+      std::optional<ParsedExactTimestamp> exact;
+      std::optional<double> t;
+      if (frame) t = parse_timestamp(timestamp_of(e, o));
+      else t = log_seconds(exact = log_time(e, o));
+      if (t && std::isfinite(*t)) {
+        if (!first) { first = *t; first_exact = exact; }
+        last = *t; last_exact = exact;
+      }
       if (resource) tr_resources.insert(*resource);
-      // On the frame a case is in the slot whatever its events' resources.
-      if (frame && !resource && in_slot(t, b)) slot_cases.insert(case_id);
-      if (resource && in_slot(t, b)) {
+      const bool slot = frame ? in_slot(t, b) : exact_in(exact, eb, false);
+      // On the frame a case is in the slot whatever its events' resources;
+      // the log variant's social position closes the window (ev <= t2).
+      if (frame && !resource && slot) slot_cases.insert(case_id);
+      if (!frame && exact_in(wall_clock(exact), eb, true)) {
         slot_cases.insert(case_id);
-        slot_cases_by_resource[*resource].insert(case_id);
+        if (resource) slot_cases_by_resource[*resource].insert(case_id);
+      }
+      if (resource && slot) {
+        if (frame) {
+          slot_cases.insert(case_id);
+          slot_cases_by_resource[*resource].insert(case_id);
+        }
         ++resource_events[*resource];
         if (resource_matches(*resource, o) && activity_matches(activity, o)) {
           ++freq[{*resource, activity}];
@@ -284,18 +549,28 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
       case_start[case_id] = *first; case_end[case_id] = *last;
       // A case counts toward a window when either endpoint lies in the closed
       // window or the case spans all of it.
-      const auto inside = [&](double t) { return (!b.lo || t >= *b.lo) && (!b.hi || t <= *b.hi); };
-      case_intersects[case_id] =
-          inside(*first) || inside(*last) || ((!b.lo || *first <= *b.lo) && (!b.hi || *last >= *b.hi));
+      if (frame) {
+        const auto inside = [&](double t) { return (!b.lo || t >= *b.lo) && (!b.hi || t <= *b.hi); };
+        case_intersects[case_id] =
+            inside(*first) || inside(*last) || ((!b.lo || *first <= *b.lo) && (!b.hi || *last >= *b.hi));
+      } else {
+        const auto inside = [&](const ParsedExactTimestamp& t) {
+          return (!eb.lo || exact_order(t, *eb.lo) >= 0) && (!eb.hi || exact_order(t, *eb.hi) <= 0);
+        };
+        const auto first_wall = *wall_clock(first_exact), last_wall = *wall_clock(last_exact);
+        case_intersects[case_id] = inside(first_wall) || inside(last_wall) ||
+                                   ((!eb.lo || exact_order(first_wall, *eb.lo) <= 0) &&
+                                    (!eb.hi || exact_order(last_wall, *eb.hi) >= 0));
+      }
     }
     case_resources[case_id].insert(tr_resources.begin(), tr_resources.end());
-    if (last && in_slot(last, b)) {
+    const bool completed = frame ? last && in_slot(last, b) : last && exact_in(last_exact, eb, false);
+    if (first && last) case_completed[case_id] = completed;
+    if (completed) {
       all_completed_cases.insert(case_id);
       for (const auto& rr : tr_resources) completed_cases[rr].insert(case_id);
     }
-    auto ints = lifecycle_intervals(tr, o, o.metric == ResourceProfileMetric::kAverageDurationActivity ||
-                                               o.metric == ResourceProfileMetric::kAverageWorkload ||
-                                               o.metric == ResourceProfileMetric::kMultitasking);
+    auto ints = lifecycle_intervals(tr, o, interval_metric, frame, mode);
     intervals.insert(intervals.end(), ints.begin(), ints.end());
   }
 
@@ -316,6 +591,7 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
       {
         std::map<std::string, double> sums;
         std::map<std::string, std::uint64_t> counts;
+        std::map<std::string, std::vector<double>> durations;
         for (const auto& [case_id, resources] : case_resources) {
           const auto start = case_start.find(case_id);
           const auto end = case_end.find(case_id);
@@ -328,18 +604,23 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
           for (const auto& resource : resources) {
             sums[resource] += duration;
             ++counts[resource];
+            durations[resource].push_back(duration);
           }
         }
         for (const auto& [resource, sum] : sums) {
           if (!resource_matches(resource, o)) continue;
           const auto count = counts[resource];
-          add_row(result, {resource, "", "", count ? sum / count : 0.0, count}, o.max_rows);
+          // The log variant averages with statistics.mean (exact).
+          const double mean = frame ? (count ? sum / count : 0.0) : detail::exact_mean(durations[resource]);
+          add_row(result, {resource, "", "", mean, count}, o.max_rows);
         }
       }
       break;
     case ResourceProfileMetric::kAverageDurationActivity: {
-      for (const auto& i : intervals) if (resource_matches(i.resource, o) && activity_matches(i.activity, o) && in_slot(i.end,b)) { activity_duration_sum[{i.resource,i.activity}] += i.end-i.start; ++activity_duration_n[{i.resource,i.activity}]; }
-      for (const auto& [k,v] : activity_duration_sum) add_row(result,{k.first,k.second,"",v/activity_duration_n[k],activity_duration_n[k]},o.max_rows);
+      std::map<Key, std::vector<double>> activity_durations;
+      for (const auto& i : intervals) if (resource_matches(i.resource, o) && activity_matches(i.activity, o) && (frame ? in_slot(i.end,b) : exact_in(i.end_exact, eb, false))) { activity_duration_sum[{i.resource,i.activity}] += i.end-i.start; ++activity_duration_n[{i.resource,i.activity}]; activity_durations[{i.resource,i.activity}].push_back(i.end-i.start); }
+      // The log variant averages with statistics.mean (exact).
+      for (const auto& [k,v] : activity_duration_sum) add_row(result,{k.first,k.second,"",frame ? v/activity_duration_n[k] : detail::exact_mean(activity_durations[k]),activity_duration_n[k]},o.max_rows);
       break; }
     case ResourceProfileMetric::kAverageWorkload:
     case ResourceProfileMetric::kMultitasking: {
@@ -392,7 +673,7 @@ ResourceProfilesResult compute_resource_profiles(const EventLog& log, const Reso
     }
     case ResourceProfileMetric::kInteractionTwoResources: {
       if ((o.resource.empty() && !o.resource_given) || (o.resource2.empty() && !o.resource2_given)) break;
-      std::uint64_t n = 0; for(const auto& [c,rs]:case_resources) { auto z=case_end.find(c); if(z!=case_end.end()&&in_slot(z->second,b)&&rs.count(o.resource)&&rs.count(o.resource2)) ++n; }
+      std::uint64_t n = 0; for(const auto& [c,rs]:case_resources) { auto z=case_completed.find(c); if(z!=case_completed.end()&&z->second&&rs.count(o.resource)&&rs.count(o.resource2)) ++n; }
       add_row(result,{o.resource,"",o.resource2,static_cast<double>(n),n},o.max_rows); break; }
     case ResourceProfileMetric::kSocialPosition: {
       const double denominator = static_cast<double>(slot_cases.size());

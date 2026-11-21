@@ -405,7 +405,89 @@ static void review_av_frame_paths() {
   }
 }
 
+// Round FO: an EventLog without frame columns (a raw log) follows pm4py
+// 2.7.22's log variant; values from pm4py on the same EventLogs (CSV-read
+// Timestamps), t1/t2 as get_dt_from_string reads them (UTC).
+static void review_fo_log_variant() {
+  using M = ResourceProfileMetric;
+  const auto ev = [](std::string act, std::string ts, std::string res, std::string st = "") {
+    Event e{"", std::move(act), std::move(ts), std::move(res), 0, {}, ""};
+    if (!st.empty()) e.attributes.push_back({"st", st});
+    return e;
+  };
+  const auto make = [](std::vector<std::pair<std::string, std::vector<Event>>> traces) {
+    EventLog log;
+    for (auto& [id, events] : traces) {
+      Trace trace; trace.case_id = id;
+      for (auto& e : events) { e.case_id = id; trace.events.push_back(e); }
+      log.traces.push_back(std::move(trace));
+    }
+    return log;
+  };
+  const auto run = [](const EventLog& log, M metric, std::string resource, std::string t1, std::string t2,
+                      std::string activity = "", std::string key = "", std::string start = "") {
+    ResourceProfilesOptions o; o.metric = metric; o.resource = std::move(resource);
+    o.t1 = std::move(t1); o.t2 = std::move(t2); o.activity = std::move(activity);
+    o.timestamp_attribute = std::move(key); o.start_timestamp_attribute = std::move(start);
+    return discover_resource_profiles(log, o);
+  };
+  const std::string lo = "2020-01-09 00:00:00", hi = "2020-01-11 00:00:00";
+  const auto l1 = make({{"c1", {ev("A", "2020-01-10 01:00:00.123456789+05:30", "r1", "2020-01-10 00:30:00.000000250+05:30"),
+                                ev("B", "2020-01-10 03:00:00.987654321+05:30", "r1", "2020-01-10 02:00:00.1+05:30")}},
+                        {"c2", {ev("A", "2020-01-10 02:00:00.5+05:30", "r2", "2020-01-10 01:00:00+05:30"),
+                                ev("B", "2020-01-10 05:00:00.000000999+05:30", "r1", "2020-01-10 04:00:00+05:30")}}});
+  // Timestamp.timestamp() seconds (microseconds) and statistics.mean.
+  assert(only_value(run(l1, M::kAverageCaseDuration, "r1", lo, hi)) == 9000.182098984718);
+  assert(only_value(run(l1, M::kAverageDurationActivity, "r1", lo, hi, "B")) == 9000.182098984718);
+  assert(only_value(run(l1, M::kAverageDurationActivity, "r1", lo, hi, "B", "", "st")) == 3600.44382750988);
+  // A start key naming the log's own time: every interval has no length.
+  assert(only_value(run(l1, M::kAverageWorkload, "r1", lo, hi, "", "", "time:timestamp")) == 0.0);
+  assert(only_value(run(l1, M::kAverageWorkload, "r1", lo, "2020-01-09 22:00:00")) == 2.0);
+  // t1 >= t2: an empty window (average_workload reads t2 only).
+  assert(only_value(run(l1, M::kDistinctActivities, "r1", hi, lo)) == 0.0);
+  assert(only_value(run(l1, M::kAverageWorkload, "r1", "2020-01-09 22:00:00", "2020-01-09 22:00:00")) == 2.0);
+  // Naive Timestamps compared with the UTC-aware bounds: pandas words the
+  // error by the compared Timestamp's nanoseconds; the intervals compare
+  // seconds and do not raise.
+  const auto l2 = make({{"c1", {ev("A", "2020-01-10 01:00:00.000000001", "r1"), ev("B", "2020-01-10 03:00:00", "r1")}}});
+  assert(raises_text([&] { (void)run(l2, M::kDistinctActivities, "r1", lo, hi); },
+                     "TypeError: Cannot compare tz-naive and tz-aware timestamps"));
+  assert(raises_text([&] { (void)run(l2, M::kCaseCompletions, "r1", lo, hi); },
+                     "TypeError: can't compare offset-naive and offset-aware datetimes"));
+  assert(only_value(run(l2, M::kAverageWorkload, "r1", lo, hi)) == 0.0);
+  // A timestamp key an event lacks; a start key the first event of the
+  // sorted log lacks makes every interval start at its own time.
+  const auto l3 = make({{"c1", {ev("A", "2020-01-10 01:00:00Z", "r1", "2020-01-10 00:00:00Z"), ev("B", "2020-01-10 03:00:00Z", "r1")}},
+                        {"c2", {ev("A", "2020-01-09 01:00:00Z", "r2"), ev("B", "2020-01-10 05:00:00Z", "r1", "2020-01-10 04:00:00Z")}}});
+  assert(raises_text([&] { (void)run(l3, M::kDistinctActivities, "r1", lo, hi, "", "st"); }, "KeyError: 'st'"));
+  assert(only_value(run(l3, M::kAverageWorkload, "r1", lo, "2020-01-10 04:30:00", "", "", "st")) == 0.0);
+  assert(only_value(run(l3, M::kMultitasking, "r1", lo, hi, "", "", "st")) == 0.0);
+  // With the start key on the first sorted event, a resource's event that
+  // lacks it is pm4py's KeyError.
+  auto l4 = l3; l4.traces[1].events[0].attributes.push_back({"st", "2020-01-09 00:00:00Z"});
+  assert(raises_text([&] { (void)run(l4, M::kAverageWorkload, "r1", lo, "2020-01-10 04:30:00", "", "", "st"); },
+                     "KeyError: 'st'"));
+  // The social window is closed.
+  assert(only_value(run(l3, M::kSocialPosition, "r1", "2020-01-10 01:00:00", "2020-01-10 05:00:00")) == 1.0);
+  // Social position and average_case_duration compare the events' wall
+  // clocks (offset dropped, nanoseconds kept) with the naive bounds, so a
+  // naive log does not raise there; interaction_two_resources compares only
+  // the cases holding both resources.
+  const auto l5 = make({{"c1", {ev("A", "2020-01-10 03:00:00+05:30", "r1"), ev("B", "2020-01-10 03:30:00.000000001+05:30", "r1")}}});
+  assert(only_value(run(l5, M::kSocialPosition, "r1", "2020-01-10 00:00:00", "2020-01-10 04:00:00")) == 1.0);
+  assert(only_value(run(l5, M::kSocialPosition, "r1", "2020-01-09 21:00:00", "2020-01-09 23:00:00")) == 0.0);
+  assert(only_value(run(l5, M::kSocialPosition, "r1", "2020-01-10 03:30:00", "2020-01-10 03:30:00")) == 0.0);
+  assert(only_value(run(l5, M::kAverageCaseDuration, "r1", "2020-01-10 00:00:00", "2020-01-10 04:00:00")) == 1800.0);
+  assert(raises_text([&] { (void)run(l5, M::kAverageCaseDuration, "r1", "2020-01-09 21:00:00", "2020-01-09 23:00:00"); },
+                     "mean requires at least one data point"));
+  assert(only_value(run(l2, M::kSocialPosition, "r1", lo, hi)) == 1.0);
+  ResourceProfilesOptions pair; pair.metric = M::kInteractionTwoResources; pair.t1 = lo; pair.t2 = hi;
+  pair.resource = "zz"; pair.resource2 = "r1";
+  assert(only_value(discover_resource_profiles(l2, pair)) == 0.0);
+}
+
 int main() {
+  review_fo_log_variant();
   reference_audit_contracts();
   frame_path_reads_pm4py_frame();
   review_au_frame_paths();
@@ -457,8 +539,10 @@ int main() {
   ResourceProfilesOptions s; s.metric = ResourceProfileMetric::kSocialPosition; s.t1 = "2024-01-01T00:00:10Z"; s.t2 = "2024-01-01T00:00:20Z";
   auto social = discover_resource_profiles(log, s);
   assert(social.rows.size() == 2);
-  assert(std::abs(social.rows[0].value - 1.0) < 1e-12);
-  assert(std::abs(social.rows[1].value - 0.5) < 1e-12);
+  // Round FO: pm4py's log variant closes the social window (t1 <= ev <= t2),
+  // so bob's C@20 puts case b in it too (1.0 for both, as pm4py).
+  assert(social.rows[0].value == 1.0);
+  assert(social.rows[1].value == 1.0);
 
   ResourceProfilesOptions interaction;
   interaction.metric = ResourceProfileMetric::kInteractionTwoResources;
@@ -583,8 +667,10 @@ int main() {
 
   ResourceProfilesOptions bad; bad.t1 = "bad";
   try { (void)discover_resource_profiles(log, bad); assert(false); } catch (const std::invalid_argument&) {}
+  // Round FO: t1 > t2 is an empty window, as in pm4py (no rows for all
+  // resources).
   bad = {}; bad.t1 = "2024-01-02"; bad.t2 = "2024-01-01";
-  try { (void)discover_resource_profiles(log, bad); assert(false); } catch (const std::invalid_argument&) {}
+  assert(discover_resource_profiles(log, bad).rows.empty());
 
   const auto json = resource_profiles_json(distinct);
   assert(json.find("RESOURCE_PROFILES") != std::string::npos);

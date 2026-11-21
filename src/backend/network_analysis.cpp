@@ -228,6 +228,32 @@ struct Ref {
   SortKey sort;
 };
 
+// The column pm4py's conversion of an EventLog to a frame gives a timestamp
+// key (round FO, observed black-box): Timestamps of one time zone (all naive,
+// or all with one offset, "Z" and "+00:00" alike) make a date column whose
+// missing cells are NaT; zones that differ make an object column whose
+// missing cells are NaN floats. kOther: a key with no cell, or a cell that
+// is no timestamp (the earlier rules apply).
+enum class EventLogDates { kOther, kDate, kObject };
+
+EventLogDates eventlog_dates(const EventLog& log, const Reader& reader, const std::string& key) {
+  std::optional<std::pair<bool, std::int32_t>> zone;
+  bool mixed = false;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) {
+      const auto text = value(reader, event, &trace, key);
+      if (!text) continue;
+      const auto exact = parse_timestamp_exact(*text);
+      if (!exact) return EventLogDates::kOther;
+      const std::pair<bool, std::int32_t> own{exact->timezone_aware,
+                                              exact->timezone_aware ? exact->offset_minutes : 0};
+      if (!zone) zone = own;
+      else if (*zone != own) mixed = true;
+    }
+  if (!zone) return EventLogDates::kOther;
+  return mixed ? EventLogDates::kObject : EventLogDates::kDate;
+}
+
 // The relation value pandas merges on: equal keys of any numeric type join
 // (1, 1.0 and True), a number and its text do not, and null-like keys (None,
 // NaN, pd.NA or an absent value) join each other, unlike in grouping.
@@ -434,12 +460,22 @@ std::vector<std::optional<double>> business_durations(const EventLog& log, const
         "@@timestamp_diff");
   std::vector<std::optional<double>> durations(refs.size());
   if (!reader.frame) {
+    // Round FO: pm4py converts the EventLog to a frame first, so a missing
+    // timestamp is a NaT in a date column (BusinessHours then fails on it)
+    // and a NaN float in an object column (no .replace), in the joined order.
+    const auto dates = eventlog_dates(log, reader, key);
+    const auto wall = [&](const Ref& ref) -> std::optional<std::int64_t> {
+      const auto text = value(reader, *ref.event, ref.trace, key);
+      if (!text && dates == EventLogDates::kObject)
+        throw std::invalid_argument("network analysis: AttributeError: 'float' object has no attribute 'replace'");
+      return text ? local_wall_micros(*text) : std::nullopt;
+    };
     for (std::size_t i = 0; i < refs.size(); ++i) {
       if (!successors[i]) continue;
-      const auto st = value(reader, *refs[i].event, refs[i].trace, key);
-      const auto et = value(reader, *successors[i]->event, successors[i]->trace, key);
-      const auto from = st ? local_wall_micros(*st) : std::nullopt;
-      const auto to = et ? local_wall_micros(*et) : std::nullopt;
+      const auto from = wall(refs[i]);
+      const auto to = wall(*successors[i]);
+      if ((!from || !to) && dates != EventLogDates::kOther)
+        throw std::invalid_argument("network analysis: ValueError: cannot convert float NaN to integer");
       if (from && to) durations[i] = detail::business_elapsed_seconds_microseconds(*from, *to, slots);
     }
     return durations;
@@ -596,6 +632,14 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
           const auto to = reader.typed(*target->event, target->trace, o.timestamp_attribute);
           if (from && to && from->kind == python::Scalar::Kind::kDate && to->kind == python::Scalar::Kind::kDate)
             duration = frame_times::total_seconds(from->date, to->date);
+        } else if (duration && std::isfinite(*duration)) {
+          // Round FO: so do the dates of the frame pm4py converts an
+          // EventLog to (the exact instants, not their nearest doubles).
+          const auto from_text = value(reader, *source.event, source.trace, o.timestamp_attribute);
+          const auto to_text = value(reader, *target->event, target->trace, o.timestamp_attribute);
+          const auto from = from_text ? parse_timestamp_exact(*from_text) : std::nullopt;
+          const auto to = to_text ? parse_timestamp_exact(*to_text) : std::nullopt;
+          if (from && to) duration = frame_times::total_seconds(*from, *to);
         }
       }
       if (duration) {
@@ -609,6 +653,11 @@ NetworkAnalysisResult discover_network_analysis(const EventLog& input, const Net
   }
   if (reader.frame && log.event_count() != 0 && !o.business_hours)
     require_timestamp_column(log, reader, o.timestamp_attribute, refs, successors);
+  // Round FO: an EventLog whose timestamps differ in time zone converts to
+  // an object column, whose differences have no .dt accessor either.
+  if (!reader.frame && !o.business_hours &&
+      eventlog_dates(log, reader, o.timestamp_attribute) == EventLogDates::kObject)
+    throw std::invalid_argument("network analysis: AttributeError: Can only use .dt accessor with datetimelike values");
   std::vector<python::Group> groups;
   try {
     groups = python::groupby(keys);
