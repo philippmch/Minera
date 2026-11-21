@@ -36660,3 +36660,108 @@ now at the log variant's values), `minera_token_replay_root_cause_tests`
 (`csv_frame_nanosecond_dates`) and `minera_review_bc1_tests` carry FP1's
 reference values. The full ctest passed 659 of 659, the Python script
 tests 406 of 406, the fixture replay gave 2,673 responses unchanged.
+
+## Review FQ1: one-hot features and the LLM log descriptions of nanosecond CSV dates, local diagnostics, interval conversions and SNA on raw logs and uploads (2026-11-21)
+
+Round FQ re-reviewed round FP on fresh banks and swept new areas. FP's CI
+run 44930288030 (477b51f) finished green in all six jobs.
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, SciPy
+1.17.1, no pyarrow), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3
+X86_V4 AVX512_ICL AVX512_SPR"` and exact float comparison.
+
+Re-review of FP (fresh seeds): resource profiles on uploads with
+nanosecond times near the window (rpnearD: 697 equal, 343 equal backward
+windows, 124 raised alike, 36 the declared NaN message; rpxD, XES: 698,
+343, 122 and 37); the log variant with lifecycle columns (rpswP on the rlP
+bank: 221 equal, 139 raised alike); passed time and the other timing
+routes on lifecycle raw logs (rlwlP: case statistics 104 equal, service
+and cycle time 75 each, arrival 170, passed time 103, one passed-time
+ulp, the declared FN1-8 gap arithmetic, the rest raised alike; rlwlQ,
+XES: 109, 90, 90, 180 and 118, the rest raised alike); root cause on
+nanosecond CSV logs with the multiplier, numeric date columns and the
+unknown-activity form (rcnsD: 464 equal, 2 raised alike; rcnsE: 264 and
+47). No difference.
+
+Fixed:
+
+- **FQ1-1. One-hot features of a CSV log's dates keep nanoseconds**
+  (`/api/log-to-features`, `/api/features`, `/api/transform-features`,
+  trace and event based). A date column of a CSV frame holds pandas
+  Timestamps of a datetime64[ns] column, and the feature name
+  `event:key@value` (`trace:key@value` for a case column) takes
+  `str(Timestamp)`: nine fraction digits when the time has nanoseconds,
+  six when it has whole microseconds, none on the second, `NaT` for a
+  blank cell (`event:time:timestamp@2020-01-01 01:00:00.000000419+00:00`).
+  Minera cut them to microseconds, which merged distinct values into one
+  column (61 of 180 comparisons on nsdA differed in the names). The same
+  rule as FP1-3's root cause features; XES logs keep microseconds.
+- **FQ1-2. The LLM log description's date columns of a nanosecond CSV log**
+  (`/api/llm-context`, log attributes). A date column whose frame unit is
+  nanoseconds (a cell with more than six fraction digits anywhere in the
+  column, the timestamp, another event column or a `case:` column) prints
+  its quantiles as `Timestamp('...')` with nine digits whenever the
+  float64 quantile is not a whole microsecond
+  (`2020-01-01 00:00:00.000312064+0000` where the cells hold
+  `.000312`), as pandas' quantile of a datetime64[ns] column does. Minera's
+  description did not mark the nanosecond columns, and its CSV importer
+  did not flag a nanosecond `case:` column, so the quantiles printed
+  microseconds (4 of 80 descriptions on llmA differed).
+- **FQ1-3. Variant durations in the LLM variants description.** A
+  variant's case durations are differences of the last and first event's
+  `Timestamp.timestamp()` floats (nanoseconds rounded to six decimals of
+  the epoch seconds), not the exact gap in seconds; the variants sort by
+  count, then by that performance, ties broken by the variant text, in
+  reverse. Two variants whose exact durations differ by an ulp can tie, or
+  swap, under the float differences (1 of 68 descriptions on llmA placed
+  `a -> c -> c`, performance 3601.000, two lines away from pm4py's place).
+
+Declared or unchanged:
+
+- Attribute value lists of nanosecond CSV dates
+  (`/api/attribute-statistics`, events, events once per case and traces)
+  already printed
+  `str(Timestamp)` (nsdA: 375 equal).
+- Local diagnostics on raw logs with a group column (the organizational
+  workbench's `discover_local_diagnostics`, `apply_from_group_attribute`
+  and `apply_from_clustering_or_roles` on the JSON transport, groups as
+  text, blanks and numbers as text, per resource or random; ldA, CSV:
+  320 equal; ldB, XES: 316 equal), apart from explicit groups listing a
+  resource outside the log (40 and 44), where pm4py raises `KeyError`
+  (declared since AT1).
+- The SNA pandas variants and roles on CSV uploads with offsets,
+  nanoseconds and ties (orgnsA: 318 equal, 425 raised alike, 47 declared
+  joint-activities ulps, 110 declared NaN resources).
+- pm4py's temporal profile, cycle and service time, concurrent
+  activities, eventually-follows graph, performance DFG and
+  `log_to_features`' interval features (maximum concurrent events, work in
+  progress, resource workload) read each event as it is: none converts a
+  log with lifecycle transitions to intervals (probes on start/complete
+  pairs), so Minera's rule of one event per row stays.
+- Timestamp interleavings (`/api/timestamp-interleavings`, new sweep
+  `il/il3.py`: CSV logs with nanosecond, offset and Z times and ties at the
+  second, some XES sides; times compared as nanosecond instants, the
+  differences exactly; ilA: 144 equal, 156 raised alike, most of them
+  pm4py's `OverflowError` on the boundary timestamps) and link analysis
+  (`/api/link-analysis`, new sweep `la/link5.py`: nanosecond times with
+  ties at the second and the microsecond, offsets, every flag
+  combination; laA: 1,152 equal, 448 raised alike) on uploads.
+- The trace explorer (`/api/traces`) prints Minera's own trace JSON and
+  has no pm4py counterpart.
+- Unchanged: the declared items of FP1 and before.
+
+Results after the fixes (exact): one-hot features and attribute value
+lists on the same seeds (nsdA2: 180 feature comparisons and 375 value
+lists equal) and on fresh seeds 400-479 (nsdB: 240 and 556 equal); the
+LLM descriptions on the same seeds (llmA2: DFG, event stream, log
+attributes and log features 80 of 80 each, variants 68 equal and 12
+raised alike), on fresh seeds 500-579 (llmB: 80 each, variants 73 and 7)
+and on XES uploads with up to seven fraction digits (llmCx, seeds
+600-659: 60 each, variants 55 and 5); root cause on fresh nanosecond CSV
+logs, unchanged (rcnsF: 152 equal, 21 raised alike).
+
+In the suite: `minera_log_to_features_tests`
+(`review_fq_csv_nanosecond_dates`) and
+`minera_llm_abstractions_parity_tests` (`review_fq_nanosecond_columns`)
+carry FQ1's reference values. The full ctest passed 659 of 659 on the
+first run (29 minutes, -j2), the Python script tests 406 of 406, the
+fixture replay gave 2,673 responses unchanged.

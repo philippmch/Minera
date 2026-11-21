@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "frame_cells.hpp"
+#include "frame_times.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/log_conversion.hpp"
@@ -371,6 +372,20 @@ struct LogClock {
   }
   [[nodiscard]] double seconds(std::int64_t from, std::int64_t to) const {
     return static_cast<double>(to - from) / (nanoseconds ? 1e9 : 1e6);
+  }
+  // Timestamp.timestamp() of an instant in the clock's unit: microseconds
+  // over 1e6, nanoseconds rounded to six decimals (frame_times::epoch_seconds).
+  [[nodiscard]] double epoch(std::int64_t units) const {
+    if (!nanoseconds) return static_cast<double>(units) / 1e6;
+    ParsedExactTimestamp date;
+    date.seconds = units / 1000000000;
+    std::int64_t rest = units % 1000000000;
+    if (rest < 0) {
+      rest += 1000000000;
+      --date.seconds;
+    }
+    date.nanoseconds = static_cast<std::uint32_t>(rest);
+    return frame_times::epoch_seconds(date);
   }
 };
 
@@ -945,8 +960,19 @@ FrameView frame_view(const EventLog& log) {
     }
   }
   std::map<std::string, FrameDtype> dtypes;
-  for (const auto& column : columns.columns) dtypes[column.key] = frame_dtype(column.type);
-  for (const auto& column : columns.trace_columns) dtypes["case:" + column.key] = frame_dtype(column.type);
+  // A CSV date column of datetime64[ns] (a cell with more than six fraction
+  // digits anywhere in it, round BO): every cell is a nanosecond Timestamp,
+  // whatever its own spelling (round FQ: the frame's cell texts are UTC
+  // texts, which drop a nine-digit spelling of whole microseconds).
+  std::set<std::string> nanosecond_keys;
+  for (const auto& column : columns.columns) {
+    dtypes[column.key] = frame_dtype(column.type);
+    if (csv && column.nanoseconds) nanosecond_keys.insert(column.key);
+  }
+  for (const auto& column : columns.trace_columns) {
+    dtypes["case:" + column.key] = frame_dtype(column.type);
+    if (csv && column.nanoseconds) nanosecond_keys.insert("case:" + column.key);
+  }
   dtypes["time:timestamp"] = FrameDtype::kDate;
   // format_dataframe's case and activity copies are of the string dtype
   // (pd.NA); read_xes's text columns are str.
@@ -981,6 +1007,7 @@ FrameView frame_view(const EventLog& log) {
       const auto value = !csv && view.dtypes[i] == FrameDtype::kObject ? object_scalar(trace, event, key)
                                                                         : frame_row_scalar(frame, trace, event, key);
       row.push_back(value ? scalar_cell(*value) : Cell{});
+      if (row.back().kind == CellKind::kDate && nanosecond_keys.contains(key)) row.back().nano_text = true;
       if (key == "time:timestamp" && row.back().kind == CellKind::kDate) micros = cell_nanos(row.back());
     }
     if (!micros) throw std::invalid_argument("every event needs a timestamp");
@@ -1193,7 +1220,11 @@ std::string llm_log_variants_description(const EventLog& log, const LlmAbstracti
       last = i ? std::max(last, micros) : micros;
     }
     if (keyed && keyed->non_text) types.emplace(activities, keyed->types[t]);
-    variants[activities].push_back(clock.seconds(first, last));
+    // A case's duration is the difference of its first and last times'
+    // Timestamp.timestamp() floats (round FQ, observed black-box: two cases
+    // of one exact duration at other offsets sort apart, and a nanosecond
+    // case reads its times rounded to the microsecond).
+    variants[activities].push_back(clock.epoch(last) - clock.epoch(first));
   }
   // The variants in the frame's case order (case ids sorted), where pm4py
   // first meets them.

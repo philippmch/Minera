@@ -274,10 +274,60 @@ void review_av_frame_descriptions() {
 }
 
 
+// Review FQ1: pm4py 2.7.22's abstract_variants and abstract_log_attributes on
+// read_csv + format_dataframe(case_id="cid", activity_key="act",
+// timestamp_key="ts") with datetime64[ns] columns: a case lasts the
+// difference of its times' Timestamp.timestamp() floats (c1 and c2 last
+// 10.635018 s exactly, but c1's floats are an ulp further apart; c3's
+// 5.0000004 s reads 5.0 and ties c4, so the variants compare in reverse), and
+// a nanosecond column's quantiles round its int64 units through floats even
+// where a cell spells whole microseconds in nine digits (case:opened).
+void review_fq_nanosecond_columns() {
+  std::istringstream csv(
+      "cid,act,ts,case:opened\n"
+      "c1,a,2023-11-19 22:13:00.609067,2020-01-01 00:00:00.000001000\n"
+      "c1,c,2023-11-19 22:13:11.244085,2020-01-01 00:00:00.000001000\n"
+      "c2,c,2023-11-19 22:40:00.068711,2020-01-02 00:00:00.000000250\n"
+      "c2,a,2023-11-19 22:40:10.703729,2020-01-02 00:00:00.000000250\n"
+      "c3,a,2023-11-20 10:00:00,2020-01-03 00:00:00\n"
+      "c3,b,2023-11-20 10:00:05.000000400,2020-01-03 00:00:00\n"
+      "c4,b,2023-11-20 11:00:00,2020-01-04 00:00:00.5\n"
+      "c4,a,2023-11-20 11:00:05,2020-01-04 00:00:00.5\n");
+  CsvImportOptions import;
+  import.case_id_column = "cid";
+  import.activity_column = "act";
+  import.timestamp_column = "ts";
+  const auto log = import_csv_event_log(csv, import);
+  const std::string variants =
+      "If I have a process with the following process variants:\n\n"
+      " a -> c ( frequency = 1  performance = 10.635 )\n c -> a ( frequency = 1  performance = 10.635 )\n"
+      " b -> a ( frequency = 1  performance = 5.000 )\n a -> b ( frequency = 1  performance = 5.000 )\n\n\n";
+  if (llm_log_variants_description(log, LlmAbstractionOptions{}) != variants) {
+    std::fprintf(stderr, "FQ1 variants: %s\n", llm_log_variants_description(log, LlmAbstractionOptions{}).c_str());
+    std::exit(1);
+  }
+  const std::string columns =
+      "case:opened  empty: 0  quantiles: {0.0: Timestamp('2020-01-01 00:00:00.000001024+0000', tz='UTC'), "
+      "0.25: Timestamp('2020-01-01 18:00:00.000000512+0000', tz='UTC'), 0.5: Timestamp('2020-01-02 12:00:00+0000', tz='UTC'), "
+      "0.75: Timestamp('2020-01-03 06:00:00.124999936+0000', tz='UTC'), 1.0: Timestamp('2020-01-04 00:00:00.500000+0000', tz='UTC')}\n"
+      "concept:name  empty: 0 values: (a; freq. 4) (c; freq. 2) (b; freq. 2)\n"
+      "time:timestamp  empty: 0  quantiles: {0.0: Timestamp('2023-11-19 22:13:00.609067008+0000', tz='UTC'), "
+      "0.25: Timestamp('2023-11-19 22:33:17.862554368+0000', tz='UTC'), 0.5: Timestamp('2023-11-20 04:20:05.351864576+0000', tz='UTC'), "
+      "0.75: Timestamp('2023-11-20 10:15:03.750000384+0000', tz='UTC'), 1.0: Timestamp('2023-11-20 11:00:05+0000', tz='UTC')}\n"
+      "ts  empty: 0  quantiles: {0.0: Timestamp('2023-11-19 22:13:00.609067008+0000', tz='UTC'), "
+      "0.25: Timestamp('2023-11-19 22:33:17.862554368+0000', tz='UTC'), 0.5: Timestamp('2023-11-20 04:20:05.351864576+0000', tz='UTC'), "
+      "0.75: Timestamp('2023-11-20 10:15:03.750000384+0000', tz='UTC'), 1.0: Timestamp('2023-11-20 11:00:05+0000', tz='UTC')}";
+  if (llm_log_columns_description(log) != columns) {
+    std::fprintf(stderr, "FQ1 columns: %s\n", llm_log_columns_description(log).c_str());
+    std::exit(1);
+  }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   review_av_frame_descriptions();
+  review_fq_nanosecond_columns();
   const char* path = argc > 1 ? argv[1] : "src/backend/tests/fixtures/llm_abstractions_bank.txt";
   int failures = 0;
   std::size_t compared = 0, errors = 0;

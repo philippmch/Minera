@@ -2784,8 +2784,10 @@ CsvEventData import_csv_event_data_impl(
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;
       column.type = column_type(typed.kind, ints);
-      if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text))
+      if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text)) {
         column.type = DataFrameColumnType::kDate;
+        column.nanoseconds = nanosecond_cells(cells, typed.text);
+      }
       unique = trace_keys.insert(column.key).second && unique;
       columns->trace_columns.push_back(std::move(column));
     }

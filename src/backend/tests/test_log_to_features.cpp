@@ -3532,7 +3532,51 @@ static void temporal_exact_json_contract() {
   assert(log_to_features_json(result).find("timestamp_ns") == std::string::npos);
 }
 
+// Review FQ1: log_to_features on read_csv + format_dataframe +
+// convert_to_event_log of a CSV whose date columns hold nanoseconds: the
+// one-hot names take str(Timestamp), nine fraction digits when the time has
+// nanoseconds below the microsecond, six when it has microseconds (a nine-digit
+// spelling of whole microseconds too), a blank cell NaT (pm4py 2.7.22,
+// observed black-box).
+void review_fq_csv_nanosecond_dates() {
+  std::istringstream csv(
+      "case:concept:name,concept:name,time:timestamp,due,case:opened\n"
+      "c1,a,2020-01-01 00:00:00.000000517,2020-01-05 10:00:00.123456789,2020-01-01 00:00:00.000001000\n"
+      "c1,b,2020-01-01 00:01:00.5,2020-01-05 10:00:00,2020-01-01 00:00:00.000001000\n"
+      "c2,a,2020-01-02 00:00:00.123456,2020-01-05 10:00:00.000002000,2020-01-02 00:00:00.000000250\n"
+      "c2,b,2020-01-02 00:01:00,,2020-01-02 00:00:00.000000250\n");
+  minera::CsvImportOptions import;
+  import.case_id_column = "case:concept:name";
+  import.activity_column = "concept:name";
+  import.timestamp_column = "time:timestamp";
+  const auto log = minera::import_csv_event_log(csv, import);
+  LogToFeaturesOptions options;
+  options.standard_keys = true;
+  options.event_string_attributes = {"time:timestamp", "due"};
+  options.case_string_attributes = {"opened"};
+  options.case_string_attributes_supplied = options.case_numeric_attributes_supplied = true;
+  options.event_string_attributes_supplied = options.event_numeric_attributes_supplied = true;
+  const auto result = log_to_features(log, options);
+  assert(result.feature_names == std::vector<std::string>({
+             "trace:opened@2020-01-01 00:00:00.000001+00:00",
+             "trace:opened@2020-01-02 00:00:00.000000250+00:00",
+             "event:time:timestamp@2020-01-01 00:00:00.000000517+00:00",
+             "event:time:timestamp@2020-01-01 00:01:00.500000+00:00",
+             "event:time:timestamp@2020-01-02 00:00:00.123456+00:00",
+             "event:time:timestamp@2020-01-02 00:01:00+00:00",
+             "event:due@2020-01-05 10:00:00+00:00",
+             "event:due@2020-01-05 10:00:00.000002+00:00",
+             "event:due@2020-01-05 10:00:00.123456789+00:00",
+             "event:due@NaT"}));
+  const std::vector<std::vector<double>> expected = {{1, 0, 1, 1, 0, 0, 1, 0, 1, 0}, {0, 1, 0, 0, 1, 1, 0, 1, 0, 1}};
+  assert(result.trace_rows.size() == 2);
+  for (std::size_t row = 0; row < 2; ++row)
+    for (std::size_t column = 0; column < expected[row].size(); ++column)
+      assert(std::get<double>(result.trace_rows[row][column]) == expected[row][column]);
+}
+
 int main() {
+  review_fq_csv_nanosecond_dates();
   temporal_frequency_public_boundaries();
   temporal_subsecond_public_rows();
   temporal_frequency_public_aliases();

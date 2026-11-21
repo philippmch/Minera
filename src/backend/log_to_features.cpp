@@ -20,6 +20,7 @@
 #include "frame_cells.hpp"
 #include "frame_times.hpp"
 #include "python_scalar.hpp"
+#include "root_cause_dates.hpp"
 #include "root_cause_trace_key.hpp"
 
 namespace minera {
@@ -1103,6 +1104,11 @@ LogToFeaturesResult log_to_features(const EventLog& source,
   // column on every event, NaN cells, frame dtypes; observed black-box).
   // The calendar TEMPORAL variant reads the frame itself: the same columns
   // (a CSV resource only under its header, the UTC timestamp copies).
+  // A CSV frame's dates are Timestamps of a datetime64[ns] column: the
+  // one-hot names take str(Timestamp), nine fraction digits when the time has
+  // nanoseconds (round FQ, observed black-box), as root cause does.
+  const detail::RootCauseNanosecondDates nanosecond_dates(
+      source.dataframe_columns && source.dataframe_columns->csv_text);
   std::optional<EventLog> frame;
   if (source.dataframe_columns &&
       (options.variant != LogToFeaturesVariant::TEMPORAL || !options.grouper_freq.empty()))

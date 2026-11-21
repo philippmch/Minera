@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FP (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FQ (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8469,6 +8469,63 @@ duckdb); the fixture replay gave 2,673 responses unchanged. FO's CI run
 this round (no folder access), so no newer reviewer handoff was read.
 The generators, the comparers and the probes are in the project files
 under `review-harness/round-fp/`.
+
+Round FQ re-reviewed FP on fresh banks and swept new areas (Review FQ1).
+FP's fixes held (resource profiles on uploads with nanosecond times near
+the window, CSV and XES; the log variant with lifecycle columns; passed
+time and the other timing routes on lifecycle raw logs; root cause on
+nanosecond CSV logs with the multiplier, numeric date columns and the
+unknown-activity form). FP's CI run 44930288030 finished green in all
+six jobs. Fixed: FQ1-1, the one-hot feature names of a CSV log's dates
+take `str(Timestamp)` with nine fraction digits when the time has
+nanoseconds (`/api/log-to-features`, `/api/features`,
+`/api/transform-features`; 61 of 180 comparisons differed); FQ1-2, the
+LLM log description marks a CSV log's nanosecond date columns (the
+timestamp, other event columns and `case:` columns, which the CSV
+importer now flags), so their quantiles print pandas' float64
+nanoseconds; FQ1-3, the LLM variants description takes a variant's
+durations as differences of `Timestamp.timestamp()` floats, so ties and
+their order follow pm4py. New areas without findings: attribute value
+lists of nanosecond CSV dates; local diagnostics on raw logs with a
+group column (CSV and XES); the SNA pandas variants and roles on CSV
+uploads with offsets and nanoseconds; timestamp interleavings and link
+analysis on CSV uploads with nanosecond times and offsets; pm4py's
+temporal profile, cycle and service time, concurrent activities,
+eventually-follows graph, performance DFG and interval features do not
+convert lifecycles to intervals, so nothing changes there; the trace
+explorer has no pm4py counterpart.
+
+In the suite: `minera_log_to_features_tests` and
+`minera_llm_abstractions_parity_tests` carry FQ1's reference values (the
+LLM bank of 2,700 calls replays unchanged). The full ctest passed 659 of
+659 on the first run (29 minutes, -j2); the Python script tests 406 of
+406 (the 13 query runtime tests in a venv with duckdb); the fixture
+replay gave 2,673 responses unchanged. The Mac was not reachable this
+round (no folder access), so no newer reviewer handoff was read. The
+generators, the comparers and the probes are in the project files under
+`review-harness/round-fq/`.
+
+Next round (FR) should start by re-reviewing round FQ:
+
+- FQ's CI run;
+- FQ1-1 to FQ1-3 on fresh banks: `nsdates.py --only features` on new
+  seeds (also with case date columns only, blanks, and XES uploads, which
+  keep microseconds), `llmns.py` on new seeds (log attributes with
+  nanosecond `case:` and event columns, variants with ties at the
+  microsecond);
+- new areas: other consumers of a CSV log's datetime64[ns] cells: the
+  table functions that read a `case:` date column's unit (the CSV frame
+  table types only event date columns by their nanosecond cells), profile
+  clustering and the other `log_to_features` callers with date string
+  features on nanosecond CSV logs, the decision mining and data Petri net
+  guards on date attributes, the OCEL conversions of a CSV log; the LLM
+  descriptions on XES uploads with more fraction digits (`llmns.py --xes`
+  now generates them); interleavings and link analysis with odd relation
+  files and nanosecond times together (`il/il3.py` with `ODD=1`);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FQ (kept for its older items):
 
 Next round (FQ) should start by re-reviewing round FP:
 
