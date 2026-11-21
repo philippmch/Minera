@@ -1,4 +1,5 @@
 #include "minera/dfg_dataframe.hpp"
+#include "minera/csv_event_log_importer.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -6,6 +7,7 @@
 #include <cstdint>
 #include <initializer_list>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -854,7 +856,40 @@ void selected_cells_outlive_row_lookup() {
   assert(performance.performance.size() == 1);
 }
 
+// Review FR1: pm4py 2.7.22's Polars DFG on a CSV whose timestamp column has
+// nanoseconds (Datetime(ns)) and whose start column has none (Datetime(us)):
+// Polars casts the difference to microseconds, truncating the completions,
+// before taking whole seconds (observed black-box): c1 waits 40 - 10.0000005
+// (30 there, 29 when exact), c2 50 - 20.999999999 (29).
+void review_fr_polars_mixed_datetime_units() {
+  std::istringstream text(
+      "case,act,ts,st\n"
+      "c1,a,2020-01-01 00:00:10.000000500,2020-01-01 00:00:05\n"
+      "c1,b,2020-01-01 00:01:10,2020-01-01 00:00:40\n"
+      "c2,a,2020-01-01 00:00:20.999999999,2020-01-01 00:00:20\n"
+      "c2,b,2020-01-01 00:01:00.5,2020-01-01 00:00:50\n");
+  CsvImportOptions import_options;
+  import_options.case_id_column = "case";
+  import_options.activity_column = "act";
+  import_options.timestamp_column = "ts";
+  const auto csv = import_csv_event_data(text, import_options);
+  DfgTableOptions options;
+  options.measure = DfgTableMeasure::kPerformance;
+  options.performance_aggregation = DfgPerformanceAggregation::kAll;
+  options.activity_attribute = "act";
+  options.case_id_attribute = "case";
+  options.timestamp_attribute = "ts";
+  options.start_timestamp_attribute = "st";
+  const auto polars = discover_polars_dfg(LazyEventTable::from_table(csv.table), options);
+  assert(polars.performance.size() == 1);
+  const auto& summary = polars.performance.at({"a", "b"}).summary;
+  assert(summary.mean == 29.5 && summary.median == 29.5);
+  assert(summary.minimum == 29.0 && summary.maximum == 30.0 && summary.sum == 59.0);
+  assert(summary.standard_deviation == 0.7071067811865476);
+}
+
 int main() {
+  review_fr_polars_mixed_datetime_units();
   graph_measure_selectors_and_ordering();
   dataframe_triples_contract();
   graph_performance_cost_and_aggregation();

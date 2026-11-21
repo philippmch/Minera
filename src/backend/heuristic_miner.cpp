@@ -4,6 +4,7 @@
 #include "exact_count_ratio.hpp"
 #include "exact_mean.hpp"
 #include "exact_stdev.hpp"
+#include "frame_times.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
@@ -134,6 +135,9 @@ struct Interval {
   std::int64_t complete_microseconds = 0;
   std::optional<std::int64_t> business_start;
   std::optional<std::int64_t> business_complete;
+  // A CSV upload's exact instants, nanoseconds included (round FR).
+  std::optional<ParsedExactTimestamp> start_exact;
+  std::optional<ParsedExactTimestamp> complete_exact;
 };
 
 using NamePair = std::pair<std::string, std::string>;
@@ -276,6 +280,14 @@ ClassicStartTimestamp classic_start_timestamp(
   }
 
   const auto* attribute = selected_start_attribute(event, key);
+  // The timestamp column under its own header (a CSV upload's) is a column
+  // of the frame too (round FR, observed black-box).
+  if (attribute == nullptr && !event.timestamp_source_key.empty() &&
+      key == event.timestamp_source_key) {
+    if (event.timestamp_state == FirstClassAttributeState::kNull)
+      return {ClassicStartKind::kNull, nullptr};
+    return {ClassicStartKind::kValue, &event.timestamp};
+  }
   if (attribute == nullptr)
     return {ClassicStartKind::kMissing, nullptr};
   if (attribute->is_null)
@@ -381,6 +393,50 @@ std::int64_t required_timestamp_microseconds(
   return *parsed;
 }
 
+// end - begin in whole microseconds, floored from the exact instants (their
+// nanoseconds included).
+std::int64_t floored_elapsed_microseconds(const ParsedExactTimestamp& last,
+                                          const ParsedExactTimestamp& first) {
+  const auto nanos = static_cast<std::int64_t>(last.nanoseconds) -
+                     static_cast<std::int64_t>(first.nanoseconds);
+  const auto fraction = nanos >= 0 ? nanos / 1'000 : -((-nanos + 999) / 1'000);
+  return (last.seconds - first.seconds) * 1'000'000 + fraction;
+}
+
+// The same for two texts; `fallback` when either has no exact instant.
+std::int64_t floored_elapsed_microseconds(const std::string& end, const std::string& begin,
+                                          std::int64_t fallback) {
+  const auto last = parse_timestamp_exact(end);
+  const auto first = parse_timestamp_exact(begin);
+  if (!last || !first) return fallback;
+  return floored_elapsed_microseconds(*last, *first);
+}
+
+// A wait of `microseconds` in seconds as pm4py measures it on an upload's
+// frame (round FR, observed black-box on CSV and XES uploads, the classic and
+// plusplus alike): the whole seconds plus the microseconds / 1e6, so 4.999997
+// seconds is 4.9999970000000005 there, where microseconds / 1e6 gives
+// 4.999997.
+double frame_elapsed_seconds(std::int64_t microseconds) {
+  auto whole = microseconds / 1'000'000;
+  auto remainder = microseconds % 1'000'000;
+  if (remainder < 0) {
+    --whole;
+    remainder += 1'000'000;
+  }
+  return static_cast<double>(whole) + static_cast<double>(remainder) / 1e6;
+}
+
+// An instant's seconds for the plusplus sojourn times: on a CSV upload's
+// frame pm4py subtracts Timestamp.timestamp() values (round(ns / 1e9, 6), round
+// FR, observed black-box: 10.0000002 less 10.0000007 is -9.5367431640625e-07);
+// else the microseconds' seconds.
+double interval_seconds(const std::optional<ParsedExactTimestamp>& exact,
+                        std::int64_t microseconds) {
+  return exact ? frame_times::epoch_seconds(*exact)
+               : detail::epoch_seconds_from_microseconds(microseconds);
+}
+
 // `utc_clock` (round FL): a CSV upload, whose frame holds UTC Timestamps (an
 // offset is converted), so pm4py's BusinessHours reads the UTC clock there
 // (observed black-box, fl t4/c1.csv); else the text's own wall clock.
@@ -415,8 +471,9 @@ IntervalTrace to_intervals(const Trace& trace,
     if (pre_interval_mode) {
       const auto timestamp_microseconds =
           required_timestamp_microseconds(timestamp_text, "event");
-      const double timestamp = detail::epoch_seconds_from_microseconds(
-          timestamp_microseconds);
+      const auto complete_exact = utc_clock ? parse_timestamp_exact(timestamp_text)
+                                            : std::optional<ParsedExactTimestamp>{};
+      const double timestamp = interval_seconds(complete_exact, timestamp_microseconds);
       const auto business_complete =
           options.use_business_hours
               ? std::optional<std::int64_t>{
@@ -429,8 +486,9 @@ IntervalTrace to_intervals(const Trace& trace,
             "configured start timestamp");
       const auto start_microseconds =
           required_timestamp_microseconds(*value, "start");
-      const double start =
-          detail::epoch_seconds_from_microseconds(start_microseconds);
+      const auto start_exact = utc_clock ? parse_timestamp_exact(*value)
+                                         : std::optional<ParsedExactTimestamp>{};
+      const double start = interval_seconds(start_exact, start_microseconds);
       const auto business_start =
           options.use_business_hours
               ? std::optional<std::int64_t>{
@@ -442,7 +500,9 @@ IntervalTrace to_intervals(const Trace& trace,
                           start_microseconds,
                           timestamp_microseconds,
                           business_start,
-                          business_complete});
+                          business_complete,
+                          start_exact,
+                          complete_exact});
       continue;
     }
 
@@ -469,8 +529,9 @@ IntervalTrace to_intervals(const Trace& trace,
 
     const auto timestamp_microseconds =
         required_timestamp_microseconds(timestamp_text, "event");
-    const double timestamp = detail::epoch_seconds_from_microseconds(
-        timestamp_microseconds);
+    const auto complete_exact = utc_clock ? parse_timestamp_exact(timestamp_text)
+                                          : std::optional<ParsedExactTimestamp>{};
+    const double timestamp = interval_seconds(complete_exact, timestamp_microseconds);
     const auto business_complete =
         options.use_business_hours
             ? std::optional<std::int64_t>{
@@ -478,12 +539,15 @@ IntervalTrace to_intervals(const Trace& trace,
             : std::optional<std::int64_t>{};
     auto start_microseconds = timestamp_microseconds;
     double start = timestamp;
+    auto start_exact = complete_exact;
     auto business_start = business_complete;
     auto pending = pending_starts.find(key);
     if (pending != pending_starts.end() && !pending->second.empty()) {
       start_microseconds = required_timestamp_microseconds(
           pending->second.front().timestamp_text, "start");
-      start = detail::epoch_seconds_from_microseconds(start_microseconds);
+      start_exact = utc_clock ? parse_timestamp_exact(pending->second.front().timestamp_text)
+                              : std::optional<ParsedExactTimestamp>{};
+      start = interval_seconds(start_exact, start_microseconds);
       if (options.use_business_hours) {
         business_start = required_business_timestamp_microseconds(
             pending->second.front().timestamp_text, "start", utc_clock);
@@ -496,7 +560,9 @@ IntervalTrace to_intervals(const Trace& trace,
                         start_microseconds,
                         timestamp_microseconds,
                         business_start,
-                        business_complete});
+                        business_complete,
+                        start_exact,
+                        complete_exact});
   }
   IntervalTrace result;
   result.sorted = intervals;
@@ -524,6 +590,7 @@ PlusAbstraction build_plus_abstraction(
       selected_start_timestamp(log.traces.front().events.front(), options,
                                true) != nullptr;
   const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
+  const bool frame_seconds = log.dataframe_columns != nullptr;  // round FR
   for (const auto& trace : log.traces) {
     const auto converted =
         to_intervals(trace, options, pre_interval_mode, utc_clock);
@@ -583,9 +650,16 @@ PlusAbstraction build_plus_abstraction(
       const NamePair pair{performance[i - 1].activity,
                           performance[i].activity};
       ++out.direct_adjacency[pair];
-      double wait = detail::epoch_seconds_from_microseconds(
-          performance[i].start_microseconds -
-          performance[i - 1].complete_microseconds);
+      // On an upload's frame the wait is the exact difference floored to the
+      // microsecond, in frame_elapsed_seconds (round FR, observed black-box).
+      const auto& previous = performance[i - 1];
+      const auto& current = performance[i];
+      const auto wait_microseconds =
+          current.start_exact && previous.complete_exact
+              ? floored_elapsed_microseconds(*current.start_exact, *previous.complete_exact)
+              : current.start_microseconds - previous.complete_microseconds;
+      double wait = frame_seconds ? frame_elapsed_seconds(wait_microseconds)
+                                  : detail::epoch_seconds_from_microseconds(wait_microseconds);
       if (options.use_business_hours) {
         wait = detail::business_elapsed_seconds_microseconds(
             *performance[i - 1].business_complete,
@@ -1109,6 +1183,7 @@ HeuristicClassicDfgInput build_classic_input(
     const EventLog& log, const HeuristicMinerOptions& options) {
   HeuristicClassicDfgInput input;
   const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
+  const bool frame_seconds = log.dataframe_columns != nullptr;  // round FR
   const auto business_slots =
       options.use_business_hours
           ? detail::normalize_business_hour_slots(
@@ -1161,8 +1236,17 @@ HeuristicClassicDfgInput build_classic_input(
                                      : *start.value;
         const auto start_microseconds =
             required_timestamp_microseconds(start_text, "start");
-        double elapsed = detail::epoch_seconds_from_microseconds(
-            start_microseconds - complete_microseconds);
+        // A CSV upload's frame holds nanoseconds: pm4py takes the exact
+        // difference floored to the microsecond, not the difference of the
+        // floored instants, in frame_elapsed_seconds on an upload's frame
+        // (round FR, observed black-box).
+        const auto elapsed_microseconds =
+            utc_clock ? floored_elapsed_microseconds(
+                            start_text, selected_timestamp(trace.events[i - 1], options),
+                            start_microseconds - complete_microseconds)
+                      : start_microseconds - complete_microseconds;
+        double elapsed = frame_seconds ? frame_elapsed_seconds(elapsed_microseconds)
+                                       : detail::epoch_seconds_from_microseconds(elapsed_microseconds);
         if (options.use_business_hours) {
           const auto previous_local =
               required_business_timestamp_microseconds(

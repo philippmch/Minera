@@ -36765,3 +36765,90 @@ In the suite: `minera_log_to_features_tests`
 carry FQ1's reference values. The full ctest passed 659 of 659 on the
 first run (29 minutes, -j2), the Python script tests 406 of 406, the
 fixture replay gave 2,673 responses unchanged.
+
+## Review FR1: case: columns of CSV frames in the batches, heuristics waits and sojourn times on uploads, the Polars DFG with mixed datetime units (2026-11-21)
+
+Round FR re-reviewed round FQ on fresh banks and swept new areas. FQ's CI
+run 44937354307 (4bddcd1) finished green in the Linux, macOS, Python,
+frontend and verifier jobs. Observed black-box on pm4py 2.7.22 (pandas
+3.0.5, numpy 2.4.6, no pyarrow), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` and exact
+float comparison.
+
+Re-review of FQ (fresh seeds): one-hot features of nanosecond CSV dates
+(nsdC: 180 equal), also on XES uploads (nsdDx: 120 equal); the LLM
+descriptions on CSV uploads (llmD: 60 of 60 for the DFG, event stream,
+log attributes and log features, variants 54 equal and 6 raised alike)
+and on XES uploads with nine fraction digits (llmEx: 40 each, variants 35
+and 5). No difference.
+
+Fixed:
+
+- **FR1-1. The `case:` columns of a CSV frame** (`/api/discover-timing`
+  batches, pandas and Polars). format_dataframe converts every column of
+  date texts, a `case:` column too, to UTC dates (datetime64[ns, UTC] when
+  a cell has digits below the microsecond), and read_csv types a `case:`
+  column of numbers int64, float64 with a gap, bool or object. Minera's
+  CSV frame table typed only the event columns, so a `case:st` start was
+  read as text (the pandas batches scale a datetime64[ns] start by 1e9
+  against the microsecond timestamps' 1e6 and find no batch) and a
+  `case:dept` resource kept its text ("4", not "4.0"). bt/ck1: pandas 51
+  of 120 and Polars 10 of 120 differed, 5 raised only in pm4py.
+- **FR1-2. `case:` keys of the batches log variant.** pm4py reads the
+  EventLog as an event stream whose events hold each trace attribute as
+  `case:<key>`, winning over an event key of that name, so a `case:`
+  column of a CSV upload is a start, activity or resource key there; a NaN
+  case value is one float object per trace (its events share a group,
+  other traces' NaNs do not). Minera raised `KeyError: 'case:dept'` (bt/ck1:
+  98 of 120).
+- **FR1-3. Heuristics waits on a CSV upload with nanoseconds**
+  (`/api/mine`, classic `performance_dfg` and plusplus edges with the
+  performance decoration). `heuristics_miner.apply_heu` on the frame
+  takes the exact difference floored to the microsecond (14.5 less
+  0.0000005 is 14.499999, 14.0000006 less 0.0000005 is 14.0), not the
+  difference of the instants cut to microseconds; the timestamp column
+  named as the start key reads the completion dates, where Minera raised
+  "missing the configured start timestamp attribute" (hsA, hsD to hsF: 144
+  of 280 comparisons differed or raised only in Minera). `plusplus.apply_heu_pandas`, which the
+  library's `discover_plus_plus_pandas` models, keeps exact nanoseconds
+  (1.000000001), unchanged.
+- **FR1-4. The Polars DFG with mixed datetime units**
+  (`/api/dfg-dataframe`, Polars backend, performance). A Datetime(ns)
+  timestamp less a Datetime(us) start is cast to microseconds, truncating
+  the nanosecond side, before the whole seconds (40 less 10.0000005 is 30
+  there, 29 exactly). dsB and dsD: 33 of 80 differed.
+- **FR1-5. Heuristics waits and plusplus sojourn times on uploads.** On
+  an upload's frame (CSV and XES) a wait is the whole seconds plus the
+  microseconds / 1e6, as pandas' `Timedelta.total_seconds()` gives it
+  (4.999997 seconds is 4.9999970000000005; Minera gave the microseconds
+  / 1e6, 4.999997); 254 of 254 random non-negative waits fit, negative
+  ones clamp to 0 (ut/fit.py). The plusplus sojourn times of a CSV upload
+  subtract `Timestamp.timestamp()` values, round(ns / 1e9, 6) (10.0000002
+  less 10.0000007 is -9.5367431640625e-07); soj/sj1: 10 of 60 differed.
+
+Declared or unchanged:
+
+- Profile clustering with date string features on nanosecond CSV logs
+  (pcA: 103 equal, 13 the declared label ties, 4 raised alike).
+- Timestamp interleavings with odd relation files and nanosecond times
+  (`il/il3.py` with `ODD=1`, ilB: 82 equal, 68 raised alike) and link
+  analysis (laB: 616 equal, 184 raised alike).
+- The classic heuristics with a `case:` start key and the batches log
+  variant with a NaT start raise in both, with other texts (declared).
+- Unchanged: the declared items of FQ1 and before.
+
+Results after the fixes (exact): batches on the same and fresh seeds
+(ck4, ck5, cs3: pandas 280, Polars 221 equal and 59 raised alike, log 267
+equal and 13 raised alike); heuristics (hsA3, hsG2, hsH2, hsI2 and the
+microsecond-only hsJ: classic 121 and plusplus 200 equal, 79 raised
+alike); the DFG (dsB2, dsD2, dsE, dsB3: pandas 159 and Polars 160 equal);
+the plusplus sojourn times (sj2, sj3: 120 equal); XES waits (ut/heu_xes.py)
+equal.
+
+In the suite: `minera_batches_parity_contracts_tests`
+(`review_fr_csv_case_columns`), `minera_heuristic_variants_tests`
+(`review_fr_nanosecond_waits`) and `minera_dfg_dataframe_tests`
+(`review_fr_polars_mixed_datetime_units`) carry FR1's reference values.
+The full ctest passed 659 of 659 on the first run (34 minutes, -j2), the
+Python script tests passed 406 of 406, the fixture replay
+gave 2,673 responses unchanged.

@@ -1,4 +1,5 @@
 #include "minera/heuristic_miner.hpp"
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/json_export.hpp"
 #include "minera/log_conversion.hpp"
@@ -18,6 +19,7 @@
 #include <numeric>
 #include <optional>
 #include <set>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -5460,6 +5462,56 @@ void plusplus_computed_public_fields_acceptance() {
 
 }  // namespace
 
+// Review FR1: pm4py 2.7.22's heuristics miners (heuristics_miner.apply_heu,
+// the classic's performance_dfg and the plusplus edges alike) on
+// format_dataframe of a CSV whose dates have nanoseconds (observed
+// black-box; plusplus.apply_heu_pandas keeps exact nanoseconds, see
+// plusplus_pandas_exact_duration_and_performance): a wait is the exact
+// difference floored to whole microseconds (14.5 - 0.0000005 is 14.499999,
+// 14.0000006 - 0.0000005 is 14.0); the timestamp column as the start key
+// reads the completion dates. A wait is the whole seconds plus the
+// microseconds / 1e6.
+void review_fr_nanosecond_waits() {
+  struct Control {
+    const char* completed_a;
+    const char* started_b;
+    const char* completed_b;
+    double from_start;
+    double from_completion;
+  };
+  const std::vector<Control> controls{
+      {"00.000000500", "14.5", "20", 14.499999, 19.999999},
+      {"00.999999500", "14.5", "20", 13.5, 19.0},
+      {"00.000000001", "14", "20", 13.999999, 19.999999},
+      {"00.123456789", "14.5", "20", 14.376543, 19.876543},
+      {"00.000000500", "14.000000100", "20", 13.999999, 19.999999},
+      {"00.000000500", "14.000000600", "20.000000001", 14.0, 19.999999},
+      // The whole seconds plus the microseconds / 1e6 (4.9999970000000005).
+      {"02.000003", "07", "20", 4.9999970000000005, 17.999997}};
+  for (const auto& control : controls) {
+    std::istringstream csv(std::string("case,act,ts,st\n") +
+                           "c1,a,2020-01-01 00:00:" + control.completed_a + ",2020-01-01 00:00:00\n" +
+                           "c1,b,2020-01-01 00:00:" + control.completed_b + ",2020-01-01 00:00:" +
+                           control.started_b + "\n");
+    CsvImportOptions import;
+    import.case_id_column = "case";
+    import.activity_column = "act";
+    import.timestamp_column = "ts";
+    const auto log = import_csv_event_log(csv, import);
+    for (const auto variant : {HeuristicMinerVariant::kClassic, HeuristicMinerVariant::kPlusPlus})
+      for (const std::string start : {"st", "ts", ""}) {
+        HeuristicMinerOptions options;
+        options.variant = variant;
+        options.decoration = HeuristicNetDecoration::kPerformance;
+        if (!start.empty()) options.start_timestamp_attribute = start;
+        const auto net = discover_heuristics_net(log, options);
+        const auto* found = edge(net, "a", "b");
+        assert(found != nullptr);
+        assert(found->representation == (start == "st" ? control.from_start : control.from_completion));
+      }
+  }
+}
+
 int main(int argc, char** argv) {
   std::optional<std::string> classic_flat_evidence;
   std::optional<std::string> classic_object_evidence;
@@ -5505,6 +5557,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_object_dtype_error_preserves_input();
   plusplus_pandas_missing_start_error_mutation();
   plusplus_pandas_exact_duration_and_performance();
+  review_fr_nanosecond_waits();
   plusplus_pandas_nat_statistics_and_error_order();
   plusplus_pandas_occurrence_order_and_self_concurrency();
   plusplus_pandas_concurrency_rounding_keeps_exact_waits();

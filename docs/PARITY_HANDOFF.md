@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FQ (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FR (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8504,6 +8504,67 @@ replay gave 2,673 responses unchanged. The Mac was not reachable this
 round (no folder access), so no newer reviewer handoff was read. The
 generators, the comparers and the probes are in the project files under
 `review-harness/round-fq/`.
+
+Round FR re-reviewed FQ on fresh banks and swept new areas (Review FR1).
+FQ's fixes held (one-hot names of nanosecond CSV dates, also with case
+date columns only and on XES uploads; the LLM descriptions on CSV and on
+XES uploads with nine fraction digits). FQ's CI run 44937354307 finished
+green in the Linux, macOS, Python, frontend and verifier jobs (Windows
+ctest still running at the push). Fixed: FR1-1, the CSV frame table types
+a `case:` column like an event column (read_csv's int64, float64, bool
+or object; UTC dates, datetime64[ns, UTC] with a cell below the
+microsecond), so the pandas and Polars batches read a `case:` start,
+resource or activity key as pm4py does; FR1-2, the batches log variant
+reads `case:X` as the trace attribute X (pm4py's event stream), a NaN
+case value one float per trace (its events share a group, other traces'
+NaNs do not), where Minera raised `KeyError`; FR1-3, the heuristics
+miners on a CSV upload with nanoseconds floor each wait's exact
+difference to the microsecond (classic and plusplus), and the timestamp
+column named as the start key reads the completion dates; FR1-4, the
+Polars DFG with a Datetime(ns) timestamp and a Datetime(us) start
+truncates the nanosecond side to microseconds before whole seconds;
+FR1-5, on an upload's frame (CSV and XES) a heuristics wait is the whole
+seconds plus the microseconds / 1e6 (4.9999970000000005 for 4.999997 s),
+and the plusplus sojourn times of a CSV upload subtract
+`Timestamp.timestamp()` values. `plusplus.apply_heu_pandas` (the
+library's `discover_plus_plus_pandas`) keeps exact nanoseconds and is
+unchanged. New areas without findings: profile clustering with date
+string features on nanosecond CSV logs (13 declared label ties);
+interleavings with odd relation files and nanosecond times (`ODD=1`);
+link analysis; the pandas DFG with `case:` and event start keys.
+
+In the suite: `minera_batches_parity_contracts_tests`
+(`review_fr_csv_case_columns`), `minera_heuristic_variants_tests`
+(`review_fr_nanosecond_waits`) and `minera_dfg_dataframe_tests`
+(`review_fr_polars_mixed_datetime_units`) carry FR1's reference values.
+The full ctest passed 659 of 659 on the first run (34 minutes, -j2); the
+Python script tests passed 406 of 406; the fixture replay
+gave 2,673 responses unchanged. The Mac was not reachable this round (no
+folder access), so no newer reviewer handoff was read. The generators,
+the comparers and the probes are in the project files under
+`review-harness/round-fr/`.
+
+Next round (FS) should start by re-reviewing round FR:
+
+- FR's CI run (and FQ's Windows job);
+- FR1-1 to FR1-5 on fresh banks: `bt/casekeys.py` and `bt/casest.py` on
+  new seeds (also XES uploads and case columns of dates with offsets),
+  `heu/heustart.py` with `SKS`, `TSNS`, `STNS` and `NSOFF=1` on new
+  seeds, `soj/soj.py`, `dfg/dfgstart.py` with `TSNS=0.5`; the
+  whole-seconds-plus-microseconds wait rule on XES uploads with a sweep
+  (only probed so far, `ut/heu_xes.py`) and with business hours;
+- new areas: other routes that read a timedelta's `total_seconds()` on
+  an upload's frame (pm4py's Timedelta gives whole seconds plus
+  microseconds / 1e6 and drops nanoseconds): the footprints and
+  correlation miner start keys, the temporal profile, the performance
+  spectrum, the eventually-follows performance; the decision mining and
+  data Petri net guards on date attributes; the OCEL conversions of a
+  CSV log (`/api/log-convert`); the plusplus eventually-follows and
+  concurrency comparisons between sub-microsecond instants;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FR (kept for its older items):
 
 Next round (FR) should start by re-reviewing round FQ:
 

@@ -70,6 +70,10 @@ struct IndexedEvent {
   // BO).
   bool activity_shared_nan = false;
   bool resource_shared_nan = false;
+  // A CSV frame log's NaN `case:` cell is its trace's one float object, the
+  // same in every event of the trace (round FR): the trace's index.
+  std::optional<std::size_t> activity_nan_trace;
+  std::optional<std::size_t> resource_nan_trace;
 };
 
 struct TableSelector {
@@ -295,6 +299,10 @@ const std::string* log_case_value(const Trace& trace, const Event& event,
       key == "case:concept:name" || key == "concept:name" || key == "case";
   if (canonical) return trace_value(trace, key);
 
+  // The log variant reads the log as an event stream: a `case:` key is the
+  // trace's attribute (round FR, see stream_trace_value).
+  if (key.starts_with("case:"))
+    if (const auto* value = trace.attribute(key.substr(5))) return value;
   // A custom case selector is an event selector.  A trace-level value remains
   // a useful fallback for logs whose case metadata was imported separately.
   if (const auto* value = event_value(event, key, "case")) return value;
@@ -596,8 +604,14 @@ BatchDiscovery detect_grouped(std::vector<IndexedEvent> values,
     std::unordered_map<std::string, std::size_t> index;
     for (std::size_t row = 0; row < values.size(); ++row) {
       const auto& value = values[row];
-      const auto key = tuple_member(value.activity_value, row, value.activity_shared_nan) +
-                       tuple_member(value.resource_value, row, value.resource_shared_nan);
+      const auto member = [&](const ScalarValue& scalar, bool shared_nan,
+                              const std::optional<std::size_t>& nan_trace) {
+        if (nan_trace && !shared_nan && scalar.kind == ScalarValue::Kind::kFloat && std::isnan(scalar.real))
+          return "Fnan#trace" + std::to_string(*nan_trace);
+        return tuple_member(scalar, row, shared_nan);
+      };
+      const auto key = member(value.activity_value, value.activity_shared_nan, value.activity_nan_trace) +
+                       member(value.resource_value, value.resource_shared_nan, value.resource_nan_trace);
       const auto [it, added] = index.try_emplace(key, groups.size());
       if (added) groups.push_back({{value.activity_value, value.resource_value}, {}});
       groups[it->second].rows.push_back(row);
@@ -694,34 +708,73 @@ std::optional<double> log_instant(const std::string& text) {
   return parse_timestamp(text);
 }
 
+// A `case:` key of the log variant's events: pm4py reads the EventLog as an
+// event stream (convert_to_event_stream), whose events hold every trace
+// attribute as case:<key>, the trace's value winning over an event key of
+// that name, so a `case:` column of a CSV frame (a trace attribute after
+// convert_to_event_log) is a start, activity or resource key there (round FR,
+// observed black-box). A CSV frame's trace attribute is its typed cell
+// (`frame`, dataframe_frame_event_log's view; the case's first sorted row),
+// printed as str() gives it; nullopt when the key names no trace attribute,
+// a missing (NaN, NaT) cell an empty text.
+std::optional<std::string> stream_trace_value(const Trace& trace, const Trace* frame_trace,
+                                              const EventLog* frame, std::string_view key) {
+  if (!key.starts_with("case:") || key == "case:concept:name") return std::nullopt;
+  const std::string bare(key.substr(5));
+  if (frame && frame_trace) {
+    if (!frame_trace->attribute(bare)) return std::nullopt;
+    static const Event kNoEvent;
+    const auto cell = frame_scalar(*frame, *frame_trace, kNoEvent, std::string(key), FrameKeyScope::kDataFrame);
+    return cell ? python::str(*cell) : std::string{};
+  }
+  if (const auto* value = trace.attribute(bare)) return *value;
+  return std::nullopt;
+}
+
 // `frame_cells`: a missing activity or resource is read as "" here, for
-// append_frame_log_events to give its frame cell (NaN).
+// append_frame_log_events to give its frame cell (NaN). `frame`: a CSV log's
+// dataframe_frame_event_log view, whose traces pair with the log's.
 void append_log_events(
     const EventLog& log, const BatchDiscoveryOptions& options,
-    std::vector<IndexedEvent>& values, bool frame_cells = false) {
+    std::vector<IndexedEvent>& values, bool frame_cells = false,
+    const EventLog* frame = nullptr) {
   static const std::string kMissing;
-  const auto read = [&](const Event& event, std::string_view key, std::string_view kind) -> const std::string& {
+  std::optional<std::string> traced;
+  const auto read = [&](const Trace& trace, const Trace* frame_trace, const Event& event,
+                        std::string_view key, std::string_view kind) -> const std::string& {
+    if ((traced = stream_trace_value(trace, frame_trace, frame, key))) {
+      if (!traced->empty() || frame_cells) return *traced;
+      throw std::invalid_argument("batches: event is missing " + std::string(kind) +
+                                  " attribute '" + std::string(key) + "'");
+    }
     if (frame_cells)
       if (const auto* value = event_value(event, key, kind)) return *value;
     return frame_cells ? kMissing : required_event_value(event, key, kind);
   };
+  if (frame && frame->traces.size() != log.traces.size()) frame = nullptr;
   for (std::size_t trace_index = 0; trace_index < log.traces.size();
        ++trace_index) {
     const auto& trace = log.traces[trace_index];
+    const Trace* frame_trace = frame ? &frame->traces[trace_index] : nullptr;
     for (std::size_t event_index = 0; event_index < trace.events.size();
          ++event_index) {
       const auto& event = trace.events[event_index];
-      const auto& activity = read(event, options.activity_attribute, "activity");
-      const auto& resource = read(event, options.resource_attribute, "resource");
-      const auto& completion_text =
-          required_event_value(event, options.timestamp_attribute, "timestamp");
+      const auto activity = read(trace, frame_trace, event, options.activity_attribute, "activity");
+      const auto resource = read(trace, frame_trace, event, options.resource_attribute, "resource");
+      const auto completion_traced =
+          stream_trace_value(trace, frame_trace, frame, options.timestamp_attribute);
+      const auto& completion_text = completion_traced
+          ? *completion_traced
+          : required_event_value(event, options.timestamp_attribute, "timestamp");
       const auto complete = log_instant(completion_text);
       if (!complete || !std::isfinite(*complete))
         throw std::invalid_argument(
             "batches: event has an invalid completion timestamp");
       double start = *complete;
       if (!options.start_timestamp_attribute.empty()) {
-        const auto* value = event_value(
+        const auto start_traced =
+            stream_trace_value(trace, frame_trace, frame, options.start_timestamp_attribute);
+        const auto* value = start_traced ? &*start_traced : event_value(
             event, options.start_timestamp_attribute, "timestamp");
         if (value == nullptr || value->empty())
           throw std::invalid_argument(
@@ -759,7 +812,8 @@ void append_log_events(
 void append_frame_log_events(const EventLog& log, const BatchDiscoveryOptions& options,
                              std::vector<IndexedEvent>& values) {
   const auto frame = dataframe_frame_event_log(log);
-  const auto keys = frame_keys(frame, FrameKeyScope::kEventLog);
+  // The event stream's keys: the events' columns and the case: ones (round FR).
+  const auto keys = frame_keys(frame, FrameKeyScope::kDataFrame);
   // Minera's role names (activity, org:resource, ...) that the frame has no
   // column of keep naming the selected column, or no resource ("") when the
   // upload selects none, as before (declared: pm4py raises KeyError).
@@ -776,15 +830,31 @@ void append_frame_log_events(const EventLog& log, const BatchDiscoveryOptions& o
       if (!key->empty() && !alias(*key, {"timestamp", "time:timestamp"})) require_frame_key(keys, *key);
   }
   const auto first = values.size();
-  append_log_events(log, options, values, frame.traces.size() == log.traces.size());
+  append_log_events(log, options, values, frame.traces.size() == log.traces.size(), &frame);
   if (frame.traces.size() != log.traces.size()) return;
-  const auto typed = [&](const Trace& trace, const Event& event, const std::string& key,
-                         ScalarValue& value, bool& shared_nan, std::string& text) {
-    if (auto cell = frame_scalar(frame, trace, event, key, FrameKeyScope::kEventLog)) {
+  static const Event kNoEvent;
+  const auto case_key = [&](const std::string& key) {
+    if (!key.starts_with("case:") || key == "case:concept:name") return false;
+    for (const auto& column : log.dataframe_columns->trace_columns)
+      if (column.key == key.substr(5)) return true;
+    return false;
+  };
+  const auto typed = [&](std::size_t trace_index, const Trace& trace, const Event& event,
+                         const std::string& key, ScalarValue& value, bool& shared_nan,
+                         std::optional<std::size_t>& nan_trace, std::string& text) {
+    // A case: key is the trace's cell, which wins over the event's (round FR).
+    const bool traced = key.starts_with("case:") && key != "case:concept:name" &&
+                        trace.attribute(key.substr(5));
+    if (auto cell = frame_scalar(frame, trace, traced ? kNoEvent : event, key,
+                                 traced ? FrameKeyScope::kDataFrame : FrameKeyScope::kEventLog)) {
       value = std::move(*cell);
     } else {
       value = python::real(std::numeric_limits<double>::quiet_NaN());
       shared_nan = frame_column_type(frame, key) != DataFrameColumnType::kFloat64;
+      // A float NaN trace attribute is one object for the trace's events
+      // (round FR, observed black-box: they share a group, other traces'
+      // NaNs do not).
+      if (case_key(key)) nan_trace = trace_index;
     }
     text = python::str(value);
   };
@@ -801,11 +871,13 @@ void append_frame_log_events(const EventLog& log, const BatchDiscoveryOptions& o
       const auto& activity_key = options.activity_attribute;
       if (!activity_key.empty() && !activity_alias && activity_key != "concept:name" &&
           activity_key != source.activity_source_key)
-        typed(trace, event, activity_key, value.activity_value, value.activity_shared_nan, value.activity);
+        typed(t, trace, event, activity_key, value.activity_value, value.activity_shared_nan,
+              value.activity_nan_trace, value.activity);
       // An alias reads the selected resource column's typed cells.
       const auto& resource_key = resource_alias ? source.resource_source_key : options.resource_attribute;
       if (!resource_key.empty() && keys.contains(resource_key))
-        typed(trace, event, resource_key, value.resource_value, value.resource_shared_nan, value.resource);
+        typed(t, trace, event, resource_key, value.resource_value, value.resource_shared_nan,
+              value.resource_nan_trace, value.resource);
     }
   }
 }

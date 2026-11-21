@@ -1,5 +1,6 @@
 #include "batches/discovery_registry.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -15,6 +16,8 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/directly_follows_graph.hpp"
 #include "minera/log_conversion.hpp"
+#include "minera/active_event_source.hpp"
+#include "../tools/csv_frame_table.hpp"
 
 using namespace minera;
 using namespace minera::batches_detail;
@@ -585,9 +588,109 @@ void polars_batches_accept_a_mined_csv_text_case_column() {
   }
 }
 
+// Review FR1: a CSV's case: columns as format_dataframe holds them. pm4py
+// 2.7.22's batches on this CSV (observed black-box): the pandas variant with
+// the case:st start, a datetime64[ns, UTC] column scaled by 1e9 against the
+// us timestamps' 1e6, finds no batch; with the case:dept resource (float64,
+// c2's cell NaN) one "Concurrent batching" of c1 and c3 under resource 4.0.
+// The log variant reads case:X as the trace attribute X: case:dept groups
+// c1 and c3 under 4.0 and case:st is their start.
+void review_fr_csv_case_columns() {
+  std::istringstream text(
+      "case,act,ts,res,case:st,case:dept\n"
+      "c1,a,2020-01-01 00:01:00,r1,2020-01-01 00:00:00.000000500,4\n"
+      "c2,a,2020-01-01 00:01:00,r1,2020-01-01 00:00:30,\n"
+      "c3,a,2020-01-01 00:02:00,r1,2020-01-01 00:01:30,4\n"
+      "c1,b,2020-01-01 00:05:00,r2,2020-01-01 00:00:00.000000500,4\n");
+  CsvImportOptions import_options;
+  import_options.case_id_column = "case";
+  import_options.activity_column = "act";
+  import_options.timestamp_column = "ts";
+  import_options.resource_column = "res";
+  const auto data = import_csv_event_data(text, import_options);
+  const auto source = ActiveEventSource::from_csv(data, {"fr.csv", "csv", "csv-bytes"},
+                                                 {"case", "act", "ts", "res", "lifecycle"});
+  const auto table = indexed_csv_frame_table(source);
+  assert(table);
+  const auto column = [&](const char* name) {
+    return static_cast<std::size_t>(std::find(table->columns.begin(), table->columns.end(), name) - table->columns.begin());
+  };
+  assert(table->dtypes.at(column("case:st")) == "datetime64[ns, UTC]");
+  assert(table->dtypes.at(column("ts")) == "datetime64[us, UTC]");
+  assert(table->dtypes.at(column("case:dept")) == "float64");
+  BatchDiscoveryOptions options;
+  options.activity_attribute = "act";
+  options.timestamp_attribute = "ts";
+  options.resource_attribute = "res";
+  options.case_id_attribute = "case";
+  options.start_timestamp_attribute = "case:st";
+  const auto pandas_start = BatchDiscoverySelectorRegistry::dispatch(
+      EventDataView(*table), BatchDiscoverySelector::PANDAS, options);
+  assert(pandas_start.groups.empty());
+  options.start_timestamp_attribute.clear();
+  options.resource_attribute = "case:dept";
+  const auto pandas_dept = BatchDiscoverySelectorRegistry::dispatch(
+      EventDataView(*table), BatchDiscoverySelector::PANDAS, options);
+  assert(pandas_dept.groups.size() == 1);
+  assert(only_group(pandas_dept).activity == "a" && only_group(pandas_dept).resource == "4.0");
+  assert(only_group(pandas_dept).batches.size() == 1);
+  const auto& batch = only_group(pandas_dept).batches.front();
+  assert(batch.type == BatchType::kConcurrent && batch.events.size() == 2);
+  assert(batch.start == 1577836.86 && batch.complete == 1577836.92);
+
+  const auto& log = source.checked_log();
+  options.case_id_attribute = "case:concept:name";
+  for (const bool start : {false, true}) {
+    options.start_timestamp_attribute = start ? "case:st" : "";
+    const auto events = BatchDiscoverySelectorRegistry::dispatch(
+        EventDataView(log), BatchDiscoverySelector::LOG, options);
+    assert(events.groups.size() == 1);
+    assert(only_group(events).activity == "a" && only_group(events).resource == "4.0");
+    const auto& found = only_group(events).batches.front();
+    assert(found.type == BatchType::kConcurrent && found.events.size() == 2);
+    assert(found.start == (start ? 1577836800.0 : 1577836860.0) && found.complete == 1577836920.0);
+  }
+  options.resource_attribute = "res";
+  options.start_timestamp_attribute = "case:st";
+  const auto by_resource = BatchDiscoverySelectorRegistry::dispatch(
+      EventDataView(log), BatchDiscoverySelector::LOG, options);
+  assert(by_resource.groups.size() == 1 && only_group(by_resource).resource == "r1");
+  assert(only_group(by_resource).batches.front().events.size() == 3);
+  assert(only_group(by_resource).batches.front().start == 1577836800.0);
+
+  // A missing case:dept is the trace's NaN, one float object for its events:
+  // c0's events share a group, c3's and c4's NaNs stay apart (reference: no
+  // batch by case:dept; by activity case:dept one "Concurrent batching" of
+  // c0's two events under (nan, r9), its twin a events one tuple).
+  std::istringstream gaps(
+      "case,act,ts,res,case:dept\n"
+      "c0,a,2020-01-01 00:00:00,r9,\nc0,a,2020-01-01 00:00:00,r9,\nc0,b,2020-01-01 00:01:00,r9,\n"
+      "c1,a,2020-01-01 00:00:00,r1,4\nc3,a,2020-01-01 00:05:00,r1,\nc4,a,2020-01-01 00:05:00,r1,\n");
+  const auto gap_data = import_csv_event_data(gaps, import_options);
+  const auto gap_source = ActiveEventSource::from_csv(gap_data, {"gaps.csv", "csv", "csv-bytes"},
+                                                     {"case", "act", "ts", "res", "lifecycle"});
+  const auto& gap_log = gap_source.checked_log();
+  BatchDiscoveryOptions gap_options;
+  gap_options.activity_attribute = "act";
+  gap_options.timestamp_attribute = "ts";
+  gap_options.resource_attribute = "case:dept";
+  gap_options.case_id_attribute = "case:concept:name";
+  assert(BatchDiscoverySelectorRegistry::dispatch(EventDataView(gap_log), BatchDiscoverySelector::LOG, gap_options)
+             .groups.empty());
+  gap_options.activity_attribute = "case:dept";
+  gap_options.resource_attribute = "res";
+  const auto nan_group = BatchDiscoverySelectorRegistry::dispatch(
+      EventDataView(gap_log), BatchDiscoverySelector::LOG, gap_options);
+  assert(nan_group.groups.size() == 1);
+  assert(only_group(nan_group).activity == "nan" && only_group(nan_group).resource == "r9");
+  const auto& twin = only_group(nan_group).batches.front();
+  assert(twin.type == BatchType::kConcurrent && twin.start == 1577836800.0 && twin.complete == 1577836860.0);
+}
+
 }  // namespace
 
 int main() {
+  review_fr_csv_case_columns();
   polars_batches_accept_a_mined_csv_text_case_column();
   selector_components_cover_all_input_adapters();
   all_five_classifications_are_stable();

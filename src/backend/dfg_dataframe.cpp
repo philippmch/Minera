@@ -898,9 +898,26 @@ bool instant_less(double a, const std::optional<ParsedExactTimestamp>& a_exact, 
   return a < b;
 }
 
+// `polars_microseconds`: the Polars frame's start and completion columns
+// have different units (datetime64[us] beside datetime64[ns] in the pandas
+// frame), so Polars casts both to their supertype Datetime(us), truncating
+// the nanosecond one, before the clamp and the subtraction (round FR,
+// observed black-box: a start at 00:49:40 after a completion at
+// 00:49:00.000000001 is 40 seconds, not 39).
 double flow_time(const TableRow& source, const TableRow& target,
-                 const DfgTableOptions& options, bool clamp_start, bool polars = false) {
+                 const DfgTableOptions& options, bool clamp_start, bool polars = false,
+                 bool polars_microseconds = false) {
   if (!source.completion || !target.start) return 0.0;
+  if (polars && polars_microseconds && !options.business_hours &&
+      ((source.completion_exact && source.completion_exact->nanoseconds % 1000 != 0) ||
+       (target.start_exact && target.start_exact->nanoseconds % 1000 != 0))) {
+    const auto truncate = [](TableRow row) {
+      for (auto* exact : {&row.completion_exact, &row.start_exact})
+        if (*exact) (*exact)->nanoseconds -= (*exact)->nanoseconds % 1000;
+      return row;
+    };
+    return flow_time(truncate(source), truncate(target), options, clamp_start, polars, false);
+  }
   double target_start = *target.start;
   std::optional<std::string> target_start_text = target.start_text;
   auto target_start_exact = target.start_exact;
@@ -1151,6 +1168,18 @@ DfgTableResult discover_table_dfg(const EventTable& table,
     // The eager adapter calls a groupby method named after the key, and
     // pandas has no SeriesGroupBy.stdev.
     throw std::invalid_argument("'SeriesGroupBy' object has no attribute 'stdev'");
+  // Polars subtracts a start and a completion column of different units in
+  // microseconds (flow_time).
+  bool polars_microseconds = false;
+  if (polars && computes_duration && clamp_start) {
+    const auto unit = [&](const std::string& name, bool start) -> bool {
+      if (const auto declared = declared_datetime_unit(table, name)) return *declared;
+      return std::any_of(rows.begin(), rows.end(), [&](const TableRow& row) {
+        return sub_microsecond(start ? row.start_text : row.completion_text);
+      });
+    };
+    polars_microseconds = unit(start_column_name(options), true) != unit(options.timestamp_attribute, false);
+  }
   // Polars keeps an edge whose duration is null and one whose source activity
   // is null in the performance result, but neither counts in frequency.
   std::map<std::string, std::vector<double>> null_source_values;
@@ -1168,7 +1197,7 @@ DfgTableResult discover_table_dfg(const EventTable& table,
       if (options.measure == DfgTableMeasure::kCost)
         values.push_back(target.cost.value_or(0.0));
       else if (source.completion && target.start)
-        values.push_back(flow_time(source, target, options, clamp_start, polars));
+        values.push_back(flow_time(source, target, options, clamp_start, polars, polars_microseconds));
       else if (source.completion && clamp_start)
         values.push_back(0.0);
       continue;
@@ -1198,7 +1227,7 @@ DfgTableResult discover_table_dfg(const EventTable& table,
         continue;
       }
       performance_values[pair].push_back(
-          flow_time(source, target, options, clamp_start, polars));
+          flow_time(source, target, options, clamp_start, polars, polars_microseconds));
     }
   }
   finish_performance(performance_values, options, polars, result.performance);

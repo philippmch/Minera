@@ -59,6 +59,35 @@ inline bool csv_frame_replaced_column(const minera::ActiveEventSource& source, s
   return false;
 }
 
+// The frame's `case:` column under `key` ("case:" plus a trace column's key):
+// read_csv types it over every data row and format_dataframe converts it to
+// UTC dates like any other column of date texts, so the DataFrame functions
+// read its dtype and typed cells as for an event column (round FR, observed
+// black-box: a case: date column with a cell below the microsecond is
+// datetime64[ns, UTC], a case: column of numbers int64 or float64). nullopt
+// for other keys and for the case column under a `case:` header, which the
+// routes select for the text copy case:concept:name.
+inline std::optional<minera::DataFrameColumn> csv_frame_case_column(const minera::DataFrameColumns& frame,
+                                                                    std::string_view key) {
+  if (!key.starts_with("case:")) return std::nullopt;
+  for (const auto& candidate : frame.trace_columns)
+    if (candidate.role != minera::FirstClassAttributeRole::kCaseId && key.substr(5) == candidate.key) {
+      auto column = candidate;
+      column.key = std::string(key);
+      return column;
+    }
+  return std::nullopt;
+}
+
+// A CSV frame column under `key`: an event column, else a `case:` one.
+inline std::optional<minera::DataFrameColumn> csv_frame_column(const minera::DataFrameColumns& frame,
+                                                               std::string_view key) {
+  std::optional<minera::DataFrameColumn> column;
+  for (const auto& candidate : frame.columns)
+    if (candidate.key == key) column = candidate;
+  return column ? column : csv_frame_case_column(frame, key);
+}
+
 // A CSV upload's table as format_dataframe's frame, which pm4py's DataFrame
 // functions read (round BM, observed black-box): the rows without a case,
 // activity or timestamp dropped, the others in the frame's order (cases by
@@ -140,6 +169,12 @@ inline std::optional<minera::EventTable> csv_frame_table(const minera::ActiveEve
       const auto index = static_cast<std::size_t>(found - result.columns.begin());
       result.dtypes[index] = date_column.nanoseconds ? "datetime64[ns, UTC]" : "datetime64[us, UTC]";
     }
+    // The case: date columns too (round FR).
+    for (std::size_t index = 0; index < result.columns.size(); ++index) {
+      const auto column = csv_frame_case_column(frame, result.columns[index]);
+      if (column && column->type == minera::DataFrameColumnType::kDate)
+        result.dtypes[index] = column->nanoseconds ? "datetime64[ns, UTC]" : "datetime64[us, UTC]";
+    }
   }
   // A CSV column the frame's copies replace is not in the frame (round BO).
   for (std::size_t index = result.columns.size(); index-- > 0;) {
@@ -182,9 +217,7 @@ inline void type_csv_frame_cells(minera::EventTable& table, const minera::DataFr
     // The case and activity columns stay text: the routes select them for
     // the frame's text copies case:concept:name and concept:name.
     if (key == activity_key) continue;
-    std::optional<minera::DataFrameColumn> column;
-    for (const auto& candidate : frame.columns)
-      if (candidate.key == key) column = candidate;
+    const auto column = csv_frame_column(frame, key);
     if (!column || column->role == minera::FirstClassAttributeRole::kCaseId) continue;
     const char* dtype = nullptr;
     switch (column->type) {
@@ -243,8 +276,7 @@ inline std::optional<minera::EventTable> formatted_csv_frame_table(const minera:
     if (key == selectors.activity_key) {
       column = minera::DataFrameColumn{key, frame.activity_type};
     } else {
-      for (const auto& candidate : frame.columns)
-        if (candidate.key == key) column = candidate;
+      column = csv_frame_column(frame, key);
       if (!column) continue;
       if (column->role != minera::FirstClassAttributeRole::kCaseId &&
           column->type != minera::DataFrameColumnType::kDate) continue;
@@ -275,9 +307,8 @@ inline std::optional<minera::EventTable> formatted_csv_frame_table(const minera:
   // and one shared NaN object elsewhere (NaT in a date column stays null).
   for (std::size_t index = 0; index < table->columns.size(); ++index) {
     const auto& key = table->columns[index];
-    bool date = false;
-    for (const auto& candidate : frame.columns)
-      if (candidate.key == key && candidate.type == minera::DataFrameColumnType::kDate) date = true;
+    const auto column = csv_frame_column(frame, key);
+    const bool date = column && column->type == minera::DataFrameColumnType::kDate;
     if (date || key == "@@index" || key == "@@case_index") continue;
     const bool float64 = dtypes && table->dtypes[index] == "float64";
     std::optional<minera::EventAttribute> shared;
