@@ -97,7 +97,11 @@ Ocel filter_ocel_activity_type_matching_exact(
       if ((static_cast<unsigned char>(byte) & 0xC0) != 0x80) ++length;
     length = std::max<std::size_t>(length, 1);
   }
-  if (log.relations.empty() && log.untyped_relations) {
+  // Round FI: so does a degenerate relations frame (an OCEL CSV import
+  // without any object reference), whose one column, the qualifier, is
+  // float64 without rows (observed black-box, fi q36's q2808_0000 and
+  // q2808_0076 with the qualifier as the activity key).
+  if (log.relations.empty() && (log.untyped_relations || ocel_relations_frame_degenerate(log))) {
     throw std::invalid_argument(
         "UFuncTypeError: ufunc 'add' did not contain a loop with signature matching types (dtype('float64'), "
         "dtype('<U" + std::to_string(length) + "')) -> None");
@@ -112,13 +116,36 @@ Ocel filter_ocel_activity_type_matching_exact(
     throw std::invalid_argument("TypeError: unsupported operand type(s) for +: 'DatetimeArray' and 'str'");
   require_relation_column(log, options.object_type_key);
   refuse_typed_qualifier_key(log, options.object_type_key, false, length);
-  if (options.object_type_key == "ocel:timestamp" && !log.relations.empty())
-    throw std::invalid_argument(std::string("TypeError: unsupported operand type(s) for +: '") +
-                                (log.relations.size() == 1 ? "DatetimeArray" : "Timestamp") + "' and 'str'");
   std::unordered_map<std::string, const OcelEvent*> events;
   std::unordered_map<std::string, const OcelObject*> objects;
   for (const auto& event : log.events) events.emplace(event.id, &event);
   for (const auto& object : log.objects) objects.emplace(object.id, &object);
+  // Round FI: a missing time (an OCEL CSV row's NaT) in that type column.
+  // A str activity column masks its rows out first, so the rows with a time
+  // decide: none passes (the pairs are NaN and match nothing), one names the
+  // array, more the scalar. The qualifier of a CSV read is an object column,
+  // which adds cell by cell from the first row: one row names the array,
+  // more the first row's NaT or Timestamp (observed black-box, pandas 3.0.5,
+  // fi q36's q2808_0054 and t1/p4.py). Without NaT both read as before.
+  if (options.object_type_key == "ocel:timestamp" && !log.relations.empty()) {
+    const auto nat = [&](const OcelRelation& relation) {
+      const auto event = events.find(relation.event_id);
+      return event != events.end() && event->second->timestamp.empty();
+    };
+    std::string scalar;
+    if (log.relations.size() == 1) {
+      if (options.activity_key != "ocel:qualifier" && nat(log.relations.front())) scalar.clear();
+      else scalar = "DatetimeArray";
+    } else if (options.activity_key == "ocel:qualifier") {
+      scalar = nat(log.relations.front()) ? "NaTType" : "Timestamp";
+    } else {
+      const auto timed = std::count_if(log.relations.begin(), log.relations.end(),
+                                       [&](const OcelRelation& relation) { return !nat(relation); });
+      scalar = timed == 0 ? "" : timed == 1 ? "DatetimeArray" : "Timestamp";
+    }
+    if (!scalar.empty())
+      throw std::invalid_argument("TypeError: unsupported operand type(s) for +: '" + scalar + "' and 'str'");
+  }
 
   // The observed string-column temporary join loses terminal NUL characters
   // from its scalar separator. Python mapping strings preserve those bytes.
@@ -140,6 +167,8 @@ Ocel filter_ocel_activity_type_matching_exact(
     const auto* type = relation_value(relation, *event->second, *object->second, options.object_type_key);
     const auto allowed = correspondence.find(*type);
     if (allowed == correspondence.end() || !separator_matches) return true;
+    // Round FI: a time type key that passed above is NaN in every pair.
+    if (options.object_type_key == "ocel:timestamp") return true;
     const auto* activity = relation_value(relation, *event->second, *object->second, options.activity_key);
     if (std::find(allowed->second.begin(), allowed->second.end(), *activity) == allowed->second.end())
       return true;

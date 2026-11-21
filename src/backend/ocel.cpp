@@ -5580,15 +5580,28 @@ static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDisco
   std::unordered_map<std::string, const OcelObject*> object_by_id;
   for (const auto& event : log.events) event_by_id.emplace(event.id, &event);
   for (const auto& object : log.objects) object_by_id.emplace(object.id, &object);
-  struct Row { std::string event; std::string object; std::string activity; std::string type; bool null_activity; };
+  // Round FI: a missing time as the event id is NaT, a null cell: the
+  // activity associations keep it (pandas' agg(list) keeps NaT, printed
+  // "NaT" in a naive column too), the start and end activities read each
+  // column's first and last cell that is not null (groupby first()/last()),
+  // so an object's start or end event is its first or last row with a time
+  // (NaT when none has one), and the edges skip it (the groupby drops the
+  // NaT key, as the edge metrics do, FH1-1; observed black-box, fi
+  // t1/p2.py on OCEL CSV logs with empty times).
+  const auto id_label = [&](const OcelEvent& event) -> const std::string& {
+    if (event_id_column == "ocel:timestamp" && event.timestamp.empty()) return kNaT;
+    return event_label(event, event_id_column);
+  };
+  struct Row { std::string event; std::string object; std::string activity; std::string type; bool null_activity; bool null_event; };
   std::vector<Row> rows;
   for (const auto& relation : log.relations) {
     const auto event = event_by_id.find(relation.event_id);
     const auto object = object_by_id.find(relation.object_id);
     if (event == event_by_id.end() || object == object_by_id.end()) continue;
-    rows.push_back({event_label(*event->second, event_id_column), relation.object_id,
+    rows.push_back({id_label(*event->second), relation.object_id,
                     event_label(*event->second, activity_column), object_label(*object->second, type_column),
-                    activity_column == "ocel:timestamp" && event->second->timestamp.empty()});
+                    activity_column == "ocel:timestamp" && event->second->timestamp.empty(),
+                    event_id_column == "ocel:timestamp" && event->second->timestamp.empty()});
   }
   const auto add_association = [](OcdfgActivityMetric& metric, const std::string& event, const std::string& object) {
     metric.events.push_back(event);
@@ -5603,7 +5616,10 @@ static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDisco
     metric.unique_objects.erase(std::unique(metric.unique_objects.begin(), metric.unique_objects.end()),
                                 metric.unique_objects.end());
   };
-  struct Bounds { std::size_t first, last; std::optional<std::size_t> first_label, last_label; };
+  struct Bounds {
+    std::size_t first, last;
+    std::optional<std::size_t> first_label, last_label, first_event, last_event;
+  };
   std::map<std::string, Bounds> bounds;
   for (std::size_t i = 0; i < rows.size(); ++i) {
     const auto& row = rows[i];
@@ -5612,11 +5628,16 @@ static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDisco
       add_association(result.activities_indep[row.activity], row.event, row.object);
       add_association(types[row.activity], row.event, row.object);
     }
-    auto& range = bounds.try_emplace(row.object, Bounds{i, i, std::nullopt, std::nullopt}).first->second;
+    auto& range = bounds.try_emplace(row.object, Bounds{i, i, std::nullopt, std::nullopt, std::nullopt, std::nullopt})
+                      .first->second;
     range.last = i;
     if (!row.null_activity) {
       if (!range.first_label) range.first_label = i;
       range.last_label = i;
+    }
+    if (!row.null_event) {
+      if (!range.first_event) range.first_event = i;
+      range.last_event = i;
     }
   }
   for (const auto& [object, range] : bounds) {
@@ -5624,8 +5645,10 @@ static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDisco
     const auto& last = rows[range.last];
     auto& starts = result.start_activities[first.type];
     auto& ends = result.end_activities[last.type];
-    if (range.first_label) add_association(starts[rows[*range.first_label].activity], first.event, object);
-    if (range.last_label) add_association(ends[rows[*range.last_label].activity], last.event, object);
+    const auto& first_event = range.first_event ? rows[*range.first_event].event : kNaT;
+    const auto& last_event = range.last_event ? rows[*range.last_event].event : kNaT;
+    if (range.first_label) add_association(starts[rows[*range.first_label].activity], first_event, object);
+    if (range.last_label) add_association(ends[rows[*range.last_label].activity], last_event, object);
   }
   for (auto& [activity, metric] : result.activities_indep) normalize(metric);
   for (auto& [type, metrics] : result.activities_ot) for (auto& [activity, metric] : metrics) normalize(metric);
@@ -5637,6 +5660,7 @@ static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDisco
   std::map<std::string, std::string> timestamp;
   identifiers.reserve(log.events.size());
   for (const auto& event : log.events) {
+    if (event_id_column == "ocel:timestamp" && event.timestamp.empty()) continue;  // NaT: no group
     const auto& identifier = event_label(event, event_id_column);
     identifiers.push_back(&identifier);
     activity_of.try_emplace(identifier, activity_column == "ocel:timestamp" && event.timestamp.empty()
@@ -5645,7 +5669,8 @@ static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDisco
     timestamp.try_emplace(identifier, event.timestamp);
   }
   std::unordered_map<std::string, std::vector<std::string>> objects_of;
-  for (const auto& row : rows) objects_of[row.event].push_back(row.object);
+  for (const auto& row : rows)
+    if (!row.null_event) objects_of[row.event].push_back(row.object);
   std::unordered_map<std::string, std::string> type_of;
   for (const auto& object : log.objects) type_of.try_emplace(object.id, object_label(object, type_column));
   std::unordered_map<std::string, std::string> history;

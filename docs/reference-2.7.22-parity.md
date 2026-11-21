@@ -35797,3 +35797,101 @@ with the plain id for contrast; the window over a dropped null, through the
 transport, and over a dropped row lacking the key; the aware datetime's
 slot before a float; the related events' and related activities' numeric
 family before the endpoints, and the endpoints' KeyError without it).
+
+## Review FI1: the OC-DFG's NaT event id, the type matching's time key and degenerate relations, None as NaT in the exact filters (2026-11-21)
+
+Round FI checked FH's CI (run 44869187203 on 2e35929: all six jobs green).
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the
+reference venv with fresh banks: o92 (`fg/o5/o5gen.py 92 60`, OCEL 2.0 with
+null-only attributes and respelled instants; JSON, SQLite and XML), c93
+(`fg/c6/c6gen.py 93 60`, OCEL 1.0 JSON and XML), c94 (`c7/c7gen.py`, new:
+c6gen with aware times carrying nanoseconds and more booleans next to 0
+and 1, for FH1-3), q35 and q36 (`eq/csv/q2gen.py 2807 60`, `2808 60`, with
+the declared CSV features). New sweeps: `q/ocd2.py` (FH1-1 on the OC-DFG's
+own `ocdfg_event_id_attribute` and timestamp attribute, `ocel:timestamp`
+included, with and without business hours) and `q/xe2.py` (FH1-2 on the
+exact filters' value lists mixing None, NaT and NaN with values, every
+event and object column, positive and negated). Hand-made: `t1/m*.csv`
+and `t1/a*.csv` (CSV logs with empty times), `t3/d1.csv` (no object
+reference), `t3/n1.csv`, `p/isin.py` and `p/isin2.py` (pandas' isin on
+datetime64 and object columns with mixed value lists).
+
+FH's fixes matched outside four classes. FH1-2 on the other consumers:
+the exact filters (xen 0 of 2,088, 2,136 and 1,258 on o92's JSON, SQLite
+and XML, 0 of 2,482, 868, 2,312 and 341 on c93 and c94's JSON and XML),
+the chains' exact filters and window after filters and splits (onx 0 of
+19,015 on q36) and the features after chains (onf 0 of 6,936 on q36)
+agree; xe2 found FI1-4. FH1-3: the attribute lists and families (fat 0 of
+824, 876 and 438 on o92, 0 of 894 and 284 on c93, fat2 0 on every OCEL 2.0
+and 1.0 bank) agree; c94's one fat difference (`c6_94` JSON) follows the
+seed (the string family's set order, declared). FH1-4: the events'
+related objects with the object lists and `filter_per_type` with one
+failing type (fat2 0 of 897, 950, 478, 995, 326, 946 and 129) agree.
+FH1-1 on the other NaT keys: the edge metrics (emg2) differ by the
+declared typed and missing labels alone (o92 172 and 221, q36 130); the
+flattening (fl 0 of 3,054 on q36) and the type matching on OCEL 1.0
+(atm2 0 of 4,680 on c93's and o92's JSON) agree; the OC-DFG's own event id found
+FI1-1 and the type matching on the CSV banks FI1-2 and FI1-3. q35's differences
+(ocd2 87 of 429, fat 93 of 292, fat2 127 of 347, xen 354 of 1,128, fl 612
+of 1,701, atm2 758 of 3,900, emg2 134 of 853) are each on a file with a
+declared CSV feature or a declared missing label. The OC-DFG timing on the
+chains' results (ono 6 of 13,491 on q36) and on an attribute column with
+str cells and NaN (`q2808_0022`, the time key `x1`) is one of pm4py's
+outcomes under PYTHONHASHSEED 0 to 9 (`probe/hschk2.py`; the first pair of
+a set of event couples).
+
+Fixed:
+- **FI1-1 A missing event time as the OC-DFG's own event id.** With
+  `ocdfg_event_id_attribute=ocel:timestamp` an OCEL CSV row with an empty
+  time is NaT: pm4py lists it among the activities' events (`NaT`), its
+  groupby drops it as an edge key (the event joins no edge), and an
+  object's start and end events are the first and last of its rows with a
+  time, while its start and end activities stay its first and last row's
+  (q36 ocd2 83 of 796, `t1/m1.csv`). Native keyed the event by the empty
+  text and used it everywhere.
+- **FI1-2 A time column as the type matching's type key.** The relations
+  frame's `ocel:timestamp` is datetime64. With a str activity column the
+  activity's rows with a NaT time are masked out before the type column is
+  added: no row with a time passes (every pair is NaN and matches
+  nothing), one names the array (`'DatetimeArray' and 'str'`), more the
+  scalar (`'Timestamp'`). With the qualifier as the activity key (an
+  object column, added cell by cell from the first row) one row names the
+  array and more the first row's `NaTType` or `Timestamp` (q36
+  `q2808_0054`, `t1/a1.csv` to `a4.csv`). Native always named the array.
+- **FI1-3 A CSV log without any object reference in the type matching.**
+  Its relations frame is one float64 qualifier column without rows, so the
+  qualifier as the activity key raises numpy's `UFuncTypeError: ufunc
+  'add' did not contain a loop with signature matching types
+  (dtype('float64'), dtype('<U4')) -> None` (the separator's length in
+  code points), as an untyped empty relations frame does (q36
+  `q2808_0000`, `q2808_0076`, `t3/d1.csv`). Native raised the qualifier's
+  KeyError.
+- **FI1-4 None next to datetimes in the exact filters on a datetime64
+  column.** pandas' isin converts a value list whose other values are
+  datetimes of the column's kind (aware on an aware column, naive on a
+  naive one, one timezone) to a datetime array, None and NaN becoming NaT,
+  so the NaT rows match (and drop under `positive=false`); a list with a
+  text, a number, datetimes of two timezones or of the other kind keeps
+  None as None, which matches nothing there (o92's JSON xe2 248 of 6,602, q36 250
+  of 7,880; `p/isin.py`). Native read None as None always. Both the
+  events' and the objects' exact filters, `ocel:timestamp` and attribute
+  columns read as datetime64.
+
+Declared, unchanged: the edge metrics' typed and missing labels, the first
+failing pair's hash-seed order, the CSV declared features, the type
+matching's result without its temporary column (the harness reads
+'nocol'), the string family's set order.
+
+Results with the fixed server: ocd2 0 of 189 on q36's 21 files that
+differed; xe2 0 of 2,452 on q36's 25 files and 0 of 3,344 on o92's 26
+JSON files; atm2 on q36's 4 files that differed 12 of 312, each the
+harness's 'nocol' reading of the dropped temporary column. The full
+ctest passes 656 of 656 and the fixture replay gives 2,673 responses
+unchanged.
+
+In the suite: `minera_review_fi1_tests` (the NaT event in the OC-DFG's
+activities, edges and end events; the type matching's time key with one,
+none and a single row with a time, both activity keys; the degenerate
+relations frame's UFuncTypeError and the activity's KeyError; None as NaT
+next to an aware datetime, negated, without None, and next to a naive
+datetime).
