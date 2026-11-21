@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FI (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FJ (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8230,6 +8230,73 @@ jobs. The Mac was not reachable this round (no
 folder access), so no newer reviewer handoff was read. The generators,
 the comparers and the probes are in the project files under
 `review-harness/round-fi/`.
+
+Round FJ re-reviewed FI (Review FJ1). FI's fixes matched on fresh banks
+(o95 from `fg/o5/o5gen.py 95 60` as JSON, SQLite and XML; c96 and c97
+from `fg/c6/c6gen.py 96 60` and `fi/c7/c7gen.py 97 60`; q38 from
+`eq/csv/q2gen.py 2810 60` with the declared CSV features, and the new q39,
+`q2gen.py 2811 60` with `FEAT` leaving those features out, so its CSV
+differences need no per-file classing): the OC-DFG with the activity and
+event id on a NaT time, its timing and every events column as the event
+id agree, and the type matching agrees with every pair of relations
+columns as its keys and temporary columns named like relations columns
+(hand-made logs with NaT, with events without objects, a degenerate
+relations frame and OCEL 1.0 logs without relations) outside the declared
+'nocol' reading. Four new sweeps: `q/xe3.py` (the exact filters' value
+lists with a cell's datetime at another offset or of the other kind next
+to the nulls), `q/xe4.py` (a cell's datetime plus or minus nanoseconds),
+`q/xn2.py` (the non-exact filters on datetime columns) and `q/atm3.py`
+(the type matching's other columns). They found three classes, all fixed:
+FJ1-1, pandas' converted value array of the other awareness matches
+nothing at all, NaT included; FJ1-2, the non-exact filters' None matches
+by the column's dtype and a datetime cell equals no text; FJ1-3, the
+converted array holds its datetimes floored to the column's unit
+(microseconds unless a CSV time has more than six fraction digits).
+Declared, unchanged: the type matching's dropped relations column
+('nocol'), the CSV declared features (q38's remaining differences keep
+the same events and differ by the objects a log relates but does not
+list), the edge metrics' typed and missing labels, the first failing
+pair's hash-seed order, the string family's set order.
+
+In the suite: `minera_review_fj1_tests`. The full ctest passed 657 of 657
+on the first run (39 minutes, -j2, next to two sweeps); the fixture
+replay gave 2,673 responses unchanged. FI's CI run 44876007645 finished
+green in all six jobs. The Mac was not reachable this round (no folder
+access), so no newer reviewer handoff was read. The generators, the
+comparers and the probes are in the project files under
+`review-harness/round-fj/`.
+
+Next round (FK) should start by re-reviewing round FJ:
+
+- FJ's CI run;
+- FJ1-1 on the other places that hand pandas a value list for a datetime
+  column: the chains' exact filters after splits and windows (`onx` with
+  xe3's lists), an object column holding naive and aware datetimes next
+  to NaT, and the exact filters after a type declaration changed the
+  column's kind;
+- FJ1-2 on the non-exact filters after the pre steps (`PRE=evnone`,
+  `otnone`, `winnone`, `actnone`), on SQLite all-NULL columns (an object
+  column) and on OCEL 1.0 XML date elements kept as texts;
+- FJ1-3 on the other time units: a naive CSV column without any time
+  (unit s), an aware CSV column at nanoseconds through the chains and the
+  writers, and OCEL 1.0 times with nanoseconds;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FJ's list, taken in FJ: FI's CI (six green); FI1-1 on the other
+OC-DFG selectors holding NaT (the activity and event id both
+`ocel:timestamp` on naive CSV times, the timing with a NaT event id key,
+every events column as the event id: 0; an objects column as the object
+type key raises pm4py's KeyError in both); FI1-2 and FI1-3 on the other
+columns added in the type matching (every pair of relations columns,
+temporary columns named like relations columns, OCEL 1.0 logs without
+relations: 0 outside 'nocol'); FI1-4 on the other isin consumers (the
+exact filters' other value lists fixed as FJ1-1 and FJ1-3, the non-exact
+filters as FJ1-2; the flattening and the features take no value list).
+Carried to FK: EV1-1, the SQLite leftovers, the new Polars dtypes, DW1,
+the other declared items, the rest of the CU list and the open choices.
+
+Previous list for round FJ (kept for its older items):
 
 Next round (FJ) should start by re-reviewing round FI:
 

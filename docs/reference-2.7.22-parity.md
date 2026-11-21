@@ -35895,3 +35895,107 @@ none and a single row with a time, both activity keys; the degenerate
 relations frame's UFuncTypeError and the activity's KeyError; None as NaT
 next to an aware datetime, negated, without None, and next to a naive
 datetime).
+
+## Review FJ1: the exact filters' other awareness next to NaT and their column's unit, None and time texts in the non-exact filters (2026-11-21)
+
+Round FJ checked FI's CI (run 44876007645 on 4c25652: all six jobs
+green). Observed black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in
+the reference venv with fresh banks: o95 (`fg/o5/o5gen.py 95 60`, OCEL
+2.0 JSON, SQLite and XML), c96 (`fg/c6/c6gen.py 96 60`) and c97
+(`fi/c7/c7gen.py 97 60`, OCEL 1.0 JSON and XML), q38 (`eq/csv/q2gen.py
+2810 60`, with the declared CSV features) and q39 (new: `q2gen.py 2811
+60` with `FEAT` leaving out the declared features, so every file has an
+objects file, ids, types and unique event ids). New sweeps: `q/xe3.py`
+(FI1-4 on the other value lists: a cell's datetime at another offset or
+of the other kind next to None, NaT and NaN, and all three nulls next to
+one datetime), `q/xe4.py` (a cell's datetime plus or minus nanoseconds,
+alone, next to a null, next to the cell's own datetime or a text),
+`q/xn2.py` (the non-exact filters on datetime columns: the cells' times
+as texts in four spellings, None next to them, numbers and booleans) and
+`q/atm3.py` (FI1-2 and FI1-3 on the other columns added in the type
+matching: every pair of relations columns as the activity and type keys,
+with temporary columns named like each relations column). Hand-made:
+`t1/n1.csv` (naive CSV times with an empty one: the OC-DFG with the
+activity and event id both `ocel:timestamp`), `t2/h1.csv` to `h3.csv`
+(the event id as the type key next to NaT, a CSV log with some events
+without objects, a degenerate relations frame with temporary columns
+named like relations columns), `t2/h4.jsonocel` and `h5.jsonocel` (OCEL
+1.0 logs without relations), `t4/k1.json` to `k3.json` and `t4/c1.csv`
+to `c3.csv` (time columns at microseconds and nanoseconds), `p/isin3.py`
+to `p/isin6.py` (pandas' isin on datetime64, float64, str and object
+columns with mixed value lists).
+
+FI's fixes matched outside the classes below. FI1-1 on the other OC-DFG
+selectors holding NaT: the activity and event id both `ocel:timestamp` on
+naive CSV times (pm4py's label None, `t1/n1.csv`), the timing with an
+event id key holding NaT, and every events column as the event id with
+and without business hours agree (ocd2 0 of 813 and 846 on o95's JSON and
+SQLite, 0 of 574 on q39; q38's 72 are each on a file with a declared CSV
+feature). An objects column as the OC-DFG's object type key raises
+pm4py's KeyError (the relations frame lacks it), as native does. FI1-2
+and FI1-3 on the other columns added in the type matching: every pair of
+relations columns as the keys with temporary columns named like
+relations columns agrees on the hand-made logs (0 of 1,584 on `h1` to
+`h3`, 0 of 1,056 on the OCEL 1.0 logs without relations) and on the
+banks outside the declared reading of a temporary column that replaces
+`ocel:eid` or `ocel:oid` (pm4py's result then lacks that relations
+column; the harness reads 'nocol', events and objects equal). FI1-4 on
+the other isin consumers: the value lists of `xe3` found FJ1-1 and FJ1-3,
+the non-exact filters FJ1-2; the flattening and the features take no
+value list (an object type, attribute names).
+
+Fixed:
+- **FJ1-1 Datetimes of the other awareness next to NaT in the exact
+  filters.** pandas converts a value list whose other values are
+  datetimes of one timezone to a datetime array first (FI1-4); when that
+  array has the other awareness (naive datetimes on an aware column, or
+  aware ones of one offset on a naive column) isin finds the two
+  incompatible and matches nothing at all, NaT included, so the negated
+  filter keeps every row (o95's JSON xe3 204 of 8,000, q38's
+  `q2810_0001`; `p/isin5.py`). A list mixing both kinds, two offsets, a
+  text or a number compares value by value as before (NaT then matches
+  NaT). Native matched the NaT rows. Both the events' and the objects'
+  exact filters, `ocel:timestamp` and attribute columns.
+- **FJ1-2 None and time texts in the non-exact attribute filters.** The
+  values the non-exact filters take (texts, numbers, booleans, None) meet
+  the column as pandas holds it: None matches by the column's dtype as in
+  the exact filters (FD1-2: any missing cell of a str column, an explicit
+  None of an object column, nothing in a float64 or datetime64 column),
+  and a cell the frame holds as a datetime equals no text, number or
+  boolean (o95's JSON xn2 272 of 3,880; `p/isin6.py`). Native matched an
+  explicit null alone whatever the column, and the text of a time where it
+  spelled the cell as stored.
+- **FJ1-3 A datetime finer than the column's unit in the exact filters.**
+  The converted array (FI1-4) holds its datetimes at the column's unit,
+  floored: the readers keep microseconds (read_ocel2_json truncates finer
+  digits, `t4/k3.json`) unless an OCEL CSV time has more than six
+  fraction digits (nanoseconds, `t4/c1.csv`), so `10:00:00.0000005`
+  matches a `10:00:00` cell and `09:59:59.9999999` does not; a list pandas
+  compares value by value keeps the nanoseconds (`t4/k1.json`, `c3.csv`).
+  Native compared the nanoseconds always.
+
+Declared, unchanged: the type matching's result without the relations
+column its temporary column replaced ('nocol'), the CSV declared features
+(every q38 difference is on such a file), the edge metrics' typed and
+missing labels, the first failing pair's hash-seed order, the string
+family's set order.
+
+Results with the fixed server: xe3 0 of 5,188 and xn2 0 of 1,888 on
+o95's JSON files that differed; on the other banks xe3 0 of 4,400, 2,376,
+4,344 and 4,532 (o95's SQLite and XML, q39, c96), xe4 0 of 9,200, 2,700,
+5,150 and 5,200 (o95's JSON and XML, c96, c97), xn2 0 on o95, q39, c96 and
+c97, the non-exact filters with None on every column (`fe/q/xn.py`,
+`EXTRA=1`) 0 on o95's SQLite and XML, q39 and c96, and FI's sweeps (xe2,
+xen, ocd2) 0 on o95's JSON and c97. q38's remaining differences keep the
+same events and differ by the objects a log relates but does not list
+(declared). `t4/csvunit.py` (CSV time columns at nanoseconds and
+microseconds) 0 of 60 (12 before). The full ctest passes 657 of 657
+and the fixture replay gives 2,673 responses unchanged.
+
+In the suite: `minera_review_fj1_tests` (a naive datetime next to NaT on
+an aware column, negated, next to all three nulls, the objects' filter,
+`ocel:timestamp` of a CSV log; another offset next to None and NaT and
+NaT alone as controls; None on datetime64, float64 and str columns and a
+time's text in the non-exact filters; a finer datetime alone, next to
+None, floored not rounded, on the time column and the objects' filter,
+and a list of both kinds keeping the nanoseconds).

@@ -2,6 +2,7 @@
 #include "ocel_frame_types.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <ctime>
 #include <iomanip>
@@ -511,30 +512,6 @@ Ocel filter_object_id_set(const Ocel& log, const IdSet& selected) {
 
 }  // namespace
 
-Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key,
-                                 const std::vector<OcelValue>& values,
-                                 bool positive) {
-  if (attribute_key.empty()) {
-    throw std::invalid_argument("OCEL event attribute key must not be empty");
-  }
-  // Round DV: an events frame without columns (an empty playout).
-  require_ocel_event_column(log, attribute_key);
-  Ocel filtered = log;
-  const auto column = ocel_numeric_column(log.events, attribute_key);
-  const auto column_values = isin_values(values, column);
-  filter_records(filtered.events, [&](const OcelEvent& event) {
-    // The id and activity are columns of the reference events frame, so
-    // filter_ocel_event_attribute selects on them (ocel:timestamp holds
-    // datetimes, which no given value equals, as a missing key matches none).
-    const bool matches =
-        attribute_key == "ocel:eid" ? contains_value(values, OcelValue(event.id))
-        : attribute_key == "ocel:activity" ? contains_value(values, OcelValue(event.activity))
-        : has_attribute_value(event.attributes, attribute_key, column_values, column);
-    return positive ? matches : !matches;
-  });
-  return propagate_event_filter(std::move(filtered), log);
-}
-
 namespace {
 // Round FA: a column only rows a reader or an earlier filter removed hold
 // stays a column of the reference frame (OcelFrameHint, round EM / EZ), so
@@ -716,17 +693,62 @@ bool null_cell_match(NullColumn column, NullValue value, const OcelValue& cell, 
 // compares value by value, NaT alone matching NaT (observed black-box,
 // pandas 3.0.5, fi p/isin.py and p/isin2.py; sweep fi q/xe2.py on o92 and
 // q36: [ts, None] kept the events and objects without a time).
-bool nulls_read_as_nat(const std::vector<OcelEventAttributeFilterValue>& values, bool naive_column) {
+// Round FJ: when that array has the other awareness (naive datetimes on an
+// aware column, or aware ones of one offset on a naive column) pandas
+// finds the two incompatible and matches nothing at all, NaT included
+// (observed black-box, fj p/isin5.py; sweep fj q/xe3.py on o95 and q38:
+// [naive ts, NaT] kept nothing on an aware column, native kept its NaT
+// rows).
+// The converted array also holds the datetimes at the column's unit,
+// floored (as_unit): a value finer than the column's microseconds matches
+// the cell it falls in (fj t4/k1.json, k3.json: read_ocel2_json keeps
+// microseconds, so 10:00:00.0000005 matches a 10:00:00 cell).
+enum class DatetimeValueList { kAsGiven, kNullsAsNaT, kNothing };
+DatetimeValueList datetime_value_list(const std::vector<OcelEventAttributeFilterValue>& values, bool naive_column) {
   std::optional<std::pair<bool, std::int32_t>> zone;
   for (const auto& value : values) {
     if (null_value(value)) continue;
     const auto* stamp = std::get_if<ParsedExactTimestamp>(&value);
-    if (stamp == nullptr) return false;
+    if (stamp == nullptr) return DatetimeValueList::kAsGiven;
     const std::pair<bool, std::int32_t> here{stamp->timezone_aware, stamp->timezone_aware ? stamp->offset_minutes : 0};
-    if (zone && *zone != here) return false;
+    if (zone && *zone != here) return DatetimeValueList::kAsGiven;
     zone = here;
   }
-  return zone && zone->first != naive_column;
+  if (!zone) return DatetimeValueList::kAsGiven;
+  return zone->first != naive_column ? DatetimeValueList::kNullsAsNaT : DatetimeValueList::kNothing;
+}
+// Round FJ: the step (in nanoseconds) of a datetime64 column's unit: the
+// readers keep microseconds unless a time text has more than six fraction
+// digits (an OCEL CSV time; pandas parses the column at nanoseconds then,
+// fj t4/c1.csv), a naive CSV column says its unit.
+bool nanosecond_text(std::string_view text) {
+  const auto dot = text.find('.');
+  if (dot == std::string_view::npos) return false;
+  std::size_t digits = 0;
+  while (dot + 1 + digits < text.size() && std::isdigit(static_cast<unsigned char>(text[dot + 1 + digits]))) ++digits;
+  return digits > 6;
+}
+template <typename Records>
+std::uint32_t datetime_column_step(const Records& records, std::string_view key) {
+  for (const auto& record : records)
+    for (const auto& attribute : record.attributes)
+      if (attribute.key == key)
+        if (const auto* text = std::get_if<std::string>(&attribute.value); text && nanosecond_text(*text)) return 1;
+  return 1000;
+}
+std::uint32_t event_time_step(const Ocel& log) {
+  if (log.naive_event_time_unit == "ns") return 1;
+  if (log.naive_event_time_unit == "s") return 1000000000;
+  if (log.naive_event_time_unit == "us") return 1000;
+  for (const auto& event : log.events)
+    if (nanosecond_text(event.timestamp)) return 1;
+  return 1000;
+}
+std::vector<OcelEventAttributeFilterValue> datetimes_at_step(std::vector<OcelEventAttributeFilterValue> values,
+                                                             std::uint32_t step) {
+  for (auto& value : values)
+    if (auto* stamp = std::get_if<ParsedExactTimestamp>(&value)) stamp->nanoseconds -= stamp->nanoseconds % step;
+  return values;
 }
 bool naive_datetime_column(const ocel_frame::Columns& frame, const std::string& key) {
   const auto* stats = frame.stats(key);
@@ -910,7 +932,84 @@ bool event_filter_instant_less(const ParsedExactTimestamp& left,
   return std::tie(left.seconds, left.nanoseconds) <
          std::tie(right.seconds, right.nanoseconds);
 }
+
+// Round FJ: the non-exact attribute filters' values (texts, numbers,
+// booleans, None) meet the reference frame's column as the exact filters'
+// do: None matches by the column's dtype (NullColumn: any missing cell of a
+// str column, an explicit None of an object column, nothing in a float64 or
+// datetime64 column), and a cell the frame holds as a datetime equals no
+// text, number or boolean (observed black-box, pandas 3.0.5, fj p/isin6.py;
+// sweep fj q/xn2.py on o95: None kept the events whose time attribute was
+// null, and the text of a time kept the rows holding that time).
+template <typename Records>
+std::optional<NullColumn> plain_filter_null_column(const Ocel& log, const ocel_frame::Columns& frame,
+                                                   const Records& records, const std::vector<OcelValue>& values,
+                                                   const std::string& key) {
+  const bool none = std::any_of(values.begin(), values.end(),
+                                [](const OcelValue& value) { return std::holds_alternative<std::nullptr_t>(value); });
+  if (!none) return std::nullopt;
+  if (log.event_frame_hint.str_columns) return NullColumn::kStr;
+  return null_column(frame, records, key);
+}
+OcelIsinValues without_none(OcelIsinValues values) {
+  values.values.erase(std::remove_if(values.values.begin(), values.values.end(),
+                                     [](const OcelValue& value) { return std::holds_alternative<std::nullptr_t>(value); }),
+                      values.values.end());
+  return values;
+}
+bool plain_attribute_match(const std::vector<OcelAttribute>& attributes, std::string_view key,
+                           const std::optional<NullColumn>& nulls, const OcelIsinValues& non_null,
+                           OcelNumericColumn column, bool datetime_column) {
+  const OcelAttribute* found = nullptr;
+  for (const auto& attribute : attributes)
+    if (attribute.key == key) {
+      found = &attribute;
+      break;
+    }
+  if (nulls && null_cell_match(*nulls, NullValue::kNone, found ? found->value : OcelValue(std::numeric_limits<double>::quiet_NaN()),
+                               found == nullptr))
+    return true;
+  if (found == nullptr) return false;
+  if (datetime_column && !found->text && std::holds_alternative<std::string>(found->value) &&
+      date_like_candidate(found->value))
+    return false;
+  return has_attribute_value(attributes, key, non_null, column);
+}
+
 }  // namespace
+
+Ocel filter_ocel_event_attribute(const Ocel& log, std::string_view attribute_key,
+                                 const std::vector<OcelValue>& values,
+                                 bool positive) {
+  if (attribute_key.empty()) {
+    throw std::invalid_argument("OCEL event attribute key must not be empty");
+  }
+  // Round DV: an events frame without columns (an empty playout).
+  require_ocel_event_column(log, attribute_key);
+  Ocel filtered = log;
+  const auto column = ocel_numeric_column(log.events, attribute_key);
+  const auto column_values = isin_values(values, column);
+  const bool canonical = attribute_key == "ocel:eid" || attribute_key == "ocel:activity" || attribute_key == "ocel:timestamp";
+  // Round FJ: None by the column's dtype (plain_attribute_match).
+  const auto nulls = canonical ? std::nullopt
+                               : plain_filter_null_column(log, ocel_frame::event_frame(log, true), log.events, values,
+                                                          std::string(attribute_key));
+  const auto non_null = nulls ? without_none(column_values) : column_values;
+  filter_records(filtered.events, [&](const OcelEvent& event) {
+    // The id and activity are columns of the reference events frame, so
+    // filter_ocel_event_attribute selects on them (ocel:timestamp holds
+    // datetimes, which no given value equals, as a missing key matches none).
+    const bool matches =
+        attribute_key == "ocel:eid" ? contains_value(values, OcelValue(event.id))
+        : attribute_key == "ocel:activity" ? contains_value(values, OcelValue(event.activity))
+        : canonical ? has_attribute_value(event.attributes, attribute_key, column_values, column)
+        : plain_attribute_match(event.attributes, attribute_key, nulls, non_null, column,
+                                event_filter_timestamp_column(log, event, attribute_key,
+                                                              OcelEventAttributeColumnKind::kAutomatic));
+    return positive ? matches : !matches;
+  });
+  return propagate_event_filter(std::move(filtered), log);
+}
 
 Ocel filter_ocel_event_attribute_exact(
     const Ocel& log, std::string_view attribute_key,
@@ -921,26 +1020,39 @@ Ocel filter_ocel_event_attribute_exact(
   // Round FD: None, NaT and NaN match by the column's dtype (NullColumn).
   std::optional<NullColumn> nulls;
   const bool null_values = std::any_of(values.begin(), values.end(), [](const auto& value) { return null_value(value).has_value(); });
-  bool nat_nulls = false;
-  if (column_kind == OcelEventAttributeColumnKind::kAutomatic && null_values) {
-    if (attribute_key == "ocel:eid" || attribute_key == "ocel:activity") nulls = NullColumn::kNever;
+  const bool datetime_values = std::any_of(values.begin(), values.end(), [](const auto& value) {
+    return std::holds_alternative<ParsedExactTimestamp>(value);
+  });
+  auto datetime_list = DatetimeValueList::kAsGiven;
+  std::uint32_t step = 1;
+  if (column_kind == OcelEventAttributeColumnKind::kAutomatic && (null_values || datetime_values)) {
+    std::optional<NullColumn> column;
+    if (attribute_key == "ocel:eid" || attribute_key == "ocel:activity") column = NullColumn::kNever;
     else if (attribute_key == "ocel:timestamp") {
       if (!ocel_raw_event_times(log) && !log.none_event_times) {
-        nulls = NullColumn::kDatetime;
-        nat_nulls = nulls_read_as_nat(values, !log.naive_event_time_unit.empty());
+        column = NullColumn::kDatetime;
+        datetime_list = datetime_value_list(values, !log.naive_event_time_unit.empty());
+        step = event_time_step(log);
       }
     } else if (log.event_frame_hint.str_columns) {
       // An OCEL CSV read's columns are str ones (OcelFrameHint::str_columns).
-      nulls = NullColumn::kStr;
+      column = NullColumn::kStr;
     } else {
       const auto frame = ocel_frame::event_frame(log, true);
-      nulls = null_column(frame, log.events, std::string(attribute_key));
-      if (nulls == NullColumn::kDatetime)
-        nat_nulls = nulls_read_as_nat(values, naive_datetime_column(frame, std::string(attribute_key)));
+      column = null_column(frame, log.events, std::string(attribute_key));
+      if (column == NullColumn::kDatetime) {
+        datetime_list = datetime_value_list(values, naive_datetime_column(frame, std::string(attribute_key)));
+        step = datetime_column_step(log.events, attribute_key);
+      }
     }
+    if (null_values) nulls = column;
   }
+  const bool nat_nulls = datetime_list == DatetimeValueList::kNullsAsNaT;
+  // Round FJ: the converted array's datetimes at the column's unit.
+  const auto used = nat_nulls && step > 1 ? datetimes_at_step(values, step) : values;
   Ocel filtered = log;
   filter_records(filtered.events, [&](const OcelEvent& event) {
+    if (datetime_list == DatetimeValueList::kNothing) return !positive;
     bool matches = false;
     const auto candidate = event_filter_scalar(event, attribute_key);
     if (nulls) {
@@ -955,7 +1067,7 @@ Ocel filter_ocel_event_attribute_exact(
     if (!kept_text_value(event.attributes, attribute_key) &&
         event_filter_timestamp_column(log, event, attribute_key, column_kind) &&
         (column_kind != OcelEventAttributeColumnKind::kAutomatic || date_like_candidate(candidate))) {
-      for (const auto& value : values)
+      for (const auto& value : used)
         matches = matches || (!skip(value) && attribute_filter_datetime_equal(candidate, value));
     } else {
       for (const auto& value : values)
@@ -1010,12 +1122,20 @@ Ocel filter_ocel_object_attribute(const Ocel& log,
   Ocel filtered = log;
   const auto column = ocel_numeric_column(log.objects, attribute_key);
   const auto column_values = isin_values(values, column);
+  const bool canonical = attribute_key == "ocel:oid" || attribute_key == "ocel:type";
+  // Round FJ: None by the column's dtype (plain_attribute_match).
+  const auto nulls = canonical ? std::nullopt
+                               : plain_filter_null_column(log, ocel_frame::object_frame(log, true), log.objects, values,
+                                                          std::string(attribute_key));
+  const auto non_null = nulls ? without_none(column_values) : column_values;
   filter_records(filtered.objects, [&](const OcelObject& object) {
     // The id and type are columns of the reference objects frame.
     const bool matches =
         attribute_key == "ocel:oid" ? contains_value(values, OcelValue(object.id))
         : attribute_key == "ocel:type" ? contains_value(values, OcelValue(object.type))
-        : has_attribute_value(object.attributes, attribute_key, column_values, column);
+        : plain_attribute_match(object.attributes, attribute_key, nulls, non_null, column,
+                                object_filter_timestamp_column(log, object, attribute_key,
+                                                               OcelObjectAttributeColumnKind::kAutomatic));
     return positive ? matches : !matches;
   });
   return propagate_object_filter(std::move(filtered), log);
@@ -1029,23 +1149,35 @@ Ocel filter_ocel_object_attribute_exact(
     throw std::out_of_range("'" + std::string(attribute_key) + "'");
   // Round FD: None, NaT and NaN match by the column's dtype (NullColumn).
   std::optional<NullColumn> nulls;
-  bool nat_nulls = false;
+  auto datetime_list = DatetimeValueList::kAsGiven;
+  std::uint32_t step = 1;
   const bool null_values = std::any_of(values.begin(), values.end(), [](const auto& value) { return null_value(value).has_value(); });
-  if (column_kind == OcelObjectAttributeColumnKind::kAutomatic && null_values) {
-    if (attribute_key == "ocel:oid" || attribute_key == "ocel:type") nulls = NullColumn::kNever;
+  const bool datetime_values = std::any_of(values.begin(), values.end(), [](const auto& value) {
+    return std::holds_alternative<ParsedExactTimestamp>(value);
+  });
+  if (column_kind == OcelObjectAttributeColumnKind::kAutomatic && (null_values || datetime_values)) {
+    std::optional<NullColumn> column;
+    if (attribute_key == "ocel:oid" || attribute_key == "ocel:type") column = NullColumn::kNever;
     // An OCEL CSV read's objects file is read as str too (observed
     // black-box, bank q28; the events frame's hint marks the read).
-    else if (log.event_frame_hint.str_columns) nulls = NullColumn::kStr;
+    else if (log.event_frame_hint.str_columns) column = NullColumn::kStr;
     else {
       const auto frame = ocel_frame::object_frame(log, true);
-      nulls = null_column(frame, log.objects, std::string(attribute_key));
-      // Round FI: a value list of datetimes and nulls (nulls_read_as_nat).
-      if (nulls == NullColumn::kDatetime)
-        nat_nulls = nulls_read_as_nat(values, naive_datetime_column(frame, std::string(attribute_key)));
+      column = null_column(frame, log.objects, std::string(attribute_key));
+      // Round FI / FJ: a value list of datetimes and nulls (datetime_value_list).
+      if (column == NullColumn::kDatetime) {
+        datetime_list = datetime_value_list(values, naive_datetime_column(frame, std::string(attribute_key)));
+        step = datetime_column_step(log.objects, attribute_key);
+      }
     }
+    if (null_values) nulls = column;
   }
+  const bool nat_nulls = datetime_list == DatetimeValueList::kNullsAsNaT;
+  // Round FJ: the converted array's datetimes at the column's unit.
+  const auto used = nat_nulls && step > 1 ? datetimes_at_step(values, step) : values;
   Ocel filtered = log;
   filter_records(filtered.objects, [&](const OcelObject& object) {
+    if (datetime_list == DatetimeValueList::kNothing) return !positive;
     const auto candidate = object_filter_scalar(object, attribute_key);
     if (nulls) {
       const bool canonical = attribute_key == "ocel:oid" || attribute_key == "ocel:type";
@@ -1060,7 +1192,7 @@ Ocel filter_ocel_object_attribute_exact(
     const bool datetime = !kept_text_value(object.attributes, attribute_key) &&
                           object_filter_timestamp_column(log, object, attribute_key, column_kind) &&
                           (column_kind != OcelObjectAttributeColumnKind::kAutomatic || date_like_candidate(candidate));
-    const bool matches = std::any_of(values.begin(), values.end(), [&](const auto& value) {
+    const bool matches = std::any_of(used.begin(), used.end(), [&](const auto& value) {
       return !skip(value) && (datetime ? attribute_filter_datetime_equal(candidate, value)
                                        : event_filter_scalar_equal(candidate, value));
     });

@@ -1819,6 +1819,12 @@ if(MINERA_BUILD_TESTS)
   target_compile_options(minera_review_fi1_tests PRIVATE ${MINERA_TEST_OPTIONS})
   add_test(NAME minera_review_fi1_tests COMMAND minera_review_fi1_tests)
 
+  add_executable(minera_review_fj1_tests src/backend/tests/test_review_fj1.cpp)
+  target_link_libraries(minera_review_fj1_tests PRIVATE minera::core)
+  target_compile_features(minera_review_fj1_tests PRIVATE cxx_std_20)
+  target_compile_options(minera_review_fj1_tests PRIVATE ${MINERA_TEST_OPTIONS})
+  add_test(NAME minera_review_fj1_tests COMMAND minera_review_fj1_tests)
+
   add_executable(minera_review_dz1_tests src/backend/tests/test_review_dz1.cpp)
   target_link_libraries(minera_review_dz1_tests PRIVATE minera::core)
   target_compile_features(minera_review_dz1_tests PRIVATE cxx_std_20)
