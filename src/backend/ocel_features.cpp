@@ -322,13 +322,48 @@ std::int64_t python_float_hash(double value) {
   return hash == -1 ? -2 : hash;
 }
 
+// Round FH: CPython 3.11's hash of an aware datetime (datetime.datetime, or
+// a pandas Timestamp without nanoseconds): the hash of the tuple (days,
+// seconds, microseconds) of its UTC instant as a timedelta from 0001-01-01
+// (day 1), xxHash's tuple hash; a Timestamp with nanoseconds hashes its
+// value in nanoseconds. Neither depends on the seed (a naive datetime
+// hashes its bytes, which does; observed black-box, fh probe/dthash.py).
+std::int64_t python_tuple_hash(std::initializer_list<std::int64_t> items) {
+  constexpr std::uint64_t kPrime1 = 11400714785074694791ULL, kPrime2 = 14029467366897019727ULL,
+                          kPrime5 = 2870177450012600261ULL;
+  std::uint64_t acc = kPrime5;
+  for (const auto item : items) {
+    acc += static_cast<std::uint64_t>(python_int_hash(item)) * kPrime2;
+    acc = (acc << 31) | (acc >> 33);
+    acc *= kPrime1;
+  }
+  acc += static_cast<std::uint64_t>(items.size()) ^ (kPrime5 ^ 3527539ULL);
+  if (acc == ~std::uint64_t{0}) return 1546275796;
+  return static_cast<std::int64_t>(acc);
+}
+std::optional<std::int64_t> python_aware_time_hash(const std::string& text, bool timestamp) {
+  const auto parsed = parse_timestamp_exact(text);
+  if (!parsed || !parsed->timezone_aware) return std::nullopt;
+  if (timestamp && parsed->nanoseconds % 1000 != 0) {
+    if (parsed->seconds > std::numeric_limits<std::int64_t>::max() / 1000000000 - 1 ||
+        parsed->seconds < std::numeric_limits<std::int64_t>::min() / 1000000000 + 1)
+      return std::nullopt;
+    return python_int_hash(parsed->seconds * 1000000000 + parsed->nanoseconds);
+  }
+  const auto day = parsed->seconds >= 0 ? parsed->seconds / 86400 : -((-parsed->seconds + 86399) / 86400);
+  return python_tuple_hash({719163 + day, parsed->seconds - day * 86400, parsed->nanoseconds / 1000});
+}
+
 // Round FG: the cell whose value comes first when pm4py iterates the set of
 // a column's non-null values (CPython 3.11's set: values inserted in row
 // order, equal numbers kept once as the first, a table of 8 slots grown
 // fourfold past 60 % fill, linear probing of 9 slots, then perturbation).
-// Texts and datetimes hash by the seed (PYTHONHASHSEED), so they count
-// towards the table's size but take no slot here: where one would push a
-// number aside the order follows the seed (declared).
+// Texts and naive datetimes hash by the seed (PYTHONHASHSEED), so they
+// count towards the table's size but take no slot here: where one would
+// push a number aside the order follows the seed (declared). Round FH: an
+// aware datetime's hash is the seed's free (python_aware_time_hash), so it
+// takes its slot as a number does (bank c91's OCEL 1.0 XML: a UTC datetime
+// before a float in every seed).
 std::optional<std::size_t> python_set_first(const std::vector<FeatureCell>& cells,
                                             const std::function<bool(const FeatureCell&)>& wanted) {
   using Kind = FeatureCell::Kind;
@@ -378,6 +413,8 @@ std::optional<std::size_t> python_set_first(const std::vector<FeatureCell>& cell
                                     std::to_string(parsed->nanoseconds)
                               : cell.text;
       if (times.insert(key).second) {
+        if (const auto hash = python_aware_time_hash(cell.text, cell.kind == Kind::kTimestamp))
+          place(table, Entry{row, static_cast<std::uint64_t>(*hash)});
         ++used;
         grow();
       }
@@ -1928,8 +1965,12 @@ OcelFeatureTable extract_ocel_features(const Ocel& log,
       if (lifecycle && options.include_lifecycle_wip_features.value_or(false) && first_object_event)
         throw raw_error(*first_object_event);
       if (lifecycle && options.include_lifecycle_wip_features.value_or(false) && nat_object) throw nat_error();
+      // Round FH: the related events run the whole events algorithm, so its
+      // attribute families (str, then num) come before the endpoints' KeyError
+      // (observed black-box: q34's CSV chain results, num_ev_attr's ValueError
+      // before an unrelated object's KeyError).
       if (options.include_related_events_features || options.include_related_activities_features)
-        event_family_errors(false);
+        event_family_errors(true);
       if (options.include_obj_con_in_graph_features) default_object_family_errors();
     }
   }

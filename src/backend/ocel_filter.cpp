@@ -794,17 +794,15 @@ void check_event_attribute_window_column(const Ocel& log, std::string_view key) 
       // the key (NaN next to None) and object when every row holds a null
       // (observed black-box: o72's o2t72_0040, one null "d" among four
       // events, raises 'float'); an all-NULL SQLite table column is object.
-      const auto* stats = frame.stats(name);
-      if (stats != nullptr && stats->has_none) return;
       // Round FC: read_ocel_csv reads its files as str, so its column of
       // nulls is a str one and compares nothing (OcelFrameHint::str_columns;
       // observed black-box: q26's files whose column only empty cells hold).
       if (log.event_frame_hint.str_columns) return;
-      const bool every = std::all_of(log.events.begin(), log.events.end(), [&](const OcelEvent& event) {
-        return std::any_of(event.attributes.begin(), event.attributes.end(),
-                           [&](const OcelAttribute& attribute) { return attribute.key == key; });
-      });
-      if (every && log.event_frame_hint.dropped_rows == 0) return;
+      // Round FH: the rows a reader or a filter dropped count too: their
+      // nulls keep the column object (None), one of them lacking the key
+      // makes it float64 (Columns::all_nulls; observed black-box, bank o89's
+      // JSON files whose unrelated events hold the column's nulls).
+      if (frame.all_nulls(name)) return;
       refuse("float");
       return;
     }

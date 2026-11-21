@@ -240,11 +240,19 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
       activity_instants(activity == kTimestamp || activity_reading.date_column),
       type_instants(type_reading.date_column);
 
+  // Round FH: a missing event time (an OCEL CSV row's NaT) as the event id
+  // is no group: pm4py's groupby drops the NaT key, so the event takes no
+  // part in any edge (observed black-box, bank q34's files with an empty
+  // time cell, fh q/emg2.py).
+  const auto id_cell = [&](Cell cell) {
+    if (eid == kTimestamp && cell.kind == Cell::Kind::kText && cell.text.empty()) return Cell();
+    return eid_instants(std::move(cell));
+  };
   std::vector<Cell> identifiers;
   std::unordered_map<std::string, Cell> activities;
   identifiers.reserve(log.events.size());
   for (const auto& event : log.events) {
-    identifiers.push_back(eid_instants(event_cell(event, eid, eid_reading)));
+    identifiers.push_back(id_cell(event_cell(event, eid, eid_reading)));
     auto label_cell = activity_instants(event_cell(event, activity, activity_reading));
     // Round FF: a missing event time (an OCEL CSV row's NaT) as the activity
     // is the label NaT, as the OC-DFG's edges have it (observed black-box,
@@ -267,7 +275,7 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
     const auto object = object_by_id.find(relation.object_id);
     if (event == event_by_id.end() || object == object_by_id.end())
       throw std::invalid_argument("OCDFG association adapter requires source events and objects for each relation");
-    const auto key = eid_instants(relation_cell(relation, *event->second, *object->second, eid));
+    const auto key = id_cell(relation_cell(relation, *event->second, *object->second, eid));
     const auto* group = group_key(key, eid);
     if (group == nullptr) continue;
     omap[*group].push_back(label(relation_cell(relation, *event->second, *object->second, oid), oid));

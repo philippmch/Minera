@@ -35701,3 +35701,99 @@ order TypeError and numeric name, the family order on a CSV log with an
 unrelated object; a column of nulls with a dropped event holding a null,
 through the transport, and lacking the attribute; the NaT label of a
 datetime64 activity).
+
+## Review FH1: the edge metrics' NaT event id, the exact window over a dropped row's nulls, an aware datetime in the objects' string family, the related events' attribute families (2026-11-21)
+
+Round FH checked FG's CI (run 44860924885 on 0e0cfb7: all six jobs green,
+Linux 24 minutes of build and 34 of ctest, Windows 34 and 50). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, no pyarrow) in the reference venv
+with fresh banks: o89 (`fg/o5/o5gen.py 89 60`, OCEL 2.0 with null-only
+attributes and respelled instants; JSON, SQLite and XML), c90 and c91
+(`fg/c6/c6gen.py 90 60`, `91 60`, OCEL 1.0 JSON and XML) and q34
+(`eq/csv/q2gen.py 2806 60`, with the declared CSV features). New sweeps:
+`q/fat2.py` (FG1-1 on the other readers of the attribute lists: the
+objects' related events with the event lists, the events' related objects
+with the object lists, `ocel_features_filter_per_type` per object type
+with every object column in both lists), `q/emg2.py` (the edge metrics
+with `event_id_key` and `object_id_key` on every relations column) and
+`q/onchain.py` (the exact filters, the OC-DFG timing, the edge metrics and
+fat2 on the result of a filter or split chain: pm4py's result pickled with
+its frames and dtypes against the native result's transport).
+Hand-made: `t1/f*.json`, `t1/g*.jsonocel` (OCEL 2.0 and 1.0 logs whose
+null-only column's nulls sit on events the reader or an event id filter
+drops), `t1/old3.t.json` (a transport with three-entry dropped rows),
+`t4/m1.csv` (an empty event time), `t5/n1.xmlocel`, `t6/m4.csv`.
+
+FG's fixes matched outside four classes. FG1-1 on the other readers: fat
+0 of 792, 820 and 314 on o89's JSON, SQLite and XML and 0 of 904 on c90,
+fat2 0 of 876, 905, 352 and 1,010; the native names style is native's own
+(no pm4py counterpart); q34's differences (fat 86 of 362, fat2 125 of 418)
+are each on a file with a declared CSV feature (an object not listed,
+without id or type, a repeated event id, no objects file). A text pushing
+a number aside in the objects' set: 0 seed-dependent outcomes of 169
+columns (`probe/setseed.py`, seeds 0 to 5, o89 and c90's first 30 files).
+FG1-2 on the other routes: the chains' exact filters (onx 0 of 22,545 on
+o89's SQLite, 0 of 10,532, 26,701 and 28,246 on o89's XML, c90 and c91),
+the OCEL 1.0 JSON reader's dropped events and objects (`t1/p2.py` 0 of 240)
+and the event id filter before an exact null filter or the OC-DFG timing
+(`t1/p1.py` 0 of 64, `p2.py` 0 of 144 on OCEL 2.0) agree, and a
+transport with three-entry dropped rows (`t1/old3.t.json`) gives FG's
+responses. FG1-3: a NaT label of a datetime64
+column as the event id or object type key is the declared missing label
+(emg2: the typed and missing labels alone on o89, c90 and c91; q34's other
+differences are FH1-1, missing labels or declared CSV features). The OC-DFG differences
+(ocd 5, 10 and 9 on o89, 4 and 5 on c90 and c91, and on the chains 44 of
+15,864 on o89's JSON and 10 of 17,399 on c90) are each one of pm4py's
+outcomes under PYTHONHASHSEED 0 to 19 for o89's JSON and SQLite, 0 to 9
+for the rest (`fg/probe/hscheck.py`, `probe/hschk2.py` for the chains).
+
+Fixed:
+- **FH1-1 A missing event time as the edge metrics' event id key.** With
+  `event_id_key=ocel:timestamp` an OCEL CSV row with an empty time is NaT
+  there, and pm4py's groupby drops the NaT key, so the event takes part in
+  no edge (q34 48 of 932, `t4/m1.csv`). Native keyed the event by the
+  empty text and kept its edges.
+- **FH1-2 The exact window's timestamp key over a dropped row's nulls.**
+  FG1-2 made the OC-DFG timing and the exact filters' null column read the
+  nulls of the rows a reader dropped; the exact time window
+  (`event_timestamp_exact` with a `timestamp_key`) still counted any dropped
+  row as one lacking the key and raised `TypeError: '>=' not supported
+  between instances of 'float' and 'datetime.datetime'`, where pandas keeps
+  the column object (None), which compares nothing: the window keeps no
+  event (o89's JSON xen 10 of 2,028, the chains' onx 104 of 22,541). It now
+  reads `Columns::all_nulls` too.
+- **FH1-3 An aware datetime in the objects' string family.** pm4py raises
+  for the first value of the column's Python set that is no str. An aware
+  datetime hashes free of the seed (CPython 3.11: the tuple hash of its UTC
+  days since 0001-01-01, seconds of the day and microseconds; a Timestamp
+  with sub-microsecond nanoseconds hashes its nanosecond integer), so it
+  takes a fixed slot next to the numbers: `TypeError: can only concatenate
+  str (not "datetime.datetime") to str` where native named the float (c91
+  `c6_91_0054`, fat 2 of 842 and fat2 5 of 952; the same outcome in 40 of
+  40 seeds; `probe/dthash.py`). A naive datetime still follows the seed.
+- **FH1-4 The related events' attribute families in the objects variant.**
+  The objects' related events (and related activities) run pm4py's whole
+  events algorithm, whose string and numeric attribute families come
+  before the endpoints, so `num_ev_attr`'s `ValueError: could not convert
+  string to float: '<text>'` comes before an unrelated object's
+  `KeyError` (q34's chain results, 12 of 3,530 cases of onf, `t6/m4.csv`).
+  Native checked the related events without their attribute families.
+
+Declared, unchanged: the edge metrics' typed and missing labels (o89 172,
+212 and 68; c90 275, c91 254), the first failing pair's hash-seed order,
+the CSV declared features, the download date fractions, the order of the
+string family's columns.
+
+Results with the fixed server: fat and fat2 0 of 792 and 876, 314 and 352
+on o89's JSON and XML, 0 of 842 and 952 on c91; xen 0 of 318 and onx 0 of
+4,878 on the files that differed; emg2 on q34 left the declared CSV
+features and missing labels alone; with FH1-4, onf 0 of 373 on q34's
+three chain files that differed, fat2 0 of 876 on o89's JSON and q34's
+121 of 418 each on a declared CSV feature. The fixture replay gives 2,673
+responses unchanged.
+
+In the suite: `minera_review_fh1_tests` (the NaT event id on a CSV log,
+with the plain id for contrast; the window over a dropped null, through the
+transport, and over a dropped row lacking the key; the aware datetime's
+slot before a float; the related events' and related activities' numeric
+family before the endpoints, and the endpoints' KeyError without it).

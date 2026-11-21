@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FG (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FH (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8168,6 +8168,72 @@ on the first run (29 minutes, -j2); the fixture replay gave 2,673
 responses unchanged. FF's CI run 44850626080 finished green in all six
 jobs, macOS included. The generators, the comparers and
 the probes are in the project files under `review-harness/round-fg/`.
+
+Round FH re-reviewed FG (Review FH1). FG's fixes matched on fresh banks
+(o89 from `fg/o5/o5gen.py 89 60` as JSON, SQLite and XML; c90 and c91 from
+`fg/c6/c6gen.py`; q34 from `eq/csv/q2gen.py 2806 60`): the attribute lists
+on the related events and related objects and under
+`ocel_features_filter_per_type` agree (new sweep `q/fat2.py`), the
+dropped rows' nulls agree after filter and split chains (new sweep
+`q/onchain.py`, pm4py's chain result pickled against the native result's
+transport) and on the OCEL 1.0 JSON reader, and no objects' string family
+outcome followed the hash seed in 169 columns. Four classes were fixed:
+FH1-1, a missing event time as the edge metrics' event id key is NaT,
+which pm4py's groupby drops (the event joins no edge); FH1-2, the exact
+time window's `timestamp_key` reads the dropped rows' nulls as FG1-2's
+consumers do (a column object None compares nothing); FH1-3, an aware
+datetime takes its seed-free slot in the objects' string family set
+(CPython's tuple hash of its UTC days, seconds and microseconds), so its
+TypeError comes before a float's; FH1-4, the objects' related events and
+related activities check the events' attribute families before the
+endpoints' KeyError. Declared, unchanged: the edge metrics' typed and
+missing labels, the OC-DFG's first failing pair (each difference one of
+pm4py's outcomes under seeds 0 to 9 or 0 to 19, the chains' too), the CSV declared
+features, the download date fractions, the string family's column order.
+
+In the suite: `minera_review_fh1_tests`. The full ctest passed 655 of 655
+on the first run with FH1-1 to FH1-3 (33 minutes, -j2); after FH1-4 the
+110 OCEL, feature and review tests passed again and the fixture replay
+gave 2,673 responses unchanged. FG's CI run 44860924885 finished green in
+all six jobs. The generators, the comparers
+and the probes are in the project files under `review-harness/round-fh/`.
+
+Next round (FI) should start by re-reviewing round FH:
+
+- FH's CI run;
+- FH1-1 on the other places that group by a key holding NaT: the OC-DFG's
+  own `ocdfg_event_id_attribute=ocel:timestamp` on CSV logs with empty
+  times, the flattening and the type matching with a time column as a
+  key, and the SQLite and XML readers' missing times if any reach a key;
+- FH1-2 on the other consumers of a frame's column type after dropped
+  rows: the exact filters' other value lists (NaN and NaT next to None),
+  the event attribute window of the non-exact filter, the features'
+  timestamp families on a null-only column, and the chains' splits
+  (connected components and ancestors) before the window;
+- FH1-3 on the other seed-free hashes in a Python set: the events'
+  string family (no concatenation there, but the column order), aware
+  Timestamps with nanoseconds, booleans next to 0 and 1, and the OCEL 1.0
+  XML reader's dates as object values;
+- FH1-4 on the other families pm4py runs inside another: the events'
+  related objects (the objects algorithm inside the events one) with the
+  object attribute lists and an event the objects' families fail on, and
+  `filter_per_type` with a failing family on one type only;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FH's list, taken in FH: FG's CI (six green), FG1-1 on the other readers of the attribute lists
+(fat2 0 outside the CSV declared features; related events fixed as
+FH1-4; the native names style is native-only; 0 seed-dependent string
+family outcomes in 169 columns, but the aware datetime's place fixed as
+FH1-3), FG1-2 after filters and splits (onchain 0 outside the hash-seed
+class; the exact window fixed as FH1-2) and on the OCEL 1.0 JSON reader,
+SQLite's unrelated events and three-entry transports (0), FG1-3 on the
+id keys (the event id key's NaT fixed as FH1-1; the object type key
+agrees). Carried to FI: EV1-1, the SQLite leftovers, the new Polars
+dtypes, DW1, the other declared items, the rest of the CU list and the
+open choices.
+
+Previous list for round FH (kept for its older items):
 
 Next round (FH) should start by re-reviewing round FG:
 
