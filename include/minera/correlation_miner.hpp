@@ -32,6 +32,12 @@ struct CorrelationMinerOptions {
   std::string timestamp_attribute = "time:timestamp";
   std::string start_timestamp_attribute;
   std::string case_id_attribute = "case:concept:name";
+  // The completion key pm4py is given on the same input (an upload's
+  // formatted frame reads time:timestamp where `timestamp_attribute` names
+  // its own column). When set, the trace-based variant models pm4py's
+  // projected log, which keeps only the standard keys (round FS). Empty (the
+  // default) keeps the native contract: the selectors are read as given.
+  std::string reference_timestamp_key;
   bool exact_time_matching = false;
   std::size_t sample_size = 100000;
 };

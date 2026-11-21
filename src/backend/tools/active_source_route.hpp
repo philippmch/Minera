@@ -60,6 +60,16 @@ minera::FirstClassAttributeRole selector_role(const minera::ActiveSourceSelector
   return minera::FirstClassAttributeRole::kNone;
 }
 
+// The completion key pm4py's correlation miner is given on the same input
+// (round FS): a supplied text as written, else the formatted frame's
+// time:timestamp on a CSV source, else the selected key.
+std::string correlation_reference_timestamp_key(const httplib::Request& request,
+    const minera::CorrelationMinerOptions& options, bool csv_source) {
+  if (active_source_supplied(request, "correlation_timestamp_attribute"))
+    return active_source_field(request, "correlation_timestamp_attribute");
+  return csv_source ? std::string("time:timestamp") : options.timestamp_attribute;
+}
+
 // Unsupplied keys take the source's selected columns. On a CSV source
 // (`csv_frame`) a supplied case:concept:name, concept:name or time:timestamp
 // reads the selected column, as format_dataframe's copy holds it (round BO,

@@ -898,6 +898,28 @@ bool instant_less(double a, const std::optional<ParsedExactTimestamp>& a_exact, 
   return a < b;
 }
 
+// Whether a Polars frame's start and completion columns have different units
+// (datetime64[us] beside datetime64[ns] in the pandas frame): Polars then
+// casts both to Datetime(us) before it compares or subtracts them (round FR).
+bool polars_mixed_units(const EventTable& table, const std::vector<TableRow>& rows,
+                        const DfgTableOptions& options) {
+  const auto unit = [&](const std::string& name, bool start) -> bool {
+    if (const auto declared = declared_datetime_unit(table, name)) return *declared;
+    return std::any_of(rows.begin(), rows.end(), [&](const TableRow& row) {
+      return sub_microsecond(start ? row.start_text : row.completion_text);
+    });
+  };
+  return unit(start_column_name(options), true) != unit(options.timestamp_attribute, false);
+}
+
+// An instant as such a Polars frame holds it: truncated to the microsecond
+// when its units differ.
+std::optional<ParsedExactTimestamp> polars_instant(std::optional<ParsedExactTimestamp> exact,
+                                                   bool microseconds) {
+  if (exact && microseconds) exact->nanoseconds -= exact->nanoseconds % 1000;
+  return exact;
+}
+
 // `polars_microseconds`: the Polars frame's start and completion columns
 // have different units (datetime64[us] beside datetime64[ns] in the pandas
 // frame), so Polars casts both to their supertype Datetime(us), truncating
@@ -1170,16 +1192,8 @@ DfgTableResult discover_table_dfg(const EventTable& table,
     throw std::invalid_argument("'SeriesGroupBy' object has no attribute 'stdev'");
   // Polars subtracts a start and a completion column of different units in
   // microseconds (flow_time).
-  bool polars_microseconds = false;
-  if (polars && computes_duration && clamp_start) {
-    const auto unit = [&](const std::string& name, bool start) -> bool {
-      if (const auto declared = declared_datetime_unit(table, name)) return *declared;
-      return std::any_of(rows.begin(), rows.end(), [&](const TableRow& row) {
-        return sub_microsecond(start ? row.start_text : row.completion_text);
-      });
-    };
-    polars_microseconds = unit(start_column_name(options), true) != unit(options.timestamp_attribute, false);
-  }
+  const bool polars_microseconds =
+      polars && computes_duration && clamp_start && polars_mixed_units(table, rows, options);
   // Polars keeps an edge whose duration is null and one whose source activity
   // is null in the performance result, but neither counts in frequency.
   std::map<std::string, std::vector<double>> null_source_values;
@@ -1344,6 +1358,10 @@ DfgPartialOrderResult discover_partial_table(const EventTable& table,
 
   DfgPartialOrderResult result;
   result.backend = backend;
+  // Polars measures a flow in whole seconds, in microseconds when the start
+  // and completion units differ (round FS, observed black-box).
+  const bool polars = backend == DfgTableBackend::kPolars;
+  const bool polars_microseconds = polars && polars_mixed_units(table, rows, options);
   std::vector<DfgPartialOrderPair> pairs;
   for (std::size_t i = 0; i < rows.size(); ++i) {
     for (std::size_t j = 0; j < rows.size(); ++j) {
@@ -1354,8 +1372,10 @@ DfgPartialOrderResult discover_partial_table(const EventTable& table,
       // name; round BM, observed black-box).
       if (!same_case(source, target, backend == DfgTableBackend::kPandas) || !index_less(source, target))
         continue;
+      // Polars compares the instants as its frame holds them (round FS).
       if (!source.completion || !target.start ||
-          instant_less(*target.start, target.start_exact, *source.completion, source.completion_exact))
+          instant_less(*target.start, polars_instant(target.start_exact, polars_microseconds),
+                       *source.completion, polars_instant(source.completion_exact, polars_microseconds)))
         continue;
       DfgPartialOrderPair pair;
       pair.source = source.event;
@@ -1364,7 +1384,7 @@ DfgPartialOrderResult discover_partial_table(const EventTable& table,
       pair.target_index = output_index(target);
       pair.source_index_value = output_index_text(source);
       pair.target_index_value = output_index_text(target);
-      pair.flow_time_seconds = flow_time(source, target, options, false);
+      pair.flow_time_seconds = flow_time(source, target, options, false, polars, polars_microseconds);
       pairs.push_back(std::move(pair));
     }
   }
@@ -1451,6 +1471,7 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
   }
   DfgConcurrentResult result;
   result.backend = backend;
+  const bool polars_microseconds = !pandas && polars_mixed_units(table, rows, options);
   result.max_start_column = options.max_start_column;
   result.min_complete_column = options.min_complete_column;
   result.overlap_column = options.overlap_column;
@@ -1472,7 +1493,10 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
         continue;
       // Only the lazy adapter applies this one-sided prefilter before it
       // calculates interval overlap.
-      if (!pandas && *left.completion > *right.start) continue;
+      // On the instants as Polars holds them (round FS).
+      if (!pandas && instant_less(*right.start, polars_instant(right.start_exact, polars_microseconds),
+                                  *left.completion, polars_instant(left.completion_exact, polars_microseconds)))
+        continue;
       double maximum_start = std::max(*left.start, *right.start);
       double minimum_completion = std::min(*left.completion, *right.completion);
       // pandas takes each instant's Timestamp.timestamp() (a float rounded
@@ -1485,7 +1509,22 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
         minimum_completion = std::min(frame_times::epoch_seconds(*left.completion_exact),
                                       frame_times::epoch_seconds(*right.completion_exact));
       }
-      const double overlap = minimum_completion - maximum_start;
+      double overlap = minimum_completion - maximum_start;
+      // Polars measures the overlap in whole seconds, truncated toward zero,
+      // and compares that with 0 (round FS, observed black-box: an overlap
+      // of -0.7 seconds is 0, so concurrent unless strict).
+      if (!pandas && left.start_exact && right.start_exact && left.completion_exact &&
+          right.completion_exact) {
+        const auto left_start = *polars_instant(left.start_exact, polars_microseconds);
+        const auto right_start = *polars_instant(right.start_exact, polars_microseconds);
+        const auto left_completion = *polars_instant(left.completion_exact, polars_microseconds);
+        const auto right_completion = *polars_instant(right.completion_exact, polars_microseconds);
+        const auto& latest_start =
+            instant_less(0.0, left_start, 0.0, right_start) ? right_start : left_start;
+        const auto& earliest_completion =
+            instant_less(0.0, right_completion, 0.0, left_completion) ? right_completion : left_completion;
+        overlap = polars_whole_seconds(latest_start, earliest_completion);
+      }
       if (options.strict ? overlap <= 0.0 : overlap < 0.0) continue;
       DfgConcurrentPair pair;
       pair.left = left.event;

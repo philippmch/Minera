@@ -8,6 +8,7 @@
 #include <map>
 #include <optional>
 #include <queue>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -757,14 +758,20 @@ double exact_duration(const PreparedEvents& source,
   return mean_or_zero(delays);
 }
 
+// pm4py walks the two start-sorted lists once: for each source in turn it
+// moves to the first target that starts after the source completes and counts
+// the targets from there, never stepping back, so a source that completes
+// before an earlier one (a nested interval, only with a start key) counts
+// only the targets after the earlier one's (round FS, observed black-box:
+// fuzzed on 2,479 groups; without a start key it is the full count).
 double precede_succeed_probability(const PreparedEvents& source,
                                    const PreparedEvents& target) {
   if (source.empty() || target.empty()) return 0.0;
   std::uint64_t valid = 0;
+  std::size_t next = 0;
   for (const auto& source_event : source) {
-    for (const auto& target_event : target) {
-      if (source_event.complete < target_event.start) ++valid;
-    }
+    while (next < target.size() && !(source_event.complete < target[next].start)) ++next;
+    valid += static_cast<std::uint64_t>(target.size() - next);
   }
   return static_cast<double>(valid) /
          static_cast<double>(source.size() * target.size());
@@ -1108,19 +1115,59 @@ CorrelationMinerResult discover_prepared(
   return result;
 }
 
+namespace {
+
+// pm4py's trace-based variant projects each trace to its activities and
+// completion times under the standard keys (concept:name, time:timestamp)
+// before it pairs two activities, so a pairing reads neither another
+// completion key nor a start key there: with two or more activities in the
+// input that is a KeyError for the key, a TypeError for a start key of
+// concept:name (an activity compared with a time); with fewer it never pairs
+// (round FS, observed black-box on frames and EventLogs alike). Modeled when
+// the caller names pm4py's completion key (reference_timestamp_key).
+template <typename Input, typename Prepare>
+CorrelationMinerResult discover_with_reference_keys(
+    const Input& input, const CorrelationMinerOptions& options, Prepare prepare) {
+  if (options.variant == CorrelationVariant::kTraceBased &&
+      !options.reference_timestamp_key.empty()) {
+    const auto& timestamp_key = options.reference_timestamp_key;
+    const auto& start_key = options.start_timestamp_attribute;
+    const bool start_read = !start_key.empty() && start_key != "time:timestamp";
+    if (timestamp_key != "time:timestamp" || start_read) {
+      auto projected = options;
+      projected.start_timestamp_attribute.clear();
+      const auto prepared = prepare(input, projected);
+      std::set<std::string> activities;
+      for (const auto& event : prepared.raw_flat) activities.insert(event.activity);
+      if (activities.size() >= 2) {
+        if (timestamp_key != "time:timestamp")
+          throw std::invalid_argument("KeyError: '" + timestamp_key + "'");
+        if (start_key == "concept:name")
+          throw std::invalid_argument(
+              "TypeError: '<' not supported between instances of 'float' and 'str'");
+        throw std::invalid_argument("KeyError: '" + start_key + "'");
+      }
+      return discover_prepared(prepared, projected);
+    }
+  }
+  return discover_prepared(prepare(input, options), options);
+}
+
+}  // namespace
+
 CorrelationMinerResult discover_correlation_miner(
     const EventLog& log, const CorrelationMinerOptions& options) {
-  return discover_prepared(prepare_event_log(log, options), options);
+  return discover_with_reference_keys(log, options, prepare_event_log);
 }
 
 CorrelationMinerResult discover_correlation_miner(
     const EventStream& stream, const CorrelationMinerOptions& options) {
-  return discover_prepared(prepare_event_stream(stream, options), options);
+  return discover_with_reference_keys(stream, options, prepare_event_stream);
 }
 
 CorrelationMinerResult discover_correlation_miner(
     const EventTable& table, const CorrelationMinerOptions& options) {
-  return discover_prepared(prepare_event_table(table, options), options);
+  return discover_with_reference_keys(table, options, prepare_event_table);
 }
 
 CorrelationMinerResult discover_correlation_miner(

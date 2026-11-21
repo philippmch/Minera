@@ -888,7 +888,55 @@ void review_fr_polars_mixed_datetime_units() {
   assert(summary.standard_deviation == 0.7071067811865476);
 }
 
+// Round FS: Polars measures a partial order's flow and a concurrency overlap
+// in whole seconds truncated toward zero (in microseconds when the start and
+// completion units differ) and compares the overlap with 0 (expected values
+// observed black-box with pm4py's Polars adapters on the formatted frame).
+void review_fs_polars_partial_order_and_overlap() {
+  const auto table = [](const std::string& rows) {
+    std::istringstream text("case,act,ts,st\n" + rows);
+    CsvImportOptions import_options;
+    import_options.case_id_column = "case";
+    import_options.activity_column = "act";
+    import_options.timestamp_column = "ts";
+    return import_csv_event_data(text, import_options).table;
+  };
+  DfgTableOptions options;
+  options.activity_attribute = "act";
+  options.case_id_attribute = "case";
+  options.timestamp_attribute = "ts";
+  options.start_timestamp_attribute = "st";
+  const std::vector<std::pair<std::string, double>> flows{
+      {"c1,a,2020-01-01 00:00:10.000000700,2020-01-01 00:00:00\n"
+       "c1,b,2020-01-01 00:01:00,2020-01-01 00:00:40.000000300\n", 29.0},
+      {"c1,a,2020-01-01 00:00:10.000001,2020-01-01 00:00:00\n"
+       "c1,b,2020-01-01 00:01:00,2020-01-01 00:00:40.000000300\n", 29.0},
+      {"c1,a,2020-01-01 00:00:10.000000700,2020-01-01 00:00:00\n"
+       "c1,b,2020-01-01 00:01:00,2020-01-01 00:00:40\n", 30.0}};
+  for (const auto& [rows, flow] : flows) {
+    const auto polars = discover_polars_partial_order(LazyEventTable::from_table(table(rows)), options);
+    assert(polars.pairs.size() == 1 && polars.pairs.front().flow_time_seconds == flow);
+  }
+  // b starts 1 ns before a completes; Polars compares them in microseconds.
+  const auto touching = table("c1,a,2020-01-01 00:00:10.000000001,2020-01-01 00:00:00\n"
+                              "c1,b,2020-01-01 00:01:00,2020-01-01 00:00:10\n");
+  const auto polars_touching = discover_polars_partial_order(LazyEventTable::from_table(touching), options);
+  assert(polars_touching.pairs.size() == 1 && polars_touching.pairs.front().flow_time_seconds == 0.0);
+  assert(discover_pandas_partial_order(touching, options).pairs.empty());
+  for (const std::string completion : {"10.300000", "10.300000001"}) {
+    const auto overlapping = table("c1,a,2020-01-01 00:00:" + completion + ",2020-01-01 00:00:00\n"
+                                   "c1,b,2020-01-01 00:00:20,2020-01-01 00:00:11\n");
+    options.strict = false;
+    const auto lazy = discover_polars_concurrent_events(LazyEventTable::from_table(overlapping), options);
+    assert(lazy.pairs.size() == 1 && lazy.pairs.front().overlap_seconds == 0.0);
+    assert(discover_pandas_concurrent_events(overlapping, options).pairs.empty());
+    options.strict = true;
+    assert(discover_polars_concurrent_events(LazyEventTable::from_table(overlapping), options).pairs.empty());
+  }
+}
+
 int main() {
+  review_fs_polars_partial_order_and_overlap();
   review_fr_polars_mixed_datetime_units();
   graph_measure_selectors_and_ordering();
   dataframe_triples_contract();

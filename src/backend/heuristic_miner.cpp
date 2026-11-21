@@ -451,6 +451,30 @@ std::int64_t required_business_timestamp_microseconds(
   return *local;
 }
 
+// An interval endpoint as an exact (seconds, nanoseconds) instant: a CSV
+// upload's own nanoseconds where they were parsed, else its microseconds.
+// pm4py orders, follows and overlaps an upload's intervals by its Timestamps,
+// nanoseconds included (round FS, observed black-box).
+std::pair<std::int64_t, std::int64_t> exact_instant(
+    const std::optional<ParsedExactTimestamp>& exact, std::int64_t microseconds) {
+  if (exact) return {exact->seconds, static_cast<std::int64_t>(exact->nanoseconds)};
+  auto seconds = microseconds / 1'000'000;
+  auto fraction = microseconds % 1'000'000;
+  if (fraction < 0) {
+    fraction += 1'000'000;
+    --seconds;
+  }
+  return {seconds, fraction * 1'000};
+}
+
+std::pair<std::int64_t, std::int64_t> start_instant(const Interval& interval) {
+  return exact_instant(interval.start_exact, interval.start_microseconds);
+}
+
+std::pair<std::int64_t, std::int64_t> complete_instant(const Interval& interval) {
+  return exact_instant(interval.complete_exact, interval.complete_microseconds);
+}
+
 struct IntervalTrace {
   std::vector<Interval> sorted;
   std::vector<Interval> performance_order;
@@ -568,7 +592,7 @@ IntervalTrace to_intervals(const Trace& trace,
   result.sorted = intervals;
   std::stable_sort(result.sorted.begin(), result.sorted.end(),
                    [](const Interval& lhs, const Interval& rhs) {
-                     return lhs.start_microseconds < rhs.start_microseconds;
+                     return start_instant(lhs) < start_instant(rhs);
                    });
   result.performance_order =
       pre_interval_mode ? std::move(intervals) : result.sorted;
@@ -619,8 +643,7 @@ PlusAbstraction build_plus_abstraction(
     // after each interval has completed.
     for (std::size_t i = 0; i < intervals.size(); ++i) {
       for (std::size_t j = i + 1; j < intervals.size(); ++j) {
-        if (intervals[i].complete_microseconds <=
-            intervals[j].start_microseconds) {
+        if (complete_instant(intervals[i]) <= start_instant(intervals[j])) {
           ++out.eventually_follows[
               {intervals[i].activity, intervals[j].activity}];
           break;
@@ -631,10 +654,8 @@ PlusAbstraction build_plus_abstraction(
     // Inclusive overlap: intervals touching at one endpoint are concurrent.
     for (std::size_t i = 0; i < intervals.size(); ++i) {
       for (std::size_t j = i + 1; j < intervals.size(); ++j) {
-        if (std::max(intervals[i].start_microseconds,
-                     intervals[j].start_microseconds) <=
-            std::min(intervals[i].complete_microseconds,
-                     intervals[j].complete_microseconds)) {
+        if (std::max(start_instant(intervals[i]), start_instant(intervals[j])) <=
+            std::min(complete_instant(intervals[i]), complete_instant(intervals[j]))) {
           ++out.concurrency[std::minmax(intervals[i].activity,
                                        intervals[j].activity)];
         } else {

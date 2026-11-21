@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FR (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FS (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8509,8 +8509,8 @@ Round FR re-reviewed FQ on fresh banks and swept new areas (Review FR1).
 FQ's fixes held (one-hot names of nanosecond CSV dates, also with case
 date columns only and on XES uploads; the LLM descriptions on CSV and on
 XES uploads with nine fraction digits). FQ's CI run 44937354307 finished
-green in the Linux, macOS, Python, frontend and verifier jobs (Windows
-ctest still running at the push). Fixed: FR1-1, the CSV frame table types
+green in all six jobs (the Windows ctest, still running at FR's push,
+finished green too; checked in FS). Fixed: FR1-1, the CSV frame table types
 a `case:` column like an event column (read_csv's int64, float64, bool
 or object; UTC dates, datetime64[ns, UTC] with a cell below the
 microsecond), so the pandas and Polars batches read a `case:` start,
@@ -8543,6 +8543,76 @@ gave 2,673 responses unchanged. The Mac was not reachable this round (no
 folder access), so no newer reviewer handoff was read. The generators,
 the comparers and the probes are in the project files under
 `review-harness/round-fr/`.
+
+Round FS re-reviewed FR on fresh banks and swept new areas (Review FS1).
+FR's CI run 44945360743 finished green in all six jobs. FR's fixes held
+(the batches with `case:` keys on CSV and XES uploads, `case:st` starts,
+the plusplus sojourn times, the DFG with start keys, the heuristics waits
+on XES uploads with and without business hours). Fixed: FS1-1, the
+plusplus heuristics on a CSV upload order, follow and overlap intervals
+at their exact instants (nanoseconds), not at microseconds; FS1-2, the
+trace-based correlation reads pm4py's projected log (concept:name and
+time:timestamp only): with two or more activities another completion key
+or a start key raises `KeyError` (a start key of concept:name a
+`TypeError`), which the routes model through
+`CorrelationMinerOptions::reference_timestamp_key`; FS1-3, the classic
+precede/succeed probability counts the pairs in pm4py's single pass over
+the start-sorted lists, which differs from the full count for nested
+intervals with a start key; FS1-4, `/api/mine`'s flat footprints read the
+upload's frame (a CSV's formatted frame with each row's `case:` cells, an
+XES upload's read_xes frame), so the Polars variant sorts by a `case:st`
+that varies within a case; FS1-5, the Polars partial order measures whole
+seconds (microseconds when the units differ, also in its pair
+condition) and pairs by a CSV frame's own `@@index`, and the Polars
+concurrency truncates the overlap to whole seconds before comparing it
+with 0. Declared: the classic frequency DFGs that still differ are the
+LP ties of round BQ (every one at the optimum of pm4py's cost matrix);
+corrst.py's stream reference should be the frame's event stream (equal
+there). New areas without findings: the pandas partial order and
+concurrency; the footprints entire_dataframe, entire_event_log and
+trace_by_trace variants with start keys; decision mining with date
+attributes (pm4py skips them, so do Minera's tables); no OCEL target in
+`/api/log-convert`.
+
+In the suite: `minera_heuristic_variants_tests`
+(`review_fs_nanosecond_ordering`), `minera_correlation_miner_tests`
+(`review_fs_trace_based_reference_keys`,
+`review_fs_nested_interval_precedence`), `minera_dfg_dataframe_tests`
+(`review_fs_polars_partial_order_and_overlap`) and the new
+`minera_server_review_fs_tests` (the three routes on CSV uploads) carry
+FS1's reference values. The full ctest passed 658 of 660 on the first
+run (24 minutes, -j2): two older expectations in
+`minera_correlation_miner_tests` still held the pairwise precede-succeed
+count (pm4py's `get_PS_dur_matrix` gives 0 for A(0, 100), A(1, 2),
+B(3, 3) and 2/3, not 5/6, for the rectangular utility log; both updated),
+and the new route test read the activities array with the wrong spacing;
+both reran green. The Python script tests passed 406 of 406, the fixture
+replay gave 2,673 responses unchanged. The Mac was not reachable this
+round (no folder access), so no newer reviewer handoff was read. The
+generators, the comparers and the probes are in the project files under
+`review-harness/round-fs/`.
+
+Next round (FT) should start by re-reviewing round FS:
+
+- FS's CI run;
+- FS1-1 to FS1-5 on fresh banks: `heu/heuns.py` with `DENSE=1` and new
+  seeds (also lifecycle logs without a start key, and XES uploads),
+  `corr/corrst.py` with `XES=1` and new seeds (also one-activity logs and
+  supplied completion keys), `corr/psdsweep.py` for classic and
+  classic_split (also `correlation_sample_size` below the event count, so
+  several chunks), `fp/fpst.py` with `XES=1` and the alpha model (which
+  reads its own log), `po/dfgpo.py` with `TSNS`/`STNS` and
+  `dfg_keep_first_following`, `dfg_strict`;
+- new areas, carried from FS: the other routes that read a timedelta's
+  `total_seconds()` on an upload's frame (the temporal profile, the
+  performance spectrum, the eventually-follows performance), the plusplus
+  heuristics through `apply_heu_pandas` with lifecycle columns; also the
+  Polars graph DFG and concurrency on XES uploads (only CSV swept), the
+  streaming correlation and footprints routes against the same keys;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FS (kept for its older items):
 
 Next round (FS) should start by re-reviewing round FR:
 

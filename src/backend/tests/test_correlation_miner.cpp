@@ -196,7 +196,9 @@ void greedy_matching_preserves_zero_when_one_direction_is_empty() {
   CorrelationMinerOptions options;
   options.start_timestamp_attribute = "start";
   const auto result = discover_correlation_miner(log, options);
-  assert_near(result.precede_succeed_probability.at(kAB), 0.5);
+  // pm4py's single pass leaves B behind the pointer once A(0, 100) passed it
+  // (round FS: get_PS_dur_matrix gives 0 here, not 1 of 2).
+  assert_near(result.precede_succeed_probability.at(kAB), 0.0);
   assert_near(result.duration_matrix.at(kAB), 0.0);
 }
 
@@ -241,12 +243,12 @@ void correlation_utility_matrix_and_transport_contract() {
   options.start_timestamp_attribute = "start";
 
   const auto greedy = discover_correlation_miner(log, options);
-  assert_near(greedy.precede_succeed_probability.at(kAB), 5.0 / 6.0);
+  assert_near(greedy.precede_succeed_probability.at(kAB), 2.0 / 3.0);
   assert_near(greedy.duration_matrix.at(kAB), 2.5);
 
   options.exact_time_matching = true;
   const auto exact = discover_correlation_miner(log, options);
-  assert_near(exact.precede_succeed_probability.at(kAB), 5.0 / 6.0);
+  assert_near(exact.precede_succeed_probability.at(kAB), 2.0 / 3.0);
   assert_near(exact.duration_matrix.at(kAB), 1.5);
 
   std::map<std::string, std::uint64_t> outgoing;
@@ -340,7 +342,88 @@ void transportation_is_deterministic_and_balanced() {
 
 }  // namespace
 
+// Round FS: pm4py's trace-based variant pairs activities on a projected log
+// that keeps only concept:name and time:timestamp (observed black-box).
+void review_fs_trace_based_reference_keys() {
+  EventLog intervals;
+  intervals.traces = {
+      trace("1", {interval_event("A", 0.0, 1.0), interval_event("B", 3.0, 5.0)}),
+      trace("2", {interval_event("A", 0.0, 2.0), interval_event("B", 1.0, 9.0)})};
+  const auto message = [&](const CorrelationMinerOptions& options) {
+    try {
+      (void)discover_correlation_miner(intervals, options);
+    } catch (const std::invalid_argument& error) {
+      return std::string(error.what());
+    }
+    return std::string("no error");
+  };
+  CorrelationMinerOptions options;
+  options.variant = CorrelationVariant::kTraceBased;
+  const auto plain = discover_correlation_miner(intervals, options);
+  assert(plain.frequency_dfg.at(kAB) == 2 && plain.frequency_dfg.at(kBA) == 2);
+  assert_near(plain.performance_dfg.at(kAB), 5.5);
+  assert_near(plain.performance_dfg.at(kBA), 0.0);
+
+  options.reference_timestamp_key = "time:timestamp";
+  options.start_timestamp_attribute = "start";
+  assert(message(options) == "KeyError: 'start'");
+  options.start_timestamp_attribute = "concept:name";
+  assert(message(options) ==
+         "TypeError: '<' not supported between instances of 'float' and 'str'");
+  options.reference_timestamp_key = "ts";
+  assert(message(options) == "KeyError: 'ts'");
+  options.start_timestamp_attribute.clear();
+  assert(message(options) == "KeyError: 'ts'");
+  // The standard keys pair as before.
+  options.reference_timestamp_key = "time:timestamp";
+  options.start_timestamp_attribute = "time:timestamp";
+  const auto standard = discover_correlation_miner(intervals, options);
+  assert(standard.frequency_dfg == plain.frequency_dfg);
+  assert(standard.performance_dfg == plain.performance_dfg);
+  // One activity never pairs.
+  EventLog single;
+  single.traces = {trace("1", {interval_event("A", 0.0, 1.0), interval_event("A", 0.0, 2.0)})};
+  options.reference_timestamp_key = "ts";
+  options.start_timestamp_attribute = "start";
+  const auto alone = discover_correlation_miner(single, options);
+  assert(alone.activity_counts.at("A") == 2);
+  // The native contract (no reference key) and the classic variants read the
+  // start key as given.
+  options = CorrelationMinerOptions{};
+  options.variant = CorrelationVariant::kTraceBased;
+  options.start_timestamp_attribute = "start";
+  assert(message(options) == "no error");
+  options.variant = CorrelationVariant::kClassic;
+  options.reference_timestamp_key = "time:timestamp";
+  assert(message(options) == "no error");
+}
+
+// Round FS: the precede/succeed count walks the start-sorted lists once, so
+// with a start key a nested interval (A at 18-19 inside A at 0-20) counts
+// only the targets after its predecessor's: pm4py's probability is 0.5 here,
+// the full pairwise count 0.75 (observed black-box).
+void review_fs_nested_interval_precedence() {
+  EventLog log;
+  log.traces = {
+      trace("1", {interval_event("A", 0.0, 20.0), interval_event("A", 18.0, 19.0),
+                  interval_event("B", 20.0, 21.0)}),
+      trace("2", {interval_event("B", 59.0, 60.0)})};
+  CorrelationMinerOptions options;
+  options.start_timestamp_attribute = "start";
+  for (const auto variant : {CorrelationVariant::kClassic, CorrelationVariant::kClassicSplit}) {
+    options.variant = variant;
+    const auto result = discover_correlation_miner(log, options);
+    assert_near(result.precede_succeed_probability.at(kAB), 0.5);
+    assert_near(result.precede_succeed_probability.at(kBA), 0.0);
+    assert_near(result.duration_matrix.at(kAB), 39.0);
+    assert(result.frequency_dfg.at(kAB) == 2 && result.frequency_dfg.at(kBA) == 2);
+    assert_near(result.performance_dfg.at(kAB), 39.0);
+  }
+}
+
 int main() {
+  review_fs_nested_interval_precedence();
+  review_fs_trace_based_reference_keys();
   classic_matches_reference_fixture();
   trace_based_keeps_case_boundaries_and_ignores_exact_matching();
   split_uses_raw_chunks_and_reference_aggregation();

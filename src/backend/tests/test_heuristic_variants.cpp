@@ -25,6 +25,7 @@
 #include <string_view>
 #include <type_traits>
 #include <vector>
+#include <tuple>
 
 using namespace minera;
 
@@ -5512,6 +5513,49 @@ void review_fr_nanosecond_waits() {
   }
 }
 
+// Round FS: on a CSV upload pm4py's PLUSPLUS orders, follows and overlaps the
+// intervals by their exact instants, nanoseconds included (expected values
+// observed black-box with apply_heu on the formatted frame).
+void review_fs_nanosecond_ordering() {
+  struct Control {
+    std::string rows;
+    std::vector<std::tuple<std::string, std::string, double>> edges;
+  };
+  const std::vector<Control> controls{
+      // a completes 800 ns after b starts: concurrent, b does not follow a.
+      {"c1,a,2020-01-01 00:00:01.000000900,2020-01-01 00:00:00\n"
+       "c1,b,2020-01-01 00:00:02,2020-01-01 00:00:01.000000100\n",
+       {}},
+      // b starts 200 ns after a completes.
+      {"c1,a,2020-01-01 00:00:01.000000900,2020-01-01 00:00:00\n"
+       "c1,b,2020-01-01 00:00:02,2020-01-01 00:00:01.000001100\n",
+       {{"a", "b", 1.0}}},
+      // b starts 800 ns before a and completes 50 ns after a starts.
+      {"c1,a,2020-01-01 00:00:05,2020-01-01 00:00:00.000000900\n"
+       "c1,b,2020-01-01 00:00:00.000000950,2020-01-01 00:00:00.000000100\n"
+       "c1,c,2020-01-01 00:00:06,2020-01-01 00:00:05.5\n",
+       {{"a", "c", 1.0}, {"b", "c", 1.0}}}};
+  for (const auto& control : controls) {
+    std::istringstream csv("case,act,ts,st\n" + control.rows);
+    CsvImportOptions import;
+    import.case_id_column = "case";
+    import.activity_column = "act";
+    import.timestamp_column = "ts";
+    const auto log = import_csv_event_log(csv, import);
+    HeuristicMinerOptions options;
+    options.variant = HeuristicMinerVariant::kPlusPlus;
+    options.dependency_threshold = 0.0;
+    options.start_timestamp_attribute = "st";
+    const auto net = discover_heuristics_net(log, options);
+    std::vector<std::tuple<std::string, std::string, double>> found;
+    for (const auto& item : net.edges)
+      found.emplace_back(net.activities.at(item.source), net.activities.at(item.target),
+                         item.representation);
+    std::sort(found.begin(), found.end());
+    assert(found == control.edges);
+  }
+}
+
 int main(int argc, char** argv) {
   std::optional<std::string> classic_flat_evidence;
   std::optional<std::string> classic_object_evidence;
@@ -5558,6 +5602,7 @@ int main(int argc, char** argv) {
   plusplus_pandas_missing_start_error_mutation();
   plusplus_pandas_exact_duration_and_performance();
   review_fr_nanosecond_waits();
+  review_fs_nanosecond_ordering();
   plusplus_pandas_nat_statistics_and_error_order();
   plusplus_pandas_occurrence_order_and_self_concurrency();
   plusplus_pandas_concurrency_rounding_keeps_exact_waits();

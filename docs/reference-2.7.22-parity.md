@@ -36852,3 +36852,126 @@ In the suite: `minera_batches_parity_contracts_tests`
 The full ctest passed 659 of 659 on the first run (34 minutes, -j2), the
 Python script tests passed 406 of 406, the fixture replay
 gave 2,673 responses unchanged.
+
+## Review FS1: sub-microsecond plusplus intervals, trace-based and classic correlation start keys, footprints and the Polars partial order on uploads (2026-11-21)
+
+Round FS re-reviewed round FR on fresh banks and swept new areas. FR's CI
+run 44945360743 (cd6c24a) finished green in all six jobs (FQ's Windows
+job, still running at FR's push, finished green too). Observed black-box
+on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow),
+every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL
+AVX512_SPR"` and exact float comparison.
+
+Re-review of FR (fresh seeds): the batches with `case:` keys on CSV
+uploads (ckA: pandas 150, Polars 119 equal and 31 raised alike, log 137
+equal and 13 raised alike) and on XES uploads (ckX: 120, 104 and 16, 112
+and 8), `case:st` starts only (csA: 150 equal); the plusplus sojourn
+times (sjA: 60 equal); the DFG with start keys (dsA: 120 equal, dsB: 119
+equal, 1 raised alike); the heuristics waits on XES uploads, whole
+seconds plus microseconds / 1e6, also with business hours (hxA, hxB: 80
+classic and 100 plusplus equal, two of them after correcting the
+harness's edge decoding, 20 raised alike). No difference.
+
+Fixed:
+
+- **FS1-1. Plusplus intervals between sub-microsecond instants**
+  (`/api/mine`, heuristics plusplus on a CSV upload). `apply_heu` on the
+  frame orders a trace's intervals by their start Timestamps and decides
+  "b follows a" (a completes no later than b starts) and "a and b
+  overlap" on the exact instants, nanoseconds included; Minera compared
+  the instants cut to microseconds, so an interval completing 800 ns
+  after the next one starts was followed by it, and two starts 800 ns
+  apart in the same microsecond kept file order. hnA, hnD, hnE: 4 of 300
+  plusplus comparisons differed (edges present or missing). The waits
+  stay floored to the microsecond (FR1-3).
+- **FS1-2. Trace-based correlation keys** (`/api/analyze-behavior`
+  correlation and `/api/mine` correlation variants, every adapter).
+  pm4py's trace-based variant projects each trace to its activities and
+  completion times under the standard keys, concept:name and
+  time:timestamp, before pairing two activities, so with two or more
+  activities in the input a completion key other than time:timestamp
+  raises `KeyError: '<key>'` (an upload's own `ts` column too), a start
+  key other than time:timestamp raises `KeyError: '<key>'`, a start key
+  of concept:name raises "'<' not supported between instances of 'float'
+  and 'str'"; with one activity nothing is paired and the result stands.
+  Minera read both keys from the events and computed a result (csA: 37 of
+  40 dataframe runs, 28 of 40 log runs raised only in pm4py; csB on XES
+  uploads alike). The routes name pm4py's completion key
+  (`reference_timestamp_key`: the supplied text, else time:timestamp on a
+  CSV upload, else the selected key); the library keeps its generic
+  contract when it is not set.
+- **FS1-3. Classic precede/succeed probabilities with a start key**
+  (classic and classic_split, every adapter). pm4py counts the pairs in
+  one pass over the two start-sorted lists: for each source in turn it
+  moves to the first target that starts after the source completes and
+  counts the targets from there, never stepping back. A source nested in
+  an earlier one (it starts later and completes sooner, only possible
+  with a start key) therefore counts only the targets after the earlier
+  one's; Minera counted every pair (A at 0-20 and 18-19 before B at 20-21
+  and 59-60: 0.5 in pm4py, 0.75 in Minera). Fuzzed on 2,479 groups
+  (corr/psfuzz.py); psdsweep on the FR server: 16 of 180 matrices
+  differed. The frequency DFGs then differed beyond the declared LP ties
+  (seed 330: Minera's DFG cost 2394.18 under pm4py's cost matrix, the
+  optimum 2393.78).
+- **FS1-4. Flat footprints of an upload** (`/api/mine`,
+  `footprints_discovery_variants` entire_dataframe and
+  polars_lazyframes). pm4py's DataFrame paths read the upload's frame,
+  where a `case:` column keeps every row's own cell; Minera rebuilt a
+  table from the log, which keeps a case's first cell once per case, so
+  the Polars variant sorted by a constant `case:st` (fsB: 9 of 60
+  differed, all with `case:st` cells that vary within a case). The route
+  now reads a CSV's formatted frame and an XES upload's read_xes frame,
+  as `/api/discover-graph` already did.
+- **FS1-5. The Polars partial order and concurrency**
+  (`/api/dfg-dataframe`, Polars backend). The partial order's flow time
+  is whole seconds truncated toward zero, in microseconds when the start
+  and completion columns have different units (Datetime(ns) beside
+  Datetime(us)), and so is the "target starts no earlier than the source
+  completes" comparison (a start 1 ns before a completion pairs there,
+  with 0 seconds); the rows pair by a CSV frame's own `@@index`
+  (format_dataframe's order), not by a sort on the start key. The
+  concurrency overlap is whole seconds truncated toward zero and compared
+  with 0 (an overlap of -0.7 seconds is 0: concurrent unless strict), and
+  its prefilter compares the instants as the frame holds them. poB: 25 of
+  40 partial orders and 3 of 40 concurrency results differed.
+
+Declared or unchanged:
+
+- Classic and classic_split frequency DFGs that differ where the
+  probability and duration matrices are equal are the declared LP ties
+  (round BQ): lp3 classified 16 of 180 runs, every one at the optimum of
+  pm4py's cost matrix in both; trace-based on XES uploads alike (tbtie: 2
+  of 2).
+- corrst.py compares the stream adapter with pm4py's EventLog result,
+  which raises `KeyError: 'case:st'`; against pm4py's event stream of the
+  frame (the stream Minera models) the stream adapter is equal
+  (corr/strm.py: 10 of 10).
+- Decision mining and the data Petri net: pm4py's decision mining skips
+  date attributes (dm/p1.py), and Minera's decision tables map a date to
+  "other", which they skip too; no route difference.
+- OCEL conversion of a CSV log: `/api/log-convert` has no OCEL target
+  (pm4py's `convert_log_to_ocel` is outside the 387-module target).
+- Unchanged: the declared items of FR1 and before.
+
+Results after the fixes (exact): heuristics (hp1 to hp3: plusplus 260 and
+classic 130 equal, 130 raised alike); correlation matrices (ps1, ps2:
+classic and classic_split 360 of 360 equal); correlation results (cp3 on
+CSV and cp4 on XES uploads: trace-based equal or raised alike, the rest
+equal or the declared ties); footprints (fp1, fp2 on CSV and fp3 on XES
+uploads: 170 of 170 equal in each of the four variants); partial order
+and concurrency (pp3, pp4: pandas 120 and 113 equal, 7 raised alike,
+Polars 240 of 240 equal).
+
+In the suite: `minera_heuristic_variants_tests`
+(`review_fs_nanosecond_ordering`), `minera_correlation_miner_tests`
+(`review_fs_trace_based_reference_keys`,
+`review_fs_nested_interval_precedence`; two older classic expectations
+now follow pm4py's single pass: 0 for A(0, 100), A(1, 2), B(3, 3) and 2/3
+for the rectangular utility log), `minera_dfg_dataframe_tests`
+(`review_fs_polars_partial_order_and_overlap`) and the new
+`minera_server_review_fs_tests` (footprints, trace-based correlation keys
+and the Polars partial order on CSV uploads) carry FS1's reference values.
+The full ctest passed 658 of 660 on the first run (24 minutes, -j2; the
+two older expectations and a parser slip in the new route test, then
+green), the Python script tests passed 406 of 406, the fixture replay
+gave 2,673 responses unchanged.

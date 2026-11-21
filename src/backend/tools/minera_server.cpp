@@ -1115,7 +1115,8 @@ minera::FootprintsAnalysis analyze_footprints(
     const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
     const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
     const minera::FootprintsOptions& options,
-    const minera::ActiveEventSource* active_source = nullptr) {
+    const minera::ActiveEventSource* active_source = nullptr,
+    const minera::EventTable* upload_frame = nullptr) {
   minera::FootprintsAnalysis analysis;
   analysis.model = options.model;
   analysis.strict = options.strict;
@@ -1169,16 +1170,18 @@ minera::FootprintsAnalysis analyze_footprints(
   }
   if (options.discovery_variants.contains("entire_dataframe")) {
     if (!dataframe) {
-      dataframe =
-          active_source ? active_source->checked_table() : minera::prepare_footprints_event_table(selected_log, discovery_options);
+      dataframe = active_source ? active_source->checked_table()
+                  : upload_frame  ? *upload_frame
+                                  : minera::prepare_footprints_event_table(selected_log, discovery_options);
     }
     analysis.entire_dataframe = minera::discover_footprints(
         *dataframe, discovery_options);
   }
   if (options.discovery_variants.contains("polars_lazyframes")) {
     if (!lazy_dataframe) {
-      lazy_dataframe =
-          active_source ? active_source->checked_lazy() : minera::prepare_footprints_lazy_table(selected_log, discovery_options);
+      lazy_dataframe = active_source ? active_source->checked_lazy()
+                       : upload_frame  ? minera::LazyEventTable::from_table(*upload_frame)
+                                       : minera::prepare_footprints_lazy_table(selected_log, discovery_options);
     }
     analysis.polars_lazyframes = minera::discover_footprints(
         *lazy_dataframe, discovery_options);
@@ -1718,6 +1721,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     std::optional<minera::CorrelationVariantsAnalysis>
         correlation_variants_analysis;
     if (!params.correlation_variants.empty()) {
+      params.correlation.reference_timestamp_key =
+          correlation_reference_timestamp_key(request, params.correlation, !xes_input);
       if (xes_input) {
         correlation_variants_analysis = analyze_correlation_variants(
             minera::EventDataView(log), params.correlation_variants,
@@ -1807,10 +1812,23 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto powl_net = minera::to_petri_net(powl);
     register_activity_selector_values(
         graph, log, params.footprints.activity_attribute);
+    // The flat variants read the upload's frame, as pm4py's DataFrame paths
+    // do: a CSV's formatted frame (its rows' own case: cells, which the log
+    // keeps once per case), an XES's read_xes frame (round FS).
+    std::optional<minera::EventTable> footprint_frame;
+    if (params.footprints.discovery_variants.contains("entire_dataframe") ||
+        params.footprints.discovery_variants.contains("polars_lazyframes")) {
+      if (xes_input) {
+        if (const auto* table = active_source->checked_table_if_available()) footprint_frame = *table;
+      } else {
+        footprint_frame = formatted_csv_frame_table(*active_source);
+      }
+    }
     const auto footprints =
         analyze_footprints(log, graph, alpha_log, tree, powl,
                            inductive_net, net,
-                           heuristic_net, powl_net, params.footprints);
+                           heuristic_net, powl_net, params.footprints, nullptr,
+                           footprint_frame ? &*footprint_frame : nullptr);
     checkpoint("Performance and resources");
     const auto performance = minera::compute_performance_metrics(
         log, graph, dataframe_performance_source(active_source.get()));
@@ -4502,6 +4520,9 @@ void handle_behavior_analysis(const httplib::Request& request,
         for (const auto& witness : distance.witnesses) graph.ensure_activity(witness);
       }
     } else {
+      params.correlation.reference_timestamp_key = correlation_reference_timestamp_key(
+          request, params.correlation,
+          session->active_source && session->active_source->file().format == "csv");
       correlations = analyze_correlation_variants(input(), params.correlation_variants, params.correlation);
       minera::register_correlation_activities(graph, *correlations);
     }
@@ -11110,8 +11131,16 @@ void handle_dfg_dataframe(const httplib::Request& request,
                     table, params.dfg_table_options)),
             "application/json");
       } else {
+        // Polars pairs a CSV upload's rows by the frame's own "@@index"
+        // (format_dataframe's order), not by a sort on the start key (round
+        // FS, observed black-box).
+        auto polars_frame = csv_frame_table(*session);
+        if (polars_frame) mark_csv_nan_cells(*polars_frame);
         const auto lazy_view = cached_source_view(*session,minera::EventDataKind::kLazyEventTable);
-        const auto& lazy = *lazy_view.lazy_table();
+        const auto frame_lazy = polars_frame ? std::optional<minera::LazyEventTable>(
+                                                   minera::LazyEventTable::from_table(*polars_frame))
+                                             : std::nullopt;
+        const auto& lazy = frame_lazy ? *frame_lazy : *lazy_view.lazy_table();
         response.set_content(
             minera::serialize_dfg_partial_order_json(
                 minera::discover_polars_partial_order(
