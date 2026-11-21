@@ -87,7 +87,13 @@ const char* python_type(const TimeCell& cell){
  }
 }
 bool number(const TimeCell& cell){return cell.kind==TimeCell::Kind::kInt||cell.kind==TimeCell::Kind::kFloat||cell.kind==TimeCell::Kind::kBool;}
-TimeCell time_cell(const Ocel& log,const OcelEvent& event,const std::string& key,ocel_frame::Dtype dtype,bool str_column,bool csv){
+// Round FF: `nan_nulls`: the column's explicit nulls are NaN cells of a
+// float64 column. A column without a value of its own is object (its
+// nulls None) only when every row holds an explicit None (or an all-NULL
+// SQLite column took part); a missing cell next to them makes it float64
+// (pandas' frame from records, read_ocel2_json; observed black-box, probe
+// ff t1/jnull.py), as the exact filters' null_column has it.
+TimeCell time_cell(const Ocel& log,const OcelEvent& event,const std::string& key,ocel_frame::Dtype dtype,bool str_column,bool csv,bool nan_nulls){
  using Kind=TimeCell::Kind;using ocel_frame::Dtype;
  TimeCell cell;
  if(csv){
@@ -100,7 +106,7 @@ TimeCell time_cell(const Ocel& log,const OcelEvent& event,const std::string& key
  const bool dates=dtype==Dtype::kDatetime;
  if(!found){cell.kind=dates?Kind::kNaT:Kind::kFloat;return cell;}
  const auto& value=found->value;
- if(std::holds_alternative<std::nullptr_t>(value)){cell.kind=dates?Kind::kNaT:dtype==Dtype::kFloat64||str_column?Kind::kFloat:Kind::kNone;return cell;}
+ if(std::holds_alternative<std::nullptr_t>(value)){cell.kind=dates?Kind::kNaT:dtype==Dtype::kFloat64||str_column||nan_nulls?Kind::kFloat:Kind::kNone;return cell;}
  if(const auto* text=std::get_if<std::string>(&value)){
   if(ocel_frame::reference_date_value(log.event_type_attributes,event.activity,*found)){
    if(const auto parsed=parse_timestamp_exact(*text)){cell.kind=Kind::kDate;cell.date=*parsed;return cell;}
@@ -121,11 +127,19 @@ std::vector<double> attribute_performance(const Ocel& log,const std::vector<std:
  const bool csv=log.event_frame_hint.str_columns;
  const bool str_column=csv||(dtype==ocel_frame::Dtype::kObject&&stats&&stats->has_string&&!stats->has_bool&&!stats->has_int&&
                        !stats->has_float&&!stats->has_date()&&!stats->has_none);
+ bool nan_nulls=false;
+ if(!csv&&(stats==nullptr||stats->present==0)&&!(stats&&stats->has_none)){
+  std::size_t nulls=0;
+  for(const auto& source:log.events)
+   for(const auto& attribute:source.attributes)
+    if(attribute.key==time_key&&std::holds_alternative<std::nullptr_t>(attribute.value))++nulls;
+  nan_nulls=nulls!=frame.rows();
+ }
  std::map<std::string,TimeCell> cells;
  for(const auto& source:log.events){
   const auto identifier=selected_string(source,id_key);
   if(!identifier||cells.count(*identifier))continue;
-  cells.emplace(*identifier,time_cell(log,source,time_key,dtype,str_column,csv));
+  cells.emplace(*identifier,time_cell(log,source,time_key,dtype,str_column,csv,nan_nulls));
  }
  for(const auto& [from,to]:couples){if(!cells.count(from))missing(from);if(!cells.count(to))missing(to);}
  // The pairs measure in the order given (see finish_ocdfg_edges).

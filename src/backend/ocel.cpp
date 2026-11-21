@@ -5538,11 +5538,28 @@ static OcdfgGraph discover_ocdfg_reader_frames(const Ocel& log, const OcdfgDisco
   // the edges label it NaT (observed black-box, probe fd probe/p10.py).
   static const std::string kNaT = "NaT", kNone = "None";
   const auto& missing_time = log.naive_event_time_unit.empty() ? kNaT : kNone;
-  const auto event_label = [&missing_time](const OcelEvent& event, const std::string& key) -> const std::string& {
-    return key == "ocel:eid"        ? event.id
-           : key == "ocel:activity" ? event.activity
-           : event.timestamp.empty() ? missing_time
-                                     : event.timestamp;
+  // Round FF: the times are Timestamps, one label per instant however the
+  // texts spell it ("...Z" and "...+00:00"; observed black-box, probe ff
+  // t3/tsk2.jsonocel): the first spelling in event order names it.
+  std::unordered_map<std::string, const std::string*> time_label;
+  if (activity_column == "ocel:timestamp" || event_id_column == "ocel:timestamp") {
+    std::map<std::pair<std::int64_t, std::uint32_t>, const std::string*> first_spelling;
+    for (const auto& event : log.events) {
+      if (event.timestamp.empty() || time_label.count(event.timestamp)) continue;
+      const auto parsed = parse_timestamp_exact(event.timestamp);
+      time_label.emplace(event.timestamp,
+                         parsed ? first_spelling.try_emplace({parsed->seconds, parsed->nanoseconds}, &event.timestamp)
+                                      .first->second
+                                : &event.timestamp);
+    }
+  }
+  const auto event_label = [&missing_time, &time_label](const OcelEvent& event,
+                                                        const std::string& key) -> const std::string& {
+    if (key == "ocel:eid") return event.id;
+    if (key == "ocel:activity") return event.activity;
+    if (event.timestamp.empty()) return missing_time;
+    const auto found = time_label.find(event.timestamp);
+    return found == time_label.end() ? event.timestamp : *found->second;
   };
   const auto object_label = [](const OcelObject& object, const std::string& key) -> const std::string& {
     return key == "ocel:oid" ? object.id : object.type;

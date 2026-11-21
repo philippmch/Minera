@@ -35506,3 +35506,92 @@ written SQLite file with hand-made columns of mixed, text, real and NULL
 cells and the exact object filter with None and NaN on them; CSV logs with
 `+02:00`, `-05:30`, UTC and naive times flattened with ocel:timestamp as
 the activity); `minera_ocel_transform_tests` follows the rename.
+
+## Review FF1: JSON nulls next to missing cells, one label per instant, a missing event time as the edge metrics' activity (2026-11-21)
+
+Round FF checked FE's CI (run 44840037435 on e5c293a: the verifier, the
+Linux build and ctest, the frontend, the Python scripts and Windows
+green; macOS stopped in `actions/checkout` on a network timeout, `RPC
+failed; curl 56`, before building). Observed black-box on pm4py 2.7.22
+(pandas 3.0.5, no pyarrow) in the reference venv with fresh banks: o84
+(`ff/o4/o4gen.py 84 60`, round FC's OCEL 2.0 generator with `NUL=0.25`,
+any drawn value null: JSON `null`, an XML element without text, a SQLite
+NULL), c85 (`ff/c1/c1gen.py 85 60`, round EO's OCEL 1.0 JSON and XML with
+nulls), q30 (`eq/csv/q2gen.py 2803 60`, every CSV feature) and q31 (the
+same generator with `FEAT` leaving out the declared CSV features:
+repeated event ids, objects named but not listed, objects-file rows
+without an id or a type, files without an objects file). New sweeps:
+`q/cfl.py` (round FE's flattening cases through the CLI,
+`minera_ocel FILE --flatten-object-type T
+[--flatten-event-activity-attribute A] [--flatten-event-timestamp-attribute
+TS]`, on the source file), `probe/clisrv.py` (the CLI's XES against the
+server's flatten route, raw bytes), `q/chfl.py` (the flattening on the
+results of round FE's chains), `q/emr.py` (the edge metrics with the time
+labels as raw text), `q/emg.py` (the edge metrics with the UTC normaliser,
+flagging two native edges that normalise to one key), `t1/jnull.py`
+(read_ocel2_json's cells for a column of nulls next to each kind of value
+and to missing cells).
+
+FE's fixes matched: the CLI's flattening equals pm4py's on o84 (JSON 0 of
+2,384, SQLite 0 of 2,396, XML 0 of 1,493), c85 (0 of 2,643 and 0 of
+2,618) and q31 (0 of 2,253), and the server route byte for byte (0 of 298
+on o84's JSON); q30's 699 of 1,980 are all in logs with the declared CSV
+features. The flattening of chain results gives 0 of 15,472 on q31, 0 of
+23,719 and 0 of 23,494 on c85, q30's 2,427 of 12,195 all declared. The
+other readers' nulls agree in the exact and non-exact filters (xe 0 of
+5,636, 5,152 and 3,836 on o84's JSON, SQLite and XML, 0 of 6,332 and
+6,188 on c85; xn 0 of 3,316, 3,496 and 2,820), the routes (rsw3 0 on
+o84's SQLite and XML and c85, o84's JSON 8 of 2,340: the declared date
+fractions of the downloads), the downloads (dsw 0 of 420, 420 and 259),
+esw (0 of 960), fsw (0 of 766), the event-object graph (0 of 60) and osw
+(5 of 360: the declared hash-seed order of the CSV writer's type columns).
+q31's chains (cswu) give 0 of 13,510. The XML readers make no None (an
+element without text is NaN).
+
+Fixed:
+- **FF1-1 A JSON null next to missing cells is NaN.** `read_ocel2_json`
+  and `read_ocel_json` build the events frame from records, so a column
+  holding explicit nulls and no value of its own is object (the nulls
+  None) only when every row holds a null; a row without the attribute
+  (NaN) makes it float64 and the nulls NaN. Next to numbers or texts alone
+  the column is float64 or str (NaN), next to booleans or mixed values
+  object (None). The OC-DFG timed by such a column measured as None
+  (`unsupported operand type(s) for -: 'NoneType' and 'float'`) where pm4py
+  measures 0 (NaN - NaN) or names `'float'` in the business-hours
+  replace() (FE's server: o84's JSON 4 of 1,327, c85's JSON 2 of 1,418).
+  The attribute time cells now read such a null as NaN, as the exact
+  filters' null column does since FD1-2.
+- **FF1-2 One label per instant.** The event time is a Timestamp in
+  pm4py's frames, so as the OC-DFG's activity or event id, and as the edge
+  metrics' activity, event id or (a datetime64 attribute column) object
+  type, it is one label however the file spells the instant
+  (`2024-01-01T10:00:00Z` and `2024-01-01T10:00:00+00:00`, or one instant
+  at two offsets): their events share the activity and an edge joins them.
+  Native kept one label per text (two activities, an edge between them);
+  the comparers' UTC normaliser folded the two keys into one, so only the
+  hand-made `t3/tsk2.jsonocel` and the duplicate check of `q/emg.py` show
+  it. The label is now the first spelling in event (object) order.
+- **FF1-3 A missing event time as the edge metrics' activity.** An OCEL
+  CSV row's NaT as the activity is the label `NaT` in pm4py's associations
+  per edge, as the OC-DFG's edges print it since FD1-1. Native printed an
+  empty label (q31 14 of 536).
+
+Declared, unchanged: the edge metrics' typed and missing labels (q31 104
+of 536, c85 238 of 690, o84 204 of 673 and 218 of 688), the first failing
+pair's hash-seed order (o84 17 of 1,327 and 13 of 1,358, c85's XML 6 of
+1,320: each outcome one of pm4py's under seeds 0 to 9, `probe/hs3.py`),
+the CSV writer's type column order (hash seed), the date fractions of the
+downloads, the CSV features above. The time labels print as the log spells
+the event time (`2024-01-02T23:17:20+00:00`, `.5Z`), where pm4py holds a
+Timestamp and prints none; an OCEL CSV log's labels print as pandas does.
+
+Results with the fixed server: emg 104 of 536 on q31, 238 of 690 on c85,
+204 of 673 and 218 of 688 on o84 (the declared labels alone); ocd 0 of
+1,038 on q31, 0 of 1,418 on c85's JSON, 17 of 1,327 and 13 of 1,358 on
+o84 (the declared hash-seed pair alone); xe and rsw3 as before. The
+fixture replay gives 2,673 responses unchanged.
+
+In the suite: `minera_review_ff1_tests` (the OC-DFG timed by a column of
+nulls next to missing cells, nulls alone, a number and a boolean; an OCEL
+1.0 log with one instant spelled twice through the OC-DFG and the edge
+metrics; a CSV log with a NaT time as the edge metrics' activity).

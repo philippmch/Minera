@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FE (2026-11-05 to 2026-11-20, cloud container)
+## Review-fix loop, rounds T–FF (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8109,6 +8109,65 @@ minutes, -j2); the fixture replay gave 2,673 responses unchanged. FD's CI
 run 44827214734 finished green in all six jobs. The generators,
 the comparers and the probes are in the project files under
 `review-harness/round-fe/`.
+
+Round FF re-reviewed FE (Review FF1). FE's fixes matched on fresh banks
+(o84 from `ff/o4/o4gen.py 84 60`, round FC's OCEL 2.0 generator with any
+value null at 25 %, as JSON, SQLite and XML; c85 from round EO's
+`c1gen.py 85 60`, OCEL 1.0 JSON and XML with nulls; q30 from
+`eq/csv/q2gen.py 2803 60` and q31 from the same generator without the
+declared CSV features): the CLI's flattening (`q/cfl.py`) equals pm4py's
+and the server route byte for byte, the flattening of chain results
+(`q/chfl.py`) gives 0 outside the declared CSV features, the other readers'
+nulls agree in the exact and non-exact filters, routes, downloads and
+graph sweeps, and q31's chains give 0. The OC-DFG timing and the edge
+metrics with the time labels as raw text (`q/emr.py`) and with a duplicate
+check under the UTC normaliser (`q/emg.py`) found three classes. Fixed:
+FF1-1, a JSON null in a column with no value of its own is NaN where a row
+lacks the attribute (pandas makes the column float64; nulls alone stay
+object None), so the OC-DFG timed by it measures 0 instead of raising on
+None; FF1-2, the event time as the OC-DFG's activity or event id and as the
+edge metrics' activity, event id or (datetime64) type is one label per
+instant however the file spells it (the first spelling in event order);
+FF1-3, a missing event time as the edge metrics' activity is the label
+NaT. Declared, unchanged: the edge metrics' typed and missing labels, the
+first failing pair's hash-seed order, the CSV writer's type column order,
+the download date fractions, the CSV features; the time labels print as the
+log spells them (pm4py holds Timestamps and prints none).
+
+In the suite: `minera_review_ff1_tests`. FE's CI run 44840037435: five
+jobs green, macOS stopped in `actions/checkout` on a network timeout before
+building. The generators, the comparers and the probes are in the project
+files under `review-harness/round-ff/`.
+
+Next round (FG) should start by re-reviewing round FF:
+
+- FF's CI run (and the macOS job FE's run lost to the checkout timeout);
+- FF1-1 on the other routes that read a JSON log's null cells by the
+  column's dtype (the edge metrics' and the flattening's labels of a null
+  cell, the features' and statistics' null cells, the OCEL 1.0 XML
+  reader's empty values next to missing ones), with banks whose nulls
+  share a column with missing cells only;
+- FF1-2 on the other keys that group by a time (the flattening's
+  `case:concept:name` of a time object column, the type matching's
+  object type key, the split's object type, the OC-DFG's attribute
+  activity when a datetime64 column is selected through the edge
+  metrics), with hand-made logs spelling one instant twice (the random
+  banks never do);
+- FF1-3 on the OC-DFG's start and end activities and the flattening with
+  a NaT time on CSV logs with and without offsets;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Round FF's list, taken in FF: FE's CI (five green, macOS lost to a
+checkout timeout), FE1-1 on the CLI and chain results (0 outside the
+declared CSV features; the frontend's form posts to the same route),
+FE1-2 on the other readers' nulls (FF1-1) and the None-vs-NaN routes
+(0), FE1-3 on the edge metrics (FF1-2, FF1-3) and CSV offset logs through
+chains (q31 cswu 0 of 13,510). Carried to FG: EV1-1, the SQLite
+leftovers, the new Polars dtypes, DW1, the other declared items, the rest
+of the CU list and the open choices.
+
+Previous list for round FF (kept for its older items):
 
 Next round (FF) should start by re-reviewing round FE:
 

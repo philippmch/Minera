@@ -1,7 +1,11 @@
 #include "minera/ocdfg_edge_metrics.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <unordered_map>
+#include <utility>
+
+#include "minera/timestamp.hpp"
 
 #include "ocel_frame_types.hpp"
 
@@ -136,6 +140,27 @@ const std::string& label(const Cell& cell, const std::string& key) {
     throw std::invalid_argument("OCDFG association companion requires string cells: " + key);
   return cell.text;
 }
+// Round FF: a datetime column's cells (ocel:timestamp, an attribute column
+// read as datetime64) are Timestamps in pm4py, one group and one label per
+// instant however the texts spell it ("...Z" and "...+00:00", or the same
+// instant at two offsets; observed black-box, probe ff t3/tsk2.jsonocel).
+// The label is the first spelling in event (object) order.
+class InstantLabels {
+ public:
+  explicit InstantLabels(bool active) : active_(active) {}
+  Cell operator()(Cell cell) {
+    if (!active_ || cell.kind != Cell::Kind::kText) return cell;
+    const auto parsed = parse_timestamp_exact(cell.text);
+    if (!parsed) return cell;
+    cell.text = seen_.try_emplace({parsed->seconds, parsed->nanoseconds}, cell.text).first->second;
+    return cell;
+  }
+
+ private:
+  bool active_;
+  std::map<std::pair<std::int64_t, std::uint32_t>, std::string> seen_;
+};
+
 // A groupby key: a missing cell is no group; another value rejects.
 const std::string* group_key(const Cell& cell, const std::string& key) {
   if (cell.missing()) return nullptr;
@@ -211,14 +236,23 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
   };
   const auto eid_reading = events_reading(eid), activity_reading = events_reading(activity);
   const auto oid_reading = objects_reading(oid), type_reading = objects_reading(type);
+  InstantLabels eid_instants(eid == kTimestamp || eid_reading.date_column),
+      activity_instants(activity == kTimestamp || activity_reading.date_column),
+      type_instants(type_reading.date_column);
 
   std::vector<Cell> identifiers;
   std::unordered_map<std::string, Cell> activities;
   identifiers.reserve(log.events.size());
   for (const auto& event : log.events) {
-    identifiers.push_back(event_cell(event, eid, eid_reading));
+    identifiers.push_back(eid_instants(event_cell(event, eid, eid_reading)));
+    auto label_cell = activity_instants(event_cell(event, activity, activity_reading));
+    // Round FF: a missing event time (an OCEL CSV row's NaT) as the activity
+    // is the label NaT, as the OC-DFG's edges have it (observed black-box,
+    // bank q30, ff q/emr.py).
+    if (activity == kTimestamp && label_cell.kind == Cell::Kind::kText && label_cell.text.empty())
+      label_cell = Cell(std::string("NaT"));
     if (const auto* key = group_key(identifiers.back(), eid))
-      activities.try_emplace(*key, event_cell(event, activity, activity_reading));
+      activities.try_emplace(*key, std::move(label_cell));
   }
   std::unordered_map<std::string, const OcelEvent*> event_by_id;
   std::unordered_map<std::string, const OcelObject*> object_by_id;
@@ -230,7 +264,7 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
     const auto object = object_by_id.find(relation.object_id);
     if (event == event_by_id.end() || object == object_by_id.end())
       throw std::invalid_argument("OCDFG association adapter requires source events and objects for each relation");
-    const auto key = relation_cell(relation, *event->second, *object->second, eid);
+    const auto key = eid_instants(relation_cell(relation, *event->second, *object->second, eid));
     const auto* group = group_key(key, eid);
     if (group == nullptr) continue;
     omap[*group].push_back(label(relation_cell(relation, *event->second, *object->second, oid), oid));
@@ -238,7 +272,8 @@ OcdfgEdgeAssociations find_ocdfg_edge_associations(
   std::unordered_map<std::string, Cell> objtypes;
   for (const auto& object : log.objects) {
     const auto key = object_cell(object, oid, oid_reading);
-    if (const auto* group = group_key(key, oid)) objtypes.try_emplace(*group, object_cell(object, type, type_reading));
+    auto type_cell = type_instants(object_cell(object, type, type_reading));
+    if (const auto* group = group_key(key, oid)) objtypes.try_emplace(*group, std::move(type_cell));
   }
 
   std::unordered_map<std::string, std::string> history;
