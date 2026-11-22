@@ -218,19 +218,33 @@ PetriNet discover_classic_table(const EventTable& table,
   check_schema(activity, FirstClassAttributeRole::kActivity);
   const bool reads_time = options.sort_caseid_required &&
                           options.sort_timestamp_along_case_id;
-  check_schema(options.timestamp_attribute, FirstClassAttributeRole::kTimestamp);
   const std::string start = options.start_timestamp_attribute.empty()
                                 ? "start_timestamp"
                                 : options.start_timestamp_attribute;
   const bool has_start = selector_available(
       table, stream, start, FirstClassAttributeRole::kTimestamp);
-  if (!options.start_timestamp_attribute.empty() && !has_start)
+  // An XES upload's frame with an explicit start key the frame holds (round
+  // GB, observed black-box): the rows sort by case, start and completion,
+  // each column by its own values (a text start as text); Polars sorts
+  // without the completion when the frame lacks it, and reads a start the
+  // frame lacks as an alias of the completion (xes_frame_checks.hpp raises
+  // the missing columns' errors).
+  const bool explicit_frame_start = xes_frame && !options.start_timestamp_attribute.empty();
+  const bool has_completion = selector_available(
+      table, stream, options.timestamp_attribute, FirstClassAttributeRole::kTimestamp);
+  if (!(explicit_frame_start && polars && has_start && !has_completion))
+    check_schema(options.timestamp_attribute, FirstClassAttributeRole::kTimestamp);
+  if (!options.start_timestamp_attribute.empty() && !has_start && !xes_frame)
     check_schema(start, FirstClassAttributeRole::kTimestamp);
 
   // The table footprint uses sorted rows, while its boundary activities come
   // from the original per-case row order. Keep those two observations separate.
-  const bool text_times = text_dtype(selected_dtype(table, options.timestamp_attribute)) &&
+  const bool text_times = !explicit_frame_start &&
+                          text_dtype(selected_dtype(table, options.timestamp_attribute)) &&
                           (!has_start || text_dtype(selected_dtype(table, start)));
+  const auto frame_text = [&](std::string_view selector) { return detail::xes_frame_text_column(table, selector); };
+  const bool text_start = explicit_frame_start && has_start && frame_text(start);
+  const bool text_completion = explicit_frame_start && has_completion && frame_text(options.timestamp_attribute);
   struct Row {
     std::optional<std::string> case_id;
     std::optional<std::string> activity;
@@ -272,7 +286,20 @@ PetriNet discover_classic_table(const EventTable& table,
                     ":" + *row.case_id;
     row.activity = value(select_field(record, activity,
         FirstClassAttributeRole::kActivity, false, true));
-    if (reads_time && text_times) {
+    if (reads_time && explicit_frame_start) {
+      const auto* completion = has_completion ? select_field(record, options.timestamp_attribute,
+          FirstClassAttributeRole::kTimestamp, false, true) : nullptr;
+      if (text_completion) row.completion_text = value(completion);
+      else row.completion = instant(completion);
+      if (!has_start) {
+        row.start_text = row.completion_text;
+        row.start = row.completion;
+      } else {
+        const auto* begin = select_field(record, start, FirstClassAttributeRole::kTimestamp, false, true);
+        if (text_start) row.start_text = value(begin);
+        else row.start = instant(begin);
+      }
+    } else if (reads_time && text_times) {
       row.completion_text = value(select_field(record, options.timestamp_attribute,
           FirstClassAttributeRole::kTimestamp, false, true));
       row.start_text = has_start ? value(select_field(record, start,
@@ -323,6 +350,14 @@ PetriNet discover_classic_table(const EventTable& table,
   const auto compare_rows = [&](const Row& left, const Row& right) {
     if (const int by = compare_text(left.case_id, right.case_id)) return by;
     if (!reads_time) return 0;
+    if (explicit_frame_start) {
+      const bool start_as_text = has_start ? text_start : text_completion;
+      if (const int by = start_as_text ? compare_text(left.start_text, right.start_text)
+                                       : compare_instant(left.start, right.start))
+        return by;
+      return text_completion ? compare_text(left.completion_text, right.completion_text)
+                             : compare_instant(left.completion, right.completion);
+    }
     if (text_times) {
       if (const int by = compare_text(left.start_text, right.start_text)) return by;
       return compare_text(left.completion_text, right.completion_text);
@@ -513,7 +548,8 @@ PetriNet discover_petri_net_xes_frame(const EventDataView& data,
   const std::string start = options.start_timestamp_attribute.empty()
                                 ? "start_timestamp" : options.start_timestamp_attribute;
   detail::check_xes_frame_columns(data, detail::XesFrameFamily::kAlpha, options.case_id_attribute,
-                                  activity, options.timestamp_attribute, start);
+                                  activity, options.timestamp_attribute, start,
+                                  !options.start_timestamp_attribute.empty());
   std::optional<EventTable> materialized;
   const EventTable* source = polars
       ? &materialized.emplace(data.lazy_table()->materialize(options.max_rows_to_materialize))

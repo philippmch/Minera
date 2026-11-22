@@ -1203,8 +1203,12 @@ std::vector<HeuristicBundle> plus_bundles(
   return maximal_cliques(neighbours, adjacent);
 }
 
+// `frame_clock` (round GB): an XES upload's frame, whose missing
+// timestamps are NaT: a wait that reads one is NaT, and pm4py keeps
+// max(0, NaN), a zero wait (observed black-box on the pandas frame).
 HeuristicClassicDfgInput build_classic_input(
-    const EventLog& log, const HeuristicMinerOptions& options) {
+    const EventLog& log, const HeuristicMinerOptions& options,
+    bool frame_clock = false) {
   HeuristicClassicDfgInput input;
   const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
   const bool frame_seconds = log.dataframe_columns != nullptr;  // round FR
@@ -1239,6 +1243,13 @@ HeuristicClassicDfgInput build_classic_input(
       if (!options.keep_once_per_case || seen_direct.insert(pair).second)
         ++input.dfg[pair];
       if (options.decoration == HeuristicNetDecoration::kPerformance) {
+        if (frame_clock && (!trace.events[i - 1].has_timestamp() ||
+                            trace.events[i - 1].timestamp_state == FirstClassAttributeState::kNull ||
+                            !trace.events[i].has_timestamp() ||
+                            trace.events[i].timestamp_state == FirstClassAttributeState::kNull)) {
+          (*input.performance_dfg)[pair].push_back(0.0);
+          continue;
+        }
         const auto complete_microseconds = required_timestamp_microseconds(
             selected_timestamp(trace.events[i - 1], options), "event");
         const auto start =
@@ -2716,8 +2727,14 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     const EventDataView& data,
     const HeuristicMinerOptions& options) {
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
-  if (options.variant != HeuristicMinerVariant::kClassic ||
-      options.decoration != HeuristicNetDecoration::kFrequency ||
+  const bool plus = options.variant == HeuristicMinerVariant::kPlusPlus;
+  const bool performance = !plus && options.decoration == HeuristicNetDecoration::kPerformance;
+  // Heuristics++ and the classic performance decoration read the frame's own
+  // clock (round GB); another clock (business hours, a start key, another
+  // timestamp column) stays on the older path.
+  const bool own_clock = !options.use_business_hours && !options.start_timestamp_attribute &&
+                         canonical_timestamp_attribute(options) == "time:timestamp";
+  if ((!plus && options.variant != HeuristicMinerVariant::kClassic) || ((plus || performance) && !own_clock) ||
       (!polars && data.kind() != EventDataKind::kEventTable))
     return discover_heuristics_net(data, options);
   std::optional<EventTable> materialized;
@@ -2748,24 +2765,57 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     return out + quote;
   };
   const auto activity_key = canonical_activity_attribute(options);
+  const auto timestamp_key = canonical_timestamp_attribute(options);
   const auto case_at = column_of(options.case_id_attribute);
   if (!case_at) throw HeuristicPandasError("builtins.KeyError", repr(options.case_id_attribute));
   const auto activity_at = column_of(activity_key);
+  const auto timestamp_at = column_of(timestamp_key);
   const auto value = [](const EventTable::Row& row, std::size_t at) -> const std::string* {
     if (at >= row.size() || !row[at] || row[at]->is_null) return nullptr;
     return &row[at]->value;
   };
-  if (!activity_at) {
-    // No event names an activity: the converted events lack the key, which
-    // only the directly-follows pairs read. A case of two or more events
-    // raises KeyError; otherwise the log has no activity at all.
+  // Heuristics++ reads every event's activity and timestamp: their columns
+  // are required (round GB).
+  if (plus && !activity_at) throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
+  if (plus && !timestamp_at) throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
+  const auto lifecycle_at = column_of("lifecycle:transition");
+  // Interval input (a start column, a lifecycle with gaps) stays on the older
+  // path.
+  if (plus && (column_of("start_timestamp") ||
+               (lifecycle_at && std::any_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
+                  return value(row, *lifecycle_at) == nullptr;
+                }))))
+    return discover_heuristics_net(data, options);
+  if (!plus) {
+    // The classic reads activities, and the performance decoration
+    // timestamps, only in directly-follows pairs: a case of two or more
+    // events raises KeyError for a missing column (activity first);
+    // otherwise a missing activity column leaves no activity at all.
     std::map<std::optional<std::string>, std::size_t> events_of;
+    bool repeated = false;
     for (const auto& row : table.rows) {
       const auto* case_id = value(row, *case_at);
-      if (++events_of[case_id ? std::optional<std::string>(*case_id) : std::nullopt] > 1)
-        throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
+      if (++events_of[case_id ? std::optional<std::string>(*case_id) : std::nullopt] > 1) {
+        repeated = true;
+        break;
+      }
     }
-    return finish(discover_heuristics_net(EventLog{}, projected));
+    if (repeated && !activity_at) throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
+    if (repeated && performance && !timestamp_at) throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
+    if (!activity_at) return finish(discover_heuristics_net(EventLog{}, projected));
+  }
+  const auto missing_time = [&](const EventTable::Row& row) {
+    if (!timestamp_at || *timestamp_at >= row.size() || !row[*timestamp_at]) return true;
+    return row[*timestamp_at]->is_null || is_typed_nat(*row[*timestamp_at]);
+  };
+  // Heuristics++ reads each event's timestamp first: a pandas NaT has no
+  // timestamp(), and Polars' None is subtracted from None (complete less
+  // start; round GB, observed black-box).
+  if (plus && std::any_of(table.rows.begin(), table.rows.end(), missing_time)) {
+    if (polars)
+      throw HeuristicPandasError("builtins.TypeError",
+                                 "unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
+    throw HeuristicPandasError("builtins.ValueError", "NaTType does not support timestamp");
   }
   // Python's str of the missing label, unique among the named activities.
   std::set<std::string> named;
@@ -2777,6 +2827,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   std::string null_label = polars ? "None" : "nan";
   while (named.contains(null_label)) null_label += '\x1f';
   const std::string null_type = polars ? "NoneType" : "float";
+  const bool timed = plus || performance;
   EventLog log;
   std::map<std::optional<std::string>, std::size_t> trace_of;
   for (const auto& row : table.rows) {
@@ -2794,15 +2845,119 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     const auto* activity = value(row, *activity_at);
     event.activity = activity ? *activity : null_label;
     event.activity_state = FirstClassAttributeState::kPresent;
+    if (timed && timestamp_at) {
+      if (missing_time(row)) {
+        event.timestamp_state = FirstClassAttributeState::kNull;
+      } else {
+        event.timestamp = row[*timestamp_at]->value;
+        event.timestamp_state = FirstClassAttributeState::kPresent;
+        event.timestamp_attribute = *row[*timestamp_at];
+      }
+      event.timestamp_source_key = timestamp_key;
+    }
+    if (plus) {
+      if (lifecycle_at) {
+        event.lifecycle = *value(row, *lifecycle_at);
+        event.lifecycle_state = FirstClassAttributeState::kPresent;
+      }
+      // The lifecycle pairing reads the other attributes (concept:instance).
+      for (std::size_t column = 0; column < table.columns.size(); ++column)
+        if (column != *case_at && column != *activity_at && column != *timestamp_at && column != lifecycle_at &&
+            value(row, column)) {
+          auto attribute = *row[column];
+          attribute.key = table.columns[column];
+          event.attributes.push_back(std::move(attribute));
+        }
+    }
     log.traces[it->second].events.push_back(std::move(event));
   }
+  if (plus) {
+    // Python compares two labels while it keys a concurrency pair (each
+    // overlapping pair of a trace's time-sorted intervals, trace by trace)
+    // and while it reads each kept eventually-follows pair's concurrency
+    // (sources in the order their activity first appears, each source's
+    // targets in the order they follow it first): the missing label beside
+    // a named one raises TypeError, and on Polars None beside anything
+    // (round GB, observed black-box).
+    if (any_missing) {
+      const auto type_of = [&](const std::string& label) { return label == null_label ? null_type : std::string("str"); };
+      const auto less = [&](const std::string& left, const std::string& right) {
+        const bool left_null = left == null_label, right_null = right == null_label;
+        if (polars ? (left_null || right_null) : left_null != right_null)
+          throw HeuristicPandasError("builtins.TypeError", "'<' not supported between instances of '" +
+                                                               type_of(left) + "' and '" + type_of(right) + "'");
+      };
+      std::vector<std::string> order;
+      std::set<std::string> known;
+      std::map<std::string, std::uint64_t> occurrences;
+      std::map<NamePair, std::uint64_t> follows;
+      std::map<std::string, std::vector<std::string>> targets;
+      for (const auto& trace : log.traces) {
+        const auto converted = to_intervals(trace, projected, false, false);
+        const auto& intervals = converted.sorted;
+        for (const auto& interval : converted.performance_order) {
+          if (known.insert(interval.activity).second) order.push_back(interval.activity);
+          ++occurrences[interval.activity];
+        }
+        for (std::size_t i = 0; i < intervals.size(); ++i)
+          for (std::size_t j = i + 1; j < intervals.size(); ++j) {
+            if (!(std::max(start_instant(intervals[i]), start_instant(intervals[j])) <=
+                  std::min(complete_instant(intervals[i]), complete_instant(intervals[j]))))
+              break;
+            less(intervals[j].activity, intervals[i].activity);
+          }
+        for (std::size_t i = 0; i < intervals.size(); ++i)
+          for (std::size_t j = i + 1; j < intervals.size(); ++j)
+            if (complete_instant(intervals[i]) <= start_instant(intervals[j])) {
+              if (follows[{intervals[i].activity, intervals[j].activity}]++ == 0)
+                targets[intervals[i].activity].push_back(intervals[j].activity);
+              break;
+            }
+      }
+      const PlusCountThreshold min_activity{options.min_activity_count, options.plusplus_min_activity_count};
+      const PlusCountThreshold min_frequency{options.min_frequency, options.plusplus_min_frequency};
+      for (const auto& from : order) {
+        const auto found = targets.find(from);
+        if (found == targets.end()) continue;
+        for (const auto& to : found->second)
+          if (min_activity.accepts(occurrences[from]) && min_activity.accepts(occurrences[to]) &&
+              min_frequency.accepts(follows[{from, to}]))
+            less(to, from);
+      }
+    }
+    auto net = finish(discover_heuristics_net(log, projected));
+    const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
+    if (any_missing && null_at != net.activities.end())
+      net.null_activity = static_cast<std::size_t>(null_at - net.activities.begin());
+    return net;
+  }
+  // Polars' performance decoration subtracts each directly-follows pair's
+  // timestamps, case by case, before the noise cleaning: None on either side
+  // raises TypeError (round GB, observed black-box).
+  if (performance && polars)
+    for (const auto& trace : log.traces)
+      for (std::size_t e = 1; e < trace.events.size(); ++e) {
+        const bool later = trace.events[e].timestamp_state == FirstClassAttributeState::kNull;
+        const bool earlier = trace.events[e - 1].timestamp_state == FirstClassAttributeState::kNull;
+        if (later || earlier)
+          throw HeuristicPandasError("builtins.TypeError",
+                                     std::string("unsupported operand type(s) for -: '") +
+                                         (later ? "NoneType" : "datetime.datetime") + "' and '" +
+                                         (earlier ? "NoneType" : "datetime.datetime") + "'");
+      }
   // The noise cleaning reads each DFG pair's first element as text.
   if (any_missing)
     for (const auto& trace : log.traces)
       for (std::size_t e = 1; e < trace.events.size(); ++e)
         if (trace.events[e - 1].activity == null_label)
           throw HeuristicPandasError("builtins.TypeError", "'" + null_type + "' object is not subscriptable");
-  auto net = finish(discover_heuristics_net(log, projected));
+  auto net = finish([&] {
+    if (!performance) return discover_heuristics_net(log, projected);
+    // A pair with a NaT reads as a zero wait.
+    auto decorated = discover_classic_dfg(build_classic_input(log, projected, true), projected);
+    decorated.activity_ids_are_local = !standard_activity_attribute(projected.activity_attribute);
+    return decorated;
+  }());
   const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
   if (null_at == net.activities.end()) return net;
   const auto null_id = static_cast<std::size_t>(null_at - net.activities.begin());

@@ -1074,10 +1074,20 @@ TemporalProfile discover_temporal_profile(
 }
 
 TemporalProfile discover_temporal_profile_xes_frame(
-    const EventDataView& data, const TemporalProfileOptions& options) {
-  if (data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable)
+    const EventDataView& data, const TemporalProfileOptions& options, bool explicit_start_key) {
+  if (data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable) {
+    // A start key other than the timestamp is read as given (round GB); the
+    // routes pass the timestamp when none is given. The timestamp given as
+    // the start key reads the same in pandas, while Polars selects it once
+    // without the start alias.
+    const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
+    const auto timestamp = source_timestamp_key(options);
+    const bool explicit_start =
+        !start.empty() && (start != timestamp || (explicit_start_key && data.kind() == EventDataKind::kLazyEventTable));
     detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
-                                    options.activity_attribute, source_timestamp_key(options));
+                                    options.activity_attribute, timestamp,
+                                    explicit_start ? start : std::string("start_timestamp"), explicit_start);
+  }
   return discover_temporal_profile(data, options);
 }
 

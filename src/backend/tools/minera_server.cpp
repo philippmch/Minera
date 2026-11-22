@@ -4520,6 +4520,11 @@ void handle_behavior_analysis(const httplib::Request& request,
         if (!request.has_param("temporal_profile_json")) throw std::invalid_argument("temporal_profile_json is required");
         profile = minera::parse_temporal_profile_json(request.get_param_value("temporal_profile_json"));
         conformance = minera::conform_temporal_profile(input(), *profile, params.temporal_profile);
+      } else if (session->active_source && session->active_source->file().format == "xes" &&
+                 (adapter == "dataframe" || adapter == "lazyframe")) {
+        // An XES upload's frame as /api/mine reads it (round GB).
+        profile = minera::discover_temporal_profile_xes_frame(input(), params.temporal_profile,
+                                                              request.has_param("temporal_target_timestamp_attribute"));
       } else profile = minera::discover_temporal_profile(input(), params.temporal_profile);
       for (const auto& entry : profile->entries) { graph.ensure_activity(entry.source); graph.ensure_activity(entry.target); }
     } else if (family == "minimum_self_distance") {
@@ -4816,7 +4821,7 @@ void handle_constraint_discovery(const httplib::Request& request,
     std::optional<minera::DeclareModel> declare;
     std::optional<minera::LogSkeletonModel> skeleton;
     std::optional<std::vector<minera::DeclareConformance>> declare_conformance;
-    std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance;
+    std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance, skeleton_frame_conformance;
     auto graph = session->log_ready ? minera::discover_directly_follows_graph(require_prepared_log(*session)) : minera::DirectlyFollowsGraph{};
     std::string diagnostics, diagnostics_error, playout_xes, playout_result, playout_error;
     // An XES source's cases in pm4py's DataFrame order (see constraint_case_order);
@@ -4874,20 +4879,33 @@ void handle_constraint_discovery(const httplib::Request& request,
       }
     } else {
       skeleton = xes_frame_session(*session)
-          ? minera::discover_log_skeleton_xes_frame(session_selected_view(*session), params.log_skeleton)
+          ? minera::discover_log_skeleton_xes_frame(session_selected_view(*session), params.log_skeleton, true)
           : constraint_order
           ? minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton, *constraint_order)
           : minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton);
       auto options = params.log_skeleton; options.activity_key = conformance_activity;
-      skeleton_conformance = minera::check_log_skeleton_conformance(session_selected_view(*session), *skeleton, options);
+      std::string trace_conformance_error;
+      if (xes_frame_session(*session)) {
+        // pm4py's conformance on the frame lists the cases of its groupby
+        // (rows without a case dropped, same-named traces merged) in its
+        // order, as /api/mine's (round GB). The analysis presentation and
+        // the diagnostics keep their one result per trace of the session log.
+        skeleton_frame_conformance = minera::check_log_skeleton_conformance_xes_frame(session_selected_view(*session), *skeleton, options);
+        try { skeleton_conformance = minera::check_log_skeleton_conformance(session_selected_view(*session), *skeleton, options); }
+        catch (const minera::OperationCancelled&) { throw; }
+        catch (const std::exception& error) { trace_conformance_error = error.what(); }
+      } else {
+        skeleton_conformance = minera::check_log_skeleton_conformance(session_selected_view(*session), *skeleton, options);
+      }
       for (const auto* relations : {&skeleton->equivalence, &skeleton->always_after, &skeleton->always_before, &skeleton->never_together, &skeleton->directly_follows})
         for (const auto& relation : *relations) { graph.ensure_activity(relation.source); graph.ensure_activity(relation.target); }
       for (const auto& [name, frequencies] : skeleton->activ_freq) { (void)frequencies; graph.ensure_activity(name); }
-      for (const auto& trace : *skeleton_conformance) for (const auto& deviation : trace.deviations) {
+      if (skeleton_conformance) for (const auto& trace : *skeleton_conformance) for (const auto& deviation : trace.deviations) {
         if (deviation.constraint == "activ_freq") graph.ensure_activity(deviation.activity);
         else { graph.ensure_activity(deviation.relation.source); graph.ensure_activity(deviation.relation.target); }
       }
-      try { diagnostics = minera::serialize_event_table_input_json(minera::log_skeleton_conformance_diagnostics(session_selected_view(*session), *skeleton_conformance, {diagnostics_case})); }
+      if (!skeleton_conformance) diagnostics_error = trace_conformance_error;
+      else try { diagnostics = minera::serialize_event_table_input_json(minera::log_skeleton_conformance_diagnostics(session_selected_view(*session), *skeleton_conformance, {diagnostics_case})); }
       catch (const std::exception& error) { diagnostics_error = error.what(); }
     }
     std::string result = "null", result_error;
@@ -4899,6 +4917,7 @@ void handle_constraint_discovery(const httplib::Request& request,
     const auto quote = minera::embedding_runtime::detail::escape_json;
     const auto native_result = declare
         ? [&] { const auto ordered = in_constraint_order(*declare_conformance, constraint_order); return minera::serialize_active_source_declare_json(*declare, &ordered); }()
+        : skeleton_frame_conformance ? minera::serialize_active_source_skeleton_json(*skeleton, &*skeleton_frame_conformance)
         : [&] { const auto ordered = in_constraint_order(*skeleton_conformance, constraint_order); return minera::serialize_active_source_skeleton_json(*skeleton, &ordered); }();
     const auto optional_json = [](const std::string& value) { return value.empty() ? std::string("null") : value; };
     const auto optional_text = [&](const std::string& value) { return value.empty() ? std::string("null") : quote(value); };
@@ -5097,13 +5116,17 @@ void handle_workflow_discovery(const httplib::Request& request,
     minera::PetriNet net;
     const auto variant = family == "alpha" ? (params.alpha.short_loops ? "plus" : "classic") :
       (params.heuristic.variant == minera::HeuristicMinerVariant::kPlusPlus ? "plusplus" : "classic");
+    // An XES session's frame is read as /api/mine reads it (round GB).
+    const bool xes_frame = xes_frame_session(*session);
     if (family == "alpha") {
       if (params.alpha.short_loops) {
-        alpha_plus = minera::discover_alpha_plus_result(discovery_input, params.alpha);
+        alpha_plus = xes_frame ? minera::discover_alpha_plus_result_xes_frame(discovery_input, params.alpha)
+                               : minera::discover_alpha_plus_result(discovery_input, params.alpha);
         net = alpha_plus->net;
-      } else net = minera::discover_petri_net(discovery_input, params.alpha);
+      } else net = xes_frame ? minera::discover_petri_net_xes_frame(discovery_input, params.alpha)
+                             : minera::discover_petri_net(discovery_input, params.alpha);
     } else {
-      heuristic = minera::observe_exact_heuristic_call(discovery_input,params.heuristic,[&]{return minera::discover_heuristics_net(discovery_input, params.heuristic);});
+      heuristic = minera::observe_exact_heuristic_call(discovery_input,params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(discovery_input, params.heuristic) : minera::discover_heuristics_net(discovery_input, params.heuristic);});
       try{net = minera::to_petri_net(*heuristic);minera::record_exact_petri_net(net);}
       catch(const std::exception& e){minera::record_exact_optional_artifact("conversion",e.what(),true);throw;}
     }
@@ -9567,7 +9590,9 @@ void handle_alpha_plus_result(const httplib::Request& request, httplib::Response
       }
       overlay_cached_source_selectors(request,*session,params);
       options = params.alpha;
-      response.set_content(minera::alpha_plus_result_json(minera::discover_alpha_plus_result(session_selected_view(*session),options)),"application/json");
+      response.set_content(minera::alpha_plus_result_json(xes_frame_session(*session)
+          ? minera::discover_alpha_plus_result_xes_frame(session_selected_view(*session), options)
+          : minera::discover_alpha_plus_result(session_selected_view(*session), options)), "application/json");
       return;
     }
     response.set_content(minera::alpha_plus_result_json(

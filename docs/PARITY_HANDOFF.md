@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GA (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GB (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8896,6 +8896,69 @@ GA's suite: the full ctest 664 of 664 (26 minutes, -j2, first run; the new
 `minera_server_mine_xes_frames_ga_tests` fails 36 of its checks on FZ's
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged (no fixture refresh; frontend untouched). Harness and probes: `review-harness/round-ga/`.
+
+Round GB re-reviewed GA on fresh banks and aligned Heuristics++, the
+classic performance view, Alpha's and the temporal profile's explicit
+start keys and the workbench routes that re-discover on an XES session,
+on the frame shapes of XES uploads with gaps (Review GB1). GA's CI run
+45024372369 and FZ's Windows job passed. GA's fixes held on six new banks
+from `gen/gengb.py` (genfz.py plus repeats of the previous label and
+length-two loops: gbM, gbR, gbA, gbL, gbH, gbS; 280 uploads per shape):
+Alpha, the heuristics, the temporal profile, the log skeleton, Alpha+
+(also `remove_unconnected`) and the conformance (also with noise 0.3).
+Fixed: GB1-1, Heuristics++ on frames converts to an event log, raises
+`KeyError` for case, activity, timestamp in that order, then on any
+missing timestamp (pandas `ValueError: NaTType does not support
+timestamp`, Polars `TypeError` subtracting None), then where Python
+compares a missing label with a named one (interval overlaps per trace,
+then the eventually-follows pairs past the minimum counts; pandas when
+exactly one side is NaN, Polars when either side is None); GB1-2, the
+classic performance view waits 0 over a pandas NaT and raises Polars'
+subtraction `TypeError` at the first pair with a None; GB1-3, an explicit
+start key the frame holds is read as given (pandas selects case,
+activity, timestamp, start with the Index repr wrapped at width 80;
+Alpha sorts each key by its own values, a text start as text; Polars
+without the start alias, the duplicate `ComputeError` when the start is
+the timestamp; the temporal profile's text-start `TypeError` or Polars
+`InvalidOperationError`; the text test reads the values since a
+session's frame table has no dtypes; `discover_temporal_profile_xes_frame`
+takes `explicit_start_key`); GB1-4, `/api/discover-constraints`
+(log skeleton and its conformance), `/api/discover-workflow`,
+`/api/discover-alpha-plus` without an upload and `/api/analyze-behavior`'s
+temporal profile read an XES session's frame as `/api/mine` does.
+Declared: Alpha+ through the routes keeps GA1's set-order upload; the
+top-cases and top-activities selections among tied counts change from run
+to run in pm4py itself (two of the `std::stable_sort` sites). Sweeps set
+`PYTHONHASHSEED=0` and use one fresh server per sweep.
+
+GB's suite: the full ctest 665 of 665 (26 minutes, -j2, first run; the new
+`minera_server_mine_xes_frames_gb_tests` fails 32 of its checks on GA's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged (no fixture refresh; frontend untouched).
+Harness and probes: `review-harness/round-gb/`.
+
+Next round (GC) should start by re-reviewing round GB:
+
+- GB's CI run;
+- GB1 on fresh banks: `optval.py` with the Heuristics++ and performance
+  option sets (`hpp`, `hpp_thr`, `hpp_perf`, `hpp_min`, `hpp_min3`,
+  `hpp_and`, `hperf`, `hperf_min`) and the start-key sets (`a_szzz`,
+  `a_sst`, `a_sres`, `a_sts`, `tp_szzz`, `tp_sts`, `tp_sres`) on new
+  `gen/gengb.py` banks (lifecycle columns with gaps, a start timestamp
+  column, numeric and boolean start columns, mixed text and dates), and
+  `wb/cskel.py` and `wb/wfval.py` (the workbench routes) with options
+  (noise thresholds, Alpha+ `remove_unconnected`, heuristics thresholds);
+- the routes that read the cached models of an XES session (footprints,
+  token replay, model conversion on a heuristics net with a None label);
+- the remaining `std::stable_sort` on Polars paths
+  (`polars_variants_filter.cpp`, `polars_sequence_filters.cpp`,
+  `polars_sort.hpp`'s Null-dtype keys, `polars_ltl_filter.cpp`,
+  `temporal_lazy_reference.cpp`): probe pm4py's own determinism first,
+  as GB did for the top selections;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GB (kept for its older items):
 
 Next round (GB) should start by re-reviewing round GA:
 

@@ -139,7 +139,9 @@ void handle_active_source_mining(const httplib::Request& request,
   run("temporal_profile", selected, [&](bool& native_returned) {
     auto temporal_options = params.temporal_profile;
     mark_frame_index_rows(*session, temporal_options);
-    temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options)
+    temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options,
+                               active_source_supplied(request, "temporal_target_timestamp_attribute") ||
+                               active_source_supplied(request, "temporal_target_start_timestamp_attribute"))
                          : minera::discover_temporal_profile(data(), temporal_options);
     native_returned = true;
     return minera::serialize_active_source_temporal_profile_json(*temporal);

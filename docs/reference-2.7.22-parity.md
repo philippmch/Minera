@@ -37972,3 +37972,134 @@ checks fail on FZ's binary) carries the reference values.
 The full ctest passed 664 of 664 (26 minutes, -j2) on the first run. The
 fixture replay gave no change (2,673 responses unchanged), and the Python
 script tests passed 406 of 406.
+
+## Review GB1: Heuristics++, the performance view, explicit start keys and the workbench routes on frame shapes of XES uploads (2026-11-22)
+
+Round GB re-reviewed round GA on fresh banks and aligned the Heuristics++
+variant (`heuristic_variant=plusplus`), the classic performance view
+(`heuristic_decoration=performance`), Alpha's and the temporal profile's
+explicit start keys (`alpha_start_timestamp_attribute`,
+`temporal_target_timestamp_attribute`) and the workbench routes that
+re-discover on an XES session, on the `dataframe` and `lazyframe` shapes of
+XES uploads with gaps, against pm4py's algorithm applies on read_xes's
+frame and its Polars copy. GA's CI run 45024372369 (80845f5) and FZ's
+Windows job passed. Observed black-box on pm4py 2.7.22 (pandas 3.0.5,
+numpy 2.4.6, polars 1.44.1, no pyarrow; frames converted to Polars column
+by column), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4
+AVX512_ICL AVX512_SPR"`, `PYTHONHASHSEED=0` and exact comparison of the
+canonical results (as in GA1; the heuristics' activities, edges with their
+dependency, frequency and performance value, start and end activities) or
+of the error messages.
+
+Re-review of GA (fresh seeds of the new `gen/gengb.py`, `gen/genfz.py`
+plus repeats of the previous label, the missing label included, and
+length-two loops): six new banks (gbM mixed gaps, gbR repeats, gbA unnamed
+events, gbL long traces, gbH heavy gaps, gbS tiny logs; 280 uploads per
+shape). Alpha, the heuristics, the temporal profile, the log skeleton,
+Alpha+ (also with `remove_unconnected`) and the log skeleton's conformance
+(also with a noise threshold of 0.3) agree on every upload of both
+shapes.
+
+Fixed:
+
+- **GB1-1. Heuristics++ on XES frames.** pm4py converts the frame to an
+  event log (one trace per case value in first-row order, the rows without
+  a case id one trace, events in row order). A missing case, activity or
+  timestamp column raises `KeyError` in that order; then any missing
+  timestamp raises (pandas: `ValueError: NaTType does not support
+  timestamp`; Polars: `TypeError: unsupported operand type(s) for -:
+  'NoneType' and 'NoneType'`). Python then compares labels in two places:
+  per trace, the overlapping pairs of the time-sorted intervals (equal
+  timestamps for atomic events), and over the eventually-follows pairs
+  that pass the minimum activity and edge counts, sources in their first
+  appearance over the sorted traces and targets in insertion order. A
+  missing label beside a named one raises `TypeError: '<' not supported
+  between instances of ...` (pandas: exactly one side NaN; Polars: either
+  side None, None against None too). A start timestamp column or a
+  lifecycle with gaps keeps the older path. Minera named its own errors on
+  204 of GA's 280 uploads per shape, answered 5 that pm4py refuses and
+  refused 2 that pm4py answers.
+- **GB1-2. The classic performance view on XES frames.** The repeated
+  case's `KeyError` names the activity, then the timestamp; a wait over a
+  pandas NaT is 0 (and a negative wait 0); Polars raises at the first pair
+  in trace order with a None, `unsupported operand type(s) for -:` with
+  `datetime.datetime` or `NoneType` per side, before the noise cleaning's
+  error. Minera differed on 228 of 280 uploads per shape (32 in values).
+- **GB1-3. Explicit start keys on XES frames.** A start column the frame
+  holds is read as given. pandas selects `[case, activity, timestamp,
+  start]` (Alpha also when the frame lacks the start; the timestamp given
+  as the start once), so a missing one raises `KeyError` with the unique
+  missing labels, or `None of [Index([...], dtype='str')] are in the
+  [columns]` wrapped as pandas prints an Index at width 80. Alpha sorts by
+  case, start and timestamp, each column by its own values (a text start
+  as text, missing values last); Polars keeps the columns in frame order
+  without the start alias, sorts without the timestamp when the frame
+  lacks it, and raises a `ComputeError` on the duplicate
+  `time:timestamp_2` when the start is the timestamp. The temporal profile
+  with a text start raises on pandas `TypeError: Invalid comparison
+  between dtype=datetime64[us, UTC] and StringArray` when some case (the
+  rows without one as one case) has two starts, else `cannot subtract
+  DatetimeArray from ndarray[object]`, and on Polars an
+  `InvalidOperationError` over the join plan; given the timestamp itself
+  as the start key, Polars selects it once without the alias. A session's
+  frame table carries no dtypes, so the text test reads the column's
+  values. Before (GA's binary, 200 uploads): pandas named its own error
+  on every upload for a start key the frame lacks; with the text start
+  Minera answered 154 uploads per shape where pm4py's temporal profile
+  raises and refused Alpha on about 155 where pm4py answers; on Polars it
+  refused 157 uploads where pm4py answers a start key the frame lacks and
+  answered 157 where pm4py raises the duplicate error.
+  New: `discover_temporal_profile_xes_frame`'s `explicit_start_key`.
+- **GB1-4. The workbench routes on XES sessions.** `/api/discover-constraints`
+  (`log_skeleton`), `/api/discover-workflow` (Alpha, Alpha+, the
+  heuristics), `/api/discover-alpha-plus` without an upload and
+  `/api/analyze-behavior`'s temporal profile (`variant=dataframe` or
+  `lazyframe`) re-discover on the session and used the older paths:
+  discover-constraints refused the Polars missing activity and listed one
+  conformance result per session trace (pm4py: the groupby's cases, as
+  GA1-3), discover-workflow and discover-alpha-plus refused the missing
+  activity or answered where pm4py raises, and analyze-behavior answered
+  frames without a case column. They now read the frame as `/api/mine`
+  does; the analysis presentation and the diagnostics table keep one
+  result per session trace. Before (GA's binary, 190 uploads per shape):
+  the log skeleton's conformance 25 (`dataframe`) and 29 (`lazyframe`)
+  equal of 33 answering, with 4 and 133 refusals where pm4py answers;
+  discover-workflow Alpha 133 and 45 values equal of 165, Alpha+ 25 of
+  190, the heuristics 51 of 190 (127 answers where pm4py raises);
+  discover-alpha-plus 25 of 190; analyze-behavior 165 of 190.
+
+After, on the twelve banks (560 uploads per shape; 740 with the
+heuristics' option sets): Heuristics++ with and without its thresholds,
+minimum counts and the AND threshold, its performance view, the classic
+performance view, the classic heuristics' thresholds and defaults agree on
+every upload of both shapes; the seven start-key option sets (`zzz`,
+`start_timestamp`, `org:resource`, `time:timestamp`, for Alpha and the
+temporal profile) on every upload; the workbench routes on every upload
+but one per shape (below).
+
+Declared or unchanged:
+
+- Alpha+ through discover-workflow and discover-alpha-plus on one upload
+  per shape (gaM/f2130 on pandas, gaM/f2128 on Polars): the Python set
+  order of GA1's declared item, the same answer as `/api/mine`.
+- Two of the remaining `std::stable_sort` calls on Polars paths, the top
+  cases by event count (`polars_case_filter.cpp`) and the top activities
+  (`polars_attributes_filter.cpp`): pm4py's own choice among tied counts
+  changes from run to run (30 tied frames, three runs with one Polars
+  thread and `PYTHONHASHSEED=0` gave three different selections each), so
+  the contract is a valid top selection. The other sites stay listed.
+- The Inductive miner's and POWL's `TypeError` beside a missing label
+  (FY1's declared item: the operands follow the iteration order of the
+  set of activities, which the missing label's object address decides)
+  names the other order on 84 of 560 uploads per shape on `lazyframe` and
+  on one on `dataframe`; Minera keeps the order seed 0 shows most.
+- Unchanged: the declared items of GA1 and before.
+
+In the suite: the new `minera_server_mine_xes_frames_gb_tests`
+(Heuristics++'s missing timestamp and label comparison, both performance
+views, the explicit start keys, and the four workbench routes on both
+shapes; 32 of its checks fail on GA's binary) carries the reference
+values.
+The full ctest passed 665 of 665 (26 minutes, -j2) on the first run. The
+fixture replay gave no change (2,673 responses unchanged), and the Python
+script tests passed 406 of 406.

@@ -71,6 +71,41 @@ inline std::string polars_df_missing_column_error(const std::string& missing, co
   return message;
 }
 
+// repr() of a pandas str Index of `values` at the default display width
+// (80): pandas' format_object_summary wraps the values after "Index([" with
+// seven spaces of indent, and puts the dtype on a line of its own once the
+// values took more than the width (round GB, checked against pandas).
+inline std::string pandas_str_index_repr(const std::vector<std::string>& values) {
+  constexpr std::size_t width = 80;
+  const std::string space1 = "\n      ", space2 = "\n       ";
+  std::vector<std::string> shown;
+  for (const auto& value : values) shown.push_back(frame_python_str_repr(value));
+  std::string summary;
+  if (shown.empty()) summary = "[], ";
+  else if (shown.size() == 1) summary = "[" + shown[0] + "], ";
+  else if (shown.size() == 2) summary = "[" + shown[0] + ", " + shown[1] + "], ";
+  else {
+    const auto rstripped = [](const std::string& text) {
+      auto end = text.find_last_not_of(" \t\n\r\f\v");
+      return end == std::string::npos ? std::string() : text.substr(0, end + 1);
+    };
+    std::string line = space2;
+    const auto extend = [&](const std::string& value, std::size_t limit) {
+      if (rstripped(line).size() + rstripped(value).size() >= limit) {
+        summary += rstripped(line);
+        line = space2;
+      }
+      line += value;
+    };
+    for (std::size_t i = 0; i + 1 < shown.size(); ++i) extend(shown[i] + ", ", width);
+    extend(shown.back(), width - 2);
+    summary += line + "],";
+    summary += summary.size() > width ? space1 : std::string(" ");
+    summary = "[" + summary.substr(space2.size());
+  }
+  return "Index(" + summary + "dtype='str')";
+}
+
 // pandas' KeyError for a list selection (`frame.loc[:, keys]`) some of whose
 // labels the frame lacks: the missing labels in selection order, or, when
 // none is there, the whole selection as a str Index.
@@ -80,6 +115,8 @@ inline std::string pandas_list_selection_key_error(const std::vector<std::string
   for (const auto& key : keys) {
     bool found = false;
     for (const auto& column : columns) found = found || column == key;
+    // A label selected twice is named once (round GB).
+    for (const auto& named : missing) found = found || named == key;
     if (!found) missing.push_back(key);
   }
   if (missing.empty()) return {};
@@ -88,8 +125,11 @@ inline std::string pandas_list_selection_key_error(const std::vector<std::string
     for (std::size_t i = 0; i < names.size(); ++i) out += (i ? ", " : "") + frame_python_str_repr(names[i]);
     return out + "]";
   };
-  std::string text = missing.size() == keys.size()
-      ? "None of [Index(" + listed(keys) + ", dtype='str')] are in the [columns]"
+  bool any_present = false;
+  for (const auto& key : keys)
+    for (const auto& column : columns) any_present = any_present || column == key;
+  std::string text = !any_present
+      ? "None of [" + pandas_str_index_repr(keys) + "] are in the [columns]"
       : listed(missing) + " not in index";
   return "KeyError: " + frame_python_str_repr(text);
 }
