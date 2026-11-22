@@ -9049,7 +9049,13 @@ and f5716's totals vary with the hash seed in pm4py; the footprints
 route's log part raises on a missing label as pm4py's entire_event_log
 variant does (`KeyError: 'concept:name'`, a different message).
 
-GD's suite: @@SUITE@@
+GD's suite: the full ctest 667 of 667 (25 minutes, -j2, first run; the new
+`minera_server_mine_xes_frames_gd_tests` fails 23 of its checks on GC's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,671 responses unchanged and 2 refreshed
+(`xes-custom-clock-native-flat-dataframe` and `-lazyframe`: the Alpha,
+Inductive and POWL replays of a trace against its clock misfit, as
+pm4py's frame replay does).
 Harness and probes: `review-harness/round-gd/`.
 
 Next round (GE) should start by re-reviewing round GD:
