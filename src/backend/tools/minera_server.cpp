@@ -667,6 +667,14 @@ minera::EventDataView session_selected_view(const MinedSession& session) {
   return session.active_source->selected_view();
 }
 
+// Whether the session holds an XES upload mined as a pandas or Polars frame:
+// pm4py's frame families read read_xes's frame there, gaps and all (round FY).
+bool xes_frame_session(const MinedSession& session) {
+  if (!session.active_source || session.active_source->file().format != "xes") return false;
+  const auto kind = session.active_source->selected_kind();
+  return kind == minera::EventDataKind::kEventTable || kind == minera::EventDataKind::kLazyEventTable;
+}
+
 const minera::EventLog& cached_model_log(const MinedSession& session,
                                          std::string_view miner) {
   if (miner == "inductive" || miner == "process_tree") {
@@ -4739,7 +4747,9 @@ void handle_graph_discovery(const httplib::Request& request,
       model_footprint = minera::footprint_json(footprints->model_footprint, graph);
       model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
     } else {
-      transitions = minera::discover_transition_system(session_selected_view(*session), params.transition_system);
+      transitions = xes_frame_session(*session)
+          ? minera::discover_transition_system_xes_frame(session_selected_view(*session), params.transition_system)
+          : minera::discover_transition_system(session_selected_view(*session), params.transition_system);
       for (const auto& state : transitions->states()) for (const auto& activity : state.payload) if (activity) graph.ensure_activity(*activity);
       for (const auto& transition : transitions->transitions()) if (transition.label) graph.ensure_activity(*transition.label);
     }
@@ -4863,7 +4873,9 @@ void handle_constraint_discovery(const httplib::Request& request,
         } catch (const std::exception& error) { playout_error = error.what(); }
       }
     } else {
-      skeleton = constraint_order
+      skeleton = xes_frame_session(*session)
+          ? minera::discover_log_skeleton_xes_frame(session_selected_view(*session), params.log_skeleton)
+          : constraint_order
           ? minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton, *constraint_order)
           : minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton);
       auto options = params.log_skeleton; options.activity_key = conformance_activity;
@@ -4931,8 +4943,12 @@ void handle_structured_discovery(const httplib::Request& request,
   minera::PetriNet net;
   std::string variant, activity;
   if (family == "inductive") {
-    tree = minera::discover_process_tree(session_selected_view(session), params.inductive);
-    discovery_log = minera::prepare_inductive_event_log(session_selected_view(session), params.inductive);
+    // An XES upload's frame with its gaps, as pm4py reads it (round FY).
+    const bool xes_frame = xes_frame_session(session);
+    tree = xes_frame ? minera::discover_process_tree_xes_frame(session_selected_view(session), params.inductive)
+                     : minera::discover_process_tree(session_selected_view(session), params.inductive);
+    discovery_log = xes_frame ? minera::prepare_inductive_event_log_xes_frame(session_selected_view(session), params.inductive)
+                              : minera::prepare_inductive_event_log(session_selected_view(session), params.inductive);
     const auto conversion = minera::parse_process_tree_petri_net_variant(
         request.has_param("discovery_tree_variant") ? request.get_param_value("discovery_tree_variant") : "standard");
     net = minera::to_petri_net(*tree, conversion);
@@ -4943,8 +4959,11 @@ void handle_structured_discovery(const httplib::Request& request,
     // A frame session reads its frame, as pm4py's POWL does (round FV).
     const auto kind = session.active_source ? session.active_source->selected_kind() : minera::EventDataKind::kEventLog;
     if (kind == minera::EventDataKind::kEventTable || kind == minera::EventDataKind::kLazyEventTable) {
-      powl = minera::discover_powl(session_selected_view(session), params.powl);
-      discovery_log = minera::normalize_powl_event_log(session_selected_view(session), params.powl);
+      const bool xes_frame = xes_frame_session(session);
+      powl = xes_frame ? minera::discover_powl_xes_frame(session_selected_view(session), params.powl)
+                       : minera::discover_powl(session_selected_view(session), params.powl);
+      discovery_log = xes_frame ? minera::normalize_powl_event_log_xes_frame(session_selected_view(session), params.powl)
+                                : minera::normalize_powl_event_log(session_selected_view(session), params.powl);
     } else {
       powl = minera::discover_powl(require_prepared_log(session), params.powl);
       discovery_log = minera::normalize_powl_event_log(require_prepared_log(session), params.powl);

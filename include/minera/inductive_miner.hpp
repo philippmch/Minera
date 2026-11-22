@@ -134,4 +134,19 @@ using InductiveMinerVariantLog =
     const InductiveMinerVariantLog& variants,
     const InductiveMinerOptions& options = {});
 
+// The projection and discovery on the frame of an XES upload, pandas (an
+// event table) or Polars (a lazy table), as pm4py's project_univariate reads
+// it: its KeyError or plan error for a missing column, np.unique's TypeError
+// for a missing case id beside named ones (pandas), the rows without a case
+// id as one case (Polars), missing timestamps last (pandas) or first
+// (Polars), and the TypeError of a missing activity (round FY). Other inputs
+// as the functions above.
+[[nodiscard]] EventLog prepare_inductive_event_log_xes_frame(
+    const EventDataView& data,
+    const InductiveMinerOptions& options = {});
+
+[[nodiscard]] ProcessTree discover_process_tree_xes_frame(
+    const EventDataView& data,
+    const InductiveMinerOptions& options = {});
+
 }  // namespace minera

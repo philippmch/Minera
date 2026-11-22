@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FX (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–FY (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8792,6 +8792,73 @@ Polars variant with the start key equal to the timestamp key on the log
 shape raises pm4py's `ColumnNotFoundError` with the unsorted plan),
 refreshed, its two stale result captures removed.
 Harness and probes: `review-harness/round-fx/`.
+
+Round FY re-reviewed FX on fresh banks and swept the `/api/mine`
+transition system, Inductive, POWL and log skeleton families on the frame
+shapes of XES uploads with gaps (Review FY1). FX's CI run 44999089784
+passed on Linux and macOS, the frontend, the Python tests and the
+verifier (Windows still building at the time); FW's Windows job in run
+44992448995 passed. FX's fixes held: the footprints frame variants on new
+seeds of the random key banks (rK, 1,920 of 1,920 equal, refusals alike),
+the higher-gap banks fH (240 of 240, also with `sort_required=false`) and
+the start key equal to the timestamp key (fD, 240 of 240); concept drift on
+unnamed traces at the start, middle and end (dY, 60 of 60 on each shape).
+Fixed: FY1-1, the four families follow pm4py's algorithm applies on
+read_xes's frame and its Polars copy: missing columns (pandas `KeyError`s,
+a list selection naming the missing labels for Inductive and POWL; the
+Polars plans' `ColumnNotFoundError` with the resolved plan and the "Did you
+mean" hint, via the new `polars_missing_column.hpp`), rows without a case
+id (pandas groups drop them, Polars keeps one null group; Inductive and
+POWL on pandas raise np.unique's `TypeError` with numpy's stable argsort
+deciding the operands), rows without an activity (pandas: one transition
+per unnamed step, `KeyError: nan` in the log skeleton; Inductive and POWL
+the alphabet's `TypeError`), and rows without a timestamp (Inductive and
+POWL now answer, NaT last); the log skeleton on pandas counts the rows
+without a case id where pm4py counts every row (equivalence, never
+together, directly follows, the frequency threshold), while always after
+and always before count the traces only. Declared: the alphabet
+`TypeError`'s operand order (a set of str and NaN or None, hash- and
+address-dependent). Left for FZ: the log skeleton with a null activity on
+Polars (pm4py answers with `None` as an activity; Minera's model has no
+null label), and the alpha, heuristics and temporal profile families on the
+same frames (below).
+
+FY's suite: the full ctest 662 of 662 (28 minutes, -j2, first run; the new
+`minera_server_mine_xes_frames_tests` fails 42 of its 49 checks on FX's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged (no fixture refresh; frontend untouched).
+Harness and probes: `review-harness/round-fy/`.
+
+Next round (FZ) should start by re-reviewing round FY:
+
+- FY's CI run (and FX's Windows job);
+- FY1-1 on fresh banks: `famval.py` with `SHAPE` and `FAMS` on new
+  `gen/genfp.py` banks with mixed gap kinds and higher rates, larger
+  traces, and options (`noise_threshold`, the transition system's window
+  and direction, the Inductive variants); the TS, model and log skeleton
+  workbench routes on XES sessions (same code paths, not swept);
+- left from FY: the log skeleton on a Polars frame with a null activity
+  (pm4py answers with `None` among the activities and in `activ_freq`;
+  needs a null label in the model and its JSON), and the families not
+  yet aligned on these frames: Alpha (missing columns as pandas
+  `KeyError`s and Polars `with_columns`/`sort` plans, NaN or None counted
+  as an activity, the Polars null case group), the heuristics (pm4py
+  converts the frame to an EventLog: a NaN case is one trace, an unnamed
+  event raises `TypeError: 'float' object is not subscriptable`, or
+  `'NoneType'` on Polars) and the temporal profile (missing columns);
+  `famval.py` already compares all seven families;
+- carried from FX's list: footprints on CSV uploads (frame order and
+  header-only files) and a check that the plan's `DF` line holds for CSV
+  frames and for the log shape;
+- the remaining `std::stable_sort` on Polars paths (`polars_case_filter.cpp`
+  kCount, `polars_attributes_filter.cpp` top activities,
+  `polars_variants_filter.cpp`, `polars_sequence_filters.cpp`,
+  `polars_sort.hpp`, `polars_ltl_filter.cpp`, `temporal_lazy_reference.cpp`),
+  the two items carried from FU;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FY (kept for its older items):
 
 Next round (FY) should start by re-reviewing round FX:
 

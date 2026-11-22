@@ -3479,11 +3479,15 @@ ResolvedTransitionSystem resolve_transition_system(
     if (transition.source >= states.size() || transition.target >= states.size())
       throw std::invalid_argument("transition system transition references an unknown state");
     if (transition.count == 0) throw std::invalid_argument("transition system transition counts must be positive");
-    if (!seen.emplace(transition.source, transition.target, transition.label).second)
+    // A missing label of a pandas frame (NaN) equals no other, so pm4py keeps
+    // one transition per step it labels (round FY): only those may repeat.
+    const bool repeatable = !transition.label;
+    if (!seen.emplace(transition.source, transition.target, transition.label).second && !repeatable)
       throw std::invalid_argument("transition system contains duplicate transitions");
     const auto transition_key = std::make_tuple(transition.source, transition.target,
                                                 transition.label);
-    if (!first_transition && transition_key <= previous_transition)
+    if (!first_transition && (transition_key < previous_transition ||
+                              (transition_key == previous_transition && !repeatable)))
       throw std::invalid_argument("transition system transitions must be strictly sorted");
     first_transition = false;
     previous_transition = transition_key;

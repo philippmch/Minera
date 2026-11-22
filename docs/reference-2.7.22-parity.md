@@ -37629,3 +37629,107 @@ checked against pm4py on the same upload; refreshed, its two result
 captures removed), and every other response unchanged. The Python script
 tests passed 406 of 406 and the footprints capture vitest files 336 of
 336.
+
+## Review FY1: the mine families on frame shapes of XES uploads with gaps (2026-11-22)
+
+Round FY re-reviewed round FX on fresh banks and swept the `/api/mine`
+families on the `dataframe` and `lazyframe` shapes of XES uploads with
+gaps against pm4py's algorithm applies on read_xes's frame and its Polars
+copy. FX's CI run 44999089784 (2691acb) passed on Linux and macOS (build
+and ctest), the parity verifier, the Python script tests and the frontend;
+its Windows job was still building when this round was written. FW's
+Windows job in run 44992448995 passed. Observed black-box on pm4py 2.7.22
+(pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow; the harness
+converts frames to Polars column by column), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`,
+`PYTHONHASHSEED=0` and exact comparison of the canonical results (states
+and transitions with labels and payloads, the process tree, the POWL
+model, the six log skeleton relations and `activ_freq`) or of the error
+messages.
+
+Re-review of FX (fresh seeds): the footprints frame variants on keys drawn
+from each upload's columns (rK, seeds 7 and 11: 1,920 of 1,920 equal, 1,096
+of them refused alike), on banks with higher gap rates (fH: 240 of 240,
+with `sort_required=false` 240 of 240) and with the start key equal to
+the timestamp key (fD: 240 of 240, the Polars plan errors included);
+concept drift on XES uploads with unnamed traces at the start, middle or
+end (dY: 60 of 60 on each shape, 43 refused alike, 17 equal change
+points).
+
+Fixed:
+
+- **FY1-1. The transition system, Inductive, POWL and log skeleton
+  families on XES frames with gaps** (`/api/mine` with
+  `mining_input_shape=dataframe` or `lazyframe` after an XES upload; the
+  transition system, model and log skeleton workbench routes on such a
+  session take the same paths). read_xes's frame has no column for an
+  attribute no event carries (FW1-2's rule), and a log without events no
+  column at all.
+  - Missing columns. pandas: the transition system and the log skeleton
+    group by the case column (`KeyError: 'case:concept:name'`) and then
+    read the activity (`KeyError: 'Column not found: concept:name'`);
+    Inductive and POWL select `[activity, case, timestamp]` (`KeyError:
+    "['time:timestamp'] not in index"`, or `None of [Index([...],
+    dtype='str')] are in the [columns]` when none is there). Polars: the
+    plans fail at the `group_by` with `ColumnNotFoundError` (`unable to
+    find column "X"; valid columns: [...]`, the "Did you mean" hint, the
+    resolved plan's `DF` line in read_xes's column order, and the context
+    stack: `select`, `group_by` for the transition system and the log
+    skeleton, `select`, `select`, `group_by` for Inductive and POWL), the
+    first missing of case, activity and timestamp named. The renderer is
+    the new `polars_missing_column.hpp`.
+  - Rows without a case id. pandas groups (`sort=True`, `dropna=True`)
+    leave them out; Inductive and POWL raise np.unique's `TypeError` on a
+    case column mixing names and NaN, its operands as numpy's stable
+    object argsort compares them (round FW's
+    `numpy_object_stable_argsort`). Polars keeps them as one group (null
+    case) in every family.
+  - Rows without an activity. The transition system on pandas makes one
+    transition per unnamed step (pm4py's transitions compare by name and
+    NaN equals nothing), on Polars one `None` label; Inductive and POWL
+    raise the alphabet's `TypeError` (`'float'` or `'NoneType'` against
+    `'str'`); the log skeleton on pandas raises `KeyError: nan`.
+  - Rows without a timestamp. Inductive and POWL answer (pm4py sorts by
+    the timestamp with NaT last, stably) where Minera refused.
+  - The log skeleton on pandas counts every row of the frame for the
+    activity counts behind equivalence, never together and directly
+    follows, and for the frequency threshold, so the activities of rows
+    without a case id count there; always after and always before count
+    each activity's occurrences in the traces only.
+  Minera refused rows without a case id, an activity or a timestamp with
+  its own messages, named a missing column its own way, and answered where
+  the frame lacked a column. Before (FX's binary, outcome classes; gC
+  unnamed traces, gA unnamed events, gT missing timestamps, 30 uploads
+  each): on `dataframe` the transition system agreed on 33 of 90, Inductive
+  and POWL on 11 of 90 each, the log skeleton answered or refused alike on
+  55 of 90; on `lazyframe` 33, 11, 11 and 55 of 90. After (value by value
+  where both answer; the clean bank gN added, 110 uploads per shape): the
+  transition system 110 of 110 on each shape; Inductive and POWL 109 of 110
+  on `dataframe` and 105 of 110 on `lazyframe`, the others the declared
+  operand order; the log skeleton 110 of 110 on `dataframe` and 89 of 110
+  on `lazyframe`, the 21 others a null activity on Polars (left, below).
+  The analysis presentation now accepts repeated transitions with a null
+  label between the same states.
+
+Declared or unchanged:
+
+- The alphabet `TypeError` of Inductive and POWL names its two types in
+  the order np.unique's sort meets them, over a set of str and NaN (pandas)
+  or None (Polars): the set order depends on the hash seed and, for NaN
+  and None, on object addresses. Minera names `'float'` (pandas) or
+  `'NoneType'` (Polars) first.
+- Left for FZ: the log skeleton on a Polars frame with a null activity
+  (pm4py answers with `None` among the activities and as an `activ_freq`
+  key; Minera's model has no null label and still refuses with its own
+  message), and the Alpha, heuristics and temporal profile families on
+  these frames (missing-column messages; Alpha counts NaN or None as an
+  activity; the heuristics convert the frame to an EventLog, where an
+  unnamed event raises `TypeError: 'float' object is not subscriptable`).
+- Unchanged: the declared items of FX1 and before.
+
+In the suite: the new `minera_server_mine_xes_frames_tests` (missing
+columns, unnamed traces and events and missing timestamps through
+`/api/mine` on both shapes; 42 of its 49 checks fail on FX's binary)
+carries the reference values. The full ctest passed 662 of 662 (28
+minutes, -j2) on the first run. The fixture replay gave no change (2,673
+responses unchanged), and the Python script tests passed 406 of 406.

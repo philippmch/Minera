@@ -84,4 +84,13 @@ struct PowlDiscoveryOptions {
 [[nodiscard]] EventLog normalize_powl_event_log(
     const EventDataView& data, const PowlDiscoveryOptions& options = {});
 
+// The same on the frame of an XES upload, gaps and missing columns as
+// pm4py's project_univariate reads them (prepare_inductive_event_log_xes_frame;
+// round FY).
+[[nodiscard]] PowlNode discover_powl_xes_frame(
+    const EventDataView& data, const PowlDiscoveryOptions& options,
+    const std::function<bool()>& cancelled = {});
+[[nodiscard]] EventLog normalize_powl_event_log_xes_frame(
+    const EventDataView& data, const PowlDiscoveryOptions& options = {});
+
 }  // namespace minera

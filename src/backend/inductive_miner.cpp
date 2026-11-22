@@ -24,7 +24,11 @@
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
 #include "inductive/semantics.hpp"
+#include "numpy_object_sort.hpp"
+#include "polars_missing_column.hpp"
 #include "polars_sort.hpp"
+#include "python_scalar.hpp"
+#include "xes_frame_columns.hpp"
 
 namespace minera {
 namespace inductive_detail {
@@ -2269,8 +2273,77 @@ std::string required_record_value(const EventRecord& record,
   return field->value;
 }
 
+// pm4py's project_univariate on the frame of an XES upload (round FY,
+// observed black-box), up to the projected activities. pandas selects
+// [activity, case, timestamp] (a KeyError names the labels the frame lacks),
+// sorts by case and timestamp (missing values last), then np.unique over the
+// sorted case column: numpy's stable object argsort raises Python's
+// TypeError at its first comparison of a missing case id (NaN) with a named
+// one. Polars selects [case, activity, timestamp] (a missing column fails
+// the plan) and keeps the rows without a case id as one case, sorted first.
+// The miner then sorts the set of activities, so a missing one (NaN, or None
+// on Polars) beside a named one raises TypeError; its operands follow the
+// set's order, which the hash seed and the objects' addresses decide
+// (declared: Minera names the order seed 0 shows most, 'float' first on
+// pandas, 'NoneType' first on Polars).
+void check_xes_frame_projection(const EventDataView& data, const InductiveMinerOptions& options) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  std::optional<EventTable> materialized;
+  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  std::optional<EventTable> storage;
+  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  const auto column_of = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  if (polars) {
+    for (const auto& key : {options.case_id_key, options.activity_key, options.timestamp_key})
+      if (!column_of(key))
+        throw std::invalid_argument(
+            detail::polars_df_missing_column_error(key, table.columns, {"select", "select", "group_by"}));
+  } else if (const auto error = detail::pandas_list_selection_key_error(
+                 {options.activity_key, options.case_id_key, options.timestamp_key}, table.columns);
+             !error.empty()) {
+    throw std::invalid_argument(error);
+  }
+  const auto case_at = *column_of(options.case_id_key);
+  const auto activity_at = *column_of(options.activity_key);
+  const auto missing = [](const EventTable::Row& row, std::size_t at) {
+    return at >= row.size() || !row[at] || row[at]->is_null;
+  };
+  if (!polars) {
+    std::vector<python::Scalar> named;
+    std::size_t unnamed = 0;
+    for (const auto& row : table.rows) {
+      if (missing(row, case_at)) ++unnamed;
+      else named.push_back(python::from_attribute(*row[case_at]));
+    }
+    if (unnamed && !named.empty()) {
+      // The case column in sort_values' order: named ids sorted, NaN last.
+      std::stable_sort(named.begin(), named.end(), [](const auto& a, const auto& b) { return python::less(a, b); });
+      for (std::size_t i = 0; i < unnamed; ++i) named.push_back(python::real(std::numeric_limits<double>::quiet_NaN()));
+      try {
+        (void)detail::numpy_object_stable_argsort(named.size(), [&](std::size_t a, std::size_t b) {
+          return python::compare(named[a], named[b]);
+        });
+      } catch (const python::TypeError& error) {
+        throw std::invalid_argument(std::string("TypeError: ") + error.what());
+      }
+    }
+  }
+  bool named_activity = false, missing_activity = false;
+  for (const auto& row : table.rows) (missing(row, activity_at) ? missing_activity : named_activity) = true;
+  if (named_activity && missing_activity)
+    throw std::invalid_argument(polars ? "TypeError: '<' not supported between instances of 'NoneType' and 'str'"
+                                       : "TypeError: '<' not supported between instances of 'float' and 'str'");
+}
+
 EventLog event_data_to_log(const EventDataView& data,
-                           const InductiveMinerOptions& options) {
+                           const InductiveMinerOptions& options, bool xes_frame = false) {
+  const bool frame = data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable;
+  xes_frame = xes_frame && frame;
+  if (xes_frame) check_xes_frame_projection(data, options);
   auto records = event_data_records(data);
   // pm4py's Inductive miner on a Polars frame reads each case's activities
   // after LazyFrame.sort([case, timestamp]), which is unstable: tied events
@@ -2279,7 +2352,7 @@ EventLog event_data_to_log(const EventDataView& data,
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
   if (polars) {
     struct Key {
-      std::string case_id;
+      std::optional<std::string> case_id;
       std::optional<ParsedExactTimestamp> time;
     };
     std::vector<Key> keys;
@@ -2287,7 +2360,8 @@ EventLog event_data_to_log(const EventDataView& data,
     for (const auto& indexed : records) {
       const auto* case_field = indexed.record.field(options.case_id_key);
       const auto* time_field = indexed.record.field(options.timestamp_key);
-      keys.push_back({case_field && !case_field->is_null ? case_field->value : std::string(),
+      keys.push_back({case_field && !case_field->is_null ? std::optional<std::string>(case_field->value)
+                                                         : (xes_frame ? std::nullopt : std::optional<std::string>("")),
                       time_field && !time_field->is_null ? parse_timestamp_exact(time_field->value)
                                                          : std::nullopt});
     }
@@ -2308,42 +2382,68 @@ EventLog event_data_to_log(const EventDataView& data,
   }
   EventLog log;
   std::unordered_map<std::string, std::size_t> traces;
+  // On the frame of an XES upload a row without a case id is a case of its
+  // own kind (Polars' null group; on pandas each NaN is a distinct id), and
+  // one without a timestamp sorts last (pandas) or first (Polars).
+  const auto present = [](const EventRecord& record, std::string_view key) {
+    const auto* field = record.field(key);
+    return field && !field->is_null ? field : nullptr;
+  };
+  std::size_t unnamed_rows = 0;
   for (auto& indexed : records) {
-    const std::string case_id = required_record_value(
-        indexed.record, options.case_id_key, "case id", indexed.input_order);
+    std::string case_id, timestamp;
+    std::string trace_key;
+    if (xes_frame && !present(indexed.record, options.case_id_key)) {
+      trace_key = polars ? std::string("\x1fnull") : "\x1fnan" + std::to_string(unnamed_rows++);
+    } else {
+      case_id = required_record_value(indexed.record, options.case_id_key, "case id", indexed.input_order);
+      trace_key = case_id;
+    }
     const std::string activity = required_record_value(
         indexed.record, options.activity_key, "activity", indexed.input_order);
-    const std::string timestamp = required_record_value(
-        indexed.record, options.timestamp_key, "timestamp", indexed.input_order);
-    if (!parse_timestamp(timestamp)) {
-      throw std::invalid_argument(
-          "inductive miner: timestamp field '" + options.timestamp_key +
-          "' is invalid at row " + std::to_string(indexed.input_order));
+    if (!xes_frame || present(indexed.record, options.timestamp_key)) {
+      timestamp = required_record_value(
+          indexed.record, options.timestamp_key, "timestamp", indexed.input_order);
+      if (!parse_timestamp(timestamp)) {
+        throw std::invalid_argument(
+            "inductive miner: timestamp field '" + options.timestamp_key +
+            "' is invalid at row " + std::to_string(indexed.input_order));
+      }
     }
 
-    auto [trace_it, inserted] = traces.emplace(case_id, log.traces.size());
+    auto [trace_it, inserted] = traces.emplace(trace_key, log.traces.size());
     if (inserted) {
       Trace trace;
       trace.case_id = case_id;
-      trace.case_id_state = FirstClassAttributeState::kPresent;
+      trace.case_id_state = trace_key == case_id ? FirstClassAttributeState::kPresent : FirstClassAttributeState::kNull;
       trace.case_id_source_key = options.case_id_key;
       log.traces.push_back(std::move(trace));
     }
     auto& trace = log.traces[trace_it->second];
     Event event;
     event.case_id = case_id;
-    event.case_id_state = FirstClassAttributeState::kPresent;
+    event.case_id_state = trace_key == case_id ? FirstClassAttributeState::kPresent : FirstClassAttributeState::kNull;
     event.case_id_source_key = options.case_id_key;
     event.activity = activity;
     event.activity_state = FirstClassAttributeState::kPresent;
     event.activity_source_key = options.activity_key;
     event.timestamp = timestamp;
-    event.timestamp_state = FirstClassAttributeState::kPresent;
+    event.timestamp_state = timestamp.empty() && xes_frame ? FirstClassAttributeState::kNull : FirstClassAttributeState::kPresent;
     event.timestamp_source_key = options.timestamp_key;
     event.input_order = indexed.input_order;
     trace.events.push_back(std::move(event));
   }
-  if (!polars) {
+  if (!polars && xes_frame) {
+    // sort_values: by timestamp within the case, NaT last, ties in row order.
+    for (auto& trace : log.traces)
+      std::stable_sort(trace.events.begin(), trace.events.end(), [](const Event& a, const Event& b) {
+        const auto x = a.timestamp.empty() ? std::nullopt : parse_timestamp_exact(a.timestamp);
+        const auto y = b.timestamp.empty() ? std::nullopt : parse_timestamp_exact(b.timestamp);
+        if (!x || !y) return x.has_value() && !y.has_value();
+        if (x->seconds != y->seconds) return x->seconds < y->seconds;
+        return x->nanoseconds < y->nanoseconds;
+      });
+  } else if (!polars) {
     for (auto& trace : log.traces) order_events_by_time(trace.events);
   } else {
     // The traces keep the frame order of their first row, as on the other
@@ -2556,6 +2656,21 @@ ProcessTree discover_process_tree(const EventDataView& data,
         prepare_inductive_event_log(*data.log(), options), options);
   }
   return discover_from_event_log(event_data_to_log(data, options), options);
+}
+
+EventLog prepare_inductive_event_log_xes_frame(const EventDataView& data,
+                                               const InductiveMinerOptions& options) {
+  validate_options(options);
+  if (data.kind() == EventDataKind::kEventLog)
+    return prepare_inductive_event_log(*data.log(), options);
+  return event_data_to_log(data, options, true);
+}
+
+ProcessTree discover_process_tree_xes_frame(const EventDataView& data,
+                                            const InductiveMinerOptions& options) {
+  validate_options(options);
+  if (data.kind() == EventDataKind::kEventLog) return discover_process_tree(data, options);
+  return discover_from_event_log(event_data_to_log(data, options, true), options);
 }
 
 ProcessTree discover_process_tree(const InductiveMinerVariantLog& variants,

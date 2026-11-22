@@ -184,6 +184,14 @@ struct TransitionSystemSelectorDescriptor {
     const EventDataView& data,
     const TransitionSystemOptions& options = {});
 
+// pm4py's view-based transition system on the frame of an XES upload, pandas
+// (an event table) or Polars (a lazy table): its groupby over the case
+// column, gaps and missing columns included (round FY). Other inputs as
+// discover_transition_system.
+[[nodiscard]] TransitionSystem discover_transition_system_xes_frame(
+    const EventDataView& data,
+    const TransitionSystemOptions& options = {});
+
 // Convenience overload matching the positional discovery parameters.
 [[nodiscard]] TransitionSystem discover_transition_system(
     const EventLog& event_log,

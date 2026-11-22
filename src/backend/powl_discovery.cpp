@@ -2194,12 +2194,13 @@ bool powl_frame_view(const EventDataView& data) {
 // pandas: sort_values, stable). The Inductive miner reads a frame the same
 // way, so its projection supplies the log; the result keeps the selected
 // fields under the canonical keys.
-EventLog powl_frame_log(const EventDataView& data, const PowlDiscoveryOptions& options) {
+EventLog powl_frame_log(const EventDataView& data, const PowlDiscoveryOptions& options, bool xes_frame = false) {
   InductiveMinerOptions projection;
   projection.activity_key = options.activity_key;
   projection.timestamp_key = options.timestamp_key;
   projection.case_id_key = options.case_id_key;
-  return prepare_inductive_event_log(data, projection);
+  return xes_frame ? prepare_inductive_event_log_xes_frame(data, projection)
+                   : prepare_inductive_event_log(data, projection);
 }
 
 PowlDiscoveryOptions powl_canonical_keys(PowlDiscoveryOptions options) {
@@ -2230,6 +2231,22 @@ EventLog normalize_powl_event_log(const EventDataView& data, const PowlDiscovery
     return normalize_powl_event_log(*data.log(), options);
   }
   return normalize_powl_event_log(powl_frame_log(data, options), powl_canonical_keys(options));
+}
+
+// The same on the frame of an XES upload: the Inductive miner's XES frame
+// projection (gaps and missing columns as pm4py's project_univariate; round
+// FY).
+PowlNode discover_powl_xes_frame(const EventDataView& data, const PowlDiscoveryOptions& options,
+                                 const std::function<bool()>& cancelled) {
+  validate_options(options);
+  if (!powl_frame_view(data)) return discover_powl(data, options, cancelled);
+  return discover_powl(powl_frame_log(data, options, true), powl_canonical_keys(options), cancelled);
+}
+
+EventLog normalize_powl_event_log_xes_frame(const EventDataView& data, const PowlDiscoveryOptions& options) {
+  validate_options(options);
+  if (!powl_frame_view(data)) return normalize_powl_event_log(data, options);
+  return normalize_powl_event_log(powl_frame_log(data, options, true), powl_canonical_keys(options));
 }
 
 }  // namespace minera

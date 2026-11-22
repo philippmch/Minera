@@ -3,12 +3,19 @@
 #include <algorithm>
 #include <cstddef>
 #include <initializer_list>
+#include <limits>
 #include <map>
 #include <numeric>
+#include <optional>
+#include <string>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#include "polars_missing_column.hpp"
+#include "python_scalar.hpp"
+#include "xes_frame_columns.hpp"
 
 namespace minera {
 namespace {
@@ -450,7 +457,8 @@ std::pair<StateKey, TransitionSystemState> window_state(
 template <typename Builder>
 TransitionSystem build_transition_system(
     const std::vector<TraceSequence>& sequences,
-    const TransitionSystemOptions& options, Builder&& occurrence_builder) {
+    const TransitionSystemOptions& options, Builder&& occurrence_builder,
+    bool distinct_missing_labels = false) {
   if (options.direction != TransitionDirection::kForward &&
       options.direction != TransitionDirection::kBackward) {
     throw std::invalid_argument("transition-system direction is invalid");
@@ -499,7 +507,15 @@ TransitionSystem build_transition_system(
       if (index == 0) ++result_states[source].start_count;
       if (index + 1 == activities.size()) ++result_states[target].end_count;
       EdgeKey key{source_key.payload, target_key.payload, activities[index]};
-      const auto [found, inserted] = edges.emplace(key, result_transitions.size());
+      // A missing activity of a pandas frame is NaN, which equals no label
+      // (not even itself), so each step it labels is a transition of its own.
+      std::size_t edge_index = result_transitions.size();
+      bool inserted = true;
+      if (!distinct_missing_labels || activities[index]) {
+        const auto found = edges.emplace(key, result_transitions.size());
+        edge_index = found.first->second;
+        inserted = found.second;
+      }
       if (inserted) {
         TransitionSystemTransition edge;
         edge.source = source;
@@ -507,7 +523,7 @@ TransitionSystem build_transition_system(
         edge.label = activities[index];
         result_transitions.push_back(std::move(edge));
       }
-      auto& edge = result_transitions[found->second];
+      auto& edge = result_transitions[edge_index];
       ++edge.count;
       if (options.include_data) {
         const auto occurrence = occurrence_builder(sequence, index);
@@ -536,7 +552,7 @@ TransitionSystem build_transition_system(
     edge.source = remap[edge.source];
     edge.target = remap[edge.target];
   }
-  std::sort(result_transitions.begin(), result_transitions.end(), [](const auto& left, const auto& right) {
+  std::stable_sort(result_transitions.begin(), result_transitions.end(), [](const auto& left, const auto& right) {
     if (left.source != right.source) return left.source < right.source;
     if (left.target != right.target) return left.target < right.target;
     return left.label < right.label;
@@ -577,7 +593,98 @@ TransitionSystem build_flat_system(
       });
 }
 
+// pm4py's view-based transition system on the frame of an XES upload
+// (round FY, observed black-box). It reads each case's activities with a
+// groupby over the case column: on pandas groupby(case)[activity] (sorted
+// cases, rows without a case id left out; KeyError for a missing case
+// column, then "Column not found" for a missing activity column), on Polars
+// select(case, activity).group_by(case, maintain_order=True) (cases in the
+// order of their first row, the rows without a case id one case of their
+// own; a missing column fails the plan). A missing activity is a label
+// (NaN, or None on Polars); NaN equals no label, so on pandas every step it
+// labels is a transition of its own, while a state's name compares its list
+// by identity and so matches.
+std::vector<TraceSequence> xes_frame_sequences(const EventTable& source, bool polars,
+                                               const TransitionSystemOptions& options) {
+  const auto activity_key = effective_activity_key(options);
+  const auto case_id_key = effective_case_id_key(options);
+  std::optional<EventTable> storage;
+  const auto& table = detail::xes_frame_present_columns(source, storage, polars);
+  const auto column_of = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto case_at = column_of(case_id_key);
+  const auto activity_at = column_of(activity_key);
+  if (polars) {
+    for (const auto& key : {case_id_key, activity_key})
+      if (!column_of(key))
+        throw std::invalid_argument(detail::polars_df_missing_column_error(key, table.columns, {"select", "group_by"}));
+  } else {
+    if (!case_at) throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(case_id_key));
+    if (!activity_at)
+      throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr("Column not found: " + activity_key));
+  }
+  const auto cell = [](const EventTable::Row& row, std::size_t at) -> const EventAttribute* {
+    if (at >= row.size() || !row[at] || row[at]->is_null) return nullptr;
+    return &*row[at];
+  };
+  std::vector<std::vector<std::size_t>> groups;
+  if (polars) {
+    std::map<std::optional<std::string>, std::size_t> index;
+    for (std::size_t row = 0; row < table.rows.size(); ++row) {
+      const auto* id = cell(table.rows[row], *case_at);
+      const auto [it, added] = index.emplace(id ? std::optional<std::string>(python::identity(python::from_attribute(*id)))
+                                                : std::nullopt, groups.size());
+      if (added) groups.emplace_back();
+      groups[it->second].push_back(row);
+    }
+  } else {
+    std::vector<std::vector<python::Scalar>> keys;
+    keys.reserve(table.rows.size());
+    for (const auto& row : table.rows) {
+      const auto* id = cell(row, *case_at);
+      keys.push_back({id ? python::from_attribute(*id) : python::real(std::numeric_limits<double>::quiet_NaN())});
+    }
+    for (auto& group : python::groupby(keys)) groups.push_back(std::move(group.rows));
+  }
+  std::vector<TraceSequence> sequences;
+  sequences.reserve(groups.size());
+  for (const auto& rows : groups) {
+    TraceSequence sequence;
+    sequence.occurrence_trace_index = sequences.size();
+    for (const auto row : rows) {
+      const auto* activity = cell(table.rows[row], *activity_at);
+      sequence.activities.push_back(activity ? TransitionActivity(activity->value) : std::nullopt);
+      sequence.event_indices.push_back(row);
+    }
+    sequences.push_back(std::move(sequence));
+  }
+  return sequences;
+}
+
 }  // namespace
+
+TransitionSystem discover_transition_system_xes_frame(const EventDataView& data,
+                                                      const TransitionSystemOptions& options) {
+  if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable)
+    return discover_transition_system(data, options);
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (polars && !data.lazy_table()->valid())
+    throw std::invalid_argument("transition system lazy table is invalid");
+  const auto sequences = polars ? xes_frame_sequences(data.lazy_table()->materialize(), true, options)
+                                : xes_frame_sequences(*data.table(), false, options);
+  return build_transition_system(
+      sequences, options,
+      [](const TraceSequence& sequence, std::size_t event_index) {
+        const auto source_index = event_index < sequence.event_indices.size()
+                                      ? sequence.event_indices[event_index]
+                                      : event_index;
+        return TransitionOccurrence{sequence.occurrence_trace_index, source_index};
+      },
+      /*distinct_missing_labels=*/!polars);
+}
 
 TransitionActivity transition_system_event_activity(
     const Event& event, std::string_view activity_key) {

@@ -84,6 +84,13 @@ struct LogSkeletonModel {
 // order) in the stable code-point order of their case ids: the order of
 // pm4py's DataFrame log skeleton and Declare (case_id_order for a log). The
 // Declare functions group flat data the same way.
+// pm4py's log skeleton discovery on the frame of an XES upload, pandas (an
+// event table) or Polars (a lazy table): the groupby over the case column,
+// the activity counts over every row, gaps and missing columns as pm4py
+// reads them (round FY). Other inputs as discover_log_skeleton.
+[[nodiscard]] LogSkeletonModel discover_log_skeleton_xes_frame(
+    const EventDataView& data, const LogSkeletonOptions& options);
+
 [[nodiscard]] std::vector<std::size_t> log_skeleton_case_order(
     const EventDataView& data, const LogSkeletonOptions& options);
 

@@ -51,6 +51,9 @@ void handle_active_source_mining(const httplib::Request& request,
         ",\"result\":" + result + ",\"error\":" + error + '}';
   };
   const auto selected = active_source_shape(session->active_source->selected_kind());
+  // An XES upload mined as a frame: the families read read_xes's frame, with
+  // its gaps and without the columns no value fills (round FY).
+  const bool xes_frame = xes_frame_session(*session);
   run("source_log_preparation", "source_conversion", [&](bool& native_returned) {
     // Shared with active_source (which the session keeps), not copied.
     session->log_view = &session->active_source->checked_log(); session->log_ready = true;
@@ -92,13 +95,15 @@ void handle_active_source_mining(const httplib::Request& request,
     catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_petri_json",e.what(),true);throw;}
   });
   run("inductive", selected, [&](bool& native_returned) {
-    session->tree = minera::discover_process_tree(data(), params.inductive);
+    session->tree = xes_frame ? minera::discover_process_tree_xes_frame(data(), params.inductive)
+                              : minera::discover_process_tree(data(), params.inductive);
     session->tree_ready = true;
     native_returned = true;
     return minera::serialize_inductive_process_tree_json(session->tree);
   });
   run("inductive_log_preparation", selected, [&](bool& native_returned) {
-    session->inductive_log = minera::prepare_inductive_event_log(data(), params.inductive);
+    session->inductive_log = xes_frame ? minera::prepare_inductive_event_log_xes_frame(data(), params.inductive)
+                                       : minera::prepare_inductive_event_log(data(), params.inductive);
     session->inductive_log_ready = true;
     native_returned = true;
     return minera::serialize_active_source_log_json(session->inductive_log);
@@ -112,7 +117,8 @@ void handle_active_source_mining(const httplib::Request& request,
   // (round FV); an event stream stays on the log.
   const bool powl_frame = selected == "dataframe" || selected == "lazyframe";
   run("powl", powl_frame ? selected : std::string("log"), [&](bool& native_returned) {
-    session->powl = powl_frame ? minera::discover_powl(data(), params.powl)
+    session->powl = powl_frame ? (xes_frame ? minera::discover_powl_xes_frame(data(), params.powl)
+                                            : minera::discover_powl(data(), params.powl))
                                : minera::discover_powl(require_prepared_log(*session), params.powl);
     native_returned = true;
     return minera::serialize_model_conversion_powl_json(*session->powl);
@@ -132,7 +138,9 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   std::optional<minera::TransitionSystem> transition;
   run("transition_system", selected, [&](bool& native_returned) {
-    transition = minera::discover_transition_system(data(), params.transition_system);
+    transition = xes_frame
+        ? minera::discover_transition_system_xes_frame(data(), params.transition_system)
+        : minera::discover_transition_system(data(), params.transition_system);
     native_returned = true;
     return minera::serialize_active_source_transition_json(*transition);
   });
@@ -145,9 +153,13 @@ void handle_active_source_mining(const httplib::Request& request,
                                  params.log_skeleton.activity_key, params.log_skeleton.case_id_key);
   };
   run("log_skeleton", selected, [&](bool& native_returned) {
-    const auto order = skeleton_order();
-    skeleton = order ? minera::discover_log_skeleton(data(), params.log_skeleton, *order)
-                     : minera::discover_log_skeleton(data(), params.log_skeleton);
+    if (xes_frame) {
+      skeleton = minera::discover_log_skeleton_xes_frame(data(), params.log_skeleton);
+    } else {
+      const auto order = skeleton_order();
+      skeleton = order ? minera::discover_log_skeleton(data(), params.log_skeleton, *order)
+                       : minera::discover_log_skeleton(data(), params.log_skeleton);
+    }
     native_returned = true;
     return minera::serialize_active_source_skeleton_json(*skeleton);
   });
