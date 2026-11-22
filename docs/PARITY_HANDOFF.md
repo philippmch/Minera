@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FT (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FU (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8634,6 +8634,73 @@ the fixture replay gave 2,673 responses unchanged. The Mac was not
 reachable this round (no device served, the folder not approved), so no
 newer reviewer handoff was read. The generators, the comparers and the
 probes are in the project files under `review-harness/round-ft/`.
+
+Round FU re-reviewed FT on fresh banks and swept new areas (Review FU1).
+FT's CI run 44964667724 finished green. FT's fixes held (the interval
+eventually-follows with dense nanoseconds, correlation exact time matching
+with supplied keys, the dataframe DFG, partial order and concurrency on XES
+and CSV uploads). Fixed: FU1-1, the performance spectrum sorts the
+disconnected variants by their earliest instant, gathers the frame
+variants' disconnected observations longest first in frame row order, lists
+the Polars connected observations in frame row order and groups a case's
+rows across the whole Polars frame; FU1-2, Alpha on a frame sorts text
+timestamp columns as text and a Polars frame with the unstable pdqsort, a
+missing value first (the workflow route's `dataframe`/`lazyframe` shapes,
+`/api/mine` lazyframe); FU1-3, the plusplus `pandas_mutable` shape on two
+text or boolean columns raises the subtraction `TypeError` only when the
+partial order keeps a pair (an earlier row's completion at most a later
+start, as text, rows apart included); FU1-4, the Inductive miner on a
+Polars frame reads each case after the unstable sort by case and
+timestamp; FU1-5, Declare on a Polars frame reads each case sorted by
+`time:timestamp` (always that column, a missing value first) and the row,
+and lists the cases in case-id order, in discovery and conformance
+(`/api/mine`, `/api/declare-workbench`). Not a finding: the `/api/mine`
+heuristic family follows the dispatcher `apply_heu` (frame order), not
+`pm4py.discover_heuristics_net`'s sorting `apply_heu_pandas`. New areas
+without findings: the temporal profile on XES ties, the log skeleton and
+the transition system on lazy XES uploads, the workflow route's classic
+heuristics on text CSV columns; no other route reaches SciPy's
+`linear_sum_assignment`.
+
+In the suite: `minera_performance_spectrum_parity_contracts_tests`
+(`performance_spectrum_frame_order_contract`),
+`minera_alpha_event_data_tests` (`frame_sort_contracts`, and two lazy
+expectations that now sort a missing value first),
+`minera_heuristic_variants_tests` (`review_ft_plusplus_pandas_text_columns`),
+`minera_inductive_miner_tests` (`polars_frame_reads_ties_as_polars_sorts`)
+and `minera_declare_tests` (`polars_frame_reads_cases_in_time_order`)
+carry FU1's reference values. The full ctest passed 660 of 660 on the
+first run (29 minutes, -j2), the Python script tests passed 406 of 406,
+the fixture replay gave 2,671 responses unchanged and 2 changed as
+intended (two Declare workbench conformances on lazy frames now list the
+cases in Polars' case-id order; both read uint64 case ids, which pm4py
+refuses, and were refreshed). The Mac was not
+reachable this round (no device served, the folder not approved), so no
+newer reviewer handoff was read. The generators, the comparers and the
+probes are in the project files under `review-harness/round-fu/`.
+
+Next round (FV) should start by re-reviewing round FU:
+
+- FU's CI run;
+- FU1-1 to FU1-5 on fresh banks: `tie/tiesweep.py` with `NC`/`NE` large
+  enough for frames over 20 rows (the Polars spectrum variants), `AMB=1`
+  and `DUP`; `wf/wfcsv.py` with `FMT=mixed`/`off` and larger `NC`/`NE`;
+  `am/alphamine.py` on new seeds; `mut/mutsweep.py` with more boolean and
+  mixed columns; `am/lazyfam.py` with larger frames; `dc/declxes.py` with
+  `DUP` and both shapes;
+- new areas: the other Polars inputs that group cases after a sort (POWL,
+  footprints, variants and minimum self distance on
+  `mining_input_shape=lazyframe` with XES ties); Declare on a Polars
+  frame that carries its own `@@index` (pm4py sorts by it instead of a row
+  count), with null case ids (one group, first) or null activities, and
+  with a timestamp selector other than `time:timestamp` (pm4py still sorts
+  by `time:timestamp`); the Polars frequency triples (library only) and
+  `dfg_dataframe.cpp`'s Null-dtype key rule (an all-null start column),
+  both carried from FU;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FU (kept for its older items):
 
 Next round (FU) should start by re-reviewing round FT:
 

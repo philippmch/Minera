@@ -37112,3 +37112,108 @@ In the suite: `minera_correlation_miner_tests`
 carry FT1's reference values. The full ctest passed 660 of 660 on the
 first run (39 minutes, -j2), the Python script tests passed 406 of 406,
 the fixture replay gave 2,673 responses unchanged.
+
+## Review FU1: performance spectrum order, Alpha on text and Polars frames, plusplus text pairs, Inductive and Declare on Polars frames (2026-11-22)
+
+Round FU re-reviewed round FT on fresh banks and swept new areas. FT's CI
+run 44964667724 (45ab807) finished green.
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars
+1.44.1, scipy and networkx from requirements_stable.txt, no pyarrow),
+every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL
+AVX512_SPR"` and exact comparison.
+
+Re-review of FT (fresh seeds): the interval eventually-follows with dense
+nanosecond cells (efF, efG: 57 log-variant results equal, 23 raised
+alike; the pandas variant differs only where pm4py's two variants differ
+from each other, the route follows the log variant); correlation with
+exact time matching and supplied keys (ssF: equal or raised alike apart
+from frequency DFGs at the declared LP ties; lpclass put all 15 of the
+dataframe adapter at the optimum of pm4py's cost matrix); the
+dataframe DFG, partial order and concurrency on XES and CSV uploads
+(pxG, dsF, poF: 380 equal, 6 keep-once standard deviations in the last
+digits as declared). No difference in FT's fixes.
+
+Fixed:
+
+- **FU1-1. Performance spectrum order** (`/api/discover-timing`,
+  `family=spectrum`). pm4py sorts the disconnected variants'
+  observations by their earliest instant (`min` of the points), not the
+  first, which differs once the log is not sorted (`spectrum_sort_log`
+  false); the frame variants gather the disconnected observations per
+  pattern length, longest first, each in frame row order, before that
+  stable sort, and the Polars connected variant lists its observations in
+  the frame row order of their first event; the Polars window
+  (`.over(case)`) takes a case's rows from the whole frame, not only an
+  adjacent run. On XES uploads with tied timestamps and repeated trace
+  names, tA: 18 of 1,440 spectra differed; after the fix tA3: 1,420
+  equal, 20 raised alike, and fresh seeds tB, tC: 2,147 equal, 13 raised
+  alike.
+- **FU1-2. Alpha on text and Polars frames**
+  (`/api/discover-workflow-input` with `discovery_family=alpha`, the
+  `dataframe` and `lazyframe` shapes; `/api/mine` with
+  `mining_input_shape=lazyframe`). pm4py's Alpha sorts the frame by case,
+  start and timestamp: the route keeps a CSV's columns as text, so the
+  rows sort as text (`2020-01-03T06:06:00.5+05:30` after
+  `2020-01-03 16:46:00`), and Polars sorts with its unstable pdqsort
+  (round BX), moving tied rows of frames over 20 rows, with a missing
+  start or timestamp first. Minera sorted the instants stably with a
+  missing value last. w2 (mixed formats): 16 of 40 dataframe and 17 of 40
+  lazyframe nets differed; w3 (larger frames): 4 of 40 lazyframe nets; aA
+  (`/api/mine` on XES ties): 8 of 40. After the fix 40 of 40 in each.
+- **FU1-3. Plusplus text pairs** (`/api/discover-workflow-input`,
+  `input_shape=pandas_mutable`, refining FT1-7). Two text (or two
+  boolean) columns compare fine, so pm4py's partial order keeps a pair of
+  a case's rows (sorted by start) only when the earlier row's completion
+  is at most the later start, as text; the subtraction `TypeError` comes
+  only from such a pair, two rows apart included, and without one the
+  `.dt` error stays (`2` sorts before `2020-01-01 ...` and drops the
+  pair). Minera took every adjacent pair with both cells. mA: 11 of 132
+  errors differed; after the fix 132 of 132 alike, fresh seeds mB: 181 of
+  181 (37 CSVs whose dates the import refuses skipped).
+- **FU1-4. Inductive on Polars frames** (`/api/mine` with
+  `mining_input_shape=lazyframe`, every lazy input of the Inductive
+  miner). pm4py reads each case after `LazyFrame.sort([case,
+  timestamp])`, which moves tied events of a frame over 20 rows the way
+  its pdqsort does; Minera sorted each trace stably. lA (XES uploads with
+  ties): 10 of 30 trees differed; after the fix 30 of 30.
+- **FU1-5. Declare on Polars frames** (discovery and conformance on
+  `/api/mine` and `/api/declare-workbench` with the `lazyframe` shape).
+  pm4py projects a Polars frame after `sort([case, "time:timestamp", row
+  index])` (the timestamp column is always `time:timestamp`, a missing
+  value first) and lists the cases in that sorted order; Minera read a
+  lazy XES upload as the pandas frame slices in file order. lA: 21 of 30
+  models differed; the workbench conformance on lazy XES uploads with a
+  model from another log, dB: 29 of 30 lists differed. After the fix lA
+  30 of 30, dA 40 of 40, dE (repeated trace names) 40 of 40, and the
+  pandas shape unchanged (dD: 40 of 40).
+
+Declared or unchanged:
+
+- The `/api/mine` heuristic family on a frame follows the dispatcher
+  `heuristics_miner.apply_heu`, which reads the frame as an event log in
+  frame order; `pm4py.discover_heuristics_net` calls `apply_heu_pandas`,
+  which sorts, so lazyfam's comparison with the high-level function
+  differs by design (27 and 28 of 30).
+- Clean on new areas: the temporal profile on XES uploads with ties
+  (200 of 200), the log skeleton and the transition system on lazy XES
+  uploads (30 of 30 each; the transition system also 30 of 30 on the
+  pandas shape), the
+  workflow route's classic heuristics on text CSV columns (240 of 240).
+  No other route's reference reaches SciPy's `linear_sum_assignment`
+  (PriPEL's reference needs diffprivlib, which is not installed).
+- Unchanged: the declared items of FT1 and before.
+
+In the suite: `minera_performance_spectrum_parity_contracts_tests`
+(`performance_spectrum_frame_order_contract`),
+`minera_alpha_event_data_tests` (`frame_sort_contracts`; two lazy
+expectations now sort a missing start or timestamp first),
+`minera_heuristic_variants_tests` (`review_ft_plusplus_pandas_text_columns`),
+`minera_inductive_miner_tests` (`polars_frame_reads_ties_as_polars_sorts`)
+and `minera_declare_tests` (`polars_frame_reads_cases_in_time_order`)
+carry FU1's reference values. The full ctest passed 660 of 660 on the
+first run (29 minutes, -j2), the Python script tests passed 406 of 406,
+the fixture replay gave 2,671 responses unchanged; the two that changed
+are Declare workbench conformances on lazy frames, which now list the
+cases in case-id order (FU1-5; their uint64 case ids are refused by
+pm4py's column check, so the order is Minera's own there), and were
+refreshed.

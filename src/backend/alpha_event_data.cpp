@@ -9,6 +9,7 @@
 
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
+#include "polars_sort.hpp"
 
 namespace minera {
 namespace {
@@ -171,8 +172,27 @@ bool selector_available(const EventTable& table, const EventStream& stream,
   return false;
 }
 
+// The selected column's dtype when the table names it.
+std::string_view selected_dtype(const EventTable& table, std::string_view selector) {
+  for (std::size_t index = 0; index < table.columns.size() && index < table.dtypes.size(); ++index)
+    if (table.columns[index] == selector) return table.dtypes[index];
+  return {};
+}
+
+bool text_dtype(std::string_view dtype) {
+  return dtype == "str" || dtype == "object" || dtype == "string";
+}
+
+// pm4py's Alpha on a frame (get_dfg_graph) sorts the frame itself: pandas by
+// case, start and completion with a stable lexsort (a missing value last),
+// Polars with its unstable pdqsort (a missing value first). A text timestamp
+// column (the workflow-input route keeps a CSV's columns as text) sorts as
+// text, so "2020-1-5 9:05" follows "2020-01-05 10:00:00" (round FU, observed
+// black-box). The sort switches are Minera's own (pm4py's Alpha always sorts
+// by case and timestamps); without the timestamps the sort stays stable.
 PetriNet discover_classic_table(const EventTable& table,
-                                const AlphaMinerOptions& options) {
+                                const AlphaMinerOptions& options,
+                                bool polars = false) {
   enforce_cap(table.size(), options);
   auto stream = table_stream(table);
   const std::string activity = options.activity_attribute.empty()
@@ -198,11 +218,15 @@ PetriNet discover_classic_table(const EventTable& table,
 
   // The table footprint uses sorted rows, while its boundary activities come
   // from the original per-case row order. Keep those two observations separate.
+  const bool text_times = text_dtype(selected_dtype(table, options.timestamp_attribute)) &&
+                          (!has_start || text_dtype(selected_dtype(table, start)));
   struct Row {
     std::optional<std::string> case_id;
     std::optional<std::string> activity;
     double start = std::numeric_limits<double>::infinity();
     double completion = std::numeric_limits<double>::infinity();
+    std::optional<std::string> start_text;
+    std::optional<std::string> completion_text;
   };
   std::vector<Row> rows;
   const auto value = [](const EventAttribute* field) -> std::optional<std::string> {
@@ -232,7 +256,12 @@ PetriNet discover_classic_table(const EventTable& table,
                     ":" + *row.case_id;
     row.activity = value(select_field(record, activity,
         FirstClassAttributeRole::kActivity, false, true));
-    if (reads_time) {
+    if (reads_time && text_times) {
+      row.completion_text = value(select_field(record, options.timestamp_attribute,
+          FirstClassAttributeRole::kTimestamp, false, true));
+      row.start_text = has_start ? value(select_field(record, start,
+          FirstClassAttributeRole::kTimestamp, false, true)) : row.completion_text;
+    } else if (reads_time) {
       row.completion = instant(select_field(record, options.timestamp_attribute,
           FirstClassAttributeRole::kTimestamp, false, true));
       row.start = has_start ? instant(select_field(record, start,
@@ -245,20 +274,49 @@ PetriNet discover_classic_table(const EventTable& table,
     }
     rows.push_back(std::move(row));
   }
+  // -1: left first, 1: right first, 0: tie; a missing value last for
+  // pandas and first for Polars.
+  const auto compare_missing = [&](bool left_missing, bool right_missing) {
+    if (left_missing == right_missing) return 0;
+    return left_missing == polars ? -1 : 1;
+  };
+  const auto compare_text = [&](const std::optional<std::string>& left,
+                                const std::optional<std::string>& right) {
+    if (!left || !right) return compare_missing(!left, !right);
+    return *left < *right ? -1 : (*right < *left ? 1 : 0);
+  };
+  const auto compare_instant = [&](double left, double right) {
+    const bool left_missing = left == std::numeric_limits<double>::infinity();
+    const bool right_missing = right == std::numeric_limits<double>::infinity();
+    if (left_missing || right_missing) return compare_missing(left_missing, right_missing);
+    return left < right ? -1 : (right < left ? 1 : 0);
+  };
+  const auto compare_rows = [&](const Row& left, const Row& right) {
+    if (const int by = compare_text(left.case_id, right.case_id)) return by;
+    if (!reads_time) return 0;
+    if (text_times) {
+      if (const int by = compare_text(left.start_text, right.start_text)) return by;
+      return compare_text(left.completion_text, right.completion_text);
+    }
+    if (const int by = compare_instant(left.start, right.start)) return by;
+    return compare_instant(left.completion, right.completion);
+  };
   if (options.sort_caseid_required) {
-    std::stable_sort(rows.begin(), rows.end(), [&](const Row& left, const Row& right) {
-      if (left.case_id != right.case_id) {
-        if (!left.case_id) return false;
-        if (!right.case_id) return true;
-        return *left.case_id < *right.case_id;
-      }
-      if (reads_time) {
-        if (left.start != right.start) return left.start < right.start;
-        if (left.completion != right.completion)
-          return left.completion < right.completion;
-      }
-      return false;
-    });
+    std::vector<std::size_t> order(rows.size());
+    for (std::size_t index = 0; index < order.size(); ++index) order[index] = index;
+    if (polars && reads_time) {
+      polars_sort::sort_unstable(order, [&](std::size_t left, std::size_t right) {
+        return compare_rows(rows[left], rows[right]) < 0;
+      });
+    } else {
+      std::stable_sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+        return compare_rows(rows[left], rows[right]) < 0;
+      });
+    }
+    std::vector<Row> sorted_rows;
+    sorted_rows.reserve(rows.size());
+    for (const auto index : order) sorted_rows.push_back(std::move(rows[index]));
+    rows = std::move(sorted_rows);
   }
   DfgFrequency graph;
   for (std::size_t index = 1; index < rows.size(); ++index) {
@@ -340,7 +398,7 @@ PetriNet discover_petri_net(const EventDataView& data,
     return discover_classic_table(*data.table(), options);
   if (!options.short_loops && data.kind() == EventDataKind::kLazyEventTable)
     return discover_classic_table(
-        data.lazy_table()->materialize(options.max_rows_to_materialize), options);
+        data.lazy_table()->materialize(options.max_rows_to_materialize), options, true);
   return discover_petri_net(normalize_alpha_event_log(data, options), options);
 }
 PetriNet discover_petri_net(const EventStream& data,

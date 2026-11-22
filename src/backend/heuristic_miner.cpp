@@ -2433,6 +2433,13 @@ HeuristicsNet discover_plus_plus_pandas(
       for (std::size_t row = 0; row < data.rows.size(); ++row)
         if (present(data.rows[row], *case_column))
           cases[data.rows[row][*case_column]->value].push_back(row);
+      // Two text or two boolean columns compare fine, so only the pairs the
+      // partial order keeps reach the subtraction: a later row (by start,
+      // then completion) whose start is no earlier than the completion
+      // (text order, False before True). With none, pm4py meets the .dt on
+      // an empty frame instead (round FU, observed black-box).
+      const bool same_kind = completion_dtype == start_dtype &&
+                             (completion_dtype == "str" || completion_dtype == "bool");
       bool paired = false;
       for (auto& [name, rows] : cases) {
         (void)name;
@@ -2443,11 +2450,27 @@ HeuristicsNet discover_plus_plus_pandas(
           const auto& x = *data.rows[a][started];
           const auto& y = *data.rows[b][started];
           if (numeric_start) return number(x) < number(y);
-          if (start_dtype == "bool") return x.value < y.value;
-          return x.value < y.value;
+          if (x.value != y.value || !same_kind) return x.value < y.value;
+          const bool cx = present(data.rows[a], completed), cy = present(data.rows[b], completed);
+          if (!cx || !cy) return cx && !cy;
+          return data.rows[a][completed]->value < data.rows[b][completed]->value;
         });
-        for (std::size_t k = 0; k + 1 < rows.size() && !paired; ++k)
-          paired = present(data.rows[rows[k]], completed) && present(data.rows[rows[k + 1]], started);
+        if (same_kind) {
+          std::optional<std::string> earliest;
+          for (const auto row : rows) {
+            if (earliest && present(data.rows[row], started) &&
+                *earliest <= data.rows[row][started]->value) {
+              paired = true;
+              break;
+            }
+            if (present(data.rows[row], completed) &&
+                (!earliest || data.rows[row][completed]->value < *earliest))
+              earliest = data.rows[row][completed]->value;
+          }
+        } else {
+          for (std::size_t k = 0; k + 1 < rows.size() && !paired; ++k)
+            paired = present(data.rows[rows[k]], completed) && present(data.rows[rows[k + 1]], started);
+        }
         if (paired) break;
       }
       if (paired) throw HeuristicPandasError("builtins.TypeError", message);

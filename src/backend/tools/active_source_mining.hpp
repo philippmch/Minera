@@ -173,7 +173,7 @@ void handle_active_source_mining(const httplib::Request& request,
         : minera::check_declare_conformance(data(), session->declare, params.declare_conformance_options);
     native_returned = true;
     const auto ordered = in_constraint_order(*declare_conformance,
-        constraint_case_order(*session->active_source, data(),
+        declare_case_order(*session->active_source, data(),
                               params.declare_conformance_options.activity_key,
                               params.declare_conformance_options.case_id_key));
     return minera::serialize_active_source_declare_json(session->declare, &ordered);

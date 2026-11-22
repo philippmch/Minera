@@ -5727,7 +5727,7 @@
         "filename": "typed-diagnostics-exact-uint64-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-declare-workbench/captures/typed-diagnostics-exact-uint64-lazyframe.response.json",
         "bytes": 82022,
-        "sha256": "fd9f4cc6ab90b8d1649030d4f3e1110acd3c87db5d1c580b5fe3fa65a0043d79",
+        "sha256": "855af55b9f50a702c2d3bb1062a052db012536b39e9ba02909648b9623c6a8eb",
         "status": 200
       },
       "family": "original_declare",
@@ -6363,7 +6363,7 @@
         "filename": "valid-flat-native-with-unavailable-source-log-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-declare-workbench/captures/valid-flat-native-with-unavailable-source-log-lazyframe.response.json",
         "bytes": 40293,
-        "sha256": "d2baa169ee6b62d07d47ea3204ff0035344a017b79695084fb987c70cbe7ba58",
+        "sha256": "d8e6d9c42bad65cc9d38d4b9e47d84a4656d9f08c9fde1a3023f4de5d736a767",
         "status": 200
       },
       "family": "original_declare",

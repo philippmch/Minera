@@ -2,6 +2,7 @@
 
 #include "minera/log_conversion.hpp"
 #include "frame_cells.hpp"
+#include "minera/timestamp.hpp"
 
 #include <algorithm>
 #include <array>
@@ -511,6 +512,85 @@ LazyEventTable promoted_selector_table(const LazyEventTable& source,
       source.dtypes(), source.index(), source.categorical_dtypes());
 }
 
+// pm4py's Declare on a Polars frame reads each case after
+// LazyFrame.sort([case, "time:timestamp", row index]): the timestamp column
+// is always "time:timestamp" (left out when the frame has none), a missing
+// value sorts first and the row index settles every tie, so the order is
+// fixed. Cases follow in sorted order (group_by maintain_order). Round FU,
+// XES uploads with tied timestamps, observed black-box.
+EventTable polars_projection_table(EventTable table, std::string_view case_id_key) {
+  table.validate();
+  const auto column_of = [&](std::string_view name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto case_at = column_of(case_id_key);
+  if (!case_at) return table;
+  const auto time_at = column_of("time:timestamp");
+  const auto dtype = [&](std::size_t at) -> std::string_view {
+    return at < table.dtypes.size() ? std::string_view(table.dtypes[at]) : std::string_view();
+  };
+  const auto numeric = [](std::string_view kind) {
+    return kind.rfind("int", 0) == 0 || kind.rfind("uint", 0) == 0 || kind.rfind("float", 0) == 0 ||
+           kind.rfind("Int", 0) == 0 || kind.rfind("UInt", 0) == 0 || kind.rfind("Float", 0) == 0;
+  };
+  const auto text = [](std::string_view kind) {
+    return kind == "str" || kind == "object" || kind == "string" || kind == "String";
+  };
+  const bool case_numeric = numeric(dtype(*case_at));
+  const bool time_text = time_at && text(dtype(*time_at));
+  struct Key {
+    std::optional<std::string> case_text;
+    double case_number = 0;
+    std::optional<std::string> time_text;
+    std::optional<ParsedExactTimestamp> time;
+  };
+  std::vector<Key> keys(table.rows.size());
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    const auto& cell = table.rows[row][*case_at];
+    if (cell && !cell->is_null) {
+      keys[row].case_text = cell->value;
+      if (case_numeric) {
+        try { keys[row].case_number = std::stod(cell->value); } catch (const std::exception&) {}
+      }
+    }
+    if (time_at) {
+      const auto& time = table.rows[row][*time_at];
+      if (time && !time->is_null) {
+        keys[row].time_text = time->value;
+        if (!time_text) keys[row].time = parse_timestamp_exact(time->value);
+      }
+    }
+  }
+  std::vector<std::size_t> order(table.rows.size());
+  for (std::size_t row = 0; row < order.size(); ++row) order[row] = row;
+  std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+    const auto& lhs = keys[a];
+    const auto& rhs = keys[b];
+    if (!lhs.case_text || !rhs.case_text) {
+      if (lhs.case_text || rhs.case_text) return !lhs.case_text;
+    } else if (case_numeric ? lhs.case_number != rhs.case_number : *lhs.case_text != *rhs.case_text) {
+      return case_numeric ? lhs.case_number < rhs.case_number : *lhs.case_text < *rhs.case_text;
+    }
+    if (!time_at) return false;
+    if (time_text || !lhs.time || !rhs.time) {
+      const auto& x = time_text ? lhs.time_text : lhs.time ? lhs.time_text : std::optional<std::string>();
+      const auto& y = time_text ? rhs.time_text : rhs.time ? rhs.time_text : std::optional<std::string>();
+      if (!x || !y) return !x && y;
+      return *x < *y;
+    }
+    if (lhs.time->seconds != rhs.time->seconds) return lhs.time->seconds < rhs.time->seconds;
+    return lhs.time->nanoseconds < rhs.time->nanoseconds;
+  });
+  EventTable sorted = table;
+  sorted.rows.clear();
+  sorted.index.reset();
+  sorted.rows.reserve(table.rows.size());
+  for (const auto row : order) sorted.rows.push_back(std::move(table.rows[row]));
+  return sorted;
+}
+
 EventLog event_data_log(const EventDataView& data,
                         std::string_view activity_key,
                         std::string_view case_id_key) {
@@ -532,9 +612,11 @@ EventLog event_data_log(const EventDataView& data,
       return event_data_to_event_log(EventDataView(table), conversion);
     }
     case EventDataKind::kLazyEventTable: {
-      auto table = promoted_selector_table(*data.lazy_table(),
-                                            std::string(activity_key),
-                                            std::string(case_id_key));
+      auto table = polars_projection_table(
+          promoted_selector_table(*data.lazy_table(), std::string(activity_key),
+                                  std::string(case_id_key))
+              .materialize(),
+          case_id_key);
       return event_data_to_event_log(EventDataView(table), conversion);
     }
   }
@@ -1161,7 +1243,7 @@ EventDataView frame_slice_view(const EventDataView& data, std::string_view case_
       table = frame_slice_table(*data.table(), case_id_key);
       return EventDataView(*table);
     case EventDataKind::kLazyEventTable:
-      table = frame_slice_table(data.lazy_table()->materialize(), case_id_key);
+      table = polars_projection_table(data.lazy_table()->materialize(), case_id_key);
       return EventDataView(*table);
     case EventDataKind::kEventStream:
       return data;

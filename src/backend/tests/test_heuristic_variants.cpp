@@ -5603,6 +5603,16 @@ void review_ft_plusplus_pandas_text_columns() {
   assert(error_of(late, "ts2") == pair);
   // The completion of the first row by start is missing.
   assert(error_of("case,act,ts,ts2\nc0,a,,x\nc0,b,2020-01-01 00:00:01,y\n", "ts2", true) == accessor);
+  // Round FU: two text columns compare fine, so only the pairs the partial
+  // order keeps (an earlier row by start whose completion is at most the
+  // later start, as text) reach the subtraction: "2" sorts before
+  // "2020-01-01 ..." and drops the pair, while a pair two rows apart counts.
+  assert(error_of("case,act,ts,ts2\nc0,a,2020-01-01 00:00:05,1\nc0,b,2020-01-01 00:00:06,2\n", "ts2") == accessor);
+  assert(error_of("case,act,ts,ts2\nc0,a,2020-01-01 00:00:05,3\nc0,b,2020-01-01 00:00:06,2020-01-01 00:00:07\n",
+                  "ts2") == pair);
+  assert(error_of("case,act,ts,ts2\nc0,a,2020-01-01 00:00:05,2020-01-01 00:00:01\n"
+                  "c0,b,2020-01-01 00:00:09,2020-01-01 00:00:02\nc0,c,2020-01-01 00:00:07,2020-01-01 00:00:06\n",
+                  "ts2") == pair);
 }
 
 int main(int argc, char** argv) {

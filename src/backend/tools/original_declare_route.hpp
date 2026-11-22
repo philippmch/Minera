@@ -268,7 +268,7 @@ void handle_original_declare_workbench(const httplib::Request& request,
           // An XES source's list in pm4py's DataFrame case order; the derived
           // diagnostics table keeps the frame's (file) order.
           in_constraint_order(listed ? *listed : *conformances, source && conformance_options
-              ? constraint_case_order(*source, source->selected_view(), conformance_options->activity_key,
+              ? declare_case_order(*source, source->selected_view(), conformance_options->activity_key,
                                       conformance_options->case_id_key)
               : std::nullopt)) + '}' :
       generated ? "{\"type\":\"event_log\",\"value\":" + minera::serialize_active_source_log_json(*generated) + '}' : "null";

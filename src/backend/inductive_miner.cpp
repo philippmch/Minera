@@ -24,6 +24,7 @@
 #include "minera/timestamp.hpp"
 #include "minera/token_integer.hpp"
 #include "inductive/semantics.hpp"
+#include "polars_sort.hpp"
 
 namespace minera {
 namespace inductive_detail {
@@ -2271,6 +2272,40 @@ std::string required_record_value(const EventRecord& record,
 EventLog event_data_to_log(const EventDataView& data,
                            const InductiveMinerOptions& options) {
   auto records = event_data_records(data);
+  // pm4py's Inductive miner on a Polars frame reads each case's activities
+  // after LazyFrame.sort([case, timestamp]), which is unstable: tied events
+  // of a case leave their frame order the way the parallel pdqsort moves
+  // them (round FU, XES uploads with tied timestamps, observed black-box).
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (polars) {
+    struct Key {
+      std::string case_id;
+      std::optional<ParsedExactTimestamp> time;
+    };
+    std::vector<Key> keys;
+    keys.reserve(records.size());
+    for (const auto& indexed : records) {
+      const auto* case_field = indexed.record.field(options.case_id_key);
+      const auto* time_field = indexed.record.field(options.timestamp_key);
+      keys.push_back({case_field && !case_field->is_null ? case_field->value : std::string(),
+                      time_field && !time_field->is_null ? parse_timestamp_exact(time_field->value)
+                                                         : std::nullopt});
+    }
+    std::vector<std::size_t> order(records.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    polars_sort::sort_unstable(order, [&](std::size_t a, std::size_t b) {
+      if (keys[a].case_id != keys[b].case_id) return keys[a].case_id < keys[b].case_id;
+      const auto& lhs = keys[a].time;
+      const auto& rhs = keys[b].time;
+      if (!lhs || !rhs) return !lhs && rhs;
+      if (lhs->seconds != rhs->seconds) return lhs->seconds < rhs->seconds;
+      return lhs->nanoseconds < rhs->nanoseconds;
+    });
+    std::vector<IndexedRecord> sorted;
+    sorted.reserve(records.size());
+    for (const auto i : order) sorted.push_back(std::move(records[i]));
+    records = std::move(sorted);
+  }
   EventLog log;
   std::unordered_map<std::string, std::size_t> traces;
   for (auto& indexed : records) {
@@ -2308,8 +2343,18 @@ EventLog event_data_to_log(const EventDataView& data,
     event.input_order = indexed.input_order;
     trace.events.push_back(std::move(event));
   }
-  for (auto& trace : log.traces) {
-    order_events_by_time(trace.events);
+  if (!polars) {
+    for (auto& trace : log.traces) order_events_by_time(trace.events);
+  } else {
+    // The traces keep the frame order of their first row, as on the other
+    // shapes (only the variants reach the miner).
+    const auto first_row = [](const Trace& trace) {
+      std::size_t first = std::numeric_limits<std::size_t>::max();
+      for (const auto& event : trace.events) first = std::min(first, event.input_order);
+      return first;
+    };
+    std::stable_sort(log.traces.begin(), log.traces.end(),
+                     [&](const Trace& a, const Trace& b) { return first_row(a) < first_row(b); });
   }
   return log;
 }

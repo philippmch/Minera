@@ -1520,6 +1520,16 @@ std::optional<std::vector<std::size_t>> constraint_case_order(
   return order;
 }
 
+// Declare's list: its Polars projection already meets the cases sorted by
+// case id (group_by maintain_order after the sort), so a lazy frame keeps the
+// order the native call returns (round FU).
+std::optional<std::vector<std::size_t>> declare_case_order(
+    const minera::ActiveEventSource& source, const minera::EventDataView& data,
+    std::string_view activity_key, std::string_view case_id_key) {
+  if (data.kind() == minera::EventDataKind::kLazyEventTable) return std::nullopt;
+  return constraint_case_order(source, data, activity_key, case_id_key);
+}
+
 std::optional<std::vector<std::size_t>> constraint_case_order(
     const minera::ActiveEventSource& source, const minera::EventLog& log) {
   return constraint_case_order(source, minera::EventDataView(log), "concept:name",

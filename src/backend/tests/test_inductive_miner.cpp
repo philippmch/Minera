@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -769,6 +770,46 @@ void filtered_cut_drops_activities_outside_the_filtered_alphabet() {
 
 }  // namespace
 
+// Round FU (pm4py 2.7.22 discover_process_tree_inductive on a frame and on
+// its Polars copy): Polars sorts by case and timestamp unstably, so tied
+// events of a frame over 20 rows leave their order the way its pdqsort moves
+// them; pandas keeps them in frame order.
+void polars_frame_reads_ties_as_polars_sorts() {
+  std::vector<EventTable::Row> rows;
+  for (const auto& [case_id, activity, second] :
+       std::vector<std::tuple<const char*, const char*, const char*>>{
+           {"c0", "C", "0"},
+           {"c1", "A", "1"},
+           {"c1", "B", "1"},
+           {"c0", "A", "1"},
+           {"c0", "B", "1"},
+           {"c2", "A", "1"},
+           {"c1", "C", "0"},
+           {"c2", "A", "1"},
+           {"c0", "A", "0"},
+           {"c2", "C", "0"},
+           {"c1", "C", "0"},
+           {"c1", "C", "0"},
+           {"c2", "A", "1"},
+           {"c1", "C", "0"},
+           {"c1", "A", "0"},
+           {"c1", "B", "0"},
+           {"c1", "C", "0"},
+           {"c0", "C", "1"},
+           {"c0", "C", "1"},
+           {"c2", "C", "1"},
+           {"c2", "C", "0"},
+           {"c1", "B", "1"}})
+    rows.push_back(row({field("case:concept:name", case_id), field("concept:name", activity),
+                        field("time:timestamp", std::string("2020-01-01T00:00:0") + second + "Z")}));
+  const auto table = table_from_rows({"case:concept:name", "concept:name", "time:timestamp"}, rows);
+  const auto pandas = discover_process_tree(EventDataView(table));
+  assert(render(pandas, pandas.root()) == "*(->(*(->(C,X(tau,*(A,tau))),tau),X(tau,*(B,tau))),tau)");
+  const auto lazy = LazyEventTable::from_table(table);
+  const auto polars = discover_process_tree(EventDataView(lazy));
+  assert(render(polars, polars.root()) == "+(*(C,tau),*(A,tau),X(tau,*(B,tau)))");
+}
+
 int main() {
   ordinary_variants_and_graph_input();
   present_empty_activity_is_a_visible_leaf();
@@ -793,5 +834,6 @@ int main() {
   sequence_projection_uses_ordered_min_cost_windows();
   filtered_exclusive_ties_route_to_highest_group();
   filtered_cut_drops_activities_outside_the_filtered_alphabet();
+  polars_frame_reads_ties_as_polars_sorts();
   return 0;
 }

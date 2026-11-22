@@ -36,6 +36,9 @@ struct TimedEvent {
   // full resolution, which a double of epoch seconds does not hold (two
   // instants tens of nanoseconds apart are one double; round BQ).
   std::pair<std::int64_t, std::int64_t> order{};
+  // The event's row in the (sorted or unsorted) frame the variant scans:
+  // the order its matches leave in before the final sort (round FU).
+  std::size_t position = 0;
 };
 
 // The exact sort key of a timestamp cell; a cell that parse_timestamp reads
@@ -368,7 +371,11 @@ TableColumns table_columns(const EventTable& table,
                   FirstClassAttributeRole::kTimestamp, "timestamp")};
 }
 
-Cases split_runs(std::vector<TimedEvent> events, bool sorted) {
+// Polars' `shift(-i).over(case)` windows group every row of a case, also
+// rows that an unsorted frame keeps apart (an XES upload repeating a trace
+// name), in frame order; pandas' shifted frame with its case equality check
+// only joins neighbouring rows (round FU, observed black-box).
+Cases split_runs(std::vector<TimedEvent> events, bool sorted, bool group_all = false) {
   if (events.empty()) return {};
   if (sorted) {
     std::stable_sort(events.begin(), events.end(),
@@ -380,7 +387,17 @@ Cases split_runs(std::vector<TimedEvent> events, bool sorted) {
                               std::tie(right.order, right.source_order);
                      });
   }
+  for (std::size_t index = 0; index < events.size(); ++index) events[index].position = index;
   Cases cases;
+  if (group_all) {
+    std::map<std::string, std::size_t> groups;
+    for (auto& event : events) {
+      const auto [found, inserted] = groups.emplace(event.case_id, cases.size());
+      if (inserted) cases.push_back({});
+      cases[found->second].push_back(std::move(event));
+    }
+    return cases;
+  }
   for (auto& event : events) {
     if (cases.empty() || cases.back().front().case_id != event.case_id) {
       cases.push_back({});
@@ -483,7 +500,7 @@ Cases project_lazy_table(const LazyEventTable& table,
     // Produce the same selected-column diagnostic as the eager table path.
     (void)table_columns(pending, options);
   }
-  return split_runs(std::move(events), options.sort_log);
+  return split_runs(std::move(events), options.sort_log, true);
 }
 
 EventTable stream_table(const EventStream& stream) {
@@ -662,7 +679,7 @@ std::size_t first_pattern_offset(const std::vector<std::string>& pattern,
 
 std::vector<SpectrumObservation> connected_points(
     const Cases& cases, const std::vector<std::string>& pattern,
-    double scale, bool concatenate) {
+    double scale, bool concatenate, std::vector<std::size_t>& positions) {
   std::vector<SpectrumObservation> points;
   for (const auto& events : cases) {
     if (events.size() < pattern.size()) continue;
@@ -679,6 +696,7 @@ std::vector<SpectrumObservation> connected_points(
         point.instants.push_back(scaled_instant(events[start + offset], scale));
       }
       points.push_back(std::move(point));
+      positions.push_back(events[start].position);
     }
   }
   return points;
@@ -782,7 +800,7 @@ std::vector<SpectrumObservation> pair_disconnected_points(
 
 std::vector<SpectrumObservation> full_disconnected_points(
     const Cases& cases, const std::vector<std::string>& pattern,
-    double scale, bool concatenate) {
+    double scale, bool concatenate, std::vector<std::size_t>& positions) {
   std::vector<SpectrumObservation> points;
   for (const auto& source_events : cases) {
     if (source_events.size() < 2) continue;
@@ -821,6 +839,7 @@ std::vector<SpectrumObservation> full_disconnected_points(
               scaled_instant(events[active[match.start + index]], scale));
         }
         points.push_back(std::move(point));
+        positions.push_back(events[active[match.start]].position);
       }
       for (const auto match : matches) {
         for (std::size_t index = 0; index + 1 < length; ++index) {
@@ -833,26 +852,47 @@ std::vector<SpectrumObservation> full_disconnected_points(
   return points;
 }
 
-// Stable by first instant. The reference DATAFRAME_DISCONNECTED gathers every
-// case's longest subpatterns before the shorter ones, so with
-// longer_first_on_ties an equally early longer observation leaves first.
-void stable_sort_points(std::vector<SpectrumObservation>& points,
-                        bool longer_first_on_ties = false) {
-  std::stable_sort(points.begin(), points.end(),
-                   [longer_first_on_ties](const SpectrumObservation& left,
-                                          const SpectrumObservation& right) {
-                     const double left_instant =
-                         left.instants.empty()
-                             ? std::numeric_limits<double>::infinity()
-                             : left.instants.front();
-                     const double right_instant =
-                         right.instants.empty()
-                             ? std::numeric_limits<double>::infinity()
-                             : right.instants.front();
-                     if (longer_first_on_ties && left_instant == right_instant)
-                       return left.instants.size() > right.instants.size();
-                     return left_instant < right_instant;
-                   });
+// Stable by first instant, or (min_key) by the earliest instant of the
+// observation: pm4py's disconnected variants sort with
+// `min(points, key=timestamp)`, which an unsorted log or frame tells apart
+// from the first point (round FU, observed black-box).
+void stable_sort_points(std::vector<SpectrumObservation>& points, bool min_key = false) {
+  const auto key = [min_key](const SpectrumObservation& point) {
+    if (point.instants.empty()) return std::numeric_limits<double>::infinity();
+    return min_key ? *std::min_element(point.instants.begin(), point.instants.end())
+                   : point.instants.front();
+  };
+  std::vector<std::pair<double, std::size_t>> keys;
+  keys.reserve(points.size());
+  for (std::size_t index = 0; index < points.size(); ++index) keys.emplace_back(key(points[index]), index);
+  std::stable_sort(keys.begin(), keys.end(), [](const auto& left, const auto& right) {
+    return left.first < right.first;
+  });
+  std::vector<SpectrumObservation> sorted;
+  sorted.reserve(points.size());
+  for (const auto& entry : keys) sorted.push_back(std::move(points[entry.second]));
+  points = std::move(sorted);
+}
+
+// Puts the observations in the order the frame variants collect them:
+// pandas' and Polars' DATAFRAME/LAZYFRAME_DISCONNECTED gather every case's
+// matches of the longest subpattern before the shorter ones (by_length), and
+// each length's matches in the order of their first row in the scanned
+// frame; Polars' LAZYFRAME emits its matches in that row order too (round
+// FU, observed black-box).
+void order_by_frame_rows(std::vector<SpectrumObservation>& points,
+                         const std::vector<std::size_t>& positions, bool by_length) {
+  std::vector<std::size_t> order(points.size());
+  for (std::size_t index = 0; index < order.size(); ++index) order[index] = index;
+  std::stable_sort(order.begin(), order.end(), [&](std::size_t left, std::size_t right) {
+    if (by_length && points[left].instants.size() != points[right].instants.size())
+      return points[left].instants.size() > points[right].instants.size();
+    return positions[left] < positions[right];
+  });
+  std::vector<SpectrumObservation> sorted;
+  sorted.reserve(points.size());
+  for (const auto index : order) sorted.push_back(std::move(points[index]));
+  points = std::move(sorted);
 }
 
 // The reference LOG variants sort the log first: events by time within each
@@ -889,14 +929,19 @@ PerformanceSpectrum run_cases(
           "performance spectrum: all arrays must be same length (fewer "
           "pattern events than pattern steps)");
   }
+  std::vector<std::size_t> positions;
   if (pair_only_disconnected(component)) {
     points = pair_disconnected_points(cases, activities, scale);
   } else if (full_disconnected(component)) {
-    points = full_disconnected_points(cases, activities, scale, concatenate);
+    points = full_disconnected_points(cases, activities, scale, concatenate, positions);
   } else {
-    points = connected_points(cases, activities, scale, concatenate);
+    points = connected_points(cases, activities, scale, concatenate, positions);
   }
-  stable_sort_points(points, component == Component::kDataframeDisconnected);
+  const bool frame_disconnected = component == Component::kDataframeDisconnected ||
+                                  component == Component::kLazyframeDisconnected;
+  if (frame_disconnected || component == Component::kLazyframe)
+    order_by_frame_rows(points, positions, frame_disconnected);
+  stable_sort_points(points, frame_disconnected || component == Component::kLogDisconnected);
   switch (sample_policy(component)) {
     case SamplePolicy::kMidpointWithExtremes:
       spectrum.observations =

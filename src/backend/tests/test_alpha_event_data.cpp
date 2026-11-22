@@ -375,8 +375,8 @@ void table_provenance_and_typed_dates() {
   table = event_stream_to_table(stream);
   table.rows[0][table.column_index("transported_time")].reset();
   require(connects(discover_petri_net(table), "B", "A") &&
-              connects(discover_petri_net(LazyEventTable::from_table(table)), "B", "A"),
-          "missing transported timestamp remains null-last despite alias");
+              connects(discover_petri_net(LazyEventTable::from_table(table)), "A", "B"),
+          "missing transported timestamp stays missing despite alias (last for pandas, first for Polars)");
 
   stream.events = {row("c", "A", ""), row("c", "B", "")};
   stream.events[0].fields[2].typed_value = NativeDate{"2024-01-03"};
@@ -424,8 +424,10 @@ void classic_table_null_contracts() {
   net = discover_petri_net(table);
   require(connects(net, "B", "A") && !connects(net, "A", "B"),
           "null start sorts last without completion fallback");
-  require(connects(discover_petri_net(LazyEventTable::from_table(table)), "B", "A"),
-          "lazy null start uses same ordering");
+  // pm4py 2.7.22 on the Polars copy sorts a missing start first (round FU).
+  require(connects(discover_petri_net(LazyEventTable::from_table(table)), "A", "B") &&
+              !connects(discover_petri_net(LazyEventTable::from_table(table)), "B", "A"),
+          "lazy null start sorts first, as Polars does");
   AlphaMinerOptions options;
   options.start_timestamp_attribute = "absent";
   options.sort_timestamp_along_case_id = false;
@@ -456,6 +458,31 @@ void classic_table_null_contracts() {
               boundaries(net, false) == std::set<std::string>{"B"},
           "endpoint scan skips null boundary activities");
 }
+
+// Round FU (pm4py 2.7.22 Alpha on the frame and on its Polars copy). A text
+// timestamp column sorts as text; Polars' unstable sort moves tied rows of a
+// frame over 20 rows.
+void frame_sort_contracts() {
+  EventStream stream;
+  stream.events = {row("c", "A", "2020-01-01 9:00:00"), row("c", "B", "2020-01-01 10:00:00")};
+  auto table = event_stream_to_table(stream);
+  table.dtypes = {"str", "str", "str"};
+  require(connects(discover_petri_net(table), "B", "A") && !connects(discover_petri_net(table), "A", "B") &&
+              connects(discover_petri_net(LazyEventTable::from_table(table)), "B", "A"),
+          "a text timestamp column sorts as text");
+  stream.events.clear();
+  const std::vector<std::pair<std::string, std::string>> tied{{"c0", "B"}, {"c1", "D"}, {"c0", "A"}, {"c1", "C"}, {"c0", "B"}, {"c1", "D"}, {"c1", "B"}, {"c0", "B"}, {"c1", "A"}, {"c0", "B"}, {"c0", "C"}, {"c0", "C"}, {"c1", "D"}, {"c1", "D"}, {"c1", "B"}, {"c1", "A"}, {"c0", "B"}, {"c1", "B"}, {"c1", "D"}, {"c1", "D"}, {"c1", "C"}, {"c1", "B"}};
+  for (const auto& [case_id, activity] : tied) stream.events.push_back(row(case_id, activity));
+  table = event_stream_to_table(stream);
+  const auto pandas = discover_petri_net(table);
+  const auto polars = discover_petri_net(LazyEventTable::from_table(table));
+  require(!connects(pandas, "A", "C") && connects(polars, "A", "C"),
+          "Polars moves tied rows the way its unstable sort does");
+  require(boundaries(pandas, true) == std::set<std::string>{"B", "D"} &&
+              boundaries(polars, true) == std::set<std::string>{"B", "D"} &&
+              boundaries(polars, false) == std::set<std::string>{"B"},
+          "boundary activities keep the frame order");
+}
 }  // namespace
 
 int main() {
@@ -467,6 +494,7 @@ int main() {
     table_selector_precedence_and_missing_cells();
     classic_table_null_contracts();
     table_provenance_and_typed_dates();
+    frame_sort_contracts();
     std::cout << "Alpha event-data tests passed\n";
     return 0;
   } catch (const std::exception& error) {

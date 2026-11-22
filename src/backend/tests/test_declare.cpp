@@ -8,7 +8,10 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <string_view>
+#include <tuple>
+#include <vector>
 
 using namespace minera;
 
@@ -880,6 +883,33 @@ void custom_flat_selectors_have_precedence_and_group_cases() {
   expect_rejected(
       [&] { (void)discover_declare(ambiguous_lazy, ambiguous_options); });
 }
+
+// Round FU (pm4py 2.7.22 discover_declare on a frame and on its Polars
+// copy): the Polars projection sorts by case, "time:timestamp" and row, so a
+// case's events follow their times there and their frame order in pandas.
+void polars_frame_reads_cases_in_time_order() {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  for (const auto& [case_id, activity, second] :
+       std::vector<std::tuple<const char*, const char*, const char*>>{
+           {"c2", "B", "02"}, {"c2", "A", "01"}, {"c1", "A", "05"}, {"c1", "A", "03"}})
+    table.rows.push_back({EventAttribute{"case:concept:name", case_id},
+                          EventAttribute{"concept:name", activity},
+                          EventAttribute{"time:timestamp", std::string("2020-01-01T00:00:") + second + "Z",
+                                         AttributeKind::kDate}});
+  DeclareDiscoveryOptions discovery;
+  discovery.allowed_templates = {kDeclareInit, kDeclareResponse};
+  const auto pandas = discover_declare(table, discovery);
+  assert(pandas.rules.at(kDeclareInit).empty());
+  assert(pandas.rules.at(kDeclareResponse).size() == 1);
+  assert(pandas.rules.at(kDeclareResponse)[0].first == "B" &&
+         pandas.rules.at(kDeclareResponse)[0].second == "A");
+  const auto polars = discover_declare(LazyEventTable::from_table(table), discovery);
+  assert(polars.rules.at(kDeclareResponse).empty());
+  assert(polars.rules.at(kDeclareInit).size() == 1);
+  assert(polars.rules.at(kDeclareInit)[0].first == "A");
+  assert(polars.rules.at(kDeclareInit)[0].support == 2 && polars.rules.at(kDeclareInit)[0].confidence == 2);
+}
 }  // namespace
 
 int main() {
@@ -902,5 +932,6 @@ int main() {
   activity_selector_precedence_and_ambiguity_are_strict();
   flat_inputs_and_diagnostics_are_equivalent();
   custom_flat_selectors_have_precedence_and_group_cases();
+  polars_frame_reads_cases_in_time_order();
   std::cout << "declare tests passed\n";
 }

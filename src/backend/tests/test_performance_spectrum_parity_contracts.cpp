@@ -471,6 +471,67 @@ void performance_spectrum_first_row_tie_order_contract() {
   assert_close(pairs.observations[0].instants[0], kTie);
 }
 
+// Round FU captures (pm4py 2.7.22 variants, sort_log_required False unless
+// noted, frames in the row order given). The disconnected variants order
+// observations by their earliest instant, the connected ones by their first;
+// the frame variants break ties by the observation's frame row, longest
+// subpatterns first for the disconnected ones; the Polars variants group a
+// case's rows across the whole frame.
+void performance_spectrum_frame_order_contract() {
+  constexpr double kBase = 1577836800.0;
+  const auto frame = [](const std::vector<std::tuple<std::string, std::string, int>>& rows) {
+    EventTable table;
+    table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+    for (const auto& [case_id, activity, second] : rows)
+      table.rows.push_back({cell("case:concept:name", case_id), cell("concept:name", activity),
+                            cell("time:timestamp", std::string("2020-01-01T00:00:") +
+                                                       (second < 10 ? "0" : "") +
+                                                       std::to_string(second) + "Z")});
+    return table;
+  };
+  minera::PerformanceSpectrumOptions unsorted;
+  unsorted.sort_log = false;
+  const auto earliest = frame({{"1", "A", 30}, {"1", "B", 10}, {"2", "A", 20}, {"2", "B", 25}});
+  assert(observation_case_ids(minera::discover_performance_spectrum_dataframe_disconnected(
+             earliest, {"A", "B"}, unsorted)) == std::vector<std::string>({"1", "2"}));
+  assert(observation_case_ids(minera::discover_performance_spectrum_lazyframe_disconnected(
+             LazyEventTable::from_table(earliest), {"A", "B"}, unsorted)) ==
+         std::vector<std::string>({"1", "2"}));
+  const auto by_first = minera::discover_performance_spectrum_lazyframe(
+      LazyEventTable::from_table(earliest), {"A", "B"}, unsorted);
+  assert(first_instants(by_first).size() == 2);
+  assert_close(by_first.observations[0].instants[0], kBase + 20);
+  assert_close(by_first.observations[1].instants[0], kBase + 30);
+  assert_close(by_first.observations[1].instants[1], kBase + 10);
+
+  const auto apart = frame({{"1", "A", 0}, {"2", "X", 1}, {"1", "B", 10}, {"2", "A", 3}, {"2", "B", 4}});
+  const auto grouped = minera::discover_performance_spectrum_lazyframe(
+      LazyEventTable::from_table(apart), {"A", "B"}, unsorted);
+  assert(grouped.observations.size() == 2);
+  assert_close(grouped.observations[0].instants[0], kBase);
+  assert_close(grouped.observations[0].instants[1], kBase + 10);
+  assert_close(grouped.observations[1].instants[0], kBase + 3);
+
+  const auto tied = frame({{"9", "A", 5}, {"9", "B", 7}, {"10", "A", 5}, {"10", "B", 6}});
+  assert(observation_case_ids(minera::discover_performance_spectrum_lazyframe(
+             LazyEventTable::from_table(tied), {"A", "B"}, unsorted)) ==
+         std::vector<std::string>({"9", "10"}));
+  assert(observation_case_ids(minera::discover_performance_spectrum_lazyframe(
+             LazyEventTable::from_table(tied), {"A", "B"})) ==
+         std::vector<std::string>({"10", "9"}));
+  assert(observation_case_ids(minera::discover_performance_spectrum_dataframe_disconnected(
+             tied, {"A", "B"}, unsorted)) == std::vector<std::string>({"9", "10"}));
+
+  const auto longest = frame({{"2", "A", 5}, {"2", "B", 6}, {"1", "A", 5}, {"1", "B", 6}, {"1", "C", 8}});
+  for (const auto& spectrum :
+       {minera::discover_performance_spectrum_dataframe_disconnected(longest, {"A", "B", "C"}, unsorted),
+        minera::discover_performance_spectrum_lazyframe_disconnected(
+            LazyEventTable::from_table(longest), {"A", "B", "C"}, unsorted)}) {
+    assert(observation_case_ids(spectrum) == std::vector<std::string>({"1", "2"}));
+    assert(labels(spectrum) == std::vector<std::string>({"ABC", "AB"}));
+  }
+}
+
 }  // namespace
 
 int main() {
@@ -489,4 +550,5 @@ int main() {
   performance_spectrum_lazyframe_disconnected_variant_contract();
   performance_spectrum_reference_tie_order_contract();
   performance_spectrum_first_row_tie_order_contract();
+  performance_spectrum_frame_order_contract();
 }
