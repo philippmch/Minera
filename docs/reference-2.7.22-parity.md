@@ -38230,3 +38230,147 @@ columns, on both shapes; 24 of its checks fail on GB's binary) carries the
 reference values. The full ctest passed 666 of 666 (39 minutes, -j2) on
 the first run. The fixture replay gave no change (2,673 responses
 unchanged), and the Python script tests passed 406 of 406.
+
+## Review GD1: token replay of the session models and the heuristics model's footprints on frame shapes of XES uploads (2026-11-22)
+
+Round GD re-reviewed round GC on fresh banks and aligned `/api/mine`'s
+token replay of the Alpha, Inductive and heuristics models and
+`/api/discover-graph`'s footprints of the cached heuristics model, on the
+`dataframe` and `lazyframe` shapes of XES uploads, against pm4py's
+`token_replay.apply` and footprints discovery on read_xes's frame and its
+Polars copy with pm4py's own net. GC's CI run 45046061452 (748a219) passed
+on Linux, macOS and the Python, verifier and frontend jobs (Windows still
+building at GD's start). Observed black-box on pm4py 2.7.22 (pandas 3.0.5,
+numpy 2.4.6, polars 1.44.1, no pyarrow; frames converted to Polars column
+by column), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4
+AVX512_ICL AVX512_SPR"`, `PYTHONHASHSEED=0`, a 10 second timeout per upload
+(pm4py's footprints never finish on some unbounded nets) and exact
+comparison of the replay totals (produced, consumed, missing, remaining
+tokens, fitting traces, traces), the footprints or the error messages.
+
+Banks: round GA's gaM, gaH, gaL, gaA, gaT, gaS, round GB's gbM to gbW and
+round GC's gc* (1,190 uploads per shape), and for the re-review new banks
+from `gen/gengc.py` on new seeds: gdI, gdB, gdX, gdD, gdT, gdF (240
+uploads: integer, boolean, mixed, date, text and float start columns,
+timestamp gaps, lifecycle columns, missing cases) and hdS, hdL, hdM, hdG
+(160 Heuristics++ uploads).
+
+Fixed:
+
+- **GD1-1. Token replay replays the frame's variants.** pm4py's
+  `token_replay.apply` on a frame groups it by case and replays each case's
+  activities in the frame's row order, never sorted by timestamp: pandas'
+  cases in its sorted groupby, without the rows whose case is missing;
+  Polars' in first-row order, the rows whose case is null one more case.
+  It counts the variants and sorts them by (number of cases, activity
+  tuple), descending (CPython's list.sort), so two variants with as many
+  cases that first differ where one has a missing label (pandas' NaN,
+  Polars' None, one object throughout, so two missing labels are equal)
+  and the other a name raise `TypeError: '<' not supported between
+  instances of 'float'|'NoneType' and 'str'` (or the reverse, as the sort
+  compares them). Minera replayed the model's prepared log instead (sorted
+  by timestamp, the null case counted on pandas, and for Alpha only when
+  the Alpha prepared log existed, which a missing case prevents: "the
+  cached Alpha prepared log is unavailable"). Now every model's replay of
+  an XES session (Alpha, Inductive, heuristics, POWL) reads the frame (new
+  internal header `xes_frame_token_replay.hpp`).
+- **GD1-2. The transition name sort.** Before replaying, pm4py sorts the
+  net's transitions by name. The heuristics net names a missing label's
+  transition by the label, so beside another transition the sort raises
+  `TypeError: '<' not supported between instances of 'str' and
+  'float'|'NoneType'` when the missing label leads the net's activities,
+  else `'float'|'NoneType' and 'str'`, whatever the frame holds; Alpha's
+  net names it NaN or None as well (one more transition, unlabelled in
+  Minera's net), and the sort raises `'float'|'NoneType' and 'str'` (the
+  operands' order is declared below).
+- **GD1-3. The missing label in the replay.** A pandas NaN matches no
+  transition of the heuristics net, but Alpha's NaN transition, which
+  carries the frame's own object; Polars' None matches the net's silent
+  transitions (pm4py's match of a null activity): the single enabled one,
+  else the greatest by name, force-fired.
+- **GD1-4. Routing ties in the heuristics net.** pm4py breaks the ties of
+  its silent routing by place and transition names; Minera's converted
+  net now records pm4py's names (source0, sink0, pre_X, intplace_X,
+  splace_in_T_S, hid_N with joins numbered before splits in pm4py's visit
+  order) and the replay orders ties by them (new internal header
+  `heuristics_petri_names.hpp`).
+- **GD1-5. Footprints of the cached heuristics model without POWL.**
+  `/api/discover-graph` with `footprints_model=heuristic` answered "cached
+  POWL model is unavailable" when POWL had failed on the upload (an upload
+  without events, for one); the route now needs only the models its
+  variants read (`analyze_footprints_models`).
+
+Before and after, per shape (1,190 uploads; pandas / Polars where they
+differ):
+
+- heuristics replay: 115 / 54 totals differed, 27 / 31 errors named
+  differently and 7 / 3 errors where pm4py answers; after, 2 differ
+  (gcQ/f5714 and f5716, whose totals change with the hash seed in pm4py
+  itself, Minera's among them), 155 / 159 errors and 310 / 306 totals
+  equal;
+- the heuristics net's footprints: 175 equal and 229 refused before, 398
+  equal after; the 30 where both fail are unbounded nets (pm4py does not
+  finish, Minera raises "Petri reachability graph is unbounded along an
+  ancestor path"), and the 39 where only pm4py's net footprints answer are
+  uploads with a missing label, where the route's log footprints raise as
+  pm4py's entire_event_log variant does on the legacy log (`KeyError:
+  'concept:name'`, Minera "activity selector is missing or null");
+- Alpha replay: 191 / 194 totals equal, 106 refused where pm4py answers
+  (a missing case), and on frames with a missing label 450 / 601 errors
+  named differently and 273 / 122 refused; after, every total equal (297 /
+  300 and 273 / 122), 445 / 462 errors equal and 5 / 139 that differ only
+  in the operands' order;
+- Inductive replay: 58 / 82 totals differed (rows out of time order); all
+  191 / 297 equal after (pm4py's Inductive raises on every frame with a
+  missing label, as Minera's does);
+- POWL replay (pm4py's POWL algorithm, converted to a Petri net): 2 / 43
+  totals differed, 189 / 254 equal; after, 2 / 7 differ (open, below) and
+  189 / 290 are equal.
+
+Re-review of GC on the new banks (Minera's final binary): the heuristics
+net's conversion (`cm/conv.py` over all 1,590 uploads per shape: 654
+nets, 51 nets with a missing label and 22 errors equal, 863 where both
+raise), Alpha's and the temporal profile's seven start-key sets
+(`optval.py` on gd*: every upload equal) and Heuristics++ (`hpp`,
+`hpp_perf`, `hpp_min` on hd*: every pandas upload equal, and on
+Polars all but hdL/f7365 and f7375, open below).
+
+Declared:
+
+- The operands of Alpha's transition name sort follow the order of a
+  Python set of transitions, which changes with the hash seed and from run
+  to run under the same seed (object identities: gbH/f4424 gave both
+  orders in six runs); Minera names the missing label first. Sweeps and
+  the suite check the error's types only.
+- Polars' None against several enabled silent transitions picks by hash
+  order in pm4py (seed dependent); Minera fires the greatest by name.
+- gcQ/f5714 and gcQ/f5716: pm4py's own heuristics replay totals vary with
+  the hash seed (98/96/0/2 or 100/97/0/3; 78/76/2/4 or 79/77/2/4); Minera
+  gives one of them.
+- The footprints route on an upload with a missing label raises in its
+  log part where pm4py's entire_event_log variant raises `KeyError:
+  'concept:name'`; the messages differ, as before GD.
+- Open for round GE: the POWL replay's remaining totals (pandas
+  gaL/f2306, gcB/f5213; Polars gaL/f2310, gaM/f2136, gaS/f2606, gaT/f2531,
+  gbQ/f4708, gbQ/f4712, gcQ/f5716; deterministic in pm4py, whose POWL net
+  names its transitions by uuid), and Heuristics++ on Polars with
+  lifecycle gaps and a complete event without a timestamp (hdL/f7365 and
+  f7375: pm4py raises `TypeError: unsupported operand type(s) for -:
+  'NoneType' and 'NoneType'` on the cases in first-row order before
+  reaching a later missing lifecycle, Minera the lifecycle
+  `AttributeError`).
+- Unchanged: the declared items of GC1 and before.
+
+In the suite: the new `minera_server_mine_xes_frames_gd_tests` (heuristics
+replay totals on an unnamed trace, rows out of time order, missing labels
+alone in their cases and two routing ties; the variant sort's and the
+transition name sort's TypeErrors; Alpha's replay on an unnamed trace, rows
+out of order, a NaN transition and the name sort's types; the heuristics
+footprints of an upload without events, of an unnamed trace's upload and
+of a routing tie; both shapes; 23 of its checks fail on GC's binary)
+carries the reference values. The full ctest passed 667 of 667 (25
+minutes, -j2) on the first run. The fixture replay changed 2 of 2,673
+responses (`xes-custom-clock-native-flat-dataframe` and `-lazyframe`: the
+Alpha, Inductive and POWL replays of a trace whose rows run against its
+clock now misfit, with precision 0, as pm4py's replay of the frame does),
+refreshed; the Python script tests passed 406 of 406.

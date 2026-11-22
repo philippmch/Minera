@@ -6,6 +6,7 @@
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
 #include "token_replay_context.hpp"
+#include "token_replay_null_activity.hpp"
 #include "reference_activity_selector.hpp"
 
 #include <algorithm>
@@ -6088,17 +6089,26 @@ std::vector<std::size_t> detail::initial_enabled_token_activities(
   return {activities.begin(), activities.end()};
 }
 
-ConformanceResult check_conformance(const EventLog& event_log,
-                                    const PetriNet& net,
-                                    TokenReplayOptions options) {
+namespace {
+
+ConformanceResult check_conformance_replay(const EventLog& event_log,
+                                           const PetriNet& net,
+                                           TokenReplayOptions options,
+                                           bool match_null_activity) {
   validate_token_replay_event_limit(event_log, options);
   if (!valid_token_replay_variant(options.variant)) {
     throw std::invalid_argument("unsupported token replay variant");
   }
-  const Replayer replayer(net, options.initial_marking, options.final_marking, &options);
+  const Replayer replayer(net, options.initial_marking, options.final_marking, &options,
+                          match_null_activity);
   const auto& activity_attribute = options.activity_attribute;
-  const auto variants = collect_replay_variants(event_log, replayer,
+  auto variants = collect_replay_variants(event_log, replayer,
                                           activity_attribute);
+  // A null activity fires a silent transition, as the full replay's does.
+  if (match_null_activity)
+    for (auto& variant : variants)
+      for (const auto index : variant.null_activity_indices)
+        variant.ids[index] = replayer.null_activity_id();
 
   ConformanceResult result;
   result.trace_count = event_log.trace_count();
@@ -6200,6 +6210,20 @@ ConformanceResult check_conformance(const EventLog& event_log,
                      return a.count > b.count;
                    });
   return result;
+}
+
+}  // namespace
+
+ConformanceResult check_conformance(const EventLog& event_log,
+                                    const PetriNet& net,
+                                    TokenReplayOptions options) {
+  return check_conformance_replay(event_log, net, std::move(options), false);
+}
+
+ConformanceResult detail::check_conformance_null_silent(const EventLog& event_log,
+                                                        const PetriNet& net,
+                                                        TokenReplayOptions options) {
+  return check_conformance_replay(event_log, net, std::move(options), true);
 }
 
 ConformanceResult check_conformance(const EventLog& event_log,

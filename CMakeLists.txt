@@ -2568,6 +2568,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_mine_xes_frames_gc_tests minera_server)
     add_test(NAME minera_server_mine_xes_frames_gc_tests
              COMMAND minera_server_mine_xes_frames_gc_tests $<TARGET_FILE:minera_server>)
+    # Round GD: token replay and footprints of the heuristics model on XES frames.
+    add_executable(minera_server_mine_xes_frames_gd_tests
+      src/backend/tests/test_server_mine_xes_frames_gd.cpp)
+    target_include_directories(minera_server_mine_xes_frames_gd_tests PRIVATE third_party)
+    target_link_libraries(minera_server_mine_xes_frames_gd_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_mine_xes_frames_gd_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_mine_xes_frames_gd_tests minera_server)
+    add_test(NAME minera_server_mine_xes_frames_gd_tests
+             COMMAND minera_server_mine_xes_frames_gd_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

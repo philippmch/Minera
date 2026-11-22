@@ -2,12 +2,14 @@
 #include "minera/heuristic_miner.hpp"
 #include "minera/petri_net_reduction.hpp"
 #include "minera/process_tree_petri.hpp"
+#include "heuristics_petri_names.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <limits>
 #include <map>
 #include <optional>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -472,20 +474,90 @@ PetriNet to_petri_net(const ProcessTree& tree) {
   return convert_process_tree_to_petri_net(tree).net;
 }
 
-PetriNet to_petri_net(const HeuristicsNet& heuristics) {
+namespace {
+
+// pm4py's order of the heuristics net's silent split and join transitions:
+// its names count every join before every split, including transitions
+// removed by reduction, visiting each node's own join before its
+// name-ordered outgoing targets and the splits along the incoming relation.
+void heuristics_hidden_order(const HeuristicsNet& heuristics, const std::vector<std::size_t>& active,
+                             std::vector<std::size_t>& join_order, std::vector<std::size_t>& split_order) {
+  const std::size_t n = heuristics.activities.size();
+  const auto contains = [](const std::vector<std::size_t>& list, std::size_t a) {
+    return std::find(list.begin(), list.end(), a) != list.end();
+  };
+  const auto name_order = [&](std::size_t lhs, std::size_t rhs) {
+    return heuristics.activities[lhs] < heuristics.activities[rhs];
+  };
+  std::vector<std::vector<std::size_t>> successors(n), predecessors(n);
+  for (const auto& edge : heuristics.edges) {
+    if (edge.source >= n || edge.target >= n) continue;
+    successors[edge.source].push_back(edge.target);
+    auto& incoming = predecessors[edge.target];
+    if (std::find(incoming.begin(), incoming.end(), edge.source) == incoming.end())
+      incoming.push_back(edge.source);
+  }
+  for (auto& neighbours : successors) {
+    std::sort(neighbours.begin(), neighbours.end(), name_order);
+    neighbours.erase(std::unique(neighbours.begin(), neighbours.end()), neighbours.end());
+  }
+  for (auto& neighbours : predecessors) std::sort(neighbours.begin(), neighbours.end(), name_order);
+  const auto append_active = [&](std::vector<std::size_t>& order, std::size_t a) {
+    if (contains(active, a) && !contains(order, a)) order.push_back(a);
+  };
+  join_order.clear();
+  split_order.clear();
+  for (const auto a : active) {
+    append_active(join_order, a);
+    for (const auto target : successors[a]) append_active(join_order, target);
+  }
+  for (const auto a : active) append_active(join_order, a);
+  for (const auto a : join_order)
+    for (const auto predecessor : predecessors[a]) append_active(split_order, predecessor);
+  for (const auto a : active) append_active(split_order, a);
+}
+
+// to_petri_net(heuristics), recording pm4py's names of its places and
+// transitions in `names` when given (round GD): source0 and sink0, an edge's
+// place pre_<target> (splace_in_<target>_<source> when the target has more
+// than one predecessor), a join's hub pre_<a>, a split's hub or parking
+// place intplace_<a>, hid_<k> for the silent split and join transitions,
+// the label for an activity's (None for Polars' missing label); a place or
+// transition the reduction merges keeps the lowest original index's name.
+PetriNet build_heuristics_petri_net(const HeuristicsNet& heuristics, detail::HeuristicsPetriNames* names) {
   const std::size_t n = heuristics.activities.size();
   PetriNet net;
   net.set_activities(heuristics.activities);
+  std::vector<std::string> place_names;
+  PetriTransitionNameList transition_names;
+  const auto pm4py_label = [&](std::size_t a) {
+    auto name = heuristics.activities.at(a);
+    if (heuristics.null_activity && *heuristics.null_activity == a)
+      while (!name.empty() && name.back() == '\x1f') name.pop_back();
+    return name;
+  };
   const std::size_t source = net.add_place();
+  place_names.push_back("source0");
   const std::size_t sink = net.add_place();
+  place_names.push_back("sink0");
   net.set_source(source);
   net.set_sink(sink);
 
   // One place per accepted dependency edge: a token on it means the edge has
   // been taken and the target is now enabled (or awaited).
+  std::vector<std::size_t> predecessor_count(n, 0);
+  {
+    std::set<std::pair<std::size_t, std::size_t>> seen;
+    for (const auto& edge : heuristics.edges)
+      if (edge.target < n && seen.insert({edge.source, edge.target}).second) ++predecessor_count[edge.target];
+  }
   std::map<std::pair<std::size_t, std::size_t>, std::size_t> edge_place;
   for (const auto& edge : heuristics.edges) {
     edge_place[{edge.source, edge.target}] = net.add_place();
+    place_names.push_back(edge.target < n && edge.source < n
+        ? (predecessor_count[edge.target] <= 1 ? "pre_" + pm4py_label(edge.target)
+                                               : "splace_in_" + pm4py_label(edge.target) + "_" + pm4py_label(edge.source))
+        : std::string("p") + std::to_string(place_names.size()));
   }
 
   // A hand-built net may carry no bundle information; every edge then forms
@@ -524,17 +596,23 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
   // transition per bundle, so exactly one bundle is taken. No input
   // alternative leaves the transition inputless; no output alternative gets
   // a fresh private place where the token parks instead of vanishing.
+  // pm4py's numbers of each activity's silent join and split transitions.
+  std::vector<std::size_t> hidden_join(n, 0), hidden_split(n, 0);
   const auto merge = [&](std::vector<std::vector<std::size_t>> alts,
-                         bool joining) -> std::vector<std::size_t> {
+                         bool joining, std::size_t a) -> std::vector<std::size_t> {
     if (alts.empty()) {
       if (joining) return {};
+      place_names.push_back("intplace_" + pm4py_label(a));
       return {net.add_place()};
     }
     if (alts.size() == 1) {
       return std::move(alts.front());
     }
+    place_names.push_back((joining ? "pre_" : "intplace_") + pm4py_label(a));
     const std::size_t hub = net.add_place();
+    std::size_t number = joining ? hidden_join[a] : hidden_split[a];
     for (auto& places : alts) {
+      transition_names.push_back("hid_" + std::to_string(number++));
       if (joining) {
         net.add_transition(std::nullopt, std::move(places), {hub});
       } else {
@@ -570,6 +648,24 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
                                    [&](const auto& edge) { return edge.target == *null_activity; }))
     throw HeuristicPandasError("builtins.TypeError", std::string("can only concatenate str (not \"") +
                                    (null_is_none ? "NoneType" : "float") + "\") to str");
+  if (names) {
+    // Joins are numbered before splits, each in pm4py's visiting order.
+    std::vector<std::size_t> join_order, split_order;
+    heuristics_hidden_order(heuristics, active, join_order, split_order);
+    std::size_t counter = 0;
+    for (const auto a : join_order) {
+      auto in_alts = alternatives(a, false);
+      if (contains(heuristics.start_activities, a)) in_alts.push_back({source});
+      hidden_join[a] = counter + 1;
+      if (in_alts.size() > 1) counter += in_alts.size();
+    }
+    for (const auto a : split_order) {
+      auto out_alts = alternatives(a, true);
+      if (contains(heuristics.end_activities, a)) out_alts.push_back({sink});
+      hidden_split[a] = counter + 1;
+      if (out_alts.size() > 1) counter += out_alts.size();
+    }
+  }
   for (const std::size_t a : active) {
     auto in_alts = alternatives(a, false);
     if (contains(heuristics.start_activities, a)) {
@@ -584,15 +680,52 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
     // MSVC evaluate right to left, Clang left to right), which numbered the
     // net differently on macOS. The output side goes first, as the pinned
     // GCC results expect.
-    auto outputs = merge(std::move(out_alts), false);
-    auto inputs = merge(std::move(in_alts), true);
+    auto outputs = merge(std::move(out_alts), false, a);
+    auto inputs = merge(std::move(in_alts), true, a);
     net.add_transition(null_is_none && a == *null_activity ? std::nullopt : std::optional<std::size_t>(a),
                        std::move(inputs), std::move(outputs));
+    transition_names.push_back(null_is_none && a == *null_activity ? std::nullopt
+                                                                   : std::optional<std::string>(pm4py_label(a)));
   }
   PetriNetReductionOptions reduction_options;
   reduction_options.preserve_join_bridges = true;
-  return reduce_petri_net(net, reduction_options).net;
+  auto reduced = reduce_petri_net(net, reduction_options);
+  if (names) {
+    if (place_names.size() != reduced.old_to_new_place.size() ||
+        transition_names.size() != reduced.old_to_new_transition.size())
+      throw std::logic_error("heuristics Petri name metadata cardinality");
+    names->places.assign(reduced.net.place_count(), std::string{});
+    std::vector<bool> placed(reduced.net.place_count(), false);
+    for (std::size_t old = 0; old < place_names.size(); ++old) {
+      const auto id = reduced.old_to_new_place[old];
+      if (id == kRemovedPlace || id >= placed.size() || placed[id]) continue;
+      names->places[id] = place_names[old];
+      placed[id] = true;
+    }
+    names->transitions.assign(reduced.net.transitions().size(), std::nullopt);
+    std::vector<bool> named(reduced.net.transitions().size(), false);
+    for (std::size_t old = 0; old < transition_names.size(); ++old) {
+      const auto id = reduced.old_to_new_transition[old];
+      if (id == kRemovedTransition || id >= named.size() || named[id]) continue;
+      names->transitions[id] = transition_names[old];
+      named[id] = true;
+    }
+  }
+  return std::move(reduced.net);
 }
+
+}  // namespace
+
+PetriNet to_petri_net(const HeuristicsNet& heuristics) {
+  return build_heuristics_petri_net(heuristics, nullptr);
+}
+
+detail::HeuristicsPetriNames detail::heuristics_petri_names(const HeuristicsNet& heuristics) {
+  HeuristicsPetriNames names;
+  (void)build_heuristics_petri_net(heuristics, &names);
+  return names;
+}
+
 
 PetriNetPresentation to_petri_net_presentation(const HeuristicsNet& heuristics) {
 

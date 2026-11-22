@@ -2396,14 +2396,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "64731",
+        "Content-Length": "64799",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-custom-clock-native-flat-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-dataframe.response.json",
-        "bytes": 64731,
-        "sha256": "80e6d826f3241152823512caaac848cb7fba7f245b03d08941612ea7b9019d03",
+        "bytes": 64799,
+        "sha256": "7f4006663fd137c0c105c518a3891aae2a7761e7be41bc998488c7c9f34281a9",
         "status": 200
       },
       "exports": {},
@@ -2450,14 +2450,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "70005",
+        "Content-Length": "70073",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-custom-clock-native-flat-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-lazyframe.response.json",
-        "bytes": 70005,
-        "sha256": "ed7e6e23de83aa132741ae5dbcbde709066a5ee096984ef4a6c3c5156aafcee0",
+        "bytes": 70073,
+        "sha256": "f1c66fece86c5351d3a9c8adbc0def8991112236cd9d8ba59498e4537ba7fb88",
         "status": 200
       },
       "exports": {},

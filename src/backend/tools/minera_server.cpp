@@ -103,6 +103,9 @@
 #include "minera/dataframe_columns.hpp"
 #include "csv_frame_table.hpp"
 #include "../xes_frame_columns.hpp"
+#include "../xes_frame_token_replay.hpp"
+#include "../token_replay_null_activity.hpp"
+#include "../heuristics_petri_names.hpp"
 #include "minera/pandas_read_csv.hpp"
 #include "minera/upload_case_relations.hpp"
 #include "minera/data_petri_net.hpp"
@@ -1118,20 +1121,29 @@ minera::FootprintsDiscoveryOptions footprints_discovery_options(
   return result;
 }
 
-minera::FootprintsAnalysis analyze_footprints(
+// The footprints bundle over the models it reads; a model the session lacks
+// (nullptr: its discovery failed on the upload) raises only when the
+// selected model or a requested variant reads it (round GD).
+minera::FootprintsAnalysis analyze_footprints_models(
     const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
-    const minera::EventLog& alpha_log,
-    const minera::ProcessTree& tree, const minera::PowlNode& powl,
-    const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
-    const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
+    const minera::EventLog* alpha_log_model,
+    const minera::ProcessTree* tree_model, const minera::PowlNode* powl_model,
+    const minera::PetriNet* inductive_model, const minera::PetriNet* alpha_model,
+    const minera::PetriNet* heuristic_model, const minera::PetriNet* powl_net_model,
     const minera::FootprintsOptions& options,
     const minera::ActiveEventSource* active_source = nullptr,
     const minera::EventTable* upload_frame = nullptr) {
+  const auto need = [](const auto* model, const char* message) -> const auto& {
+    if (!model) throw std::invalid_argument(message);
+    return *model;
+  };
   minera::FootprintsAnalysis analysis;
   analysis.model = options.model;
   analysis.strict = options.strict;
   const auto discovery_options = footprints_discovery_options(options);
-  const auto& selected_log = options.model == "alpha" ? alpha_log : active_source ? active_source->checked_log() : log;
+  const auto& selected_log = options.model == "alpha"
+      ? need(alpha_log_model, "the cached Alpha prepared log is unavailable")
+      : active_source ? active_source->checked_log() : log;
   analysis.activity_attribute = discovery_options.activity_attribute;
   analysis.case_id_attribute = discovery_options.case_id_attribute;
   analysis.trace_case_ids = minera::resolve_footprints_case_ids(
@@ -1167,11 +1179,13 @@ minera::FootprintsAnalysis analyze_footprints(
     return *dfg_footprint;
   };
   const auto tree_fp = [&]() -> const minera::Footprint& {
-    if (!tree_footprint) tree_footprint = minera::discover_footprints(tree);
+    if (!tree_footprint) tree_footprint = minera::discover_footprints(
+        need(tree_model, "the active source has no successfully discovered process tree"));
     return *tree_footprint;
   };
   const auto powl_fp = [&]() -> const minera::Footprint& {
-    if (!powl_footprint) powl_footprint = minera::discover_footprints(powl);
+    if (!powl_footprint) powl_footprint = minera::discover_footprints(
+        need(powl_model, "cached POWL model is unavailable; mine the source again"));
     return *powl_footprint;
   };
 
@@ -1206,14 +1220,19 @@ minera::FootprintsAnalysis analyze_footprints(
   if (options.discovery_variants.contains("powl")) analysis.powl = powl_fp();
 
   const minera::PetriNet* selected_petri = nullptr;
+  const char* unavailable = nullptr;
   if (options.model == "process_tree" || options.model == "inductive") {
-    selected_petri = &inductive_net;
+    selected_petri = inductive_model;
+    unavailable = "cached Inductive Petri net is unavailable; mine the source again";
   } else if (options.model == "powl") {
-    selected_petri = &powl_net;
+    selected_petri = powl_net_model;
+    unavailable = "cached POWL model is unavailable; mine the source again";
   } else if (options.model == "alpha") {
-    selected_petri = &alpha_net;
+    selected_petri = alpha_model;
+    unavailable = "cached Alpha Petri net is unavailable; mine the source again";
   } else if (options.model == "heuristic") {
-    selected_petri = &heuristic_net;
+    selected_petri = heuristic_model;
+    unavailable = "cached heuristics Petri net is unavailable; mine the source again";
   }
   if (options.model == "process_tree") {
     analysis.model_footprint = tree_fp();
@@ -1223,15 +1242,15 @@ minera::FootprintsAnalysis analyze_footprints(
     analysis.model_footprint = dfg_fp();
   } else {
     analysis.model_footprint = minera::discover_footprints(
-        *selected_petri, discovery_options);
+        need(selected_petri, unavailable), discovery_options);
   }
   if (options.discovery_variants.contains("petri_reach_graph")) {
-    if (selected_petri == nullptr) {
+    if (unavailable == nullptr) {
       throw std::invalid_argument(
           "petri_reach_graph requires a Petri-capable footprints model");
     }
     analysis.petri_reach_graph = minera::discover_footprints(
-        *selected_petri, discovery_options);
+        need(selected_petri, unavailable), discovery_options);
   }
   if (options.conformance_variants.contains("log_model")) {
     minera::FootprintsLogModelOptions conformance_options;
@@ -1259,6 +1278,19 @@ minera::FootprintsAnalysis analyze_footprints(
   analysis.log_fitness = fitness.log_fitness;
   analysis.perc_fit_traces = fitness.perc_fit_traces;
   return analysis;
+}
+
+minera::FootprintsAnalysis analyze_footprints(
+    const minera::EventLog& log, const minera::DirectlyFollowsGraph& graph,
+    const minera::EventLog& alpha_log,
+    const minera::ProcessTree& tree, const minera::PowlNode& powl,
+    const minera::PetriNet& inductive_net, const minera::PetriNet& alpha_net,
+    const minera::PetriNet& heuristic_net, const minera::PetriNet& powl_net,
+    const minera::FootprintsOptions& options,
+    const minera::ActiveEventSource* active_source = nullptr,
+    const minera::EventTable* upload_frame = nullptr) {
+  return analyze_footprints_models(log, graph, &alpha_log, &tree, &powl, &inductive_net, &alpha_net,
+                                   &heuristic_net, &powl_net, options, active_source, upload_frame);
 }
 
 minera::DfgStatisticalVariant dfg_statistical_variant(
@@ -4741,6 +4773,18 @@ void handle_graph_discovery(const httplib::Request& request,
         (params.footprints.discovery_variants.contains("entire_dataframe") ||
          params.footprints.discovery_variants.contains("polars_lazyframes"));
     overlay_cached_source_selectors(request, *session, params, flat_footprints);
+    // The footprints read only the models their selection names (round GD):
+    // pm4py computes the heuristics net's footprints whether or not POWL or
+    // the process tree could be discovered on the upload. A default variant
+    // whose model the session lacks is left out; a requested one raises.
+    const auto session_net = [&](const char* name) -> const minera::PetriNet* {
+      const auto found = session->nets.find(name);
+      return found == session->nets.end() ? nullptr : &found->second;
+    };
+    if (family == "footprints" && !present("footprints_discovery_variants")) {
+      if (!session->tree_ready) params.footprints.discovery_variants.erase("process_tree");
+      if (!session->powl) params.footprints.discovery_variants.erase("powl");
+    }
     const minera::EventLog* input = nullptr;
     if (family == "footprints") input = params.footprints.model == "alpha" ? &cached_model_log(*session,"alpha") : &require_prepared_log(*session);
     else if (session->log_ready) input = &require_prepared_log(*session);
@@ -4750,11 +4794,12 @@ void handle_graph_discovery(const httplib::Request& request,
     std::optional<minera::TransitionSystem> transitions;
     std::string model_footprint, model_origin;
     if (family == "footprints") {
-      if (!session->powl) throw std::invalid_argument("cached POWL model is unavailable; mine the source again");
       register_activity_selector_values(graph, *input, params.footprints.activity_attribute);
-      footprints = analyze_footprints(require_prepared_log(*session), graph, cached_model_log(*session,"alpha"),
-        require_process_tree(*session), *session->powl, session->nets.at("inductive"), session->nets.at("alpha"),
-        session->nets.at("heuristic"), session->nets.at("powl"), params.footprints, session->active_source.get());
+      footprints = analyze_footprints_models(require_prepared_log(*session), graph,
+        session->alpha_log_ready ? &session_alpha_log(*session) : nullptr,
+        session->tree_ready ? &session->tree : nullptr, session->powl ? &*session->powl : nullptr,
+        session_net("inductive"), session_net("alpha"), session_net("heuristic"), session_net("powl"),
+        params.footprints, session->active_source.get());
       model_footprint = minera::footprint_json(footprints->model_footprint, graph);
       model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
     } else {
@@ -4766,12 +4811,12 @@ void handle_graph_discovery(const httplib::Request& request,
     }
     std::string result = "null", result_error;
     if (input) try { const minera::OmitAnalysisTraces omit_traces(!analysis_include_traces(request)); result = minera::analysis_json(session->dataset, *input, graph,
-      footprints ? &require_process_tree(*session) : nullptr, footprints ? &session->nets.at("alpha") : nullptr,
+      footprints && session->tree_ready ? &session->tree : nullptr, footprints ? session_net("alpha") : nullptr,
       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-      footprints ? &session->nets.at("inductive") : nullptr, nullptr,
-      footprints ? &session->nets.at("heuristic") : nullptr, nullptr, nullptr, nullptr,
-      transitions ? &*transitions : nullptr, footprints ? &*session->powl : nullptr,
-      footprints ? &session->nets.at("powl") : nullptr, nullptr,
+      footprints ? session_net("inductive") : nullptr, nullptr,
+      footprints ? session_net("heuristic") : nullptr, nullptr, nullptr, nullptr,
+      transitions ? &*transitions : nullptr, footprints && session->powl ? &*session->powl : nullptr,
+      footprints ? session_net("powl") : nullptr, nullptr,
       nullptr, nullptr, nullptr, nullptr, footprints ? &*footprints : nullptr); } catch (const std::exception& error) { result_error = error.what(); }
     const auto quote = minera::embedding_runtime::detail::escape_json;
     response.set_content("{\"family\":\"GRAPH_DISCOVERY\",\"method\":" + quote(family) +

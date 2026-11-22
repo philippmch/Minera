@@ -329,7 +329,13 @@ void handle_active_source_mining(const httplib::Request& request,
       for (const auto& [name, petri] : session->nets) run(name + "_conformance", "model_prepared_log", [&](bool& native_returned) {
         std::optional<minera::EventLog> projected_powl;
         if (name == "powl") projected_powl = project_powl_activity(require_prepared_log(*session), params.powl.activity_key, params.powl.timestamp_key, params.powl.case_id_key);
-        const auto& log = projected_powl ? *projected_powl : cached_model_log(*session, name);
+        // pm4py replays an XES session's frame with every model's net (round
+        // GD, below), so the replay needs no prepared log of the model; the
+        // footprints still read it (pm4py's frame footprints sort by time).
+        const bool model_log_ready = name == "alpha" ? session->alpha_log_ready
+            : name == "inductive" ? session->inductive_log_ready : true;
+        const auto& log = projected_powl ? *projected_powl
+            : xes_frame && !model_log_ready ? require_prepared_log(*session) : cached_model_log(*session, name);
         auto options = params.token_replay;
         if (!params.token_replay_activity_attribute_supplied)
           options.activity_attribute = name == "alpha" ? params.alpha.activity_attribute : name == "inductive" ? params.inductive.activity_key : name == "heuristic" ? params.heuristic.activity_attribute : params.powl.activity_key;
@@ -338,12 +344,41 @@ void handle_active_source_mining(const httplib::Request& request,
         if (xes_frame) minera::detail::check_xes_frame_replay_columns(data(), options.case_id_attribute, options.activity_attribute);
         options_overrides[name + "_conformance"] = active_source_token_replay_options_json(options);
         options.cancelled = cancelled;
+        // The frame's own cases and rows (round GD; xes_frame_token_replay.hpp).
+        std::optional<minera::detail::XesFrameReplayLog> frame_log;
+        if (xes_frame && name != "heuristic") {
+          if (name == "alpha") minera::detail::check_alpha_null_transition_names(petri, data().kind() == minera::EventDataKind::kLazyEventTable);
+          frame_log = minera::detail::xes_frame_replay_log(data(), options.case_id_attribute, options.activity_attribute);
+        }
+        if (xes_frame && name == "heuristic") {
+          if (heuristics) minera::detail::check_heuristics_null_transition_names(*heuristics, petri);
+          frame_log = minera::detail::xes_frame_replay_log(data(), options.case_id_attribute, options.activity_attribute);
+          // pm4py breaks routing ties by its place names and picks a None
+          // label's silent transition by its transition names.
+          if (heuristics && options.place_names.empty() && options.transition_names.empty() &&
+              !options.nullable_transition_names) {
+            auto names = minera::detail::heuristics_petri_names(*heuristics);
+            if (names.places.size() == petri.place_count() && names.transitions.size() == petri.transitions().size()) {
+              options.place_names = std::move(names.places);
+              options.nullable_transition_names = std::move(names.transitions);
+            }
+          }
+        }
+        const auto& replayed = frame_log ? frame_log->log : log;
         const auto reachability = minera::final_marking_reachability(petri, cancelled);
-        conformance.push_back({name, true, minera::check_conformance(log, petri, options), minera::check_footprints(log, petri), std::nullopt});
+        // A missing label fires a silent transition: Polars' None (pm4py's
+        // match of a null activity), and NaN on Alpha's net, whose only
+        // silent transition is the missing label's own (the frame's object).
+        auto token_replay = frame_log && (frame_log->polars || name == "alpha")
+            ? minera::detail::check_conformance_null_silent(replayed, petri, options)
+            : minera::check_conformance(replayed, petri, options);
+        conformance.push_back({name, true, std::move(token_replay), minera::check_footprints(log, petri), std::nullopt});
         // pm4py lists the frame's cases in the case-id order of the replayed
-        // log (the model's own case key; see session_case_order).
-        minera::order_trace_diagnostics(conformance.back().token_replay,
-            session_case_order(session->active_source.get(), log));
+        // log (the model's own case key; see session_case_order); the frame
+        // replay's cases are already in its order.
+        if (!frame_log)
+          minera::order_trace_diagnostics(conformance.back().token_replay,
+              session_case_order(session->active_source.get(), log));
         minera::set_model_soundness(conformance.back(), reachability);
         native_returned = true;
         return "{\"representation\":\"analysis_presentation\"}";

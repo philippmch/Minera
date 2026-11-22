@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GC (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GD (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9001,6 +9001,82 @@ GC's suite: the full ctest 666 of 666 (39 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged (no fixture refresh; frontend untouched).
 Harness and probes: `review-harness/round-gc/`.
+
+Round GD re-reviewed GC on fresh banks and aligned `/api/mine`'s token
+replay of the session models and `/api/discover-graph`'s footprints of the
+cached heuristics model on the frame shapes of XES uploads (Review GD1).
+GC's CI run 45046061452 passed on Linux, macOS and the Python, verifier and
+frontend jobs (Windows still building at GD's start). No device was
+reachable at GD's start, so no newer reviewer handoff was read from the
+Mac. GC's fixes held on new banks from `gen/gengc.py` (gdI, gdB, gdX, gdD,
+gdT, gdF: 240 uploads with integer, boolean, mixed, date, text and float
+start columns, timestamp gaps, lifecycle columns, missing cases; hdS, hdL,
+hdM, hdG: 160 Heuristics++ uploads): `cm/conv.py` over 1,590 uploads per
+shape (654 nets, 51 with a missing label, 22 errors equal, 863 where both
+raise), `optval.py`'s seven start-key sets on gd* and `hpp`, `hpp_perf`,
+`hpp_min` on hd* all agree, except two Polars Heuristics++ uploads (open,
+below). Fixed: GD1-1, pm4py's `token_replay.apply` on a frame replays the
+frame's variants, each case's activities in row order (no timestamp sort),
+pandas' cases in its sorted groupby without the missing case, Polars' in
+first-row order with the null case as one more, and sorts the variants by
+(count, tuple) descending, a `TypeError` where a missing label meets a
+name; Minera replayed each model's prepared log (sorted, the null case
+counted, Alpha's refused when a missing case kept the Alpha prepared log
+from existing). Every model's replay on an XES session now reads the frame
+(internal `xes_frame_token_replay.hpp`). GD1-2, pm4py first sorts the
+net's transitions by name: the heuristics net's missing label (NaN, None)
+raises `'str' and 'float'|'NoneType'` when it leads the net's activities,
+else the reverse; Alpha's raises `'float'|'NoneType' and 'str'` (operand
+order declared). GD1-3, a pandas NaN matches no heuristics transition but
+Alpha's NaN transition; Polars' None fires a silent transition (the
+single enabled one, else the greatest by name, force-fired;
+`check_conformance_null_silent`). GD1-4, the heuristics net's silent
+routing ties go by pm4py's place and transition names (source0, sink0,
+pre_X, intplace_X, splace_in_T_S, hid_N; internal
+`heuristics_petri_names.hpp`). GD1-5, the footprints of the cached
+heuristics model no longer need a POWL model or a process tree
+(`analyze_footprints_models`; a requested variant whose model is missing
+raises). Before and after per shape (1,190 uploads): heuristics replay
+115 / 54 totals differed and 34 errors differed, after 2 (hash-seed ties
+in pm4py itself); its footprints 175 equal, after 398; Alpha replay 106
+refused plus 723 / 723 missing-label uploads differed, after every total
+equal and only the declared operand order left; Inductive replay 58 / 82
+differed, after none; POWL replay 2 / 43 differed, after 2 / 7 (open). Declared: the operands of
+Alpha's transition name sort follow a Python set's order, which changes
+with the hash seed and from run to run (object identities); Polars' None
+against several enabled silent transitions follows hash order; gcQ/f5714
+and f5716's totals vary with the hash seed in pm4py; the footprints
+route's log part raises on a missing label as pm4py's entire_event_log
+variant does (`KeyError: 'concept:name'`, a different message).
+
+GD's suite: @@SUITE@@
+Harness and probes: `review-harness/round-gd/`.
+
+Next round (GE) should start by re-reviewing round GD:
+
+- GD's CI run (and GC's Windows job if it was still running);
+- GD1 on fresh banks: `cm/cmroutes2.py` with `MODEL=heuristic|alpha|
+  inductive|powl` (with footprints for the heuristic model) on new
+  `gen/gengc.py` banks, more cases with only missing labels (Alpha's lone
+  NaN transition), several enabled silent transitions under Polars' None,
+  and a probe of the Alpha name sort's operand order (if a rule beats the
+  set order, model it);
+- Heuristics++ on Polars with lifecycle gaps and a complete event without
+  a timestamp (hdL/f7365, f7375): pm4py raises `TypeError: unsupported
+  operand type(s) for -: 'NoneType' and 'NoneType'` (cases in first-row
+  order, the subtraction before a later missing lifecycle), Minera the
+  lifecycle `AttributeError`;
+- the POWL replay's remaining totals (pandas gaL/f2306, gcB/f5213; Polars
+  gaL/f2310, gaM/f2136, gaS/f2606, gaT/f2531, gbQ/f4708, gbQ/f4712,
+  gcQ/f5716): deterministic in pm4py although its POWL net names
+  transitions by uuid, so compare the nets first, then the routing;
+- the other routes that replay a session model on XES frames (the
+  workbench and `/api/conformance-*` routes reading the cached nets, the
+  replay durations and decorations), against the same frame rules;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GD (kept for its older items):
 
 Next round (GD) should start by re-reviewing round GC:
 
