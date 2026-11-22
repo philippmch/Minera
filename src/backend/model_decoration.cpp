@@ -14,6 +14,7 @@
 #include "minera/conformance.hpp"
 #include "minera/petri_reference_arcs.hpp"
 #include "minera/timestamp.hpp"
+#include "model_decoration_internal.hpp"
 #include "performance_arithmetic.hpp"
 
 namespace minera {
@@ -172,6 +173,15 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
                                std::string_view activity_attribute,
                                std::string_view timestamp_attribute,
                                const std::function<bool()>& cancelled) {
+  return detail::decorate_model(log, net, activity_attribute, timestamp_attribute, cancelled,
+                                std::nullopt);
+}
+
+ModelDecoration detail::decorate_model(const EventLog& log, const PetriNet& net,
+                                       std::string_view activity_attribute,
+                                       std::string_view timestamp_attribute,
+                                       const std::function<bool()>& cancelled,
+                                       const PlaceOutgoingOrder& place_outgoing) {
   ModelDecoration result;
   result.transition_counts.assign(net.transitions().size(), 0);
   result.place_counts.assign(net.place_count(), 0);
@@ -205,7 +215,7 @@ ModelDecoration decorate_model(const EventLog& log, const PetriNet& net,
   if (net.has_extended_arcs()) {
     firing = extended_arc_firing_sequences(net, variants, cancelled, capped, skipped);
   } else {
-    firing = token_replay_firing_sequences(net, variants, cancelled);
+    firing = detail::token_replay_firing_sequences(net, variants, cancelled, place_outgoing);
     // Token replay fires silent transitions greedily, so it can reject a
     // variant that does have a clean path through the net. Those variants
     // still get the bounded marking-graph search the decoration used before;

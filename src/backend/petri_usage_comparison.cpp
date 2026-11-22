@@ -753,6 +753,7 @@ PetriUsageComparison compare_petri_usage_reference(const PetriNet& net, const Ev
   replay.initial_marking_keys = options.initial_marking_keys;
   replay.final_marking_keys = options.final_marking_keys;
   replay.exhaustive_invisible_exploration = options.exhaustive_invisible_exploration;
+  replay.place_outgoing_transition_order = options.place_outgoing_transition_order;
   return compare_element_usage_token_replay(net, log1, log2, std::move(replay),
                                             options.arc_occurrences ? &*options.arc_occurrences : nullptr);
 }

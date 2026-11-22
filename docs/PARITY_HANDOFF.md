@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GE (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GF (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9115,6 +9115,73 @@ GE's suite: the full ctest 668 of 668 (25 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-ge/`.
+
+Round GF re-reviewed GE on fresh banks, found the default log shape's
+reference and aligned the routes that replay a cached POWL or heuristics
+net with pm4py (Review GF1). GE's CI run 45064260404 passed on Linux,
+macOS and the Python, verifier and frontend jobs (Windows still building
+at GF's start). No device was reachable, so no newer reviewer handoff was
+read from the Mac. New banks (`gen/gengf.py`, seeds from 8000: gfA to gfE
+with loops, partial orders and silent routing, gfP to gfR with routing
+ties, hfI to hfL Heuristics++ uploads with typed `concept:instance`)
+held GE1. The default log shape follows AE2-1/AF1 (the legacy log without
+empty traces, shared non-null case ids merged, unnamed traces apart): the
+177 trace-count differences of GE are that model, and the POWL, Alpha and
+Inductive totals on that shape equal pm4py's. Fixed: GF1-1, the log shape
+replays the heuristics net with pm4py's names (GD named it on frames only;
+27 uploads' totals differed, after 2: gcQ/f5714 and f5716, declared in
+GD1 as hash-seed dependent in pm4py); GF1-2, the session keeps a named replay copy
+of each cached POWL and heuristics net (pm4py's names, POWL's arc order;
+the cached net, its JSON and PNML stay), which `/api/evaluate`
+(token-based fitness, precision, generalization, composite),
+`/api/compare-petri`, the stochastic map and the decorations replay
+(gaL/f2330's POWL fitness 0.99184 against pm4py's 0.98297 before, equal
+after; the stochastic map's weights and distribution types now equal
+pm4py's on 242 of 244 comparisons); GF1-3, Heuristics++ pairs lifecycle
+events by the instance's Python value (int 2 with float 2.0, never with
+'2'; NaN never on a log, NaN with NaN on pandas, text on Polars; hfJ/f8279
+gave pandas' TypeError operands swapped). The harness footprints check
+(`cmroutes2.py`, `cmroutes4.py`) asked for the heuristics model whatever
+`MODEL` was, so GE's and GF's footprints lines for the other models
+compared the wrong net; fixed, the POWL model's footprints on gfA to gfE
+equal pm4py's (32 of 32). Declared: an upload without a non-empty trace
+reports fitness 1 in the analysis (pm4py's evaluation and `/api/evaluate`
+say 0); the log shape's whole-mine error wording for a missing label or
+time; pm4py's element usage of four POWL pairs changes with the hash seed.
+Open: the stochastic map on events out of time order (gfR/f8540, f8564),
+the element usage of gfR/f8532 against f8533 (log2 out of time order),
+the playout and Monte Carlo fits from a cached net.
+
+GF's suite: the full ctest 669 of 669 (40 minutes, -j2, first run; the new
+`minera_server_cached_net_names_gf_tests` fails 13 of its checks on GE's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gf/`.
+
+Next round (GG) should start by re-reviewing round GF:
+
+- GF's CI run (and GE's Windows job if it was still running);
+- GF1 on fresh banks: `cmroutes4.py` on the log shape with every model,
+  `ct/evprobe.py`, `cpcmp.py` and `ct/smapsw.py` with both models, and
+  Heuristics++ (`ct/hpplog.py`, `sweepopt.sh`) with typed instances beside
+  missing labels, bool and date instances, and NaN floats;
+- the stochastic map on uploads whose events are out of time order
+  (gfR/f8540, f8564: pm4py's weights differ from Minera's on both the
+  file-order and the time-sorted log; find which order its replay and its
+  service times read), and `/api/compare-petri` of gfR/f8532 against
+  f8533 (log2 out of time order, deterministic in pm4py);
+- the playout and Monte Carlo routes fitted from a cached POWL or
+  heuristics net, the alignment-based routes on those nets (names do not
+  break alignment ties the same way; check), and the footprints of the
+  Alpha and Inductive models with the fixed harness;
+- the log shape's whole-mine error for Heuristics++ with a missing time
+  (Minera's core message where pm4py raises `KeyError: 'time:timestamp'`)
+  and the empty-log fitness of the analysis (1 against pm4py's 0): decide
+  whether to follow pm4py;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GF (kept for its older items):
 
 Next round (GF) should start by re-reviewing round GE:
 

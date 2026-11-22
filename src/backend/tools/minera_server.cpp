@@ -107,6 +107,7 @@
 #include "../token_replay_null_activity.hpp"
 #include "../heuristics_petri_names.hpp"
 #include "../powl_petri_names.hpp"
+#include "../model_decoration_internal.hpp"
 #include "minera/pandas_read_csv.hpp"
 #include "minera/upload_case_relations.hpp"
 #include "minera/data_petri_net.hpp"
@@ -464,6 +465,40 @@ struct CsvFrameCache {
   std::optional<minera::LazyEventTable> indexed_lazy;
 };
 
+// pm4py replays the POWL and heuristics nets it builds with its own place
+// and transition names: its routing ties go by them (rounds GD and GE), and
+// on the POWL net its silent path search follows the arcs in the order its
+// converter made them. A route that replays the session's cached net of
+// those miners replays this copy instead (round GF): the same net carrying
+// pm4py's names (the POWL net with each transition's outputs in that order)
+// and each place's consumers in that order. Exports keep the cached net.
+struct ReferenceReplayNet {
+  minera::PetriNet net;
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing;
+};
+
+std::optional<ReferenceReplayNet> powl_reference_replay_net(const minera::PowlNode& powl,
+                                                            const minera::PetriNet& petri) {
+  auto names = minera::detail::powl_petri_names(powl, petri);
+  if (!names) return std::nullopt;
+  ReferenceReplayNet result{minera::detail::powl_replay_net(petri, *names), std::move(names->place_outgoing)};
+  result.net.set_place_names(std::move(names->places));
+  result.net.set_transition_names(std::move(names->transitions));
+  return result;
+}
+
+std::optional<ReferenceReplayNet> heuristics_reference_replay_net(
+    const minera::HeuristicsNet& heuristics, const minera::PetriNet& petri) {
+  auto names = minera::detail::heuristics_petri_names(heuristics);
+  if (names.places.size() != petri.place_count() ||
+      names.transitions.size() != petri.transitions().size())
+    return std::nullopt;
+  ReferenceReplayNet result{petri, std::nullopt};
+  result.net.set_place_names(std::move(names.places));
+  result.net.set_transition_names(std::move(names.transitions));
+  return result;
+}
+
 struct MinedSession {
   std::uint64_t query_source_id=++g_query_source_sequence;
   std::uint64_t imported_model_id = 0;
@@ -489,6 +524,9 @@ struct MinedSession {
   minera::EventLog alpha_log;
   minera::DirectlyFollowsGraph graph;
   std::unordered_map<std::string, minera::PetriNet> nets;  // miner id -> net
+  // The POWL and heuristics nets as pm4py's replay names them (round GF;
+  // ReferenceReplayNet), for the routes that replay the cached net.
+  std::unordered_map<std::string, ReferenceReplayNet> replay_nets;
   minera::ProcessTree tree;  // the inductive model, for on-demand BPMN export
   std::optional<minera::PowlNode> powl;  // exact model retained for footprint comparisons
   minera::DeclareModel declare;  // classic Declare, for on-demand playout
@@ -560,6 +598,37 @@ bool prepared_log_is_identity(const minera::EventLog& prepared, const minera::Ev
     }
   }
   return true;
+}
+
+// The net a route replays when it replays `net`: for the session's cached
+// POWL or heuristics net its copy under pm4py's names (ReferenceReplayNet),
+// whose consumer order goes to `place_outgoing` when that is still unset;
+// any other net (a conversion variant, an imported model) as it is.
+const minera::PetriNet& session_replay_net(
+    const MinedSession& session, std::string_view miner, const minera::PetriNet& net,
+    std::optional<std::vector<std::vector<std::size_t>>>* place_outgoing = nullptr) {
+  const auto cached = session.nets.find(std::string(miner));
+  if (cached == session.nets.end() || &cached->second != &net) return net;
+  const auto found = session.replay_nets.find(std::string(miner));
+  if (found == session.replay_nets.end()) return net;
+  if (place_outgoing && !*place_outgoing) *place_outgoing = found->second.place_outgoing;
+  return found->second.net;
+}
+
+// session_replay_net for a token replay: when `options` name nothing, they
+// take the replay net's names and consumer order explicitly, as the GD and
+// GE replays passed them.
+const minera::PetriNet& session_replay_net(const MinedSession& session, std::string_view miner,
+                                           const minera::PetriNet& net,
+                                           minera::TokenReplayOptions& options) {
+  if (!options.place_names.empty() || !options.transition_names.empty() ||
+      options.nullable_transition_names || options.place_outgoing_transition_order)
+    return net;
+  const auto& replay = session_replay_net(session, miner, net, &options.place_outgoing_transition_order);
+  if (&replay == &net) return net;
+  if (replay.place_names()) options.place_names = *replay.place_names();
+  options.nullable_transition_names = replay.transition_names();
+  return replay;
 }
 
 const minera::EventLog& require_prepared_log(const MinedSession& session) {
@@ -1863,6 +1932,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto inductive_net = minera::to_petri_net(tree);
     const auto heuristic_net = minera::to_petri_net(heuristics);
     const auto powl_net = minera::to_petri_net(powl);
+    // The heuristics and POWL nets under pm4py's names, which its replay
+    // breaks ties by (round GF; ReferenceReplayNet).
+    auto heuristic_replay = heuristics_reference_replay_net(heuristics, heuristic_net);
+    auto powl_replay = powl_reference_replay_net(powl, powl_net);
     register_activity_selector_values(
         graph, log, params.footprints.activity_attribute);
     // The flat variants read the upload's frame, as pm4py's DataFrame paths
@@ -1984,20 +2057,16 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       // In the order the braced initializer evaluated them.
       const auto reachability = minera::final_marking_reachability(petri, cancelled);
       mine_progress_stage(net_name + ": token replay");
-      // pm4py's POWL net names break its routing ties, and its silent path
-      // search follows the arcs as the converter made them (round GE;
-      // powl_petri_names.hpp).
-      std::optional<minera::PetriNet> powl_replay_net;
-      if (is_powl && replay_options.place_names.empty() && replay_options.transition_names.empty() &&
-          !replay_options.nullable_transition_names && !replay_options.place_outgoing_transition_order) {
-        if (auto names = minera::detail::powl_petri_names(powl, petri)) {
-          powl_replay_net = minera::detail::powl_replay_net(petri, *names);
-          replay_options.place_names = std::move(names->places);
-          replay_options.nullable_transition_names = std::move(names->transitions);
-          replay_options.place_outgoing_transition_order = std::move(names->place_outgoing);
-        }
-      }
-      auto token_replay = minera::check_conformance(*conformance_log, powl_replay_net ? *powl_replay_net : petri,
+      // pm4py's POWL and heuristics nets' names break its routing ties, and
+      // its silent path search on the POWL net follows the arcs as the
+      // converter made them (rounds GE and GF; ReferenceReplayNet).
+      const ReferenceReplayNet* named = is_powl && powl_replay ? &*powl_replay
+          : id == "heuristic" && heuristic_replay ? &*heuristic_replay : nullptr;
+      const bool use_names = named && replay_options.place_names.empty() &&
+          replay_options.transition_names.empty() && !replay_options.nullable_transition_names &&
+          !replay_options.place_outgoing_transition_order;
+      if (use_names) replay_options.place_outgoing_transition_order = named->place_outgoing;
+      auto token_replay = minera::check_conformance(*conformance_log, use_names ? named->net : petri,
                                                     replay_options);
       // pm4py lists the frame's cases in the case-id order of the replayed
       // log (its own case key; see session_case_order).
@@ -2028,11 +2097,15 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         alpha_log, net, "concept:name", "time:timestamp", cancelled);
     const auto inductive_decoration = minera::decorate_model(
         inductive_log, inductive_net, "concept:name", "time:timestamp", cancelled);
-    const auto heuristic_decoration = minera::decorate_model(
-        log, heuristic_net, params.heuristic.activity_attribute,
-        params.heuristic.timestamp_attribute, cancelled);
-    const auto powl_decoration = minera::decorate_model(
-        powl_log, powl_net, params.powl.activity_key, params.powl.timestamp_key, cancelled);
+    // The heuristics and POWL nets replay under pm4py's names (round GF).
+    const auto heuristic_decoration = minera::detail::decorate_model(
+        log, heuristic_replay ? heuristic_replay->net : heuristic_net,
+        params.heuristic.activity_attribute, params.heuristic.timestamp_attribute, cancelled,
+        heuristic_replay ? heuristic_replay->place_outgoing : std::nullopt);
+    const auto powl_decoration = minera::detail::decorate_model(
+        powl_log, powl_replay ? powl_replay->net : powl_net, params.powl.activity_key,
+        params.powl.timestamp_key, cancelled,
+        powl_replay ? powl_replay->place_outgoing : std::nullopt);
 
     checkpoint("Writing the response");
     const minera::AnalysisConstraintCaseOrder constraint_list_order(
@@ -2083,6 +2156,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->nets.emplace("alpha", net);
     session->nets.emplace("heuristic", heuristic_net);
     session->nets.emplace("powl", powl_net);
+    if (heuristic_replay) session->replay_nets.emplace("heuristic", std::move(*heuristic_replay));
+    if (powl_replay) session->replay_nets.emplace("powl", std::move(*powl_replay));
     session->tree = tree;
     session->powl = powl;
     session->declare = declare;
@@ -9111,8 +9186,23 @@ void handle_compare_petri(const httplib::Request& request,
           reference, powl_key,
           session->powl_timestamp_key, session->powl_case_id_key);
     }
-    const auto comparison = minera::compare_petri_usage_reference(
-        it->second, *comparison_log, reference, comparison_options);
+    // The session's POWL and heuristics nets replay under pm4py's names
+    // (round GF); the POWL replay net's outputs follow its converter, so its
+    // output arcs are listed back in the cached net's order (an arc's usage
+    // is its transition's).
+    const auto& replayed_net = session_replay_net(*session, miner, it->second,
+        &comparison_options.place_outgoing_transition_order);
+    auto comparison = minera::compare_petri_usage_reference(
+        replayed_net, *comparison_log, reference, comparison_options);
+    if (&replayed_net != &it->second) {
+      std::vector<std::size_t> next_output(it->second.transitions().size(), 0);
+      for (auto& arc : comparison.arcs)
+        if (arc.kind == minera::PetriArcUsageKind::kOutput && arc.transition < next_output.size()) {
+          const auto& outputs = it->second.transitions()[arc.transition].outputs;
+          if (next_output[arc.transition] < outputs.size())
+            arc.place = outputs[next_output[arc.transition]++];
+        }
+    }
     response.set_content(minera::petri_usage_comparison_json(comparison),
                          "application/json");
   } catch (const std::exception& error) {
@@ -9248,6 +9338,16 @@ void handle_evaluate(const httplib::Request& request,
         params.composite_options.case_id_attribute = case_id;
       }
     }
+    // The session's POWL and heuristics nets replay under pm4py's names, and
+    // the POWL net's silent paths follow its converter's arc order (round GF).
+    std::optional<std::vector<std::vector<std::size_t>>> replay_outgoing;
+    const auto& evaluated = session_replay_net(*session, miner, selected, &replay_outgoing);
+    if (replay_outgoing)
+      for (auto* order : {&params.replay_fitness_options.place_outgoing_transition_order,
+                          &params.precision_options.place_outgoing_transition_order,
+                          &params.generalization_options.place_outgoing_transition_order,
+                          &params.composite_options.place_outgoing_transition_order})
+        if (!*order) *order = replay_outgoing;
     minera::ModelEvaluation result;
     result.miner = miner;
     const auto evaluate_input = [&](const auto& input) {
@@ -9258,7 +9358,7 @@ void handle_evaluate(const httplib::Request& request,
                   input, *evaluation_document, params.replay_fitness_variant,
                   params.replay_fitness_options)
             : minera::evaluate_replay_fitness(
-            input, selected, params.replay_fitness_variant,
+            input, evaluated, params.replay_fitness_variant,
             params.replay_fitness_options);
         break;
       case minera::EvaluationFamily::kPrecision:
@@ -9274,7 +9374,7 @@ void handle_evaluate(const httplib::Request& request,
                   input, *evaluation_document, params.precision_variant,
                   params.precision_options)
             : minera::evaluate_precision(
-            input, selected, params.precision_variant,
+            input, evaluated, params.precision_variant,
             params.precision_options);
         break;
       case minera::EvaluationFamily::kGeneralization:
@@ -9283,7 +9383,7 @@ void handle_evaluate(const httplib::Request& request,
                   input, *evaluation_document, params.generalization_variant,
                   params.generalization_options)
             : minera::evaluate_generalization(
-            input, selected, params.generalization_variant,
+            input, evaluated, params.generalization_variant,
             params.generalization_options);
         break;
       case minera::EvaluationFamily::kSimplicity:
@@ -9299,7 +9399,7 @@ void handle_evaluate(const httplib::Request& request,
             ? minera::evaluate_composite(
                   input, *session->imported_document, params.composite_options)
             : minera::evaluate_composite(
-                  input, selected, params.composite_options);
+                  input, evaluated, params.composite_options);
         break;
     }
     };
@@ -10442,8 +10542,11 @@ void handle_stochastic_map(const httplib::Request& request,
           params.fit.replay, params.initial_marking,
           miner == "imported" && session->imported_document
               ? &*session->imported_document : nullptr);
+      // The session's POWL and heuristics nets replay under pm4py's names
+      // (round GF); the map's transitions keep the cached net's indices.
+      const auto& replayed_net = session_replay_net(*session, miner, it->second, params.fit.replay);
       const auto report = minera::fit_stochastic_map_with_report(
-          *fit_log, it->second, params.fit);
+          *fit_log, replayed_net, params.fit);
       map = report.map;
       replayed = report.replayed_traces;
       skipped = report.skipped_traces;

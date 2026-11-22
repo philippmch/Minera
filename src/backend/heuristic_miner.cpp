@@ -10,6 +10,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 #include "python_list_sort.hpp"
+#include "python_scalar.hpp"
 #include "root_cause_unicode.hpp"
 #include "xes_frame_columns.hpp"
 
@@ -484,16 +485,44 @@ struct IntervalTrace {
   std::vector<Interval> performance_order;
 };
 
+// How the lifecycle pairing compares two instance values (round GF, observed
+// black-box): pm4py keys a start by its activity and instance as Python
+// values, so 2 pairs with 2.0 and True with 1 but never with '2'. A missing
+// instance pairs only with another missing one on a log; NaN never pairs
+// there (each parsed NaN is its own object), while a pandas frame holds NaN
+// for a missing cell and pairs NaN with NaN. Polars frames hold the column's
+// one dtype and keep the text comparison.
+enum class InstanceKeyMode { kText, kPythonLog, kPythonFrame };
+
+std::string lifecycle_instance_key(const EventAttribute* cell, InstanceKeyMode mode, std::size_t position) {
+  if (mode == InstanceKeyMode::kText) return cell && !cell->is_null ? cell->value : std::string();
+  if (!cell || cell->is_null) return "N";
+  if (cell->container != AttributeContainerKind::kScalar) return "S" + cell->value;
+  const auto scalar = python::from_attribute(*cell);
+  if (scalar.kind == python::Scalar::Kind::kFloat && std::isnan(scalar.real))
+    return mode == InstanceKeyMode::kPythonFrame ? std::string("N") : "Fnan#" + std::to_string(position);
+  return python::identity(scalar);
+}
+
+const EventAttribute* event_attribute_cell(const Event& event, std::string_view key) {
+  for (const auto& entry : event.attributes)
+    if (entry.key == key) return &entry;
+  return nullptr;
+}
+
 IntervalTrace to_intervals(const Trace& trace,
                            const HeuristicMinerOptions& options,
-                           bool pre_interval_mode, bool utc_clock) {
+                           bool pre_interval_mode, bool utc_clock,
+                           InstanceKeyMode instance_mode = InstanceKeyMode::kPythonLog) {
   using LifecycleKey = std::pair<std::string, std::string>;
   struct PendingStart {
     std::string timestamp_text;
   };
   std::map<LifecycleKey, std::deque<PendingStart>> pending_starts;
   std::vector<Interval> intervals;
+  std::size_t position = 0;
   for (const auto& event : trace.events) {
+    ++position;
     const auto& timestamp_text = required_timestamp_text(event, options);
     const auto& activity = required_activity(event, options);
     if (pre_interval_mode) {
@@ -540,10 +569,8 @@ IntervalTrace to_intervals(const Trace& trace,
     // the atomic/completion form below.
     const bool lifecycle_present = event.has_lifecycle();
     const std::string lifecycle = ascii_lower(event.lifecycle);
-    std::string instance;
-    if (const auto* value =
-            event.attribute(options.lifecycle_instance_attribute))
-      instance = *value;
+    const auto instance = lifecycle_instance_key(
+        event_attribute_cell(event, options.lifecycle_instance_attribute), instance_mode, position);
     const LifecycleKey key{activity, instance};
     if ((lifecycle_present && lifecycle.empty()) ||
         (!lifecycle.empty() && lifecycle != "start" &&
@@ -604,7 +631,8 @@ IntervalTrace to_intervals(const Trace& trace,
 }
 
 PlusAbstraction build_plus_abstraction(
-    const EventLog& log, const HeuristicMinerOptions& options) {
+    const EventLog& log, const HeuristicMinerOptions& options,
+    std::optional<InstanceKeyMode> instance_mode = std::nullopt) {
   PlusAbstraction out;
   std::set<std::string> known;
   const auto business_slots =
@@ -621,7 +649,9 @@ PlusAbstraction build_plus_abstraction(
   const bool frame_seconds = log.dataframe_columns != nullptr;  // round FR
   for (const auto& trace : log.traces) {
     const auto converted =
-        to_intervals(trace, options, pre_interval_mode, utc_clock);
+        to_intervals(trace, options, pre_interval_mode, utc_clock,
+                     instance_mode.value_or(log.dataframe_columns ? InstanceKeyMode::kPythonFrame
+                                                                  : InstanceKeyMode::kPythonLog));
     const auto& intervals = converted.sorted;
     if (intervals.empty()) continue;
     // In pre-interval mode discovery preserves trace order for start/end/attribute
@@ -2301,8 +2331,9 @@ HeuristicsNet discover_plus_plus_from_abstraction(
 }
 
 HeuristicsNet discover_plus_plus(const EventLog& log,
-                                 const HeuristicMinerOptions& options) {
-  return discover_plus_plus_from_abstraction(build_plus_abstraction(log, options),
+                                 const HeuristicMinerOptions& options,
+                                 std::optional<InstanceKeyMode> instance_mode = std::nullopt) {
+  return discover_plus_plus_from_abstraction(build_plus_abstraction(log, options, instance_mode),
                                              options);
 }
 
@@ -2853,9 +2884,11 @@ HeuristicsNet discover_heuristics_net_xes_frame(
           lifecycle = ascii_lower(*transition);
         }
         const auto* activity = value(row, *activity_at);
-        const auto* instance = instance_at ? value(row, *instance_at) : nullptr;
+        const EventAttribute* instance =
+            instance_at && *instance_at < row.size() && row[*instance_at] ? &*row[*instance_at] : nullptr;
         const StartKey start_key{activity ? std::optional<std::string>(*activity) : std::nullopt,
-                                 instance ? *instance : std::string()};
+                                 lifecycle_instance_key(instance, polars ? InstanceKeyMode::kText
+                                                                         : InstanceKeyMode::kPythonFrame, r)};
         if (lifecycle == "start") {
           open[start_key].push_back(r);
           interval_free[r] = true;
@@ -2963,7 +2996,8 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       std::map<NamePair, std::uint64_t> follows;
       std::map<std::string, std::vector<std::string>> targets;
       for (const auto& trace : log.traces) {
-        const auto converted = to_intervals(trace, projected, start_at.has_value(), false);
+        const auto converted = to_intervals(trace, projected, start_at.has_value(), false,
+                                            polars ? InstanceKeyMode::kText : InstanceKeyMode::kPythonFrame);
         const auto& intervals = converted.sorted;
         for (const auto& interval : converted.performance_order) {
           if (known.insert(interval.activity).second) order.push_back(interval.activity);
@@ -2995,7 +3029,9 @@ HeuristicsNet discover_heuristics_net_xes_frame(
             less(to, from);
       }
     }
-    auto net = finish(discover_heuristics_net(log, projected));
+    // The frame's instance cells: pandas' Python objects, Polars' column text.
+    auto net = finish(discover_plus_plus(log, projected,
+                                         polars ? InstanceKeyMode::kText : InstanceKeyMode::kPythonFrame));
     const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
     if (any_missing && null_at != net.activities.end())
       net.null_activity = static_cast<std::size_t>(null_at - net.activities.begin());

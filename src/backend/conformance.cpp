@@ -3,6 +3,7 @@
 #include "minera/token_replay_error.hpp"
 #include "evaluation_internal.hpp"
 #include "petri_replay_internal.hpp"
+#include "model_decoration_internal.hpp"
 #include "root_cause_trace_key.hpp"
 #include "root_cause_unicode.hpp"
 #include "token_replay_context.hpp"
@@ -7149,6 +7150,14 @@ std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
 token_replay_firing_sequences(const PetriNet& net,
                               const std::vector<std::vector<std::string>>& variants,
                               const std::function<bool()>& cancelled) {
+  return detail::token_replay_firing_sequences(net, variants, cancelled, std::nullopt);
+}
+
+std::vector<std::optional<std::vector<std::vector<std::size_t>>>>
+detail::token_replay_firing_sequences(const PetriNet& net,
+                                      const std::vector<std::vector<std::string>>& variants,
+                                      const std::function<bool()>& cancelled,
+                                      const PlaceOutgoingOrder& place_outgoing) {
   // One trace per variant, replayed exactly as replay_token_traces replays a
   // log of them with default options (forward, final routing through hidden
   // transitions, activities outside the model skipped).
@@ -7170,6 +7179,7 @@ token_replay_firing_sequences(const PetriNet& net,
   }
   TokenReplayOptions options;
   options.cancelled = cancelled;
+  options.place_outgoing_transition_order = place_outgoing;
   const auto rows = replay_token_trace_rows(variant_log, net, options, true, false,
                                             /*enabled_transitions=*/false);
   std::vector<std::optional<std::vector<std::vector<std::size_t>>>> result(variants.size());

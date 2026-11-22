@@ -97,6 +97,8 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   if (heuristics) run("heuristic_petri_conversion", "heuristics_net", [&](bool& native_returned) {
     auto net = minera::to_petri_net(*heuristics); minera::record_exact_petri_net(net); session->nets.emplace("heuristic", net);
+    // Under pm4py's names, for the routes replaying it (round GF).
+    if (auto named = heuristics_reference_replay_net(*heuristics, net)) session->replay_nets.emplace("heuristic", std::move(*named));
     native_returned = true;
     try{auto bytes=minera::workflow_input_petri_json(net);minera::record_exact_optional_artifact("legacy_petri_json",bytes);return bytes;}
     catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_petri_json",e.what(),true);throw;}
@@ -132,6 +134,8 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   if (session->powl) run("powl_petri_conversion", "powl", [&](bool& native_returned) {
     auto net = minera::to_petri_net(*session->powl); session->nets.emplace("powl", net);
+    // Under pm4py's names, for the routes replaying it (round GF).
+    if (auto named = powl_reference_replay_net(*session->powl, net)) session->replay_nets.emplace("powl", std::move(*named));
     native_returned = true;
     return minera::workflow_input_petri_json(net);
   });
@@ -293,10 +297,16 @@ void handle_active_source_mining(const httplib::Request& request,
   for (const auto& [name, petri] : session->nets) run(name + "_decoration", "model_prepared_log", [&](bool& native_returned) {
     if (name == "alpha") alpha_decoration = minera::decorate_model(cached_model_log(*session, name), petri, "concept:name", "time:timestamp", cancelled);
     else if (name == "inductive") inductive_decoration = minera::decorate_model(cached_model_log(*session, name), petri, "concept:name", "time:timestamp", cancelled);
-    else if (name == "heuristic") heuristic_decoration = minera::decorate_model(require_prepared_log(*session), petri, params.heuristic.activity_attribute, params.heuristic.timestamp_attribute, cancelled);
-    else {
+    // The heuristics and POWL nets replay under pm4py's names (round GF).
+    else if (name == "heuristic") {
+      std::optional<std::vector<std::vector<std::size_t>>> outgoing;
+      const auto& replay = session_replay_net(*session, name, petri, &outgoing);
+      heuristic_decoration = minera::detail::decorate_model(require_prepared_log(*session), replay, params.heuristic.activity_attribute, params.heuristic.timestamp_attribute, cancelled, outgoing);
+    } else {
       const auto projected = project_powl_activity(require_prepared_log(*session), params.powl.activity_key, params.powl.timestamp_key, params.powl.case_id_key);
-      powl_decoration = minera::decorate_model(projected, petri, params.powl.activity_key, params.powl.timestamp_key, cancelled);
+      std::optional<std::vector<std::vector<std::size_t>>> outgoing;
+      const auto& replay = session_replay_net(*session, name, petri, &outgoing);
+      powl_decoration = minera::detail::decorate_model(projected, replay, params.powl.activity_key, params.powl.timestamp_key, cancelled, outgoing);
     }
     native_returned = true;
     return "{\"representation\":\"analysis_presentation\"}";
@@ -353,34 +363,13 @@ void handle_active_source_mining(const httplib::Request& request,
         if (xes_frame && name == "heuristic") {
           if (heuristics) minera::detail::check_heuristics_null_transition_names(*heuristics, petri);
           frame_log = minera::detail::xes_frame_replay_log(data(), options.case_id_attribute, options.activity_attribute);
-          // pm4py breaks routing ties by its place names and picks a None
-          // label's silent transition by its transition names.
-          if (heuristics && options.place_names.empty() && options.transition_names.empty() &&
-              !options.nullable_transition_names) {
-            auto names = minera::detail::heuristics_petri_names(*heuristics);
-            if (names.places.size() == petri.place_count() && names.transitions.size() == petri.transitions().size()) {
-              options.place_names = std::move(names.places);
-              options.nullable_transition_names = std::move(names.transitions);
-            }
-          }
         }
-        // pm4py's POWL net names its places p_N and its silent transitions
-        // <kind>_N, and its replay breaks routing ties by those names (round
-        // GE; powl_petri_names.hpp), whatever the session's shape.
-        // Its silent path search follows the arcs in the order the converter
-        // made them (powl_replay_net).
-        std::optional<minera::PetriNet> powl_replay_net;
-        if (name == "powl" && session->powl && options.place_names.empty() &&
-            options.transition_names.empty() && !options.nullable_transition_names &&
-            !options.place_outgoing_transition_order) {
-          if (auto names = minera::detail::powl_petri_names(*session->powl, petri)) {
-            powl_replay_net = minera::detail::powl_replay_net(petri, *names);
-            options.place_names = std::move(names->places);
-            options.nullable_transition_names = std::move(names->transitions);
-            options.place_outgoing_transition_order = std::move(names->place_outgoing);
-          }
-        }
-        const auto& replay_petri = powl_replay_net ? *powl_replay_net : petri;
+        // pm4py breaks routing ties by the place names of its heuristics and
+        // POWL nets and picks a None label's silent transition by their
+        // transition names; on the POWL net (p_N, <kind>_N) its silent path
+        // search follows the arcs in the order the converter made them
+        // (rounds GD and GE), whatever the session's shape (round GF).
+        const auto& replay_petri = session_replay_net(*session, name, petri, options);
         const auto& replayed = frame_log ? frame_log->log : log;
         const auto reachability = minera::final_marking_reachability(petri, cancelled);
         // A missing label fires a silent transition: Polars' None (pm4py's

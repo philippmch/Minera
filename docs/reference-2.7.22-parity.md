@@ -38471,3 +38471,120 @@ checks fail on GD's binary, and the arc-order check fails on names alone)
 carries the reference values. The full ctest passed 668 of 668 (25
 minutes, -j2) on the first run. The fixture replay left all 2,673
 responses unchanged; the Python script tests passed 406 of 406.
+
+## Review GF1: cached POWL and heuristics nets replayed with pm4py's names, the log shape's reference, typed lifecycle instances (2026-11-22)
+
+Round GF re-reviewed round GE on fresh banks and compared the default log
+shape of `/api/mine` on XES uploads and the routes that replay a session's
+cached POWL or heuristics net (`/api/evaluate`, `/api/compare-petri`, the
+stochastic map, the model decorations) against pm4py's `token_replay.apply`,
+`fitness_token_based_replay`, `precision_token_based_replay`,
+`generalization_tbr`, `element_usage_comparison.compare_element_usage_two_logs`
+and `montecarlo.utils.replay.get_map_from_log_and_net` on pm4py's own nets
+(`pm4py.convert_to_petri_net` of its POWL model, the heuristics net
+converter). GE's CI run 45064260404 (4bfa211) passed on Linux, macOS and
+the Python, verifier and frontend jobs (Windows still building at GF's
+start). Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6,
+polars 1.44.1, no pyarrow), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` and
+`PYTHONHASHSEED=0`.
+
+Banks: rounds GA to GE's banks and new banks from `gen/gengf.py` (round
+GC's generator plus `concept:instance` values of int, string or mixed
+type) on seeds from 8000: gfA to gfE (200 uploads: loops, partial orders,
+silent routing), gfP, gfQ, gfR (180 uploads: routing ties) and hfI to hfL
+(160 Heuristics++ uploads with lifecycle, time gaps and typed instances).
+GE1 held on them: the POWL replay totals equal on both frame shapes, the
+`hpp`, `hpp_perf` and `hpp_min` option sets equal on 160 uploads per shape
+but one pandas message (GF1-3).
+
+The log shape's reference: the default log shape follows AE2-1/AF1 (the
+legacy log of `read_xes(return_legacy_log_object=True)` without its empty
+traces, traces sharing a non-null `concept:name` merged into the first,
+traces without one kept apart). Against that log the 177 trace-count
+differences of GE are gone, and the POWL, Alpha and Inductive replay
+totals equal on all 953 uploads mined on that shape (the other 1,137 miss
+a label or a time, which fails the whole mine; 242 of the 953 have no
+non-empty trace, see the declared fitness below); the heuristics totals
+differed on 27 (GF1-1).
+
+Fixed:
+
+- **GF1-1. The default log shape replays the heuristics net with pm4py's
+  names.** Round GD named the converted heuristics net as pm4py does
+  (`source0`, `sink0`, `pre_X`, `intplace_X`, `splace_in_T_S`, `hid_N`)
+  for the frame shapes only; the log shape replayed with Minera's index
+  names, and its routing ties went another way on 27 uploads (gaL/f2306,
+  f2330, f2335, gbQ/f4703 to f4738, 15 gcQ uploads, gcW/f5921, gfP/f8410,
+  gfR/f8528, f8542; missing or remaining tokens off by 1 to 3). The log
+  shape now replays with the names, as the POWL net has since GE1.
+- **GF1-2. The routes replaying a cached POWL or heuristics net use pm4py's
+  names.** The session keeps, beside each cached net, a replay copy that
+  carries pm4py's place and transition names and (POWL) the converter's
+  arc order; the cached net itself, its serialized form and its PNML export
+  stay as they were. `/api/evaluate`'s token-based fitness, ETConformance
+  precision, generalization and composite, `/api/compare-petri`'s element
+  usage, the stochastic map built from the session log and the frequency
+  and performance decorations replay that copy. Before, on gaL/f2330's
+  POWL model the token-based fitness read 0.99184 (pm4py 0.98297), the
+  precision 0.19362 (0.20844) and the generalization 0.65209 (0.65675);
+  the heuristics fitness and generalization of gcQ/f5705 differed
+  likewise, the element usage of 2 of 3 compared pairs and the stochastic
+  map's activation weights of gfR/f8542 (8 weights of each model)
+  differed. After, on gfP to gfR: the stochastic map of 122 of 124 POWL
+  and 120 of 120 heuristics sessions equals pm4py's (weights and
+  distribution types; the two left are the open item below); the element
+  usage of 144 of 144 heuristics and 139 of 144 POWL pairs (log1 and log2
+  as Minera's log shape) equals pm4py's, and of the other 5, 4 (gfQ/f8463,
+  f8467, f8472, f8500) vary in pm4py with the hash seed, Minera giving one
+  of its answers, and 1 is open (gfR/f8532 against f8533); the frequency
+  decorations of 180 of 180 uploads per model equal pm4py's activations on
+  the fitting traces.
+- **GF1-3. Heuristics++ pairs a start with its complete by the instance's
+  Python value.** pm4py keys an open start by its activity and instance:
+  an int 2 pairs with a float 2.0 and True with 1, never with the string
+  '2'. On a log a missing instance pairs only with a missing one and NaN
+  with nothing (each parsed NaN is its own object); a pandas frame holds
+  NaN for a missing cell and pairs NaN with NaN; a Polars frame holds the
+  column as text ('2.0' differs from '2'). Minera compared the instances'
+  text: hfJ/f8279's pandas frame raised the concurrency key's TypeError
+  with its operands swapped (`'str' and 'float'` for pm4py's `'float' and
+  'str'`), since the missing label's int 2 start took the '2' complete.
+
+Before and after: the heuristics replay totals on the log shape differed
+on 27 uploads, after on 2 (gcQ/f5714 and f5716, whose pm4py totals vary
+with the hash seed: declared in GD1, the same on the frame shapes); the POWL, Alpha and Inductive log shape
+totals stay equal; Heuristics++ on hfI to hfL: 1 pandas message before, 0
+after (both frame shapes, all three option sets), and on the log shape 88
+dependency matrices equal before and after.
+
+Declared:
+
+- The analysis of an upload without any non-empty trace reports the token
+  replay fitness 1 (no tokens moved); pm4py's `fitness_token_based_replay`
+  says 0 there, which `/api/evaluate` returns.
+- On the default log shape an upload that misses a label or a time fails
+  the whole mine with Minera's message (`'concept:name'`, or `Heuristics
+  Miner PLUSPLUS: event is missing timestamp attribute` where pm4py raises
+  `KeyError: 'time:timestamp'`; 34 of 160 hf uploads); the frame shapes
+  report pm4py's error per family.
+- pm4py's element usage of gfQ/f8463, f8467, f8472 and f8500 against the
+  next upload changes with the hash seed (a silent routing tie in its
+  token replay; 1 to 3 of 8 to 14 seeds give Minera's counts).
+- Open for round GG: the stochastic map on uploads whose events are out
+  of time order (gfR/f8540, f8564: the activation weights differ from
+  pm4py's on both the file-order and the time-sorted log) and the element
+  usage of gfR/f8532 against f8533 (log2's events out of time order; one
+  silent transition's count moves to another, the same over 14 hash
+  seeds), the playout and
+  Monte Carlo routes fitted from a cached net, and the decoration
+  fallback (Minera decorates the fitting traces, declared since U2).
+- Unchanged: the declared items of GE1 and before.
+
+In the suite: the new `minera_server_cached_net_names_gf_tests` (the log
+shape's heuristics totals on three uploads, `/api/evaluate` on the POWL
+and heuristics models, `/api/compare-petri`'s usage multisets, Heuristics++
+with typed instances on the three shapes; 13 of its checks fail on GE's
+binary) carries the reference values. The full ctest passed 669 of 669 (40
+minutes, -j2, beside the sweeps) on the first run. The fixture replay left
+all 2,673 responses unchanged; the Python script tests passed 406 of 406.

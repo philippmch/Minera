@@ -93,6 +93,9 @@ struct PetriUsageComparisonOptions {
   std::vector<bool> final_marking_keys;
   // Select the public exhaustive pre-event hidden-routing policy.
   bool exhaustive_invisible_exploration = false;
+  // Optional silent-path tie order: per place its consumers (see
+  // TokenReplayOptions::place_outgoing_transition_order).
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
   // Physical PNML arcs. When present, arc usage has one record per arc object,
   // so a weight-2 arc stays one record and genuine parallel arcs stay two.
   std::optional<std::vector<PnmlArcOccurrence>> arc_occurrences;
