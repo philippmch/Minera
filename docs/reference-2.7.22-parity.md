@@ -38103,3 +38103,130 @@ values.
 The full ctest passed 665 of 665 (26 minutes, -j2) on the first run. The
 fixture replay gave no change (2,673 responses unchanged), and the Python
 script tests passed 406 of 406.
+
+## Review GC1: the heuristics net's conversion, Heuristics++'s intervals and start keys of other kinds on frame shapes of XES uploads (2026-11-22)
+
+Round GC re-reviewed round GB on fresh banks and aligned the conversion of
+a heuristics net with a missing label, Heuristics++'s interval input,
+Alpha's and the temporal profile's start keys of numbers, booleans and
+mixed values, the implicit start column and token replay's missing
+columns, on the `dataframe` and `lazyframe` shapes of XES uploads, against
+pm4py's algorithm applies on read_xes's frame and its Polars copy. GB's CI
+run 45033653968 (a05423f) passed. Observed black-box on pm4py 2.7.22
+(pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow; frames converted to
+Polars column by column), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3
+X86_V4 AVX512_ICL AVX512_SPR"`, `PYTHONHASHSEED=0` and exact comparison of
+the canonical results or of the error messages, as in GB1.
+
+Re-review of GB on new banks from `gen/gengc.py` (gengb.py plus start
+timestamp columns of every kind): gcI, gcF, gcB, gcX, gcD, gcT, gcP, gcQ,
+gcN, gcW (450 uploads per shape: integer, float, boolean, mixed, date and
+text start columns, start columns with gaps, starts after completions,
+lifecycle gaps) and hS, hG, hL, hK, hM, hA (240 Heuristics++ uploads).
+
+Fixed:
+
+- **GC1-1. The heuristics net's conversion with a missing label.** pm4py
+  names a node's join place "pre_" + its name, so a missing label with an
+  incoming dependency raises `TypeError: can only concatenate str (not
+  "float") to str` on pandas and `(not "NoneType")` on Polars; otherwise
+  the label is the transition's as given, and Polars' None makes a silent
+  transition. This holds for `/api/mine`'s conversion and for
+  `/api/discover-workflow`'s heuristics, which returns the converted net.
+  Before (GB's binary, 1,190 uploads per shape): Minera answered 15 where
+  pm4py raises, and on Polars named None on 4 nets where pm4py has a
+  silent transition.
+- **GC1-2. Heuristics++'s interval input.** With a start_timestamp column
+  every converted event holds the start key, so pm4py's interval
+  conversion keeps the log as it is (the lifecycle unread) and the
+  abstraction reads each start as the frame's Python object: a pandas
+  datetime column gives Timestamp or NaT, an object column (dates beside
+  text) datetime.datetime, str or float NaN; a Polars Datetime column
+  datetime.datetime or None, a String column str or None. In order: the
+  eventually-follows pass sorts each trace by its starts (CPython's
+  list.sort), comparing each completion with the later starts (`<=`,
+  first following only); the performance pass subtracts each start from
+  its predecessor's completion; the service times call `timestamp()` on
+  each start, then each completion. The first operation that raises
+  decides the error. Without a start column, a missing lifecycle
+  transition raises `AttributeError: 'float' object has no attribute
+  'lower'` (Polars: `'NoneType'`). Before (GB's binary, 240 uploads per
+  shape): Minera named its own error on 81 (pandas) and 82 (Polars),
+  answered 50 where pm4py raises and refused 2 and 1 where pm4py answers.
+  New internal header: `heuristic_plus_frame_intervals.hpp`.
+- **GC1-3. Start keys of numbers, booleans and mixed values.** read_xes
+  types the column from its values (all dates datetime64; integers int64,
+  or float64 beside a gap; numbers float64; booleans bool, or object beside
+  a gap; text str; any other mix object), and the Polars copy keeps the
+  datetime and numeric dtypes and reads str and object columns as String.
+  Alpha sorts by case, start and timestamp: pandas by the Categorical
+  order of each column (numbers before text, gaps last; a date beside a
+  number raises `TypeError: 'values' is not ordered, please explicitly
+  specify the categories order by passing in a categories argument.`),
+  Polars by its own order (nulls first, String by bytes). The temporal
+  profile compares `time:timestamp <= start_2` after joining each case
+  with itself: pandas raises `Invalid comparison between
+  dtype=datetime64[us, UTC] and ndarray` for an int64, float64 or bool
+  start; an object start is compared value by value over the sorted pairs
+  (gaps skipped), raising `'<=' not supported between instances of
+  'Timestamp' and '<type>'` or else `cannot subtract DatetimeArray from
+  ndarray[object]`; Polars raises an `InvalidOperationError`, `- not
+  allowed on i64|f64|bool and datetime[μs, UTC]`, over the plan. Before
+  (GB's binary, 450 uploads per shape): Alpha with such a start key
+  refused 204 (pandas) and 272 (Polars) uploads where pm4py answers and
+  named its own error on 66 pandas uploads; the temporal profile answered
+  270 where pm4py raises. New internal header: `frame_key_column.hpp`.
+- **GC1-4. The implicit start column.** Without a start key, pm4py's
+  directly-follows frame (Alpha) and partial-order frame (the temporal
+  profile and its conformance) read the frame's start_timestamp column
+  when it holds one, so they behave as with the explicit key
+  `start_timestamp`. Alpha, the temporal profile and
+  `/api/analyze-behavior`'s temporal conformance on XES sessions now do
+  (new `conform_temporal_profile_xes_frame`).
+- **GC1-5. GB1-3's text-start check.** pandas raises the `Invalid
+  comparison ... and StringArray` error only when a case's later present
+  start (not its least one) fails to parse as a date; otherwise the
+  subtraction error.
+- **GC1-6. Token replay's missing columns.** `/api/mine`'s token replay on
+  a frame without the case or activity column raises pandas' `KeyError:
+  'case:concept:name'`, then `KeyError: 'Column not found:
+  concept:name'`, or Polars' `ColumnNotFoundError` failed at `group_by`.
+
+After, on the new banks: Heuristics++ (`hpp`, `hpp_perf`, `hpp_min`) on
+every upload of both shapes; the seven start-key option sets on every
+upload; the conversion on every upload (482 per shape, 708 where both
+raise); `/api/discover-constraints` with a noise threshold of 0.2 and
+`/api/discover-workflow` and `/api/analyze-behavior` with options
+(heuristics thresholds, Alpha+ `remove_unconnected`, Heuristics++, the
+performance view, temporal conformance with zeta 0.5 and 1.5; 670
+uploads per shape) on every upload.
+
+Probed and kept: Polars 1.44.1 sorts by one column stably on ties (1,800
+frames up to 6,000 rows and 24 up to 150,000, Datetime, Int64 and String
+keys with nulls, lazy and eager) and by two columns with a Null-dtype key
+stably too (800 frames), so the remaining `std::stable_sort` calls on
+Polars paths (the variants and sequence filters with a None case key, the
+LTL fallback, the temporal lazy arrival and finish order, `sort_by_keys`
+with a Null key) match.
+
+Declared or open:
+
+- Temporal conformance on Polars lists the cases through
+  `select(unique())`, whose order changes from run to run in pm4py itself
+  (8 orders in 8 runs); the deviations agree as a multiset.
+- Open for round GD: token replay of the cached heuristics model on XES
+  frames (pm4py replays the frame's variants: pandas' sorted groupby
+  without the null case, Polars' first-row order with the null group, and
+  a `TypeError` sorting a missing label beside a name), and the footprints
+  of the cached heuristics model, which Minera answers only when POWL
+  succeeded.
+- Unchanged: the declared items of GB1 and before.
+
+In the suite: the new `minera_server_mine_xes_frames_gc_tests` (the
+conversion's TypeError, Heuristics++'s lifecycle and start gaps, integer,
+mixed and boolean start keys, the implicit start column for Alpha, the
+temporal profile and its conformance, and token replay on a frame without
+columns, on both shapes; 24 of its checks fail on GB's binary) carries the
+reference values. The full ctest passed 666 of 666 (39 minutes, -j2) on
+the first run. The fixture replay gave no change (2,673 responses
+unchanged), and the Python script tests passed 406 of 406.
