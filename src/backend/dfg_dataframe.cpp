@@ -816,34 +816,19 @@ std::vector<BusinessHourSlot> normalized_slots(const DfgTableOptions& options) {
   return merged;
 }
 
-// Round FN: pm4py's Polars adapter computes business time with
-// map_elements(..., return_dtype=pl.Float64), and Polars refuses a Python int
-// there (SchemaError). BusinessHours returns an int when the case moves
-// forward, every unified slot bound is an int (here: a whole number, as the
-// default slots are) and neither end falls inside a slot, after its start and
-// up to its end (detail::business_elapsed_is_float; round CQ). Observed
-// black-box on Polars 1.44.1: which int the message names follows Polars'
+// Round FN: pm4py's Polars adapter refuses a Python int business duration
+// (detail::polars_business_int); which int the message names follows Polars'
 // evaluation order, which varies between runs.
 bool polars_business_int(std::int64_t start, std::int64_t end,
                          const std::vector<BusinessHourSlot>& slots) {
-  for (const auto& slot : slots)
-    if (std::trunc(slot.start_seconds) != slot.start_seconds ||
-        std::trunc(slot.end_seconds) != slot.end_seconds)
-      return false;
-  return !detail::business_elapsed_is_float(start, end, slots);
+  return detail::polars_business_int(start, end, slots);
 }
 
 std::string polars_business_schema_error(const DfgTableOptions& options, double seconds) {
-  const auto& timestamp = options.timestamp_attribute;
   const auto start = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
                          ? *options.start_timestamp_attribute
                          : std::string("start_timestamp");
-  char value[32];
-  std::snprintf(value, sizeof(value), "%lld", static_cast<long long>(std::llround(seconds)));
-  return "unexpected value while building Series of type Float64; found value of type Int64: " +
-         std::string(value) + "\n\nThis error occurred with the following context stack:\n\t[1] while constructing Series '" +
-         timestamp + "'\n\n\nThis error occurred in the following expression:\n\tas_struct(\"" + timestamp + "\", \"" +
-         start + "_2\").python_udf()\n";
+  return detail::polars_business_schema_error(options.timestamp_attribute, start, seconds);
 }
 
 

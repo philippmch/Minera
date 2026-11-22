@@ -2396,14 +2396,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "70005",
+        "Content-Length": "64731",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "xes-custom-clock-native-flat-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/xes-custom-clock-native-flat-dataframe.response.json",
-        "bytes": 70005,
-        "sha256": "39951d581fd84878129b0f24cd92b782048da8c3403f75f062950c00ed7abb28",
+        "bytes": 64731,
+        "sha256": "80e6d826f3241152823512caaac848cb7fba7f245b03d08941612ea7b9019d03",
         "status": 200
       },
       "exports": {},

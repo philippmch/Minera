@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FV (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–FW (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8718,6 +8718,74 @@ selected timestamp column on a Polars frame (present, no empty value),
 the algorithm does not; Minera's `lazyframe` Declare answers there as the
 algorithm does (`round-fv/probe/dcwrap.py`).
 Harness and probes: `review-harness/round-fv/`.
+
+Round FW re-reviewed FV on fresh banks, settled FV's Declare timestamp
+question and swept the temporal profile with business hours on Polars
+frames and the Declare `dataframe` shape (Review FW1). FV's CI run
+44982394370 passed on Linux and Windows (its macOS job was cancelled
+during the build, warnings only in the log), and FV's fixes held (POWL and the variants
+on both frame shapes 70 of 70, Declare on Polars frames 62 equal and 58
+refused alike, the temporal profile on large, CSV and start-key frames
+exact and in pm4py's order). Decided: the Declare routes mirror the
+algorithms, so the selected-timestamp check of pm4py's Declare wrappers is
+declared. Fixed: FW1-1, the temporal profile with business hours on a
+Polars frame (`/api/mine`, `/api/analyze-behavior` discovery and
+conformance) raises Polars' `SchemaError` as pm4py does when
+`BusinessHours` returns an int for some pair (no end inside a slot; the
+message names the first such pair in the pair frame's order and the start
+column's `_2` copy, `detail::polars_business_schema_error`, shared with the
+Polars DFG); FW1-2, Declare on the `dataframe` shape of an XES upload runs
+the checks of pm4py's pandas Declare algorithm (the frame shape without
+keys, `KeyError` for the case, activity and `time:timestamp` columns,
+`np.unique`'s `TypeError` on a missing case id with numpy's stable object
+argsort deciding the operands, discovery's `TypeError` on a missing
+activity, conformance reading a missing activity as an event no rule
+names), and on an XES upload a column without any value counts as absent
+there and in FV1-4's Polars checks (`/api/mine` and the workbench
+conformance; a CSV frame keeps every header column; round BM's
+declaration withdrawn). Declared: the
+hash-seed operand order of the missing-activity `TypeError` and the
+thread-dependent int in the `SchemaError`. New areas without findings: the
+transition system and the heuristics on tie-heavy uploads (pandas frame,
+Polars copy and log agree).
+
+FW's suite: the full ctest 659 of 660 (38 minutes, -j2; round BM's
+`minera_review_bm1_tests` expected the withdrawn declaration and now
+expects pm4py's `TypeError`, then passed); Python script tests 406 of 406;
+the two vitest files that read the captures 298 of 298; the 16 manifests
+with one intended change (`xes-custom-clock-native-flat-dataframe`,
+Declare on the `dataframe` shape of an XES upload timed by `clock` raises
+`KeyError: 'time:timestamp'`), refreshed. The first replay caught the
+column rule refusing a header-only CSV on `lazyframe`, so the rule holds
+for XES uploads only.
+Harness and probes: `review-harness/round-fw/`.
+
+Next round (FX) should start by re-reviewing round FW:
+
+- FW's CI run (and FV's: its macOS job was cancelled during the build with
+  no compile error in the log; a later run builds macOS again);
+- FW1-1 and FW1-2 on fresh banks: `bhsweep.py` with `START`, sub-second
+  times, larger `NC`, custom business-hour slots and an own `@@index`, the
+  conformance with zeta near the deviations, `bhfull.py`/`bhab.py` for the
+  messages (one Polars thread); `dcmsg2.py` and `dc3.py ALG=1` on new
+  seeds on both shapes (`gen/gendcbad.py`, round-fv `dc2.py` options);
+- found at the end of FW: a CSV upload without rows (a header only) on
+  the `lazyframe` shape, where pm4py's `format_dataframe` turns every
+  other object column into a date, so the Polars Declare check refuses a
+  case column read from an alias header (`the case ID column should be of
+  type string.`) while Minera answers with an empty model; check the other
+  frame consumers of header-only CSVs the same way;
+- the column rule of FW1-2 elsewhere: the other users of
+  `check_dataframe_columns` on XES tables (`token_replay_event_data.cpp`,
+  `concept_drift_table.cpp`) may count a first-class column with no value
+  that read_xes's frame does not have;
+- the remaining `std::stable_sort` on Polars paths, the two items carried
+  from FU (the Polars frequency triples, library only, and
+  `dfg_dataframe.cpp`'s Null-dtype key rule);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FW (kept for its older items):
 
 Next round (FW) should start by re-reviewing round FV:
 

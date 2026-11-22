@@ -3,7 +3,9 @@
 #include "minera/log_conversion.hpp"
 #include "frame_cells.hpp"
 #include "minera/dataframe_validation.hpp"
+#include "numpy_object_sort.hpp"
 #include "polars_sort.hpp"
+#include "python_scalar.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -514,6 +516,38 @@ LazyEventTable promoted_selector_table(const LazyEventTable& source,
       source.dtypes(), source.index(), source.categorical_dtypes());
 }
 
+// The frame pm4py builds from an XES upload has a column only for the
+// attributes some event (or trace) carries; Minera's table keeps the first
+// class columns even when every cell is missing. The frame checks see the
+// table without such columns (round FW, observed black-box: an upload whose
+// traces are all unnamed fails the column count, or raises KeyError on the
+// case column when other text columns make up the count).
+const EventTable& present_columns(const EventTable& table, std::optional<EventTable>& storage) {
+  std::vector<bool> keep(table.columns.size(), false);
+  for (const auto& row : table.rows)
+    for (std::size_t column = 0; column < row.size() && column < keep.size(); ++column)
+      if (row[column] && !row[column]->is_null) keep[column] = true;
+  if (std::all_of(keep.begin(), keep.end(), [](bool value) { return value; })) return table;
+  EventTable& present = storage.emplace();
+  present.attributes = table.attributes;
+  present.metadata = table.metadata;
+  for (std::size_t column = 0; column < table.columns.size(); ++column) {
+    if (!keep[column]) continue;
+    present.columns.push_back(table.columns[column]);
+    if (column < table.dtypes.size()) present.dtypes.push_back(table.dtypes[column]);
+    if (column < table.categorical_dtypes.size()) present.categorical_dtypes.push_back(table.categorical_dtypes[column]);
+  }
+  if (present.dtypes.size() != present.columns.size()) present.dtypes.clear();
+  if (present.categorical_dtypes.size() != present.columns.size()) present.categorical_dtypes.clear();
+  present.rows.reserve(table.rows.size());
+  for (const auto& row : table.rows) {
+    auto& kept = present.rows.emplace_back();
+    for (std::size_t column = 0; column < row.size() && column < keep.size(); ++column)
+      if (keep[column]) kept.push_back(row[column]);
+  }
+  return present;
+}
+
 // pm4py's Declare on a Polars frame reads each case after
 // LazyFrame.sort([case, "time:timestamp", row index]): the timestamp column
 // is always "time:timestamp" (left out when the frame has none), a missing
@@ -524,7 +558,7 @@ LazyEventTable promoted_selector_table(const LazyEventTable& source,
 // column instead of a row count: its values can tie, and Polars' unstable
 // pdqsort then decides the order (round FV, observed black-box).
 EventTable polars_projection_table(EventTable table, std::string_view case_id_key,
-                                   std::string_view activity_key) {
+                                   std::string_view activity_key, bool xes_columns = false) {
   table.validate();
   const auto column_of = [&](std::string_view name) -> std::optional<std::size_t> {
     const auto found = std::find(table.columns.begin(), table.columns.end(), name);
@@ -534,10 +568,16 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
   // pm4py's projection checks the frame first (check_pandas_dataframe_columns
   // with the case and activity keys): at least three columns, two of them
   // text and one a date, then the case column (present, text, no gap), then
-  // the activity column (round FV, observed black-box).
-  check_dataframe_columns(table, DataFrameColumnOptions{
-                                     std::string(activity_key.empty() ? std::string_view("concept:name") : activity_key),
-                                     std::string(case_id_key), std::nullopt, std::nullopt, true});
+  // the activity column (round FV, observed black-box). On the frame of an
+  // XES upload a column without any value is absent (round FW); a CSV
+  // frame keeps every header column.
+  {
+    std::optional<EventTable> storage;
+    check_dataframe_columns(xes_columns ? present_columns(table, storage) : table,
+                            DataFrameColumnOptions{
+                                std::string(activity_key.empty() ? std::string_view("concept:name") : activity_key),
+                                std::string(case_id_key), std::nullopt, std::nullopt, true});
+  }
   const auto case_at = column_of(case_id_key);
   if (!case_at) return table;
   const auto time_at = column_of("time:timestamp");
@@ -1288,19 +1328,92 @@ EventTable frame_slice_table(const EventTable& table, std::string_view case_id_k
   return sliced;
 }
 
+// An activity no model names: pm4py's pandas Declare conformance keeps a row
+// whose activity is missing (NaN) as an event that matches no rule activity
+// (round FW, observed black-box).
+constexpr std::string_view kPandasMissingActivity = "\x1f__minera_pandas_missing_activity__\x1f";
+
+// pm4py's Declare algorithm on a pandas frame (round FW, observed black-box):
+// the frame check without column keys (three columns, two text, one date),
+// then KeyError for a missing case column, activity column and
+// "time:timestamp" (hard-coded, as on Polars), in that order, then
+// np.unique(case column, return_index=True, return_counts=True) in frame
+// order, numpy's stable object argsort, whose first comparison of a missing
+// case id (NaN) with a named one raises Python's TypeError. Discovery then
+// sorts the rule columns, which holds the activities; a missing activity
+// (NaN) there raises TypeError too, its operands in an order that follows
+// the hash seed (Minera names 'str' first, the usual order). Conformance
+// keeps such a row as an event no rule names.
+void check_pandas_declare_frame(const EventTable& source, std::string_view case_id_key,
+                                std::string_view activity_key, bool discovery) {
+  std::optional<EventTable> storage;
+  const auto& table = present_columns(source, storage);
+  check_dataframe_columns(table, DataFrameColumnOptions{});
+  const auto column_of = [&](std::string_view name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto activity_name = activity_key.empty() ? std::string_view("concept:name") : activity_key;
+  const auto case_at = column_of(case_id_key);
+  if (!case_at) throw std::invalid_argument("KeyError: '" + std::string(case_id_key) + "'");
+  const auto activity_at = column_of(activity_name);
+  if (!activity_at) throw std::invalid_argument("KeyError: '" + std::string(activity_name) + "'");
+  if (!column_of("time:timestamp")) throw std::invalid_argument("KeyError: 'time:timestamp'");
+  const auto scalar = [](const std::optional<EventAttribute>& cell) {
+    if (!cell || cell->is_null) return python::real(std::numeric_limits<double>::quiet_NaN());
+    return python::from_attribute(*cell);
+  };
+  std::vector<python::Scalar> cases;
+  cases.reserve(table.rows.size());
+  bool missing = false, named = false;
+  for (const auto& row : table.rows) {
+    cases.push_back(scalar(row[*case_at]));
+    (python::is_missing(cases.back()) ? missing : named) = true;
+  }
+  if (missing && named)
+    (void)detail::numpy_object_stable_argsort(cases.size(), [&](std::size_t a, std::size_t b) {
+      return python::compare(cases[a], cases[b]);
+    });
+  if (!discovery) return;
+  for (const auto& row : table.rows)
+    if (!row[*activity_at] || row[*activity_at]->is_null)
+      throw python::TypeError("'<' not supported between instances of 'str' and 'float'");
+}
+
+// A row without an activity as an event no rule names (conformance).
+void fill_missing_activities(EventTable& table, std::string_view activity_key) {
+  const auto activity_name = activity_key.empty() ? std::string_view("concept:name") : activity_key;
+  const auto found = std::find(table.columns.begin(), table.columns.end(), activity_name);
+  if (found == table.columns.end()) return;
+  const auto at = static_cast<std::size_t>(found - table.columns.begin());
+  for (auto& row : table.rows) {
+    if (at < row.size() && row[at] && !row[at]->is_null) continue;
+    if (row.size() <= at) row.resize(at + 1);
+    EventAttribute cell;
+    cell.key = std::string(activity_name);
+    cell.value = std::string(kPandasMissingActivity);
+    row[at] = std::move(cell);
+  }
+}
+
 EventDataView frame_slice_view(const EventDataView& data, std::string_view case_id_key,
                                std::string_view activity_key,
-                               std::optional<EventLog>& log, std::optional<EventTable>& table) {
+                               std::optional<EventLog>& log, std::optional<EventTable>& table,
+                               bool discovery) {
   switch (data.kind()) {
     case EventDataKind::kEventLog:
       if (!data.log()->dataframe_columns) return data;
       log = frame_slice_cases(*data.log());
       return EventDataView(*log);
-    case EventDataKind::kEventTable:
+    case EventDataKind::kEventTable: {
+      check_pandas_declare_frame(*data.table(), case_id_key, activity_key, discovery);
       table = frame_slice_table(*data.table(), case_id_key);
+      if (!discovery) fill_missing_activities(*table, activity_key);
       return EventDataView(*table);
+    }
     case EventDataKind::kLazyEventTable:
-      table = polars_projection_table(data.lazy_table()->materialize(), case_id_key, activity_key);
+      table = polars_projection_table(data.lazy_table()->materialize(), case_id_key, activity_key, true);
       return EventDataView(*table);
     case EventDataKind::kEventStream:
       return data;
@@ -1314,7 +1427,7 @@ DeclareModel discover_declare_frame_slices(const EventDataView& data,
                                            const DeclareDiscoveryOptions& options) {
   std::optional<EventLog> log;
   std::optional<EventTable> table;
-  return discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table), options);
+  return discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, true), options);
 }
 
 std::vector<DeclareConformance> check_declare_conformance_frame_slices(
@@ -1324,8 +1437,23 @@ std::vector<DeclareConformance> check_declare_conformance_frame_slices(
     return check_declare_conformance_as_uploaded(*data.log(), model, options);
   std::optional<EventLog> log;
   std::optional<EventTable> table;
-  return check_declare_conformance(frame_slice_view(data, options.case_id_key, options.activity_key, log, table), model,
-                                   options);
+  return check_declare_conformance(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, false),
+                                   model, options);
+}
+
+void check_declare_xes_polars_frame(const LazyEventTable& table, const DeclareConformanceOptions& options) {
+  validate_activity_key(options.activity_key);
+  validate_case_selector_key(options.case_id_key);
+  (void)polars_projection_table(
+      promoted_selector_table(table, options.activity_key, options.case_id_key).materialize(),
+      options.case_id_key, options.activity_key, true);
+}
+
+EventTable declare_pandas_conformance_table(const EventTable& table, const DeclareConformanceOptions& options) {
+  check_pandas_declare_frame(table, options.case_id_key, options.activity_key, false);
+  auto filled = table;
+  fill_missing_activities(filled, options.activity_key);
+  return filled;
 }
 
 std::vector<DeclareConformance> check_declare_conformance_as_uploaded(

@@ -159,6 +159,13 @@ struct DeclareDiagnosticsOptions {
     const EventLog& log, const DeclareModel& model,
     const DeclareConformanceOptions& options = {});
 
+// pm4py's Declare frame checks on the Polars frame of an XES upload, where a
+// column without any value is absent (round FW): run before
+// check_declare_conformance on such a lazy table, whose generic path keeps
+// every column as a CSV frame does.
+void check_declare_xes_polars_frame(const LazyEventTable& table,
+                                    const DeclareConformanceOptions& options = {});
+
 // pm4py's DataFrame Declare discovery and conformance list on an XES
 // upload's frame (its rows in file order) in any input shape: a log with
 // DataFrame columns as in discover_declare_as_uploaded and
@@ -171,6 +178,15 @@ struct DeclareDiagnosticsOptions {
 [[nodiscard]] std::vector<DeclareConformance> check_declare_conformance_frame_slices(
     const EventDataView& data, const DeclareModel& model,
     const DeclareConformanceOptions& options = {});
+// The pandas frame of an XES upload as pm4py's Declare conformance reads it
+// (round FW, observed black-box): the algorithm's frame checks (the column
+// counts, KeyError for the case, activity and "time:timestamp" columns, the
+// TypeError of np.unique on a missing case id among named ones) and each row
+// without an activity read as an event no rule names. A column with no value
+// is no column of the frame (read_xes has no column for an attribute no
+// event carries).
+[[nodiscard]] EventTable declare_pandas_conformance_table(const EventTable& table,
+                                                          const DeclareConformanceOptions& options = {});
 
 [[nodiscard]] EventTable declare_conformance_diagnostics(
     const EventLog& log, const std::vector<DeclareConformance>& results,

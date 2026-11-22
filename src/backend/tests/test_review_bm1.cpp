@@ -3,9 +3,10 @@
 // pairs, the case-only sort as numpy's introsort, nanosecond comparisons,
 // Timestamp.timestamp() overlaps, NaN cases meeting in the self-merge), the
 // temporal profile on a CSV with its own "@@index" column (format_dataframe
-// overwrites it), and the Declare frame slices of a table whose rows without
-// a case stay their own cases. Values are taken from pm4py 2.7.22 black-box
-// on the same inputs (review-harness round-bm, bm1/mk.py).
+// overwrites it), and the Declare frame slices of a table with rows without
+// a case (refused as pm4py's algorithm refuses them since round FW). Values
+// are taken from pm4py 2.7.22 black-box on the same inputs (review-harness
+// round-bm, bm1/mk.py; round-fw for the Declare refusal).
 #include "minera/declare.hpp"
 #include "minera/dfg_dataframe.hpp"
 #include "minera/event_data.hpp"
@@ -230,13 +231,14 @@ int csv_own_index() {
 }
 
 int declare_caseless_rows() {
-  // x's rows apart (sliced: b, c), and two rows without a case (XES traces
-  // without a name, each its own surrogate): those stay their own cases, so
-  // there is one result per case (before: the caseless rows were dropped and
-  // the mine response failed). pm4py's DataFrame Declare refuses such a
-  // frame ("the case ID column should not contain any empty value."; declared).
+  // x's rows apart and two rows without a case (XES traces without a name).
+  // Round BM let those stay their own cases (declared); since round FW the
+  // frame slices run the checks of pm4py's Declare algorithm on the pandas
+  // frame, whose np.unique on the case column meets the missing ids
+  // (numpy's stable object argsort) and raises Python's TypeError.
   EventTable table;
   table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  table.dtypes = {"object", "object", "datetime64[ns, UTC]"};
   table.rows.push_back({cell("case:concept:name", "x"), cell("concept:name", "b"), cell("time:timestamp", "2020-01-01 00:00:01")});
   table.rows.push_back({null_cell("case:concept:name", "1"), cell("concept:name", "c"), cell("time:timestamp", "2020-01-01 00:00:02")});
   table.rows.push_back({cell("case:concept:name", "x"), cell("concept:name", "a"), cell("time:timestamp", "2020-01-01 00:00:03")});
@@ -244,10 +246,14 @@ int declare_caseless_rows() {
   const EventDataView view(table);
   DeclareModel model;
   model.add(kDeclareExistence, DeclareConstraint{"a", "", false, 1, 1});
-  std::string fitness;
-  for (const auto& result : check_declare_conformance_frame_slices(view, model))
-    fitness += (fitness.empty() ? "" : " ") + std::to_string(result.no_dev_total) + "/" + number(result.dev_fitness);
-  return check("declare conformance (caseless rows)", fitness, "1/0 1/0 0/1");
+  std::string message;
+  try {
+    (void)check_declare_conformance_frame_slices(view, model);
+  } catch (const std::exception& error) {
+    message = error.what();
+  }
+  return check("declare conformance (caseless rows)", message,
+               "'<' not supported between instances of 'str' and 'float'");
 }
 
 }  // namespace

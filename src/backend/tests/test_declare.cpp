@@ -1040,7 +1040,140 @@ void polars_frame_sorts_by_its_own_index() {
   const auto category_model = discover_declare(LazyEventTable::from_table(categorical), discovery);
   assert(category_model.rules == plain.rules);
 }
+// Round FW: pm4py's Declare algorithm on a pandas frame checks the frame
+// (three columns, two text, one date), reads the case, activity and
+// "time:timestamp" columns (KeyError, in that order), runs np.unique on the
+// case column in frame order (numpy's stable object argsort raises Python's
+// TypeError on a missing case id among named ones) and, in discovery, sorts
+// rule columns that hold a missing activity (TypeError). Its conformance
+// keeps a row without an activity as an event no rule names. Reference
+// values from pm4py 2.7.22 (review-harness round-fw dcpandas.py,
+// tecase2.py, teconfnan.py).
+EventTable fw_pandas_frame(const std::vector<std::pair<std::optional<std::string>, std::optional<std::string>>>& rows,
+                           bool time = true) {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", time ? "time:timestamp" : "ts"};
+  table.dtypes = {"object", "object", "datetime64[ns, UTC]"};
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    EventTable::Row row(3);
+    if (rows[i].first) row[0] = EventAttribute{"case:concept:name", *rows[i].first};
+    if (rows[i].second) row[1] = EventAttribute{"concept:name", *rows[i].second};
+    row[2] = EventAttribute{table.columns[2], "2021-03-01T08:00:0" + std::to_string(i % 10) + "Z", AttributeKind::kDate};
+    table.rows.push_back(std::move(row));
+  }
+  return table;
+}
+
+std::string fw_declare_error(const EventTable& table, bool discovery) {
+  try {
+    if (discovery) {
+      (void)discover_declare_frame_slices(EventDataView(table), {});
+    } else {
+      DeclareModel model;
+      model.rules[kDeclareResponse].push_back({"a", "b", true, 1, 1});
+      (void)check_declare_conformance_frame_slices(EventDataView(table), model, {});
+    }
+  } catch (const std::exception& error) {
+    return error.what();
+  }
+  return "";
+}
+
+void pandas_frame_runs_the_algorithm_checks() {
+  using Rows = std::vector<std::pair<std::optional<std::string>, std::optional<std::string>>>;
+  const std::string sf = "'<' not supported between instances of 'str' and 'float'";
+  const std::string fs = "'<' not supported between instances of 'float' and 'str'";
+  const auto c = [](const char* value) { return std::optional<std::string>(value); };
+  const std::optional<std::string> none;
+  // The frame check: two columns are too few.
+  auto narrow = fw_pandas_frame({{c("c1"), c("a")}});
+  narrow.columns.erase(narrow.columns.begin());
+  narrow.dtypes.erase(narrow.dtypes.begin());
+  for (auto& row : narrow.rows) row.erase(row.begin());
+  for (const bool discovery : {true, false})
+    assert(fw_declare_error(narrow, discovery) ==
+           "the dataframe should (at least) contain a column for the case identifier, a column for the activity and a column for the timestamp.");
+  // KeyErrors: the case column, then the activity column, then time:timestamp.
+  auto renamed = fw_pandas_frame({{c("c1"), c("a")}});
+  renamed.columns[0] = "org:resource";
+  renamed.columns[1] = "org:role";
+  assert(fw_declare_error(renamed, true) == "KeyError: 'case:concept:name'");
+  renamed.columns[0] = "case:concept:name";
+  assert(fw_declare_error(renamed, false) == "KeyError: 'concept:name'");
+  const auto no_time = fw_pandas_frame({{c("c1"), c("a")}, {none, none}}, false);
+  for (const bool discovery : {true, false}) assert(fw_declare_error(no_time, discovery) == "KeyError: 'time:timestamp'");
+  // np.unique's stable argsort over the case column in frame order.
+  const std::vector<std::pair<Rows, std::string>> cases{
+      {{{c("c1"), c("a")}, {none, c("a")}}, sf},
+      {{{none, c("a")}, {c("c1"), c("a")}}, fs},
+      {{{c("c1"), c("a")}, {c("c2"), c("a")}, {none, c("a")}}, sf},
+      {{{c("c2"), c("a")}, {c("c1"), c("a")}, {none, c("a")}}, fs},
+      {{{c("c2"), c("a")}, {none, c("a")}, {c("c1"), c("a")}}, sf},
+      {{{c("b"), c("a")}, {c("a"), c("a")}, {c("c"), c("a")}, {none, c("a")}}, fs},
+      {{{c("a"), c("a")}, {c("b"), c("a")}, {c("c"), c("a")}, {c("d"), c("a")}, {none, c("a")}}, sf}};
+  for (const auto& [rows, message] : cases)
+    for (const bool discovery : {true, false}) assert(fw_declare_error(fw_pandas_frame(rows), discovery) == message);
+  // A missing activity: discovery raises, conformance reads an event no rule names.
+  const auto gap = fw_pandas_frame({{c("c1"), c("b")}, {c("c1"), none}, {c("c1"), c("c")}});
+  assert(fw_declare_error(gap, true) == sf);
+  DeclareModel model;
+  model.rules[kDeclareChainResponse].push_back({"b", "c", true, 1, 1});
+  model.rules[kDeclareChainPrecedence].push_back({"b", "c", true, 1, 1});
+  model.rules[kDeclareInit].push_back({"b", "", false, 1, 1});
+  model.rules[kDeclareExactlyOne].push_back({"b", "", false, 1, 1});
+  model.rules[kDeclareAbsence].push_back({"x", "", false, 1, 1});
+  const auto result = check_declare_conformance_frame_slices(EventDataView(gap), model, {});
+  assert(result.size() == 1 && result[0].no_constr_total == 5 && result[0].no_dev_total == 2);
+  assert(result[0].dev_fitness == 0.6 && !result[0].is_fit);
+  const auto leading = check_declare_conformance_frame_slices(
+      EventDataView(fw_pandas_frame({{c("c1"), none}, {c("c1"), c("b")}, {c("c1"), c("c")}})), model, {});
+  assert(leading.size() == 1 && leading[0].no_dev_total == 1 && leading[0].dev_fitness == 0.8);
+  // A frame without gaps answers as before.
+  assert(fw_declare_error(fw_pandas_frame({{c("c1"), c("a")}, {c("c1"), c("b")}, {c("c2"), c("a")}}), true).empty());
+  // An XES upload's frame has no column for an attribute no event carries:
+  // with every trace unnamed the column count fails, or the case column is
+  // missing when another text column makes up the count.
+  const std::string too_few =
+      "the dataframe should (at least) contain a column for the case identifier, a column for the activity and a column for the timestamp.";
+  const auto unnamed = fw_pandas_frame({{none, c("a")}, {none, c("b")}});
+  for (const bool discovery : {true, false}) assert(fw_declare_error(unnamed, discovery) == too_few);
+  auto unnamed_resource = unnamed;
+  unnamed_resource.columns.push_back("org:resource");
+  unnamed_resource.dtypes.push_back("object");
+  for (auto& row : unnamed_resource.rows) row.push_back(EventAttribute{"org:resource", "r"});
+  for (const bool discovery : {true, false})
+    assert(fw_declare_error(unnamed_resource, discovery) == "KeyError: 'case:concept:name'");
+  // The Polars frame of an XES upload follows the same column rule; a CSV
+  // frame (the generic path) keeps every header column, so a header-only CSV
+  // answers with an empty model.
+  const auto lazy_error = [](const EventTable& table, bool xes) -> std::string {
+    try {
+      if (xes) check_declare_xes_polars_frame(LazyEventTable::from_table(table), {});
+      else (void)discover_declare(LazyEventTable::from_table(table), {});
+    } catch (const std::exception& error) {
+      return error.what();
+    }
+    return "";
+  };
+  assert(lazy_error(unnamed, true) == too_few);
+  assert(lazy_error(unnamed, false) != too_few);
+  {
+    const auto lazy = LazyEventTable::from_table(unnamed);
+    std::string message;
+    try {
+      (void)discover_declare_frame_slices(EventDataView(lazy), {});
+    } catch (const std::exception& error) {
+      message = error.what();
+    }
+    assert(message == too_few);
+  }
+  auto header_only = fw_pandas_frame({});
+  assert(lazy_error(header_only, true) == too_few);
+  assert(lazy_error(header_only, false).empty());
+}
+
 }  // namespace
+
 
 int main() {
   case_provenance_does_not_shadow_event_activity();
@@ -1064,5 +1197,6 @@ int main() {
   custom_flat_selectors_have_precedence_and_group_cases();
   polars_frame_reads_cases_in_time_order();
   polars_frame_sorts_by_its_own_index();
+  pandas_frame_runs_the_algorithm_checks();
   std::cout << "declare tests passed\n";
 }

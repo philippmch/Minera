@@ -849,6 +849,74 @@ TemporalProfile discover_temporal_profile_dataframe(
 }
 
 namespace {
+// pm4py's temporal profile on a Polars frame with business hours measures
+// every pair of the pair frame (the rows of a case with a higher "@@index"
+// and a start no earlier than the earlier row's completion) with
+// BusinessHours through map_elements, before any join with a profile, and
+// Polars refuses the first Python int (detail::polars_business_int), in
+// discovery and conformance alike (round FW, observed black-box). The pair
+// named is the first in the pair frame's order (later row's position, then
+// the earlier's) with one Polars thread; with several it can differ.
+void check_polars_business_pairs(const EventTable& table, const TemporalProfileOptions& options) {
+  if (!options.use_business_hours) return;
+  const auto slots = normalized_slots(options);
+  const auto columns = temporal_table_columns(table, options);
+  const auto column_of = [&](std::string_view name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto index_at = column_of("@@index");
+  const auto position_at = column_of(kPolarsPosition);
+  if (!index_at || !position_at) return;
+  struct PairRow {
+    std::int64_t index = 0, position = 0;
+    std::optional<std::int64_t> completion, start;  // microseconds
+  };
+  const auto integer = [](const std::string* text) -> std::optional<std::int64_t> {
+    if (!text) return std::nullopt;
+    std::int64_t value = 0;
+    const auto [end, error] = std::from_chars(text->data(), text->data() + text->size(), value);
+    if (error != std::errc{} || end != text->data() + text->size()) return std::nullopt;
+    return value;
+  };
+  const auto micros = [&](const EventTable::Row& row, std::size_t column) -> std::optional<std::int64_t> {
+    const auto* value = table_value(row, column);
+    if (!value || value->empty()) return std::nullopt;
+    const auto parsed = parse_timestamp_exact(*value);
+    if (!parsed) return std::nullopt;
+    return parsed->seconds * detail::kMicrosecondsPerSecond + parsed->nanoseconds / 1000;
+  };
+  std::map<std::string, std::vector<PairRow>> cases;
+  for (const auto& row : table.rows) {
+    const auto* case_id = table_value(row, columns.case_id);
+    const auto index = integer(table_value(row, *index_at));
+    const auto position = integer(table_value(row, *position_at));
+    if (!case_id || !index || !position) continue;
+    cases[*case_id].push_back({*index, *position, micros(row, columns.source_timestamp), micros(row, columns.target_timestamp)});
+  }
+  std::optional<std::tuple<std::int64_t, std::int64_t, double>> first;
+  for (const auto& [case_id, rows] : cases)
+    for (const auto& earlier : rows) {
+      if (!earlier.completion) continue;
+      for (const auto& later : rows) {
+        if (earlier.index >= later.index || !later.start || *later.start < *earlier.completion) continue;
+        if (first && std::pair(later.position, earlier.position) >= std::pair(std::get<0>(*first), std::get<1>(*first)))
+          continue;
+        if (!detail::polars_business_int(*earlier.completion, *later.start, slots)) continue;
+        first = std::tuple(later.position, earlier.position,
+                           detail::business_elapsed_seconds_microseconds(*earlier.completion, *later.start, slots));
+      }
+    }
+  if (!first) return;
+  // The routes pass the completion key as the start key when none is given;
+  // pm4py then reads its default start key, start_timestamp.
+  const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
+  const auto timestamp = source_timestamp_key(options);
+  throw std::invalid_argument(detail::polars_business_schema_error(
+      timestamp, start.empty() || start == timestamp ? std::string("start_timestamp") : start, std::get<2>(*first)));
+}
+
 TemporalProfile discover_temporal_profile_table(const EventTable& table, const TemporalProfileOptions& options,
                                                 bool whole_seconds) {
   PairRanks ranks, orders;
@@ -862,6 +930,7 @@ TemporalProfile discover_temporal_profile_table(const EventTable& table, const T
   // Round FL: with business hours the same pairs, each measured with
   // BusinessHours on the frame's UTC Timestamps at their microsecond.
   validate_slots(options);
+  if (whole_seconds) check_polars_business_pairs(table, options);
   const auto slots = options.use_business_hours ? normalized_slots(options)
                                                 : std::vector<BusinessHourSlot>{};
   {
@@ -1198,6 +1267,10 @@ TemporalConformanceResult conform_table(const EventTable& table, const TemporalP
       throw std::invalid_argument("unable to find column \"" + options.activity_attribute +
                                   "\"; valid columns: []");
     throw std::invalid_argument("KeyError: '" + options.activity_attribute + "'");
+  }
+  if (lazy && whole_seconds) {
+    validate_slots(options);
+    check_polars_business_pairs(table, options);
   }
   // pm4py's DataFrame conformance lists the cases in the order of their
   // first rows (an XES upload's frame in file order), not by case id, and

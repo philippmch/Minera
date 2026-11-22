@@ -216,4 +216,31 @@ inline bool business_elapsed_is_float(std::int64_t start, std::int64_t end,
   return false;
 }
 
+// Round FN: pm4py's Polars adapters compute business time with
+// map_elements over struct(timestamp, start + "_2"), Polars infers Float64
+// and refuses a Python int (SchemaError). BusinessHours returns an int when
+// the case moves forward, every unified slot bound is a whole number (as the
+// default slots are) and neither end falls inside a slot, after its start and
+// up to its end (business_elapsed_is_float; round CQ). Observed black-box on
+// Polars 1.44.1 (the DFG in FN, the temporal profile in FW).
+inline bool polars_business_int(std::int64_t start, std::int64_t end,
+                                const std::vector<BusinessHourSlot>& slots) {
+  for (const auto& slot : slots)
+    if (std::trunc(slot.start_seconds) != slot.start_seconds ||
+        std::trunc(slot.end_seconds) != slot.end_seconds)
+      return false;
+  return !business_elapsed_is_float(start, end, slots);
+}
+
+// Polars' SchemaError for that int: the struct's first field (the timestamp
+// column) names the Series, the start column's join copy ends in "_2".
+inline std::string polars_business_schema_error(const std::string& timestamp, const std::string& start,
+                                                double seconds) {
+  return "unexpected value while building Series of type Float64; found value of type Int64: " +
+         std::to_string(static_cast<long long>(std::llround(seconds))) +
+         "\n\nThis error occurred with the following context stack:\n\t[1] while constructing Series '" + timestamp +
+         "'\n\n\nThis error occurred in the following expression:\n\tas_struct(\"" + timestamp + "\", \"" + start +
+         "_2\").python_udf()\n";
+}
+
 }  // namespace minera::detail

@@ -37348,3 +37348,138 @@ shape, two CSV captures carry the Inductive timestamp message for POWL,
 three `csv-omitted-optional-bindings` captures now fail POWL on the absent
 timestamp column, and the three unsigned case id captures above; those
 captures and both manifests were refreshed.
+
+
+## Review FW1: the temporal profile with business hours on Polars frames, Declare on XES frames as pm4py's algorithm checks them (2026-11-22)
+
+Round FW re-reviewed round FV on fresh banks, settled FV's Declare
+timestamp question and swept the temporal profile with business hours on
+Polars frames and the Declare `dataframe` shape against pm4py's frame
+handling. FV's CI run 44982394370 (0b56537) passed on Linux and Windows
+(build and ctest), the parity verifier, the Python script tests and the
+frontend; its macOS job was cancelled during the build (the log ends in
+"The operation was canceled" after warnings only). Observed black-box on
+pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no
+pyarrow; the harness converts frames to Polars column by column), every
+sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL
+AVX512_SPR"` and exact comparison.
+
+Re-review of FV (fresh seeds, larger frames): POWL and the variants on
+lazy and pandas XES uploads with ties and repeated trace names (zA, zB:
+70 of 70 models, 70 of 70 variant contents), minimum self-distance seen on
+all 70, Declare discovery and conformance on Polars frames with an
+`@@index` attribute, a second timestamp and missing names, against the
+Declare algorithms (dA, dB, dC: 62 equal, 58 refused alike), the temporal
+profile on Polars frames of 30 to 400 cases (zL: 12 of 12 exact, the
+conformance equal and in pm4py's order on all 12), on CSV uploads (zM: 12
+of 12 exact, conformance in order) and with a start attribute (zN, 40 to
+300 cases: 10 of 10 exact). No difference in FV's fixes.
+
+FV's leftover, decided: pm4py's `discover_declare` and
+`conformance_declare` (the wrappers) check the selected timestamp column
+on a Polars frame (present, without a gap) before calling the Declare
+algorithms, which do not; the routes mirror the algorithms (as every
+other `/api/mine` family and the Declare `dataframe` shape do), and the
+algorithms answer on an upload where some events lack `time:timestamp` or
+where only another timestamp attribute exists. Minera answers there as
+the algorithms do (declared).
+
+Fixed:
+
+- **FW1-1. The temporal profile with business hours on a Polars frame**
+  (`/api/mine` family `temporal_profile` with `mining_input_shape=lazyframe`
+  and `temporal_business_hours=true`, `/api/analyze-behavior`
+  `temporal_profile` and `temporal_conformance` with `variant=lazyframe`).
+  pm4py measures every pair of its Polars pair frame with `BusinessHours`
+  through `map_elements` on the struct of the completion and the start
+  column's join copy; Polars infers the result dtype Float64 from a probe
+  call and refuses the first Python int, which `BusinessHours` returns
+  when neither end falls inside a slot (round CQ's rule, the same refusal
+  round FN modelled for the Polars DFG). The conformance measures the
+  pairs before its join with the profile, so a pair the profile does not
+  name raises too. The message is Polars' `SchemaError` (`unexpected value
+  while building Series of type Float64; found value of type Int64:
+  36000`, with its context stack naming the timestamp column and
+  `start_timestamp_2` or the start key's `_2` copy); the int it names is
+  the first in the pair frame's order with one Polars thread and can
+  differ with several. Minera measured those pairs. Before: 10 of 10
+  uploads with night and weekend times (bA) answered where pm4py raised,
+  in discovery and conformance. After: 10 of 10 raise alike with the same
+  message; uploads whose times all fall inside the slots answer equal
+  (bB: 6 of 6, bD: 25 of 25 exact, the conformance cases in `unique()`'s
+  order as declared in FV1), and uploads with a start attribute and
+  sub-second times raise alike (bC: 30 of 30, the message equal on 20 of
+  20 compared with one Polars thread); the pandas shape is unchanged (bA: 10 of
+  10, bB: 6 of 6, bC: 20 of 20 exact, conformance exact).
+- **FW1-2. Declare on the frame of an XES upload** (`/api/mine` family
+  `declare` with `mining_input_shape=dataframe`, `/api/declare-workbench`
+  conformance with that shape; the `lazyframe` checks of FV1-4 gain the
+  column rule below). pm4py's Declare algorithm on a pandas frame checks
+  the frame without column keys (three columns, two of them text, one a
+  date), then reads the case column, the activity column and
+  `time:timestamp` (hard-coded, as on Polars), raising `KeyError` for the
+  first one missing, then runs `np.unique` on the case column in frame
+  order with `return_index`: numpy's stable object argsort compares a
+  missing case id (NaN) with a named one and raises Python's `TypeError`,
+  its operands in the order of the first such comparison
+  (`numpy_object_stable_argsort`, e.g. `['c1', NaN]` gives `'str' and
+  'float'`, `['c2', 'c1', NaN]` `'float' and 'str'`). Discovery then sorts
+  the rule columns, which carry the activities, and a missing activity
+  raises `TypeError` there; its operand order follows the hash seed
+  (`'float' and 'str'` under some seeds), and Minera names `'str'`
+  first, the usual order. The conformance answers on a missing activity
+  and reads that row as an event no rule names (it breaks a chain and
+  fails `init`). pm4py's frame has a column only for an attribute some
+  event or trace carries, so a column without any value counts as absent
+  (an upload whose traces are all unnamed fails the column count, or
+  raises `KeyError` on the case column when other text columns make up
+  the count); this also holds for the Polars checks of FV1-4 on an XES
+  upload (`/api/mine` and the workbench conformance), while a CSV frame
+  keeps every header column. An XES upload whose timestamp is another
+  attribute (`xes_timestamp_attribute=clock`) raises `KeyError:
+  'time:timestamp'` on the `dataframe` shape, as the algorithm does. Minera
+  answered on unnamed traces (round BM's declaration), refused a missing
+  activity in both operations with its own message, and on Polars named
+  a missing case where pm4py counted columns. Before: 13 of 14 refusal
+  files differed on the `dataframe` shape and 5 of 20 on `lazyframe`.
+  After: 20 of 20 discovery and 20 of 20 conformance messages agree on
+  both shapes but for the two seed-dependent operand orders above; the
+  fresh `dataframe` banks agree (dD, missing names: 6 equal, 34 refused
+  alike; dE, an `@@index` attribute and a second timestamp: 13 equal, 27
+  refused alike; dF, no gaps: 40 of 40 equal).
+
+Declared or unchanged:
+
+- The operand order of the missing-activity `TypeError` in Declare
+  discovery on a pandas frame follows `PYTHONHASHSEED`; Minera names
+  `'str'` first.
+- The int a Polars business-hours `SchemaError` names follows Polars'
+  evaluation order, which varies with the thread count; Minera names the
+  first pair in the pair frame's order (one thread).
+- The selected-timestamp check of pm4py's Declare wrappers (above).
+- Found and left for FX: on a CSV upload without rows (a header only),
+  pm4py's `format_dataframe` turns every other object column into a
+  date, so the Polars Declare check refuses a case column read from an
+  alias header (`the case ID column should be of type string.`); Minera
+  answers with an empty model (as since FV).
+- Unchanged: the declared items of FV1 and before; the Polars frequency
+  triples (library only) and the Null-dtype key rule of
+  `dfg_dataframe.cpp` stay carried. pm4py's transition system and
+  heuristics give the same result on the pandas frame, its Polars copy and
+  the log of tie-heavy uploads (no Polars sort reaches them).
+
+In the suite: `minera_temporal_profile_parity_contracts_tests`
+(`temporal_profile_polars_business_hours_contract`) and
+`minera_declare_tests` (`pandas_frame_runs_the_algorithm_checks`) carry
+FW1's reference values. The full ctest passed 659 of 660 (38 minutes, -j2): round BM's
+`minera_review_bm1_tests` still expected the Declare frame slices to
+answer on rows without a case (its declaration, withdrawn by FW1-2); it
+now expects pm4py's `TypeError` (`'str' and 'float'`, observed on the same
+frame) and passes. The Python script tests passed 406 of 406 and the two
+vitest files that read the captures 298 of 298. The fixture replay gave
+2,672 responses unchanged and 1 changed as intended
+(`xes-custom-clock-native-flat-dataframe`: Declare on the `dataframe`
+shape of an XES upload timed by `clock` raises `KeyError:
+'time:timestamp'`, refreshed with its manifest). A first replay also
+showed the header-only CSV on `lazyframe` refused by the column rule,
+which is why the rule holds for XES uploads only.

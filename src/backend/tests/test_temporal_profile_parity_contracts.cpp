@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -329,7 +330,102 @@ void temporal_profile_polars_frame_contract() {
   assert(deviations == 1);
 }
 
+minera::EventTable fw_business_table(const std::vector<std::array<const char*, 3>>& rows, bool start = false) {
+  minera::EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  if (start) table.columns.push_back("st");
+  for (const auto& [case_id, activity, time] : rows) {
+    minera::EventTable::Row row(table.columns.size());
+    row[0] = minera::EventAttribute{"case:concept:name", case_id};
+    row[1] = minera::EventAttribute{"concept:name", activity};
+    row[2] = minera::EventAttribute{"time:timestamp", std::string(time) + "+00:00", minera::AttributeKind::kDate};
+    if (start) {
+      // One hour before the completion.
+      auto text = std::string(time);
+      const auto hour = std::stoi(text.substr(11, 2)) - 1;
+      text.replace(11, 2, (hour < 10 ? "0" : "") + std::to_string(hour));
+      row[3] = minera::EventAttribute{"st", text + "+00:00", minera::AttributeKind::kDate};
+    }
+    table.rows.push_back(std::move(row));
+  }
+  return table;
+}
+
+std::string fw_business_error(const std::function<void()>& call) {
+  try {
+    call();
+  } catch (const std::exception& error) {
+    return error.what();
+  }
+  return "";
+}
+
+// Round FW: pm4py's temporal profile on a Polars frame with business hours
+// measures every pair of the pair frame through map_elements; Polars infers
+// Float64 and refuses the first Python int BusinessHours returns (no end
+// inside a slot), in discovery and conformance alike, before the join with
+// the profile. The pandas frame answers. Expected values and messages from
+// pm4py 2.7.22 on the Polars LazyFrame with one Polars thread
+// (review-harness round-fw bhorder.py, bhmsg.py, bhconf.py).
+void temporal_profile_polars_business_hours_contract() {
+  minera::TemporalProfileOptions options;
+  options.use_business_hours = true;
+  const auto message = [](const char* value, const char* start) {
+    return std::string("unexpected value while building Series of type Float64; found value of type Int64: ") + value +
+           "\n\nThis error occurred with the following context stack:\n\t[1] while constructing Series "
+           "'time:timestamp'\n\n\nThis error occurred in the following expression:\n\tas_struct(\"time:timestamp\", \"" +
+           start + "_2\").python_udf()\n";
+  };
+  const auto nights = fw_business_table({{"c1", "a", "2021-03-08T06:00:00"},
+                                         {"c1", "b", "2021-03-09T06:00:00"},
+                                         {"c1", "c", "2021-03-11T06:00:00"}});
+  const auto lazy = minera::LazyEventTable::from_table(nights);
+  assert(fw_business_error([&] { (void)minera::discover_temporal_profile(lazy, options); }) ==
+         message("36000", "start_timestamp"));
+  minera::TemporalProfile profile;
+  profile.entries.push_back({"x", "y", 1, 1.0, 1.0});
+  assert(fw_business_error([&] {
+           (void)minera::conform_temporal_profile(minera::EventDataView(lazy), profile, options);
+         }) == message("36000", "start_timestamp"));
+  // The first int pair in the pair frame's order: case c1 sorts first.
+  const auto two = minera::LazyEventTable::from_table(fw_business_table({{"c2", "a", "2021-03-08T06:00:00"},
+                                                                         {"c2", "b", "2021-03-09T06:00:00"},
+                                                                         {"c1", "a", "2021-03-08T06:00:00"},
+                                                                         {"c1", "c", "2021-03-11T06:00:00"}}));
+  assert(fw_business_error([&] { (void)minera::discover_temporal_profile(two, options); }) ==
+         message("108000", "start_timestamp"));
+  // The routes pass the completion key as the start key when none is given:
+  // pm4py then reads its default start key.
+  auto bound_options = options;
+  bound_options.source_timestamp_attribute = "time:timestamp";
+  bound_options.target_timestamp_attribute = "time:timestamp";
+  assert(fw_business_error([&] { (void)minera::discover_temporal_profile(lazy, bound_options); }) ==
+         message("36000", "start_timestamp"));
+  // A start column names its join copy.
+  auto start_options = options;
+  start_options.target_timestamp_attribute = "st";
+  const auto started = minera::LazyEventTable::from_table(
+      fw_business_table({{"c1", "a", "2021-03-08T06:00:00"}, {"c1", "b", "2021-03-09T06:00:00"}}, true));
+  assert(fw_business_error([&] { (void)minera::discover_temporal_profile(started, start_options); }) ==
+         message("36000", "st"));
+  // The pandas frame measures the same pairs without the refusal.
+  assert(minera::discover_temporal_profile(nights, options).find("a", "b")->mean_seconds == 36000.0);
+  // Durations inside the slots are floats: the profile answers.
+  const auto days = minera::LazyEventTable::from_table(fw_business_table({{"c1", "a", "2021-03-08T08:00:00"},
+                                                                          {"c1", "b", "2021-03-09T09:30:00"},
+                                                                          {"c1", "c", "2021-03-11T12:00:00"}}));
+  const auto found = minera::discover_temporal_profile(days, options);
+  assert(found.entries.size() == 3);
+  assert(found.find("a", "b")->mean_seconds == 41400.0 && found.find("a", "c")->mean_seconds == 122400.0 &&
+         found.find("b", "c")->mean_seconds == 81000.0);
+  // A tie is a float 0.0.
+  const auto tie = minera::LazyEventTable::from_table(
+      fw_business_table({{"c1", "a", "2021-03-08T06:00:00"}, {"c1", "b", "2021-03-08T06:00:00"}}));
+  assert(minera::discover_temporal_profile(tie, options).find("a", "b")->mean_seconds == 0.0);
+}
+
 }  // namespace
+
 
 int main() {
   temporal_profile_log_variant_contract();
@@ -342,5 +438,6 @@ int main() {
   temporal_profile_conformance_dispatch_contract();
   temporal_profile_conformance_json_contract();
   temporal_profile_polars_frame_contract();
+  temporal_profile_polars_business_hours_contract();
   std::cout << "temporal-profile parity contract tests passed\n";
 }
