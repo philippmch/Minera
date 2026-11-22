@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GF (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GG (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9157,6 +9157,66 @@ GF's suite: the full ctest 669 of 669 (40 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gf/`.
+
+Round GG re-reviewed GF on fresh banks and aligned the stochastic map's
+service times, the stochastic fits of the Monte Carlo and playout routes
+on cached nets and Heuristics++'s NaN and missing instances with pm4py
+(Review GG1). GF's CI run 45074453620 passed on Linux, macOS and the
+Python, verifier and frontend jobs (Windows ctest still running at GG's
+start); GE's Windows job in 45064260404 passed. No device was reachable,
+so no newer reviewer handoff was read from the Mac. New banks
+(`gen/gengg.py`, seeds from 9000: ggA to ggD with loops, partial orders,
+silent routing, events out of time order and gaps; hgI to hgL Heuristics++
+uploads with bool, date, float and NaN instances) and 20 Heuristics++
+probes. Fixed: GG1-1, pm4py times a firing from the input token of the
+latest event in replay order (not the latest time; first-event tokens
+leave a silent firing untimed, which passes its arrival token on);
+GG1-2, `/api/monte-carlo` and the stochastic playout fit the cached
+net's named replay copy, so a seeded run fitted from the log equals the
+run on `/api/stochastic-map`'s map (8 POWL and 27 heuristics runs
+differed); GG1-3, a token from an event without a timestamp stays that
+event's token and a sample with a missing time on either side is 0 (nine
+POWL and ten heuristics maps on gfA to gfE took another fit, gfC/f8087
+fitted where pm4py's exponential fit raises); GG1-4, Heuristics++ keeps a
+NaN instance apart on an XES upload's log shape, and on pandas frames
+pairs by the instance column's dtype (float64: NaN and gaps never pair;
+str: both pair; object: gaps pair, parsed NaN floats never), on Polars a
+NaN is null. After: the stochastic map equals pm4py's on 372 of 374 POWL
+and 370 of 370 heuristics sessions (560 uploads per model, the rest fail
+on both sides or in the mine), the two left vary with pm4py's hash seed
+(gfR/f8564 4 of 8 seeds, gfD/f8144 1 of 6; declared); Monte Carlo 183 and
+292 equal; Heuristics++ 131 of 131 on the log shape and 91 of 91 per frame
+shape and option set. Kept declared: the analysis' empty-log fitness 1
+(Minera's own summary; `/api/evaluate` says pm4py's 0) and the log
+shape's whole-mine message for a missing label or time. The footprints
+lines of the POWL model that differed compared the net's footprints;
+Minera gives the POWL model's (`footprints.apply` on the POWL), which
+equal pm4py's. Open: gfR/f8532 against f8533 (one silent transition's
+log2 count moves; pm4py's is stable over 8 hash seeds).
+
+GG's suite: the full ctest 670 of 670 (29 minutes, -j2, first run; the new
+`minera_server_stochastic_fits_gg_tests` fails 14 of its checks on GF's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gg/`.
+
+Next round (GH) should start by re-reviewing round GG:
+
+- GG's CI run (and GF's Windows job if it was still running);
+- GG1 on fresh banks: `smapsw2.py` (both models) on uploads with more
+  missing times, first-event gaps and events out of time order,
+  `mccheck.py` and `pcheck.py` for the fits, and Heuristics++
+  (`hpplog.py`, `sweepopt.sh`, `hppmin.py`) on CSV uploads, whose log
+  shape now pairs by the frame's column dtype (unchecked against pm4py's
+  `convert_to_event_log` of the CSV frame);
+- the element usage of gfR/f8532 against f8533 (open since GF);
+- the alignment-based routes on cached POWL and heuristics nets (the
+  replay copy's names against alignment ties), and the Alpha model's log
+  shape totals on the GG banks (GG's sweep ran past the round);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GG (kept for its older items):
 
 Next round (GG) should start by re-reviewing round GF:
 

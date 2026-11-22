@@ -1447,6 +1447,7 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
   fit.replay.final_marking = replay_marking(fitted.final_marking);
   fit.replay.place_names = fitted.place_names;
   fit.replay.transition_names = fitted.transition_names;
+  fit.replay.place_outgoing_transition_order = fitted.place_outgoing_transition_order;
   fit.replay.initial_marking_keys = fitted.initial_marking_keys;
   fit.replay.final_marking_keys = fitted.final_marking_keys;
   fit.replay.cancelled = fitted.cancelled;

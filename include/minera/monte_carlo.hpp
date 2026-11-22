@@ -151,6 +151,12 @@ struct MonteCarloOptions {
   // OperationCancelled (minera/cancellation.hpp) and returns nothing. Unset
   // never cancels, and a run that is not cancelled is unchanged.
   std::function<bool()> cancelled;
+  // Each place's consumers in the order automatic fitting's silent path
+  // search follows them (TokenReplayOptions::place_outgoing_transition_order);
+  // unset follows the net. Fitting-only, like the names above. The server
+  // fits a cached POWL net on its named replay copy with that copy's order
+  // (round GG).
+  std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
 };
 
 struct MonteCarloDiagnostics {

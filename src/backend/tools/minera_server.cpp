@@ -631,6 +631,35 @@ const minera::PetriNet& session_replay_net(const MinedSession& session, std::str
   return replay;
 }
 
+// The Monte Carlo and stochastic playout routes fit their map or weights on
+// the named replay copy of a cached POWL or heuristics net (round GG), as the
+// stochastic map does since round GF: pm4py fits the net it built, whose
+// replay ties go by its names and, on the POWL net, its consumer order. The
+// fit keeps the cached net's indices; the run simulates the cached net.
+minera::MonteCarloResult session_monte_carlo(const MinedSession& session, std::string_view miner,
+                                             const minera::EventLog& log,
+                                             const minera::PetriNet& net,
+                                             minera::MonteCarloOptions options) {
+  if (options.place_names.empty() && options.transition_names.empty() &&
+      !options.place_outgoing_transition_order) {
+    const auto& fit_net =
+        session_replay_net(session, miner, net, &options.place_outgoing_transition_order);
+    if (&fit_net != &net)
+      return minera::monte_carlo(net, minera::fit_monte_carlo_options(log, fit_net, options));
+  }
+  return minera::monte_carlo(log, net, options);
+}
+
+void fit_session_stochastic_playout(const MinedSession& session, std::string_view miner,
+                                    const minera::EventLog& log, const minera::PetriNet& net,
+                                    minera::StochasticPlayoutOptions& options) {
+  if (!options.transition_weights.empty() || options.fitting_place_outgoing_transition_order) return;
+  const auto& fit_net =
+      session_replay_net(session, miner, net, &options.fitting_place_outgoing_transition_order);
+  if (&fit_net != &net)
+    options.transition_weights = minera::fit_stochastic_transition_weights(fit_net, log, options);
+}
+
 const minera::EventLog& require_prepared_log(const MinedSession& session) {
   if (!session.log_ready) throw std::invalid_argument(
       "the active source has no prepared EventLog; inspect its preparation error");
@@ -10261,7 +10290,8 @@ void handle_monte_carlo_json(const httplib::Request& request,
       simulation_log = &*projected_powl_log;
     }
     default_monte_carlo_activity_key(present("monte_carlo_activity_key"), *simulation_log, options);
-    const auto result = minera::monte_carlo(*simulation_log, selected, options);
+    const auto result =
+        session_monte_carlo(*session, selected_miner, *simulation_log, selected, options);
     response.set_content(workspace ? simulation_workspace_json(
         result, selected, options, *session, selected_miner) :
         minera::monte_carlo_json(result), "application/json");
@@ -10715,7 +10745,7 @@ void handle_playout(const httplib::Request& request,
       }
       default_monte_carlo_activity_key(present("monte_carlo_activity_key"), *simulation_log, options);
       const auto result =
-          minera::monte_carlo(*simulation_log, selected, options);
+          session_monte_carlo(*session, selected_miner, *simulation_log, selected, options);
       response.set_content(
           minera::to_xes(result.log, selected_miner + " Monte Carlo playout"),
           "application/xml");
@@ -10770,6 +10800,8 @@ void handle_playout(const httplib::Request& request,
             request, *session, selected_miner, converted);
         // The visible budget above does not bound silent firings.
         bound_server_stochastic_playout(options, selected, true, request);
+        if (options.fit_from_log)
+          fit_session_stochastic_playout(*session, selected_miner, *fit_log, selected, options);
         const auto visited = options.fit_from_log
                                  ? minera::stochastic_playout_visited(
                                        selected, *fit_log, options)
@@ -10785,6 +10817,8 @@ void handle_playout(const httplib::Request& request,
         const auto& selected = select_cached_or_process_tree_net(
             request, *session, selected_miner, converted);
         bound_server_stochastic_playout(options, selected, false, request);
+        if (options.fit_from_log)
+          fit_session_stochastic_playout(*session, selected_miner, *fit_log, selected, options);
         const auto log = options.fit_from_log
                              ? minera::stochastic_playout(selected,
                                                          *fit_log, options)

@@ -563,9 +563,15 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       listed[place] = marking[place] > 0 ||
           (options.replay.initial_marking_keys.size() == listed.size() &&
            options.replay.initial_marking_keys[place]);
-    // Each token keeps its time and the index of the event that produced it.
-    std::vector<std::deque<std::pair<std::optional<TokenTime>, std::size_t>>> arrivals(
-        net.place_count());
+    // Each token keeps the event that produced it (its index and its time,
+    // which an event without a timestamp lacks); an undated token (from a
+    // silent firing left untimed, or none at all) times nothing.
+    struct Token {
+      bool dated = false;
+      std::optional<TokenTime> time;
+      std::size_t source = 0;
+    };
+    std::vector<std::deque<Token>> arrivals(net.place_count());
     auto initial_arrivals = marking;
     const auto first_time = trace.events.empty() ? std::nullopt
                                                  : selected_time(trace.events.front());
@@ -578,26 +584,26 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       auto& stats = statistics[transition_index];
       ++stats.activations;
       const auto& transition = net.transitions()[transition_index];
-      std::optional<TokenTime> arrival;
-      std::size_t arrival_source = 0;
+      std::optional<Token> arrival;
       bool first_event_input = false;
       std::vector<bool> consumed(net.place_count(), false);
       for (const auto place : transition.inputs) {
         if (!consumed[place]) {
-          std::optional<TokenTime> consumed_time;
-          std::size_t source = 0;
+          Token token;
           if (initial_arrivals[place] > 0) {
             --initial_arrivals[place];
-            consumed_time = first_time;
+            token = {true, first_time, 0};
           } else if (!arrivals[place].empty()) {
-            std::tie(consumed_time, source) = arrivals[place].front();
+            token = arrivals[place].front();
             arrivals[place].pop_front();
           }
-          if (consumed_time && source == 0) first_event_input = true;
-          if (consumed_time && (!arrival || *consumed_time > *arrival)) {
-            arrival = consumed_time;
-            arrival_source = source;
-          }
+          if (token.dated && token.source == 0) first_event_input = true;
+          // The dated input token of the latest event in replay order wins,
+          // not the latest time (round GG, observed black-box: a join of
+          // tokens from the first and a later event at one instant is
+          // timed, and on events out of time order the later event's token
+          // sets the arrival even when an earlier event's time is later).
+          if (token.dated && (!arrival || token.source > arrival->source)) arrival = token;
         }
         consumed[place] = true;
       }
@@ -626,26 +632,28 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         arrivals[place].clear();
         initial_arrivals[place] = 0;
       }
-      std::optional<TokenTime> time;
-      std::size_t time_source = event_index;
+      Token produced_token{false, std::nullopt, event_index};
       std::optional<double> performance;
       if (!transition.activity) {
-        // A hidden firing passes its latest input time on, unless that token
+        // A hidden firing passes its arrival token on, unless that token
         // came from the first event (or the initial marking): the reference
         // then leaves the hidden firing and its outputs untimed. Its own
-        // zero performance is recorded only when no timed input token came
+        // zero performance is recorded only when no dated input token came
         // from the first event or the initial marking (observed black-box;
-        // untimed inputs are ignored).
-        if (arrival && arrival_source > 0) {
-          time = arrival;
-          time_source = arrival_source;
+        // undated inputs are ignored, a token whose event lacks a timestamp
+        // is still dated).
+        if (arrival && arrival->source > 0) {
+          produced_token = *arrival;
           if (!first_event_input) performance = 0.0;
         }
       } else if (event_index < trace.events.size()) {
         const auto& event = trace.events[event_index];
-        time = selected_time(event);
-        if (time && arrival)
-          performance = elapsed_seconds(*arrival, *time);
+        const auto time = selected_time(event);
+        produced_token = {true, time, event_index};
+        // A sample with a missing time on either side is 0 (round GG,
+        // observed black-box on events without a timestamp).
+        if (arrival)
+          performance = (time && arrival->time) ? elapsed_seconds(*arrival->time, *time) : 0.0;
         const auto activity = selected_activity(event);
         if (activity && *activity == net.activities()[*transition.activity])
           ++event_index;
@@ -676,7 +684,7 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       }
       std::vector<bool> produced(net.place_count(), false);
       for (const auto place : transition.outputs) {
-        if (!produced[place]) arrivals[place].emplace_back(time, time_source);
+        if (!produced[place]) arrivals[place].push_back(produced_token);
         produced[place] = true;
       }
     }

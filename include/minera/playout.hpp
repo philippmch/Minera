@@ -122,6 +122,11 @@ struct StochasticPlayoutOptions {
   // checks it before each allocation and throws std::length_error instead of
   // growing past it.
   std::size_t max_visited_bytes = 0;
+  // Each place's consumers in the order source-log fitting's silent path
+  // search follows them (TokenReplayOptions::place_outgoing_transition_order);
+  // unset follows the net. The server fits a cached POWL net on its named
+  // replay copy with that copy's order (round GG).
+  std::optional<std::vector<std::vector<std::size_t>>> fitting_place_outgoing_transition_order;
 };
 
 // Plays out a Petri net into a synthetic event log, as the reference

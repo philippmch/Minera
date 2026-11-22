@@ -2594,6 +2594,17 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_cached_net_names_gf_tests minera_server)
     add_test(NAME minera_server_cached_net_names_gf_tests
              COMMAND minera_server_cached_net_names_gf_tests $<TARGET_FILE:minera_server>)
+    # Review GG: stochastic map service times (latest event, missing times),
+    # Monte Carlo and stochastic playout fits on cached nets, Heuristics++
+    # instance pairs by log shape and frame dtype.
+    add_executable(minera_server_stochastic_fits_gg_tests
+      src/backend/tests/test_server_stochastic_fits_gg.cpp)
+    target_include_directories(minera_server_stochastic_fits_gg_tests PRIVATE third_party)
+    target_link_libraries(minera_server_stochastic_fits_gg_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_stochastic_fits_gg_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_stochastic_fits_gg_tests minera_server)
+    add_test(NAME minera_server_stochastic_fits_gg_tests
+             COMMAND minera_server_stochastic_fits_gg_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

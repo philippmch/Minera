@@ -489,19 +489,76 @@ struct IntervalTrace {
 // black-box): pm4py keys a start by its activity and instance as Python
 // values, so 2 pairs with 2.0 and True with 1 but never with '2'. A missing
 // instance pairs only with another missing one on a log; NaN never pairs
-// there (each parsed NaN is its own object), while a pandas frame holds NaN
-// for a missing cell and pairs NaN with NaN. Polars frames hold the column's
-// one dtype and keep the text comparison.
-enum class InstanceKeyMode { kText, kPythonLog, kPythonFrame };
+// there (each parsed NaN is its own object). An XES upload's log keeps the
+// log's rule although it carries its frame's columns: the log shape follows
+// the legacy log (round GG).
+//
+// On a pandas frame the column's dtype decides (round GG, observed
+// black-box): a float64 column (floats, ints beside floats or a gap) holds
+// each NaN as its own float, so a missing or NaN instance pairs with
+// nothing (kPythonFrameFloat); a str column holds pandas' one NaN for both,
+// which pairs with itself (kPythonFrame); any other (object) column holds
+// that NaN for a gap but keeps each parsed NaN float its own, as on a log
+// (kPythonLog). Polars frames hold the column's one dtype and keep the text
+// comparison, a NaN null as pl.from_pandas makes it (kText).
+enum class InstanceKeyMode { kText, kPythonLog, kPythonFrame, kPythonFrameFloat };
+
+bool nan_instance(const EventAttribute& cell) {
+  if (cell.container != AttributeContainerKind::kScalar) return false;
+  const auto scalar = python::from_attribute(cell);
+  return scalar.kind == python::Scalar::Kind::kFloat && std::isnan(scalar.real);
+}
 
 std::string lifecycle_instance_key(const EventAttribute* cell, InstanceKeyMode mode, std::size_t position) {
-  if (mode == InstanceKeyMode::kText) return cell && !cell->is_null ? cell->value : std::string();
-  if (!cell || cell->is_null) return "N";
+  if (mode == InstanceKeyMode::kText)
+    return cell && !cell->is_null && !nan_instance(*cell) ? cell->value : std::string();
+  const auto own = [&] { return "Fnan#" + std::to_string(position); };
+  if (!cell || cell->is_null) return mode == InstanceKeyMode::kPythonFrameFloat ? own() : std::string("N");
   if (cell->container != AttributeContainerKind::kScalar) return "S" + cell->value;
   const auto scalar = python::from_attribute(*cell);
   if (scalar.kind == python::Scalar::Kind::kFloat && std::isnan(scalar.real))
-    return mode == InstanceKeyMode::kPythonFrame ? std::string("N") : "Fnan#" + std::to_string(position);
+    return mode == InstanceKeyMode::kPythonFrame ? std::string("N") : own();
   return python::identity(scalar);
+}
+
+// The pandas mode of an instance column from its cells, as pandas types
+// them (a missing or NaN cell a gap; see typed_columns in
+// dataframe_columns.cpp).
+InstanceKeyMode pandas_instance_mode(const std::vector<const EventAttribute*>& cells) {
+  bool gap = false, integer = false, real = false, text = false, date = false, other = false;
+  for (const auto* cell : cells) {
+    if (!cell || cell->is_null || nan_instance(*cell)) {
+      gap = true;
+      continue;
+    }
+    if (cell->container != AttributeContainerKind::kScalar) {
+      other = true;
+      continue;
+    }
+    switch (python::from_attribute(*cell).kind) {
+      case python::Scalar::Kind::kInt: integer = true; break;
+      case python::Scalar::Kind::kFloat: real = true; break;
+      case python::Scalar::Kind::kText: text = true; break;
+      case python::Scalar::Kind::kDate: date = true; break;
+      default: other = true; break;
+    }
+  }
+  if (!text && !date && !other && (real || (integer && gap) || !integer))
+    return InstanceKeyMode::kPythonFrameFloat;
+  // A str column's gaps are its one NaN, a datetime column's pandas' NaT.
+  if (!integer && !real && !other && text != date) return InstanceKeyMode::kPythonFrame;
+  return InstanceKeyMode::kPythonLog;
+}
+
+// The mode of a CSV log's instance column (its frame's dtype).
+InstanceKeyMode csv_instance_mode(const DataFrameColumns& frame, const std::string& key) {
+  for (const auto& column : frame.columns)
+    if (column.key == key) {
+      if (column.type == DataFrameColumnType::kFloat64) return InstanceKeyMode::kPythonFrameFloat;
+      if (column.type == DataFrameColumnType::kString) return InstanceKeyMode::kPythonFrame;
+      return InstanceKeyMode::kPythonLog;
+    }
+  return InstanceKeyMode::kPythonFrame;
 }
 
 const EventAttribute* event_attribute_cell(const Event& event, std::string_view key) {
@@ -650,8 +707,10 @@ PlusAbstraction build_plus_abstraction(
   for (const auto& trace : log.traces) {
     const auto converted =
         to_intervals(trace, options, pre_interval_mode, utc_clock,
-                     instance_mode.value_or(log.dataframe_columns ? InstanceKeyMode::kPythonFrame
-                                                                  : InstanceKeyMode::kPythonLog));
+                     instance_mode.value_or(log.dataframe_columns && log.dataframe_columns->csv_text
+                                                ? csv_instance_mode(*log.dataframe_columns,
+                                                                    options.lifecycle_instance_attribute)
+                                                : InstanceKeyMode::kPythonLog));
     const auto& intervals = converted.sorted;
     if (intervals.empty()) continue;
     // In pre-interval mode discovery preserves trace order for start/end/attribute
@@ -2786,6 +2845,16 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     if (found == table.columns.end()) return std::nullopt;
     return static_cast<std::size_t>(found - table.columns.begin());
   };
+  // How the frame's instance cells pair: by the column's text on Polars, by
+  // its pandas dtype on pandas (round GG).
+  const auto frame_instance_mode = [&] {
+    if (polars) return InstanceKeyMode::kText;
+    const auto at = column_of(options.lifecycle_instance_attribute);
+    if (!at) return InstanceKeyMode::kPythonFrame;
+    std::vector<const EventAttribute*> cells;
+    for (const auto& row : table.rows) cells.push_back(*at < row.size() && row[*at] ? &*row[*at] : nullptr);
+    return pandas_instance_mode(cells);
+  }();
   const auto repr = [](const std::string& text) {
     const bool double_quote = text.find('\'') != std::string::npos && text.find('"') == std::string::npos;
     const char quote = double_quote ? '"' : '\'';
@@ -2887,8 +2956,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
         const EventAttribute* instance =
             instance_at && *instance_at < row.size() && row[*instance_at] ? &*row[*instance_at] : nullptr;
         const StartKey start_key{activity ? std::optional<std::string>(*activity) : std::nullopt,
-                                 lifecycle_instance_key(instance, polars ? InstanceKeyMode::kText
-                                                                         : InstanceKeyMode::kPythonFrame, r)};
+                                 lifecycle_instance_key(instance, frame_instance_mode, r)};
         if (lifecycle == "start") {
           open[start_key].push_back(r);
           interval_free[r] = true;
@@ -2996,8 +3064,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       std::map<NamePair, std::uint64_t> follows;
       std::map<std::string, std::vector<std::string>> targets;
       for (const auto& trace : log.traces) {
-        const auto converted = to_intervals(trace, projected, start_at.has_value(), false,
-                                            polars ? InstanceKeyMode::kText : InstanceKeyMode::kPythonFrame);
+        const auto converted = to_intervals(trace, projected, start_at.has_value(), false, frame_instance_mode);
         const auto& intervals = converted.sorted;
         for (const auto& interval : converted.performance_order) {
           if (known.insert(interval.activity).second) order.push_back(interval.activity);
@@ -3030,8 +3097,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       }
     }
     // The frame's instance cells: pandas' Python objects, Polars' column text.
-    auto net = finish(discover_plus_plus(log, projected,
-                                         polars ? InstanceKeyMode::kText : InstanceKeyMode::kPythonFrame));
+    auto net = finish(discover_plus_plus(log, projected, frame_instance_mode));
     const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
     if (any_missing && null_at != net.activities.end())
       net.null_activity = static_cast<std::size_t>(null_at - net.activities.begin());

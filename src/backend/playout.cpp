@@ -557,6 +557,7 @@ std::vector<double> fit_stochastic_transition_weights(
     fit.replay.timestamp_attribute = std::move(key);
   fit.replay.initial_marking.assign(initial.begin(), initial.end());
   fit.replay.final_marking.assign(final.begin(), final.end());
+  fit.replay.place_outgoing_transition_order = options.fitting_place_outgoing_transition_order;
   const auto fitted = fit_stochastic_map_with_report(source_log, net, fit);
   std::vector<double> weights(net.transitions().size(), 1.0);
   for (const auto& record : fitted.map.transitions)

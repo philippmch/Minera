@@ -38588,3 +38588,113 @@ with typed instances on the three shapes; 13 of its checks fail on GE's
 binary) carries the reference values. The full ctest passed 669 of 669 (40
 minutes, -j2, beside the sweeps) on the first run. The fixture replay left
 all 2,673 responses unchanged; the Python script tests passed 406 of 406.
+
+## Review GG1: stochastic map service times, stochastic fits on cached nets, Heuristics++ instances by frame dtype (2026-11-22)
+
+Round GG re-reviewed round GF on fresh banks and compared the stochastic
+map (`/api/stochastic-map`), the Monte Carlo route (`/api/monte-carlo`)
+and the stochastic playout (`/api/playout?mode=stochastic`) fitted from a
+session's cached POWL or heuristics net against pm4py's
+`montecarlo.utils.replay.get_map_from_log_and_net` on pm4py's own nets,
+and Heuristics++ (`heuristic_variant=plusplus`) on the log shape and both
+frame shapes against `heuristics_miner.apply_heu(variant=PLUSPLUS)`.
+GF's CI run 45074453620 (5315e64) passed on Linux, macOS and the Python,
+verifier and frontend jobs (Windows ctest still running at GG's start);
+GE's Windows job in 45064260404 passed. Observed black-box on pm4py
+2.7.22 (pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow), every
+sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`
+and `PYTHONHASHSEED=0`, seed stability checked over `PYTHONHASHSEED` 0-7.
+
+Banks: round GF's banks and new banks from `gen/gengg.py` (round GF's
+generator plus `concept:instance` values of bool, date or float type,
+floats possibly NaN, or one of every kind per event) on seeds from 9000:
+ggA to ggD (180 uploads: loops, partial orders, silent routing, events
+out of time order, missing labels and times) and hgI to hgL (160
+Heuristics++ uploads with lifecycle, time gaps and typed instances), plus
+20 hand-made Heuristics++ probes (NaN, missing, str, object, bool and int
+instance columns).
+
+Fixed:
+
+- **GG1-1. The stochastic map times a firing from the latest event in
+  replay order.** pm4py times a visible firing from the input token that
+  the latest event (in the trace's replay order) produced, not from the
+  latest time; a token from the first event or the initial marking leaves
+  a silent firing untimed, and a silent firing passes its arrival token
+  on. Minera took the latest time, the first input winning ties: a join
+  of tokens from the first event and a later one at one instant lost its
+  zero sample, and on events out of time order (gfR/f8540) an earlier
+  event's later time set the arrival.
+- **GG1-2. The Monte Carlo route and the stochastic playout fit the
+  cached net's replay copy.** Both fitted the cached POWL or heuristics
+  net under Minera's own names, so their routing ties (and with them the
+  activation weights) differed from `/api/stochastic-map`'s, which since
+  GF1-2 replays the named copy: a seeded Monte Carlo run fitted from the
+  log differed from the run on the stochastic map on 8 POWL and 27
+  heuristics uploads (7 more failed on one side only), 0 after; a seeded
+  stochastic playout fitted from the log now equals the playout with that
+  map's weights.
+- **GG1-3. Events without a timestamp in the stochastic map.** A token
+  produced by an event without a timestamp is still that event's token
+  (it can be the latest event's), and a sample with a missing time on
+  either side is 0; a missing time on the first event times its
+  consumers 0. Minera skipped such tokens and samples: on gfA to gfE nine
+  POWL and ten heuristics maps took another distribution or parameter
+  (gfA/f8031 exponential for pm4py's uniform, gfB/f8047 another rate),
+  and gfC/f8087 fitted where pm4py's exponential fit raises
+  `FitDataError` (now both fail).
+- **GG1-4. Heuristics++ pairs NaN and missing instances as the shape's
+  objects do.** On an XES upload's log shape a NaN instance never pairs
+  (each parsed NaN is its own object); Minera used the frame rule there,
+  since the log carries its frame's columns (hgJ/f9247, f9254). On a
+  pandas frame the instance column's dtype decides: a float64 column
+  (floats, ints beside floats or a gap) holds each NaN as its own float,
+  so a NaN or missing instance pairs with nothing; a str column holds
+  pandas' one NaN for both, which pairs with itself; any other (object)
+  column holds that NaN for a gap but keeps each parsed NaN float its
+  own. On Polars a NaN is null (`pl.from_pandas`' `nan_to_null`) and pairs
+  with a gap. Minera paired NaN with NaN and with gaps on every pandas
+  frame and kept NaN apart from null on Polars.
+
+Before and after: the stochastic map (weights and distribution types) on
+560 uploads per model: POWL 363 equal and 11 different before, 372 and 2
+after (gfR/f8564 and gfD/f8144, declared below); heuristics 360 and 10
+before, 370 and 0 after. Monte Carlo: 0 differences after on 183 POWL and
+292 heuristics uploads. Heuristics++ on hgI to hgL and the probes: the log
+shape 2 bank and 10 probe dependency matrices different before, 0 after
+(131 equal); the frame shapes 10 pandas and 3 Polars probes different
+before, 0 after (91 equal per shape and option set; 89 fail on both
+sides).
+The footprints and token replay totals of the POWL, heuristics and
+Inductive models on the log shape equal pm4py's but for the declared
+empty-log fitness; three POWL footprints lines (ggA/f9017 ...) compared
+the net's footprints where Minera's `footprints_model=powl` gives the
+POWL model's (`footprints.apply` on the POWL), which equal pm4py's.
+
+Declared:
+
+- pm4py's POWL discovery orders a partial order's children by string
+  hashes, so its net, and with it the stochastic map's silent weights of
+  gfR/f8564 (4 of 8 hash seeds) and gfD/f8144 (1 of 6), changes with the
+  hash seed; Minera gives one of its answers.
+- Kept from GF1: the analysis of an upload without a non-empty trace
+  reports fitness 1 (pm4py's evaluation 0), and the log shape's whole-mine
+  message for a missing label or time (Heuristics++'s 39 of 160 hg
+  uploads). The analysis is Minera's own summary, not a reference
+  function; `/api/evaluate` returns pm4py's 0.
+- Open for round GH: the element usage of gfR/f8532 against f8533 (one
+  silent transition's log2 count moves to another; pm4py gives the same
+  over 8 hash seeds), the alignment-based routes on cached nets, and the
+  Alpha model's log-shape totals on the GG banks (its sweep ran past the
+  round).
+- Unchanged: the declared items of GF1 and before.
+
+In the suite: the new `minera_server_stochastic_fits_gg_tests` (service
+times at a first-event join, on events out of time order and after
+events without a timestamp; Monte Carlo and stochastic playout fitted on
+the POWL and heuristics nets against the stochastic map's; Heuristics++
+instance pairs on the log shape, pandas float64, str and object columns
+and Polars; 14 of its checks fail on GF's binary) carries the reference
+values. The full ctest passed 670 of 670 (29 minutes, -j2) on the first
+run. The fixture replay left all 2,673 responses unchanged; the Python
+script tests passed 406 of 406.
