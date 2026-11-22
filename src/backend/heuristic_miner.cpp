@@ -8,7 +8,9 @@
 #include "minera/frame_keys.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
+#include "python_list_sort.hpp"
 #include "root_cause_unicode.hpp"
+#include "xes_frame_columns.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -2708,6 +2710,143 @@ HeuristicsNet discover_heuristics_net(
     const EventDataView& data,
     const HeuristicMinerOptions& options) {
   return discover_heuristics_net(classic_event_log(data, options), options);
+}
+
+HeuristicsNet discover_heuristics_net_xes_frame(
+    const EventDataView& data,
+    const HeuristicMinerOptions& options) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (options.variant != HeuristicMinerVariant::kClassic ||
+      options.decoration != HeuristicNetDecoration::kFrequency ||
+      (!polars && data.kind() != EventDataKind::kEventTable))
+    return discover_heuristics_net(data, options);
+  std::optional<EventTable> materialized;
+  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  std::optional<EventTable> storage;
+  const auto& table = detail::xes_frame_present_columns(*source, storage);
+  auto projected = options;
+  projected.activity_attribute = "concept:name";
+  const auto finish = [&](HeuristicsNet net) {
+    net.activity_attribute = options.activity_attribute;
+    return net;
+  };
+  // pandas' empty frame (no column) converts to an empty log.
+  if (table.columns.empty() || table.rows.empty()) return finish(discover_heuristics_net(EventLog{}, projected));
+  const auto column_of = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto repr = [](const std::string& text) {
+    const bool double_quote = text.find('\'') != std::string::npos && text.find('"') == std::string::npos;
+    const char quote = double_quote ? '"' : '\'';
+    std::string out(1, quote);
+    for (const char ch : text) {
+      if (ch == '\\' || ch == quote) out += '\\';
+      out += ch;
+    }
+    return out + quote;
+  };
+  const auto activity_key = canonical_activity_attribute(options);
+  const auto case_at = column_of(options.case_id_attribute);
+  if (!case_at) throw HeuristicPandasError("builtins.KeyError", repr(options.case_id_attribute));
+  const auto activity_at = column_of(activity_key);
+  const auto value = [](const EventTable::Row& row, std::size_t at) -> const std::string* {
+    if (at >= row.size() || !row[at] || row[at]->is_null) return nullptr;
+    return &row[at]->value;
+  };
+  if (!activity_at) {
+    // No event names an activity: the converted events lack the key, which
+    // only the directly-follows pairs read. A case of two or more events
+    // raises KeyError; otherwise the log has no activity at all.
+    std::map<std::optional<std::string>, std::size_t> events_of;
+    for (const auto& row : table.rows) {
+      const auto* case_id = value(row, *case_at);
+      if (++events_of[case_id ? std::optional<std::string>(*case_id) : std::nullopt] > 1)
+        throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
+    }
+    return finish(discover_heuristics_net(EventLog{}, projected));
+  }
+  // Python's str of the missing label, unique among the named activities.
+  std::set<std::string> named;
+  bool any_missing = false;
+  for (const auto& row : table.rows) {
+    if (const auto* activity = value(row, *activity_at)) named.insert(*activity);
+    else any_missing = true;
+  }
+  std::string null_label = polars ? "None" : "nan";
+  while (named.contains(null_label)) null_label += '\x1f';
+  const std::string null_type = polars ? "NoneType" : "float";
+  EventLog log;
+  std::map<std::optional<std::string>, std::size_t> trace_of;
+  for (const auto& row : table.rows) {
+    const auto* case_id = value(row, *case_at);
+    const auto key = case_id ? std::optional<std::string>(*case_id) : std::nullopt;
+    const auto [it, inserted] = trace_of.try_emplace(key, log.traces.size());
+    if (inserted) {
+      Trace trace;
+      trace.case_id = key.value_or("");
+      trace.case_id_state = key ? FirstClassAttributeState::kPresent : FirstClassAttributeState::kNull;
+      trace.case_id_source_key = options.case_id_attribute;
+      log.traces.push_back(std::move(trace));
+    }
+    Event event;
+    const auto* activity = value(row, *activity_at);
+    event.activity = activity ? *activity : null_label;
+    event.activity_state = FirstClassAttributeState::kPresent;
+    log.traces[it->second].events.push_back(std::move(event));
+  }
+  // The noise cleaning reads each DFG pair's first element as text.
+  if (any_missing)
+    for (const auto& trace : log.traces)
+      for (std::size_t e = 1; e < trace.events.size(); ++e)
+        if (trace.events[e - 1].activity == null_label)
+          throw HeuristicPandasError("builtins.TypeError", "'" + null_type + "' object is not subscriptable");
+  auto net = finish(discover_heuristics_net(log, projected));
+  const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
+  if (null_at == net.activities.end()) return net;
+  const auto null_id = static_cast<std::size_t>(null_at - net.activities.begin());
+  // Each node (first appearance) sorts the successors its dependencies
+  // accept (DFG order) by name for the AND measure: a missing label beside a
+  // named one raises TypeError.
+  std::vector<std::string> appearance;
+  std::set<std::string> seen;
+  std::map<std::pair<std::string, std::string>, std::size_t> pair_order;
+  for (const auto& trace : log.traces)
+    for (std::size_t e = 0; e < trace.events.size(); ++e) {
+      if (seen.insert(trace.events[e].activity).second) appearance.push_back(trace.events[e].activity);
+      if (e) pair_order.try_emplace({trace.events[e - 1].activity, trace.events[e].activity}, pair_order.size());
+    }
+  for (const auto& name : appearance) {
+    const auto found = std::find(net.activities.begin(), net.activities.end(), name);
+    if (found == net.activities.end()) continue;
+    const auto id = static_cast<std::size_t>(found - net.activities.begin());
+    std::vector<std::size_t> successors;
+    bool reaches_null = false;
+    // The length-two loop edges join after the AND measures.
+    for (const auto& edge : net.edges)
+      if (edge.source == id && !edge.length_two_loop) {
+        successors.push_back(edge.target);
+        reaches_null = reaches_null || edge.target == null_id;
+      }
+    if (successors.size() < 2 || !reaches_null) continue;
+    const auto rank = [&](std::size_t target) {
+      const auto at = pair_order.find({name, net.activities[target]});
+      return at == pair_order.end() ? pair_order.size() : at->second;
+    };
+    std::stable_sort(successors.begin(), successors.end(),
+                     [&](std::size_t a, std::size_t b) { return rank(a) < rank(b); });
+    detail::python_list_sort(successors, [&](std::size_t a, std::size_t b) {
+      if ((a == null_id) != (b == null_id))
+        throw HeuristicPandasError("builtins.TypeError",
+                                   "'<' not supported between instances of '" +
+                                       std::string(a == null_id ? null_type : "str") + "' and '" +
+                                       std::string(b == null_id ? null_type : "str") + "'");
+      return net.activities[a] < net.activities[b];
+    });
+  }
+  net.null_activity = null_id;
+  return net;
 }
 
 HeuristicsNet discover_heuristics_net(

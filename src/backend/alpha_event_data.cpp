@@ -10,6 +10,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 #include "polars_sort.hpp"
+#include "xes_frame_checks.hpp"
 
 namespace minera {
 namespace {
@@ -190,9 +191,16 @@ bool text_dtype(std::string_view dtype) {
 // text, so "2020-1-5 9:05" follows "2020-01-05 10:00:00" (round FU, observed
 // black-box). The sort switches are Minera's own (pm4py's Alpha always sorts
 // by case and timestamps); without the timestamps the sort stays stable.
+// On the frame of an XES upload (`xes_frame`, round FZ, observed black-box) a
+// missing activity is a label of its own among the boundary activities: on
+// pandas a case's first and last named activity (GroupBy.first and last skip
+// NaN), NaN when the case has none; on Polars the first and last row's,
+// None included. The rows without a case id form one case of Polars'
+// boundary activities, but no pair of theirs counts (the directly-follows
+// pairs need a case id); a pair with a missing activity never counts.
 PetriNet discover_classic_table(const EventTable& table,
                                 const AlphaMinerOptions& options,
-                                bool polars = false) {
+                                bool polars = false, bool xes_frame = false) {
   enforce_cap(table.size(), options);
   auto stream = table_stream(table);
   const std::string activity = options.activity_attribute.empty()
@@ -246,6 +254,11 @@ PetriNet discover_classic_table(const EventTable& table,
     return *parsed;
   };
   std::map<std::string, std::pair<std::string, std::string>> endpoints;
+  struct FrameEnds {
+    std::optional<std::string> first, last;
+    bool named = false;
+  };
+  std::map<std::optional<std::string>, FrameEnds> frame_ends;
   for (const auto& record : stream.events) {
     Row row;
     const auto* selected_case = select_field(record, options.case_id_attribute,
@@ -267,7 +280,20 @@ PetriNet discover_classic_table(const EventTable& table,
       row.start = has_start ? instant(select_field(record, start,
           FirstClassAttributeRole::kTimestamp, false, true)) : row.completion;
     }
-    if (row.case_id && row.activity) {
+    if (xes_frame && polars) {
+      const auto [entry, inserted] = frame_ends.try_emplace(row.case_id);
+      if (inserted) entry->second.first = row.activity;
+      entry->second.last = row.activity;
+    } else if (xes_frame) {
+      if (row.case_id) {
+        auto& ends = frame_ends[row.case_id];
+        if (row.activity) {
+          if (!ends.named) ends.first = row.activity;
+          ends.named = true;
+          ends.last = row.activity;
+        }
+      }
+    } else if (row.case_id && row.activity) {
       const auto [entry, inserted] = endpoints.try_emplace(
           *row.case_id, *row.activity, *row.activity);
       if (!inserted) entry->second.second = *row.activity;
@@ -333,7 +359,14 @@ PetriNet discover_classic_table(const EventTable& table,
     ++starts[bounds.first];
     ++ends[bounds.second];
   }
-  return discover_petri_net(graph, starts, ends, options);
+  if (!xes_frame) return discover_petri_net(graph, starts, ends, options);
+  bool null_start = false, null_end = false;
+  for (const auto& [case_id, bounds] : frame_ends) {
+    (void)case_id;
+    if (bounds.first) ++starts[*bounds.first]; else null_start = true;
+    if (bounds.last) ++ends[*bounds.last]; else null_end = true;
+  }
+  return discover_petri_net_with_null_endpoints(graph, starts, ends, null_start, null_end, options);
 }
 
 }  // namespace
@@ -404,6 +437,26 @@ PetriNet discover_petri_net(const EventDataView& data,
 PetriNet discover_petri_net(const EventStream& data,
                             const AlphaMinerOptions& options) {
   return discover_petri_net(EventDataView(data), options);
+}
+
+PetriNet discover_petri_net_xes_frame(const EventDataView& data,
+                                      const AlphaMinerOptions& options) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (options.short_loops || (!polars && data.kind() != EventDataKind::kEventTable))
+    return discover_petri_net(data, options);
+  const std::string activity = options.activity_attribute.empty()
+                                   ? "concept:name" : options.activity_attribute;
+  const std::string start = options.start_timestamp_attribute.empty()
+                                ? "start_timestamp" : options.start_timestamp_attribute;
+  detail::check_xes_frame_columns(data, detail::XesFrameFamily::kAlpha, options.case_id_attribute,
+                                  activity, options.timestamp_attribute, start);
+  std::optional<EventTable> materialized;
+  const EventTable* source = polars
+      ? &materialized.emplace(data.lazy_table()->materialize(options.max_rows_to_materialize))
+      : data.table();
+  std::optional<EventTable> storage;
+  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  return discover_classic_table(table, options, polars, true);
 }
 PetriNet discover_petri_net(const EventTable& data,
                             const AlphaMinerOptions& options) {

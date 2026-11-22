@@ -956,6 +956,45 @@ PetriNet discover_petri_net(
   return build_classic_net(names, footprint, false);
 }
 
+PetriNet discover_petri_net_with_null_endpoints(
+    const DfgFrequency& graph,
+    const std::map<std::string, std::uint64_t>& starts,
+    const std::map<std::string, std::uint64_t>& ends,
+    bool null_start, bool null_end, const AlphaMinerOptions& options) {
+  if (!null_start && !null_end) return discover_petri_net(graph, starts, ends, options);
+  if (options.short_loops)
+    throw std::invalid_argument(
+        "Alpha: Alpha+ requires event-log trace context; direct graph input supports classic only");
+  std::set<std::string> labels;
+  for (const auto& [edge, frequency] : graph) {
+    (void)frequency;
+    labels.insert(edge.first);
+    labels.insert(edge.second);
+  }
+  for (const auto& [label, frequency] : starts) { (void)frequency; labels.insert(label); }
+  for (const auto& [label, frequency] : ends) { (void)frequency; labels.insert(label); }
+  const std::vector<std::string> names(labels.begin(), labels.end());
+  const auto n = names.size();
+  Footprint footprint;
+  footprint.follows.assign(n + 1, std::vector<bool>(n + 1));
+  for (std::size_t a = 0; a < n; ++a) {
+    if (starts.contains(names[a])) footprint.starts.insert(a);
+    if (ends.contains(names[a])) footprint.ends.insert(a);
+    for (std::size_t b = 0; b < n; ++b)
+      footprint.follows[a][b] = graph.contains({names[a], names[b]});
+  }
+  set_classic_relations(footprint, names, graph);
+  // The missing label follows and precedes nothing: no causal pair holds it.
+  for (auto& row : footprint.classic_causal) row.push_back(false);
+  footprint.classic_causal.emplace_back(n + 1, false);
+  if (null_start) footprint.starts.insert(n);
+  if (null_end) footprint.ends.insert(n);
+  std::vector<std::optional<std::size_t>> transition_labels;
+  for (std::size_t a = 0; a < n; ++a) transition_labels.push_back(a);
+  transition_labels.push_back(std::nullopt);
+  return build_classic_net(names, footprint, false, &transition_labels);
+}
+
 PetriNet discover_petri_net(const DfgFrequency& graph,
                             const AlphaMinerOptions& options) {
   const auto endpoints = infer_alpha_endpoints(graph);

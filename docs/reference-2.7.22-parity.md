@@ -37733,3 +37733,123 @@ columns, unnamed traces and events and missing timestamps through
 carries the reference values. The full ctest passed 662 of 662 (28
 minutes, -j2) on the first run. The fixture replay gave no change (2,673
 responses unchanged), and the Python script tests passed 406 of 406.
+
+## Review FZ1: Alpha, heuristics and the temporal profile on frame shapes of XES uploads with gaps (2026-11-22)
+
+Round FZ re-reviewed round FY on fresh banks and aligned the `/api/mine`
+Alpha, heuristics and temporal profile families on the `dataframe` and
+`lazyframe` shapes of XES uploads with gaps, and the log skeleton's
+missing activity on the Polars copy, against pm4py's algorithm applies on
+read_xes's frame and its Polars copy. FY's CI run 45006486972 (c136558)
+passed on Linux, macOS and Windows (build and ctest), the parity verifier,
+the Python script tests and the frontend; FX's Windows job in run
+44999089784 passed. Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no
+pyarrow; frames converted to Polars column by column), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`,
+`PYTHONHASHSEED=0` and exact comparison of the canonical results (Alpha's
+transitions and places with their arcs and markings, the heuristics
+activities and edges with dependency and frequency, the temporal profile's
+pairs with mean and deviation, the six log skeleton relations and
+`activ_freq`) or of the error messages.
+
+Re-review of FY (fresh seeds): FY1-1's four families on six new banks
+(zM mixed gaps at 25/20/20 %, zH at 50/40/40 %, zL rare gaps with 20
+traces of up to 12 events over 8 activities, zA unnamed events only, zC
+unnamed traces only, zT missing timestamps only; 260 uploads per shape):
+the transition system, Inductive, POWL and the log skeleton agree on every
+upload of the `dataframe` shape except one Inductive and one POWL refusal,
+and on the `lazyframe` shape except ten each; all of these are the
+declared operand order of the alphabet `TypeError`. The log skeleton on
+Polars, refused by Minera wherever a null activity appeared, now answers
+(below). Older banks (FX's gC, gA, gT, gN, fA, fB; FY's fH, fD, edge, ct;
+new zX with 25 traces of up to 15 events over 10 activities and tied
+timestamps, zS with tiny logs over two activities and duplicate names; 502
+uploads per shape) agree in all seven families except the same declared
+operand order (3 Inductive and 3 POWL refusals on `dataframe`, 41 each on
+`lazyframe`).
+
+Fixed:
+
+- **FZ1-1. Alpha on XES frames with gaps.** pm4py's classic Alpha reads
+  the frame's timestamp first: pandas raises `KeyError: 'time:timestamp'`,
+  Polars adds the start column as an alias of the timestamp and fails at
+  that `with_columns` over the frame itself. It then selects the case,
+  activity and timestamp: pandas' list selection names the missing labels
+  (`KeyError: "['case:concept:name'] not in index"`), Polars' resolved plan
+  fails at the `group_by` (`unable to find column "concept:name"; valid
+  columns: [...]`, the hint, `SORT BY [case, start, timestamp]` above the
+  `SELECT` when the case column is there, the `WITH_COLUMNS` alias, the
+  frame's `DF` line, and the context stack). Rows without an activity
+  leave the pandas directly-follows pairs and the start and end
+  activities, unless their case has no activity at all: then the label
+  NaN starts and ends it, one more transition without a label joined to
+  the source and the sink. On Polars a row without an activity is a start
+  or end activity of its own (a transition without a label), while its
+  pairs never count. Rows without a case id leave pandas' groups; on
+  Polars they form one case whose first and last rows are start and end
+  activities (its pairs never count). Minera named the missing columns its
+  own way, counted the unnamed rows' neighbours as pairs and left out the
+  boundary transitions. New: `discover_petri_net_xes_frame`,
+  `discover_petri_net_with_null_endpoints` and the shared
+  `xes_frame_checks.hpp`.
+- **FZ1-2. The heuristics on XES frames with gaps** (classic variant,
+  frequency decoration). pm4py converts the frame to an EventLog. A
+  missing case column raises `KeyError: 'case:concept:name'`; a missing
+  activity column (no event names an activity) raises `KeyError:
+  'concept:name'` only where the directly-follows count reaches a case of
+  two or more events, and otherwise yields the empty net. The rows
+  without a case id form one trace on both shapes. A row without an
+  activity is the activity `nan` (pandas) or `None` (Polars), shown as a
+  null activity: a successor in its trace raises `TypeError: 'float'
+  object is not subscriptable` (`'NoneType'` on Polars) in the noise
+  cleaning, and the AND measure sorts each node's accepted successors by
+  name, so a null one beside a named one raises `TypeError: '<' not
+  supported between instances of 'str' and 'float'`, its operands as
+  CPython's list sort compares them in the order of the directly-follows
+  pairs (length-two loop edges, added after the AND measure, take no
+  part). The errors now carry their Python type (`builtins.KeyError`,
+  `builtins.TypeError`). Minera refused these frames with its own
+  messages or answered where pm4py raised. New:
+  `discover_heuristics_net_xes_frame`, `HeuristicsNet::null_activity`.
+- **FZ1-3. The temporal profile on XES frames with missing columns.**
+  pandas: `KeyError: 'time:timestamp'`, then the list selection's
+  `KeyError`. Polars: the `with_columns` error over the frame, then, with
+  no case column, the resolved plan failing at the `sort` (context stack
+  `sort`), and with no activity column `KeyError: "['concept:name',
+  'concept:name_2'] not in index"` (the pair frame's pandas selection after
+  the collect). New: `discover_temporal_profile_xes_frame`.
+- **FZ1-4. The log skeleton with a missing activity on Polars.** pm4py
+  answers with `None` as one more activity: Minera's model now holds a
+  null label (`kLogSkeletonNullActivity`), its relations show `null` as
+  source or target and its counts appear as `null_activ_freq` beside
+  `activ_freq`. Minera refused these frames with a presentation error.
+
+Before (FY's binary, the six fresh banks, 260 uploads per shape; answers
+or refusals alike, values compared where both answer): on `dataframe`
+Alpha agreed on 191, the heuristics on 105, the temporal profile on 216
+and the log skeleton on 260; on `lazyframe` 86, 105, 216 and 124. After:
+260 of 260 for each of the four on each shape; the combination banks kC
+and kC1 (108 uploads mixing every gap kind with missing columns) 108 of
+108 for each of the four on each shape; the 502 older uploads 502 of 502
+for each of the four on each shape; the hand-made uploads of the new
+ctest (13 per shape) equal.
+
+Declared or unchanged:
+
+- The log skeleton's graph presentation (activity ids of the session's
+  graph) leaves out pairs with the null label; the family result lists
+  them.
+- The heuristics net's Petri net conversion labels the missing activity
+  with the text `nan` or `None` (pm4py's label is the NaN or None
+  object).
+- Unchanged: the alphabet `TypeError`'s operand order of Inductive and
+  POWL (FY1), and the declared items of FY1 and before.
+
+In the suite: the new `minera_server_mine_xes_frames_fz_tests` (missing
+columns, unnamed traces and events, cases without activities and uploads
+where no event names an activity, through `/api/mine` on both shapes; 55
+of its checks fail on FY's binary) carries the reference values. The full
+ctest passed 663 of 663 (33 minutes, -j2) on the first run. The fixture
+replay gave no change (2,673 responses unchanged), and the Python script
+tests passed 406 of 406.

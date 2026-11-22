@@ -135,6 +135,13 @@ struct TemporalDeviation {
     const LazyEventTable& table, const TemporalProfileOptions& options = {});
 [[nodiscard]] TemporalProfile discover_temporal_profile(
     const EventDataView& data, const TemporalProfileOptions& options = {});
+// pm4py's temporal profile on the frame of an XES upload (round FZ, observed
+// black-box): a frame without the case, activity or timestamp column raises
+// pandas' KeyError or the Polars plan's ColumnNotFoundError (the activity
+// missing beside a case column fails in pandas after the Polars sort);
+// otherwise discover_temporal_profile.
+[[nodiscard]] TemporalProfile discover_temporal_profile_xes_frame(
+    const EventDataView& data, const TemporalProfileOptions& options = {});
 
 // Return only observations whose absolute z-score exceeds options.zeta, or
 // whose zero-variance profile disagrees with the observed duration.

@@ -244,18 +244,27 @@ void write_powl_node(std::ostream& out, const PowlNode& node,
   out << '}';
 }
 
+// A pair or activity holding the missing activity of a Polars frame
+// (kLogSkeletonNullActivity, round FZ) has no graph id: the presentation
+// leaves it out (the family result lists it).
+bool log_skeleton_null_pair(const LogSkeletonPair& pair) {
+  return pair.source == kLogSkeletonNullActivity || pair.target == kLogSkeletonNullActivity;
+}
+
 void write_log_skeleton_pairs(std::ostream& out,
                               const std::vector<LogSkeletonPair>& pairs,
                               const DirectlyFollowsGraph& graph) {
   out << '[';
+  std::size_t emitted = 0;
   for (std::size_t i = 0; i < pairs.size(); ++i) {
+    if (log_skeleton_null_pair(pairs[i])) continue;
     const auto source = graph.activity_id(pairs[i].source);
     const auto target = graph.activity_id(pairs[i].target);
     if (!source || !target) {
       throw std::invalid_argument("log skeleton activity is not registered");
     }
-    out << "{\"source\": " << *source << ", \"target\": " << *target
-        << '}' << (i + 1 < pairs.size() ? ", " : "");
+    if (emitted++ != 0) out << ", ";
+    out << "{\"source\": " << *source << ", \"target\": " << *target << '}';
   }
   out << ']';
 }
@@ -276,6 +285,7 @@ void write_log_skeleton_model(std::ostream& out,
   out << ", \"activ_freq\": {";
   std::size_t emitted = 0;
   for (const auto& [activity, frequencies] : model.activ_freq) {
+    if (activity == kLogSkeletonNullActivity) continue;
     const auto id = graph.activity_id(activity);
     if (!id) {
       throw std::invalid_argument("log skeleton activity is not registered: " +
@@ -351,6 +361,7 @@ bool is_log_skeleton_pair_constraint(std::string_view constraint) {
 
 void validate_log_skeleton_pair(const LogSkeletonPair& pair,
                                 const DirectlyFollowsGraph& graph) {
+  if (log_skeleton_null_pair(pair)) return;
   if (!graph.activity_id(pair.source) || !graph.activity_id(pair.target)) {
     throw std::invalid_argument("log skeleton pair activity is not registered");
   }
@@ -367,7 +378,7 @@ void validate_log_skeleton_model(const LogSkeletonModel& model,
   validate_pairs(model.never_together);
   validate_pairs(model.directly_follows);
   for (const auto& [activity, frequencies] : model.activ_freq) {
-    if (!graph.activity_id(activity)) {
+    if (activity != kLogSkeletonNullActivity && !graph.activity_id(activity)) {
       throw std::invalid_argument(
           "log skeleton activity is not registered: " + activity);
     }

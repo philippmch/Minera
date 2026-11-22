@@ -275,6 +275,11 @@ struct HeuristicsNet {
   // All retained EFG pairs are present. Frequency decoration stores 0.0;
   // performance decoration stores mean wait (0.0 for an EFG-only pair).
   HeuristicMeanPerformanceDfg plusplus_computed_performance_matrix;
+  // The activity standing for a missing label (NaN on pandas, None on
+  // Polars) on the frame of an XES upload (round FZ): its name in
+  // `activities` is Python's str of it (made unique), which the Petri
+  // conversion keeps as its label; the JSON shows it as null.
+  std::optional<std::size_t> null_activity;
 };
 
 struct HeuristicMinerOptions {
@@ -372,6 +377,20 @@ struct HeuristicClassicDfgInput {
   std::optional<std::vector<std::pair<std::string, std::string>>> dfg_order;
 };
 
+// pm4py's classic heuristics miner (frequency) on the frame of an XES
+// upload, pandas or Polars (round FZ, observed black-box). It converts the
+// frame to an EventLog: a frame without columns is an empty log, a missing
+// case column raises KeyError, a missing activity column only where the DFG
+// reads it (a case of two or more rows; else the empty net); the rows keep
+// the frame's order, the cases their first appearance, the rows without a
+// case id one case of their own. A missing activity (NaN, None on Polars) is a label: the DFG's
+// noise cleaning fails on a pair it starts ("'float' object is not
+// subscriptable"), and a node whose accepted successors hold it beside a
+// named one fails when it sorts them by name (Python's list.sort over the
+// successors in DFG order, the nodes in first appearance). Other variants
+// and decorations stay on discover_heuristics_net.
+[[nodiscard]] HeuristicsNet discover_heuristics_net_xes_frame(
+    const EventDataView& data, const HeuristicMinerOptions& options = {});
 // Discovers a heuristics net from an event log. The dependency of a over b is
 // (|a>b| - |b>a|) / (|a>b| + |b>a| + 1); self-loops use |a>a| / (|a>a| + 1).
 [[nodiscard]] HeuristicsNet discover_heuristics_net(

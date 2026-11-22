@@ -27,6 +27,7 @@
 #include "frame_temporal_profile.hpp"
 #include "frame_times.hpp"
 #include "polars_sort.hpp"
+#include "xes_frame_checks.hpp"
 
 namespace minera {
 namespace {
@@ -1070,6 +1071,14 @@ TemporalProfile discover_temporal_profile(
 TemporalProfile discover_temporal_profile(
     const LazyEventTable& table, const TemporalProfileOptions& options) {
   return discover_temporal_profile_table(polars_partial_order_table(table.materialize(), options), options, true);
+}
+
+TemporalProfile discover_temporal_profile_xes_frame(
+    const EventDataView& data, const TemporalProfileOptions& options) {
+  if (data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable)
+    detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
+                                    options.activity_attribute, source_timestamp_key(options));
+  return discover_temporal_profile(data, options);
 }
 
 TemporalProfile discover_temporal_profile(

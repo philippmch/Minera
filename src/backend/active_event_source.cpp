@@ -581,8 +581,13 @@ std::string integers_json(const Range& values) {
   return array_json(values, [](auto value) { return std::to_string(value); });
 }
 
+// A missing activity (kLogSkeletonNullActivity, round FZ) shows as null.
+std::string skeleton_label_json(const std::string& label) {
+  return label == kLogSkeletonNullActivity ? "null" : quote(label);
+}
+
 std::string relation_json(const LogSkeletonPair& relation) {
-  return object_json({{"source", quote(relation.source)}, {"target", quote(relation.target)}});
+  return object_json({{"source", skeleton_label_json(relation.source)}, {"target", skeleton_label_json(relation.target)}});
 }
 
 std::string skeleton_conformance_json(const LogSkeletonConformance& result) {
@@ -819,12 +824,19 @@ std::string serialize_active_source_stream_json(const EventStream& stream) {
 std::string serialize_active_source_skeleton_json(
     const LogSkeletonModel& model, const std::vector<LogSkeletonConformance>* conformance) {
   std::vector<std::pair<std::string, std::string>> frequency;
-  for (const auto& [activity, counts] : model.activ_freq) frequency.emplace_back(activity, integers_json(counts));
+  std::optional<std::string> null_frequency;
+  for (const auto& [activity, counts] : model.activ_freq) {
+    if (activity == kLogSkeletonNullActivity) null_frequency = integers_json(counts);
+    else frequency.emplace_back(activity, integers_json(counts));
+  }
   const auto relations = [](const auto& values) { return array_json(values, relation_json); };
-  return object_json({{"model", object_json({{"equivalence", relations(model.equivalence)},
+  std::vector<std::pair<std::string, std::string>> fields{{"equivalence", relations(model.equivalence)},
       {"always_after", relations(model.always_after)}, {"always_before", relations(model.always_before)},
       {"never_together", relations(model.never_together)}, {"directly_follows", relations(model.directly_follows)},
-      {"activ_freq", object_json(frequency)}})},
+      {"activ_freq", object_json(frequency)}};
+  // A JSON object has no null key: the missing activity's counts apart.
+  if (null_frequency) fields.emplace_back("null_activ_freq", *null_frequency);
+  return object_json({{"model", object_json(fields)},
       {"conformance", conformance ? array_json(*conformance, skeleton_conformance_json) : "null"}});
 }
 

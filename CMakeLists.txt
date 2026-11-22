@@ -2529,6 +2529,16 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_mine_xes_frames_tests minera_server)
     add_test(NAME minera_server_mine_xes_frames_tests
              COMMAND minera_server_mine_xes_frames_tests $<TARGET_FILE:minera_server>)
+    # Review FZ1: Alpha, heuristics and the temporal profile on the same
+    # frames; the Polars log skeleton's None label.
+    add_executable(minera_server_mine_xes_frames_fz_tests
+      src/backend/tests/test_server_mine_xes_frames_fz.cpp)
+    target_include_directories(minera_server_mine_xes_frames_fz_tests PRIVATE third_party)
+    target_link_libraries(minera_server_mine_xes_frames_fz_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_mine_xes_frames_fz_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_mine_xes_frames_fz_tests minera_server)
+    add_test(NAME minera_server_mine_xes_frames_fz_tests
+             COMMAND minera_server_mine_xes_frames_fz_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

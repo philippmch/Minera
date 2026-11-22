@@ -70,7 +70,8 @@ void handle_active_source_mining(const httplib::Request& request,
   std::optional<minera::AlphaPlusDiscoveryResult> alpha_plus;
   run("alpha", selected, [&](bool& native_returned) {
     if (params.alpha.short_loops) {alpha_plus = minera::discover_alpha_plus_result(data(), params.alpha); alpha = alpha_plus->net;}
-    else alpha = minera::discover_petri_net(data(), params.alpha);
+    else alpha = xes_frame ? minera::discover_petri_net_xes_frame(data(), params.alpha)
+                           : minera::discover_petri_net(data(), params.alpha);
     session->nets.emplace("alpha", *alpha);
     native_returned = true;
     return alpha_plus ? minera::alpha_plus_result_json(*alpha_plus) : minera::workflow_input_petri_json(*alpha);
@@ -83,7 +84,8 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   std::optional<minera::HeuristicsNet> heuristics;
   run("heuristic", selected, [&](bool& native_returned) {
-    heuristics = minera::observe_exact_heuristic_call(data(),params.heuristic,[&]{return minera::discover_heuristics_net(data(), params.heuristic);});
+    // An XES upload's frame converts to an EventLog the way pm4py's does (round FZ).
+    heuristics = minera::observe_exact_heuristic_call(data(),params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(data(), params.heuristic) : minera::discover_heuristics_net(data(), params.heuristic);});
     native_returned = true;
     try{auto bytes=minera::workflow_input_heuristics_json(*heuristics);minera::record_exact_optional_artifact("legacy_heuristics_json",bytes);return bytes;}
     catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_heuristics_json",e.what(),true);throw;}
@@ -132,7 +134,8 @@ void handle_active_source_mining(const httplib::Request& request,
   run("temporal_profile", selected, [&](bool& native_returned) {
     auto temporal_options = params.temporal_profile;
     mark_frame_index_rows(*session, temporal_options);
-    temporal = minera::discover_temporal_profile(data(), temporal_options);
+    temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options)
+                         : minera::discover_temporal_profile(data(), temporal_options);
     native_returned = true;
     return minera::serialize_active_source_temporal_profile_json(*temporal);
   });
@@ -154,7 +157,8 @@ void handle_active_source_mining(const httplib::Request& request,
   };
   run("log_skeleton", selected, [&](bool& native_returned) {
     if (xes_frame) {
-      skeleton = minera::discover_log_skeleton_xes_frame(data(), params.log_skeleton);
+      // A Polars row without an activity is the label None (round FZ).
+      skeleton = minera::discover_log_skeleton_xes_frame(data(), params.log_skeleton, true);
     } else {
       const auto order = skeleton_order();
       skeleton = order ? minera::discover_log_skeleton(data(), params.log_skeleton, *order)

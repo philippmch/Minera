@@ -87,9 +87,16 @@ struct LogSkeletonModel {
 // pm4py's log skeleton discovery on the frame of an XES upload, pandas (an
 // event table) or Polars (a lazy table): the groupby over the case column,
 // the activity counts over every row, gaps and missing columns as pm4py
-// reads them (round FY). Other inputs as discover_log_skeleton.
+// reads them (round FY). Other inputs as discover_log_skeleton. With
+// `null_labels`, a row without an activity on Polars is the label None in
+// the model (kLogSkeletonNullActivity; round FZ, observed black-box), as
+// pm4py answers; without it such a row is refused.
 [[nodiscard]] LogSkeletonModel discover_log_skeleton_xes_frame(
-    const EventDataView& data, const LogSkeletonOptions& options);
+    const EventDataView& data, const LogSkeletonOptions& options, bool null_labels = false);
+
+// The model's name for a missing activity (Python's None): no XES or CSV
+// label holds a NUL character. The JSON shows it as null.
+inline const std::string kLogSkeletonNullActivity{"\0None", 5};
 
 [[nodiscard]] std::vector<std::size_t> log_skeleton_case_order(
     const EventDataView& data, const LogSkeletonOptions& options);

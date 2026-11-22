@@ -713,7 +713,7 @@ LogSkeletonModel discover_log_skeleton(const EventDataView& data,
 // count their activities, and a missing activity in a trace (NaN, which the
 // counts leave out) raises KeyError: nan.
 LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
-                                                 const LogSkeletonOptions& options) {
+                                                 const LogSkeletonOptions& options, bool null_labels) {
   if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable)
     return discover_log_skeleton(data, options);
   validate_activity_key(options.activity_key);
@@ -775,6 +775,10 @@ LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
       const auto* activity = cell(table.rows[row], activity_at);
       if (!activity) {
         if (!polars) throw std::invalid_argument("KeyError: nan");
+        if (null_labels) {
+          sequence.push_back(&kLogSkeletonNullActivity);
+          continue;
+        }
         throw std::invalid_argument("log skeleton: event activity selector is missing or null: '" + activity_key + "'");
       }
       sequence.push_back(&activity->value);

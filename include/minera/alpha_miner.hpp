@@ -173,4 +173,26 @@ enumerate_alpha_plus_cleanup_alternatives(
 [[nodiscard]] PetriNet discover_petri_net(
     const DfgCleanAnalysis& graph, const AlphaMinerOptions& options = {});
 
+// The classic net of a graph whose start or end activities include a
+// missing label (NaN on pandas, None on Polars): one more transition, without
+// a label, joined to the source when `null_start` and to the sink when
+// `null_end` (the graph never holds an edge of it, so no place reaches it).
+[[nodiscard]] PetriNet discover_petri_net_with_null_endpoints(
+    const DfgFrequency& graph,
+    const std::map<std::string, std::uint64_t>& start_activities,
+    const std::map<std::string, std::uint64_t>& end_activities,
+    bool null_start, bool null_end, const AlphaMinerOptions& options = {});
+
+// pm4py's classic Alpha on the frame of an XES upload, pandas or Polars
+// (round FZ, observed black-box): the frame's missing columns raise pandas'
+// KeyErrors or the Polars plan's ColumnNotFoundError; a row without an
+// activity leaves the directly-follows pairs and the boundary activities on
+// pandas unless its case has no activity at all (then the label NaN starts
+// and ends it), and is a boundary activity of its own (None) on Polars; the
+// rows without a case id leave pandas' groups, and on Polars form one case
+// whose first and last rows are boundary activities (its pairs never count).
+// Alpha+ (short_loops) stays on discover_petri_net.
+[[nodiscard]] PetriNet discover_petri_net_xes_frame(
+    const EventDataView& data, const AlphaMinerOptions& options = {});
+
 }  // namespace minera

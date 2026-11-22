@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FY (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–FZ (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8828,6 +8828,66 @@ FY's suite: the full ctest 662 of 662 (28 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged (no fixture refresh; frontend untouched).
 Harness and probes: `review-harness/round-fy/`.
+
+Round FZ re-reviewed FY on fresh banks and aligned the `/api/mine` Alpha,
+heuristics and temporal profile families on the frame shapes of XES
+uploads with gaps, and the log skeleton's missing activity on the Polars
+copy (Review FZ1). FY's CI run 45006486972 passed on Linux and macOS, the
+frontend, the Python tests, the verifier and Windows; FX's
+Windows job in run 44999089784 passed. FY's fixes held: the transition
+system, Inductive, POWL and the log skeleton on six new gap banks (zM,
+zH, zL, zA, zC, zT; 260 uploads per shape) and on the older banks with
+two new ones (zX larger logs with tied timestamps, zS tiny logs; 502
+uploads per shape), apart from the declared operand order of Inductive's
+and POWL's alphabet `TypeError`. Fixed: FZ1-1, Alpha reads the timestamp
+first and then selects case, activity and timestamp (pandas `KeyError`s,
+Polars `with_columns` and `group_by` plans with `SORT BY` when the case
+column is there); pandas rows without an activity leave the pairs and the
+boundary activities unless their case has none (then NaN starts and ends
+it), Polars rows without an activity or a case id are boundary activities
+of their own; FZ1-2, the heuristics convert the frame to an EventLog
+(missing case `KeyError`, missing activity `KeyError` only at a pair,
+null activities as `nan`/`None`, "not subscriptable" after one, the AND
+measure's sort `TypeError` via `python_list_sort.hpp`, typed errors);
+FZ1-3, the temporal profile's missing-column errors (Polars `sort` plan,
+the pair frame's `KeyError`); FZ1-4, the Polars log skeleton keeps `None`
+as an activity (`kLogSkeletonNullActivity`, `null` in relations,
+`null_activ_freq`). Declared: the graph presentation leaves out null
+skeleton pairs; the heuristics net's Petri conversion labels the missing
+activity with text.
+
+FZ's suite: the full ctest 663 of 663 (33 minutes, -j2, first run; the new
+`minera_server_mine_xes_frames_fz_tests` fails 55 of its checks on FY's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged (no fixture refresh; frontend untouched).
+Harness and probes: `review-harness/round-fz/`.
+
+Next round (GA) should start by re-reviewing round FZ:
+
+- FZ's CI run;
+- FZ1 on fresh banks: `famval.py` with `FAMS=alpha,heuristic,temporal_profile,log_skeleton`
+  on new `gen/genfz.py` banks (other gap mixes, longer traces, more
+  activities, tied timestamps), and with options: Alpha+ (`short_loops`,
+  still on the older path for frames), the heuristics' thresholds,
+  `connect_all`, the Heuristics++ variant and the performance decoration
+  on these frames (all still on the older path), the temporal profile's
+  `zeta` and start keys;
+- log skeleton conformance with a Polars null activity (the model now
+  holds `None`; conformance against it is unswept), and the workbench
+  routes that read the log skeleton, heuristics and Alpha models of an XES
+  session (same discovery, not swept);
+- carried from FY's list: footprints on CSV uploads (frame order and
+  header-only files) and a check that the plan's `DF` line holds for CSV
+  frames and for the log shape;
+- the remaining `std::stable_sort` on Polars paths (`polars_case_filter.cpp`
+  kCount, `polars_attributes_filter.cpp` top activities,
+  `polars_variants_filter.cpp`, `polars_sequence_filters.cpp`,
+  `polars_sort.hpp`, `polars_ltl_filter.cpp`, `temporal_lazy_reference.cpp`),
+  the two items carried from FU;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FZ (kept for its older items):
 
 Next round (FZ) should start by re-reviewing round FY:
 
