@@ -10,6 +10,10 @@ struct DataFrameColumnOptions {
   std::optional<std::string> case_id_key;
   std::optional<std::string> timestamp_key;
   std::optional<std::string> start_timestamp_key;
+  // pm4py's check on a Polars frame: a Categorical or Enum column (a pandas
+  // "category" once converted) counts as text and a Date column as a date
+  // (round FV, observed black-box).
+  bool polars = false;
 };
 
 // Validate the public dataframe schema and selected columns without mutation.

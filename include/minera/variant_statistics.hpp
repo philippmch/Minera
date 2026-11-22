@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 
 namespace minera {
@@ -37,6 +38,13 @@ struct VariantStatisticsResult {
 // (frame_activity_column_error, round BT).
 [[nodiscard]] VariantStatisticsResult discover_variant_statistics_as_uploaded(
     const EventLog& log, const VariantStatisticsOptions& options = {});
+
+// A Polars frame's variants as pm4py's get_variants counts them on a
+// LazyFrame: rows sorted by case:concept:name and time:timestamp (the
+// unstable pdqsort, a missing value first), each case's activities in that
+// order (round FV, XES uploads with tied timestamps, observed black-box).
+[[nodiscard]] VariantStatisticsResult discover_variant_statistics(
+    const LazyEventTable& frame, const VariantStatisticsOptions& options = {});
 
 [[nodiscard]] inline VariantStatisticsResult variant_statistics(
     const EventLog& log, const VariantStatisticsOptions& options = {}) {

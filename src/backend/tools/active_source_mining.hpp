@@ -108,8 +108,12 @@ void handle_active_source_mining(const httplib::Request& request,
     native_returned = true;
     return minera::workflow_input_petri_json(net);
   });
-  run("powl", "log", [&](bool& native_returned) {
-    session->powl = minera::discover_powl(require_prepared_log(*session), params.powl);
+  // pm4py's POWL reads a pandas or Polars frame sorted by case and timestamp
+  // (round FV); an event stream stays on the log.
+  const bool powl_frame = selected == "dataframe" || selected == "lazyframe";
+  run("powl", powl_frame ? selected : std::string("log"), [&](bool& native_returned) {
+    session->powl = powl_frame ? minera::discover_powl(data(), params.powl)
+                               : minera::discover_powl(require_prepared_log(*session), params.powl);
     native_returned = true;
     return minera::serialize_model_conversion_powl_json(*session->powl);
   });

@@ -7,8 +7,11 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <vector>
 #include <string_view>
 #include <tuple>
 #include <vector>
@@ -609,6 +612,25 @@ void first_class_activity_selectors_are_supported() {
   assert(threw);
 }
 
+// pm4py's Polars Declare path checks the frame before projecting it (round
+// FV): a frame needs a date column, so the synthetic lazy inputs below gain
+// one shared time, which keeps their row order through the time sort.
+EventTable with_time(EventTable table) {
+  const auto found = std::find(table.columns.begin(), table.columns.end(), "time:timestamp");
+  const auto column = static_cast<std::size_t>(found - table.columns.begin());
+  if (found == table.columns.end()) {
+    table.columns.push_back("time:timestamp");
+    if (!table.dtypes.empty()) table.dtypes.push_back("datetime64[ns, UTC]");
+  } else if (!table.dtypes.empty()) {
+    table.dtypes[column] = "datetime64[ns, UTC]";
+  }
+  for (auto& row : table.rows) {
+    if (row.size() <= column) row.resize(column + 1);
+    row[column] = EventAttribute{"time:timestamp", "2020-01-01T00:00:00Z", AttributeKind::kDate};
+  }
+  return table;
+}
+
 void activity_selector_precedence_and_ambiguity_are_strict() {
   const auto collision_log = [](bool exact_attribute, bool exact_null,
                                 bool ambiguous_source) {
@@ -667,7 +689,7 @@ void flat_inputs_and_diagnostics_are_equivalent() {
   const auto source = log({{"A", "B"}, {"A"}});
   const auto stream = event_log_to_event_stream(source);
   const auto table = event_log_to_table(source);
-  const auto lazy = LazyEventTable::from_table(table);
+  const auto lazy = LazyEventTable::from_table(with_time(table));
 
   const auto expected = discover_declare(source, discovery);
   assert(discover_declare(stream, discovery).rules == expected.rules);
@@ -795,7 +817,7 @@ void custom_flat_selectors_have_precedence_and_group_cases() {
     for (const bool custom_case_first : {false, true}) {
       const auto table = make_table(custom_first, custom_case_first);
       const auto stream = event_table_to_event_stream(table);
-      const auto lazy = LazyEventTable::from_table(table);
+      const auto lazy = LazyEventTable::from_table(with_time(table));
       assert(discover_declare(table, selected_options).rules == expected.rules);
       assert(discover_declare(stream, selected_options).rules == expected.rules);
       assert(discover_declare(lazy, selected_options).rules == expected.rules);
@@ -851,7 +873,7 @@ void custom_flat_selectors_have_precedence_and_group_cases() {
   null_table.rows[0][phase_column]->first_class_state =
       FirstClassAttributeState::kNull;
   const auto null_stream = event_table_to_event_stream(null_table);
-  const auto null_lazy = LazyEventTable::from_table(null_table);
+  const auto null_lazy = LazyEventTable::from_table(with_time(null_table));
   expect_rejected(
       [&] { (void)discover_declare(null_table, selected_options); });
   expect_rejected(
@@ -910,6 +932,114 @@ void polars_frame_reads_cases_in_time_order() {
   assert(polars.rules.at(kDeclareInit)[0].first == "A");
   assert(polars.rules.at(kDeclareInit)[0].support == 2 && polars.rules.at(kDeclareInit)[0].confidence == 2);
 }
+
+// Round FV: pm4py's Polars projection sorts by a frame's own "@@index"
+// column instead of a row count (ties then follow Polars' unstable pdqsort),
+// and refuses a missing case id, then a missing activity. Reference values
+// from pm4py 2.7.22 (review-harness round-fv ut/decut.py).
+EventTable fv_tie_frame(std::optional<std::vector<int>> index) {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  table.dtypes = {"str", "str", "datetime64[us, UTC]"};
+  if (index) {
+    table.columns.push_back("@@index");
+    table.dtypes.push_back("int64");
+  }
+  const std::vector<std::tuple<const char*, const char*, const char*>> rows{
+      {"c0", "C", "0"}, {"c1", "A", "1"}, {"c1", "B", "1"}, {"c0", "A", "1"}, {"c0", "B", "1"},
+      {"c2", "A", "1"}, {"c1", "C", "0"}, {"c2", "A", "1"}, {"c0", "A", "0"}, {"c2", "C", "0"},
+      {"c1", "C", "0"}, {"c1", "C", "0"}, {"c2", "A", "1"}, {"c1", "C", "0"}, {"c1", "A", "0"},
+      {"c1", "B", "0"}, {"c1", "C", "0"}, {"c0", "C", "1"}, {"c0", "C", "1"}, {"c2", "C", "1"},
+      {"c2", "C", "0"}, {"c1", "B", "1"}};
+  for (std::size_t i = 0; i < rows.size(); ++i) {
+    const auto& [case_id, activity, second] = rows[i];
+    EventTable::Row row{EventAttribute{"case:concept:name", case_id},
+                        EventAttribute{"concept:name", activity},
+                        EventAttribute{"time:timestamp", std::string("2020-01-01T00:00:0") + second + "Z",
+                                       AttributeKind::kDate}};
+    if (index) row.push_back(EventAttribute{"@@index", std::to_string((*index)[i]), AttributeKind::kInt});
+    table.rows.push_back(std::move(row));
+  }
+  return table;
+}
+
+double fv_confidence(const DeclareModel& model, const char* family, const char* first,
+                     const char* second = nullptr) {
+  for (const auto& rule : model.rules.at(family))
+    if (rule.first == first && (!second || rule.second == second)) return rule.confidence;
+  return -1;
+}
+
+void polars_frame_sorts_by_its_own_index() {
+  DeclareDiscoveryOptions discovery;
+  discovery.allowed_templates = {kDeclareInit, kDeclareChainResponse, kDeclareChainPrecedence};
+  discovery.min_support_ratio = 0.0;
+  discovery.min_confidence_ratio = 0.0;
+  discovery.has_min_support_ratio = discovery.has_min_confidence_ratio = true;
+  const auto plain = discover_declare(LazyEventTable::from_table(fv_tie_frame(std::nullopt)), discovery);
+  assert(fv_confidence(plain, kDeclareInit, "C") == 3);
+  assert(fv_confidence(plain, kDeclareChainResponse, "A", "B") == 1);
+  assert(fv_confidence(plain, kDeclareChainResponse, "B", "C") == 1);
+  // Every row ties on the index: the pdqsort moves the 22 rows.
+  const auto zeros = discover_declare(
+      LazyEventTable::from_table(fv_tie_frame(std::vector<int>(22, 0))), discovery);
+  assert(fv_confidence(zeros, kDeclareInit, "A") == 1);
+  assert(fv_confidence(zeros, kDeclareInit, "B") == 1);
+  assert(fv_confidence(zeros, kDeclareInit, "C") == 1);
+  assert(fv_confidence(zeros, kDeclareChainResponse, "A", "B") == 0);
+  assert(fv_confidence(zeros, kDeclareChainResponse, "B", "C") == 0);
+  std::vector<int> descending(22);
+  for (int i = 0; i < 22; ++i) descending[i] = 22 - i;
+  const auto desc = discover_declare(LazyEventTable::from_table(fv_tie_frame(descending)), discovery);
+  assert(fv_confidence(desc, kDeclareInit, "A") == 1);
+  assert(fv_confidence(desc, kDeclareInit, "B") == 0);
+  assert(fv_confidence(desc, kDeclareInit, "C") == 2);
+  assert(fv_confidence(desc, kDeclareChainResponse, "B", "A") == 1);
+  assert(fv_confidence(desc, kDeclareChainPrecedence, "B", "A") == 1);
+  assert(fv_confidence(desc, kDeclareChainPrecedence, "C", "B") == 1);
+
+  const auto refused = [&](EventTable table, const std::string& message) {
+    try {
+      (void)discover_declare(LazyEventTable::from_table(table), discovery);
+    } catch (const std::invalid_argument& error) {
+      assert(error.what() == message);
+      return;
+    }
+    assert(false);
+  };
+  auto missing_case = fv_tie_frame(std::nullopt);
+  missing_case.rows[3][0]->is_null = true;
+  missing_case.rows[5][1]->is_null = true;
+  refused(missing_case, "the case ID column should not contain any empty value.");
+  auto missing_activity = fv_tie_frame(std::nullopt);
+  missing_activity.rows[5][1]->is_null = true;
+  refused(missing_activity, "the activity column should not contain any empty value.");
+  // The frame checks come first: an XES upload whose events carry no
+  // concept:name leaves one text column of three (pm4py's message, observed
+  // black-box), and an integer activity column among three text ones.
+  auto no_activity = fv_tie_frame(std::vector<int>(22, 0));
+  no_activity.columns.erase(no_activity.columns.begin() + 1);
+  no_activity.dtypes.erase(no_activity.dtypes.begin() + 1);
+  for (auto& row : no_activity.rows) row.erase(row.begin() + 1);
+  refused(no_activity,
+          "the dataframe should (at least) contain a column of type string for the case identifier and a column "
+          "of type string for the activity.");
+  auto int_activity = fv_tie_frame(std::nullopt);
+  int_activity.columns.push_back("org:resource");
+  int_activity.dtypes.push_back("str");
+  int_activity.dtypes[1] = "int64";
+  for (auto& row : int_activity.rows) {
+    row[1] = EventAttribute{"concept:name", "1", AttributeKind::kInt};
+    row.push_back(EventAttribute{"org:resource", "r"});
+  }
+  refused(int_activity, "the activity column should be of type string.");
+  // A categorical activity (pandas category, Polars Categorical) is text to
+  // Polars, so the frame passes and mines as the plain one does.
+  auto categorical = fv_tie_frame(std::nullopt);
+  categorical.dtypes[1] = "category";
+  const auto category_model = discover_declare(LazyEventTable::from_table(categorical), discovery);
+  assert(category_model.rules == plain.rules);
+}
 }  // namespace
 
 int main() {
@@ -933,5 +1063,6 @@ int main() {
   flat_inputs_and_diagnostics_are_equivalent();
   custom_flat_selectors_have_precedence_and_group_cases();
   polars_frame_reads_cases_in_time_order();
+  polars_frame_sorts_by_its_own_index();
   std::cout << "declare tests passed\n";
 }

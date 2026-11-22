@@ -2,6 +2,8 @@
 
 #include "minera/log_conversion.hpp"
 #include "frame_cells.hpp"
+#include "minera/dataframe_validation.hpp"
+#include "polars_sort.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -517,14 +519,25 @@ LazyEventTable promoted_selector_table(const LazyEventTable& source,
 // is always "time:timestamp" (left out when the frame has none), a missing
 // value sorts first and the row index settles every tie, so the order is
 // fixed. Cases follow in sorted order (group_by maintain_order). Round FU,
-// XES uploads with tied timestamps, observed black-box.
-EventTable polars_projection_table(EventTable table, std::string_view case_id_key) {
+// XES uploads with tied timestamps, observed black-box. A frame with its own
+// "@@index" column (an XES event attribute of that name) sorts by that
+// column instead of a row count: its values can tie, and Polars' unstable
+// pdqsort then decides the order (round FV, observed black-box).
+EventTable polars_projection_table(EventTable table, std::string_view case_id_key,
+                                   std::string_view activity_key) {
   table.validate();
   const auto column_of = [&](std::string_view name) -> std::optional<std::size_t> {
     const auto found = std::find(table.columns.begin(), table.columns.end(), name);
     if (found == table.columns.end()) return std::nullopt;
     return static_cast<std::size_t>(found - table.columns.begin());
   };
+  // pm4py's projection checks the frame first (check_pandas_dataframe_columns
+  // with the case and activity keys): at least three columns, two of them
+  // text and one a date, then the case column (present, text, no gap), then
+  // the activity column (round FV, observed black-box).
+  check_dataframe_columns(table, DataFrameColumnOptions{
+                                     std::string(activity_key.empty() ? std::string_view("concept:name") : activity_key),
+                                     std::string(case_id_key), std::nullopt, std::nullopt, true});
   const auto case_at = column_of(case_id_key);
   if (!case_at) return table;
   const auto time_at = column_of("time:timestamp");
@@ -540,11 +553,16 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
   };
   const bool case_numeric = numeric(dtype(*case_at));
   const bool time_text = time_at && text(dtype(*time_at));
+  const auto index_at = column_of("@@index");
+  const bool index_numeric = index_at && numeric(dtype(*index_at));
+  const bool index_integer = index_numeric && dtype(*index_at).find_first_of("fF") != 0;
   struct Key {
     std::optional<std::string> case_text;
     double case_number = 0;
     std::optional<std::string> time_text;
     std::optional<ParsedExactTimestamp> time;
+    std::optional<std::string> index_text;
+    long double index_number = 0;
   };
   std::vector<Key> keys(table.rows.size());
   for (std::size_t row = 0; row < table.rows.size(); ++row) {
@@ -562,27 +580,65 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
         if (!time_text) keys[row].time = parse_timestamp_exact(time->value);
       }
     }
+    if (index_at) {
+      const auto& index = table.rows[row][*index_at];
+      if (index && !index->is_null) {
+        if (!index_numeric) {
+          keys[row].index_text = index->value;
+        } else {
+          // A float column's NaN is a missing value (from_pandas).
+          try {
+            keys[row].index_number = index_integer ? static_cast<long double>(std::stoll(index->value))
+                                                   : static_cast<long double>(std::stod(index->value));
+            if (!std::isnan(keys[row].index_number)) keys[row].index_text = index->value;
+          } catch (const std::exception&) {}
+        }
+      }
+    }
   }
   std::vector<std::size_t> order(table.rows.size());
   for (std::size_t row = 0; row < order.size(); ++row) order[row] = row;
-  std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+  // -1: lhs first, 1: rhs first, 0: tie.
+  const auto compare = [&](std::size_t a, std::size_t b) -> int {
     const auto& lhs = keys[a];
     const auto& rhs = keys[b];
     if (!lhs.case_text || !rhs.case_text) {
-      if (lhs.case_text || rhs.case_text) return !lhs.case_text;
+      if (lhs.case_text || rhs.case_text) return !lhs.case_text ? -1 : 1;
     } else if (case_numeric ? lhs.case_number != rhs.case_number : *lhs.case_text != *rhs.case_text) {
-      return case_numeric ? lhs.case_number < rhs.case_number : *lhs.case_text < *rhs.case_text;
+      return (case_numeric ? lhs.case_number < rhs.case_number : *lhs.case_text < *rhs.case_text) ? -1 : 1;
     }
-    if (!time_at) return false;
-    if (time_text || !lhs.time || !rhs.time) {
-      const auto& x = time_text ? lhs.time_text : lhs.time ? lhs.time_text : std::optional<std::string>();
-      const auto& y = time_text ? rhs.time_text : rhs.time ? rhs.time_text : std::optional<std::string>();
-      if (!x || !y) return !x && y;
-      return *x < *y;
+    if (time_at) {
+      if (time_text || !lhs.time || !rhs.time) {
+        const auto& x = time_text ? lhs.time_text : lhs.time ? lhs.time_text : std::optional<std::string>();
+        const auto& y = time_text ? rhs.time_text : rhs.time ? rhs.time_text : std::optional<std::string>();
+        if (!x || !y) {
+          if (x || y) return !x ? -1 : 1;
+        } else if (*x != *y) {
+          return *x < *y ? -1 : 1;
+        }
+      } else if (lhs.time->seconds != rhs.time->seconds) {
+        return lhs.time->seconds < rhs.time->seconds ? -1 : 1;
+      } else if (lhs.time->nanoseconds != rhs.time->nanoseconds) {
+        return lhs.time->nanoseconds < rhs.time->nanoseconds ? -1 : 1;
+      }
     }
-    if (lhs.time->seconds != rhs.time->seconds) return lhs.time->seconds < rhs.time->seconds;
-    return lhs.time->nanoseconds < rhs.time->nanoseconds;
-  });
+    if (!index_at) return 0;
+    if (!lhs.index_text || !rhs.index_text) {
+      if (lhs.index_text || rhs.index_text) return !lhs.index_text ? -1 : 1;
+      return 0;
+    }
+    if (index_numeric) {
+      if (lhs.index_number != rhs.index_number) return lhs.index_number < rhs.index_number ? -1 : 1;
+      return 0;
+    }
+    if (*lhs.index_text != *rhs.index_text) return *lhs.index_text < *rhs.index_text ? -1 : 1;
+    return 0;
+  };
+  if (index_at) {
+    polars_sort::sort_unstable(order, [&](std::size_t a, std::size_t b) { return compare(a, b) < 0; });
+  } else {
+    std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) { return compare(a, b) < 0; });
+  }
   EventTable sorted = table;
   sorted.rows.clear();
   sorted.index.reset();
@@ -616,7 +672,7 @@ EventLog event_data_log(const EventDataView& data,
           promoted_selector_table(*data.lazy_table(), std::string(activity_key),
                                   std::string(case_id_key))
               .materialize(),
-          case_id_key);
+          case_id_key, activity_key);
       return event_data_to_event_log(EventDataView(table), conversion);
     }
   }
@@ -1233,6 +1289,7 @@ EventTable frame_slice_table(const EventTable& table, std::string_view case_id_k
 }
 
 EventDataView frame_slice_view(const EventDataView& data, std::string_view case_id_key,
+                               std::string_view activity_key,
                                std::optional<EventLog>& log, std::optional<EventTable>& table) {
   switch (data.kind()) {
     case EventDataKind::kEventLog:
@@ -1243,7 +1300,7 @@ EventDataView frame_slice_view(const EventDataView& data, std::string_view case_
       table = frame_slice_table(*data.table(), case_id_key);
       return EventDataView(*table);
     case EventDataKind::kLazyEventTable:
-      table = polars_projection_table(data.lazy_table()->materialize(), case_id_key);
+      table = polars_projection_table(data.lazy_table()->materialize(), case_id_key, activity_key);
       return EventDataView(*table);
     case EventDataKind::kEventStream:
       return data;
@@ -1257,7 +1314,7 @@ DeclareModel discover_declare_frame_slices(const EventDataView& data,
                                            const DeclareDiscoveryOptions& options) {
   std::optional<EventLog> log;
   std::optional<EventTable> table;
-  return discover_declare(frame_slice_view(data, options.case_id_key, log, table), options);
+  return discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table), options);
 }
 
 std::vector<DeclareConformance> check_declare_conformance_frame_slices(
@@ -1267,7 +1324,7 @@ std::vector<DeclareConformance> check_declare_conformance_frame_slices(
     return check_declare_conformance_as_uploaded(*data.log(), model, options);
   std::optional<EventLog> log;
   std::optional<EventTable> table;
-  return check_declare_conformance(frame_slice_view(data, options.case_id_key, log, table), model,
+  return check_declare_conformance(frame_slice_view(data, options.case_id_key, options.activity_key, log, table), model,
                                    options);
 }
 

@@ -37217,3 +37217,134 @@ are Declare workbench conformances on lazy frames, which now list the
 cases in case-id order (FU1-5; their uint64 case ids are refused by
 pm4py's column check, so the order is Minera's own there), and were
 refreshed.
+
+## Review FV1: POWL, variants and the temporal profile on Polars frames, Declare's own index and frame checks (2026-11-22)
+
+Round FV re-reviewed round FU on fresh banks and swept the other Polars
+inputs that group cases after a sort. FU's CI run 44972994921 (b400d9f)
+finished green. Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy
+2.4.6, polars 1.44.1, no pyarrow; the harness converts frames to Polars
+column by column), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3
+X86_V4 AVX512_ICL AVX512_SPR"` and exact comparison.
+
+Re-review of FU (fresh seeds): the performance spectrum on XES ties (tB:
+1,073 equal, 7 raised alike), the workflow route's Alpha and classic
+heuristics on mixed-format CSV columns (wB, wC: 240 of 240 each), Alpha on
+`/api/mine` frames (aB: 80 of 80), the plusplus `pandas_mutable` shape (mC:
+134 raised alike, 16 CSVs the import refuses), the lazy families (lC, lM:
+Declare, Inductive and log skeleton 70 of 70 each) and the Declare
+workbench on lazy XES uploads with repeated trace names (dF, dG, dM: 120
+of 120, both operations). No difference in FU's fixes.
+
+Fixed:
+
+- **FV1-1. POWL on frame shapes** (`/api/mine` family `powl` with
+  `mining_input_shape=dataframe` or `lazyframe`, and
+  `/api/discover-workflow` `family=powl` on such a session). pm4py's POWL
+  discovery projects a frame after sorting it by case and timestamp
+  (stably on pandas, with Polars' unstable pdqsort on a Polars frame);
+  Minera read the prepared log in file order. On lazy XES uploads with tied
+  timestamps 16 of 20 models differed (zA). After the fix 40 of 40 on each
+  of zB, zC, zI (lazyframe), zD, zJ (dataframe) and the workflow route (zC,
+  all three shapes), compared without the order of XOR and partial-order
+  children, which follows `PYTHONHASHSEED` in pm4py. A frame without the
+  timestamp column now fails as the Inductive family on it does.
+- **FV1-2. Variants on Polars sessions** (`/api/variant-statistics` when
+  the session's active source is a Polars frame). pm4py's `get_variants`
+  on a Polars frame sorts by case and timestamp with the unstable pdqsort
+  and groups each case in that order; Minera read the uploaded log. zB: 36
+  of 40 variant sets differed; after the fix 40 of 40 (zI), the pandas
+  shape unchanged (zJ: 40 of 40). A missing case id or activity raises
+  pm4py's messages. The route keeps ranking the variants by count, then
+  activities, descending.
+- **FV1-3. Declare on a Polars frame with its own `@@index`** (discovery
+  and conformance, `/api/mine` and `/api/declare-workbench`, `lazyframe`
+  shape). pm4py's projection sorts by case, `time:timestamp` and the
+  frame's own `@@index` column when it has one (an XES event attribute of
+  that name), unstably on ties, instead of a row count. With such an
+  attribute 24 of 30 models and 20 of 30 conformance results differed;
+  after the fix 30 of 30 (dcE), dcH 40 of 40, dcI (with a second timestamp
+  selected) 40 of 40 and dcJ (only another timestamp, no
+  `time:timestamp`) 40 of 40, in both operations.
+- **FV1-4. Declare's frame checks on Polars frames.** pm4py's projection
+  first runs `check_pandas_dataframe_columns` with the case and activity
+  keys (no timestamp key): at least three columns, two of them text and
+  one a date, then the case column (present, text, no gap), then the
+  activity column. Minera raised its own selector message or answered (3
+  of 30 answered where pm4py raised, dcF). After the fix every refusal
+  carries pm4py's message (dcK: 40 of 40 messages or models alike), also
+  for an upload whose events carry no `concept:name` (one text column of
+  three). A categorical activity (pandas `category`, Polars `Categorical`
+  or `Enum`) counts as text and a Polars `Date` as a date, as in Polars.
+  An unsigned 64-bit case id is now refused as pm4py refuses a non-text
+  case column (two `original-declare` lazyframe captures and one
+  active-source capture refreshed: status 400, "the case ID column should
+  be of type string.").
+- **FV1-5. Temporal profile on Polars frames** (`/api/mine` family
+  `temporal_profile` with `mining_input_shape=lazyframe`,
+  `/api/analyze-behavior` `temporal_profile` and `temporal_conformance`
+  with `variant=lazyframe`). pm4py's Polars partial order sorts the frame
+  by case, start and completion (the start is the completion without a
+  start column) with the unstable pdqsort and numbers the rows after that
+  sort, unless the frame has its own `@@index` (format_dataframe's on a
+  CSV upload), which it keeps with the rows unsorted; it pairs rows of a
+  case by an inner join, which never pairs a row without a case, and
+  measures each pair with `Duration.total_seconds()`, whole seconds. The
+  pair frame lists the pairs by the later row's position, then the
+  earlier's, and the mean (compensated) and the deviation (Welford)
+  follow that order. The conformance lists one bucket per unique case
+  value, the missing one included (always empty; Polars' `unique()` has
+  no fixed order, Minera lists the buckets by first row), each case's
+  deviations in the pair frame's order, or first by the profile's entry
+  when the pair frame has no more rows than the profile (Polars then
+  probes the profile). Minera used the pandas pairing and Timedelta
+  durations. zC: 30 of 40 and zB: 16 of 40 profiles differed, and 15 of
+  20 conformance results (zC). After the fix discovery is exact and the
+  conformance equal and in pm4py's order on zB and zC (40 each), zE (12
+  frames of 30 to 400 cases), zF (unnamed traces, 40), zG (an `@@index`
+  attribute with repeated values, 30) and CSV uploads (zH, 40), with zeta
+  0.5 and 6, and with a start attribute (zK: some starts missing, half
+  seconds, 30 of 30); the pandas shape unchanged on the same banks.
+
+Declared or unchanged:
+
+- The Polars conformance's bucket order follows `unique()` in pm4py,
+  which has no fixed order; the comparison is order-free across buckets
+  (exact within each).
+- The Declare `dataframe` shape keeps the declared behavior of round BM
+  (it answers on frames pm4py's check refuses, such as unnamed traces or
+  no timestamps), while the `lazyframe` shape now raises as pm4py does;
+  aligning the pandas shape is left open.
+- Open for round FW: `pm4py.discover_declare` and `conformance_declare`
+  (the wrappers) also check the selected timestamp column on a Polars
+  frame (present, no empty value), while the Declare algorithm does not;
+  Minera's `lazyframe` Declare answers as the algorithm does on an upload
+  with some events lacking `time:timestamp`, or with only another
+  timestamp attribute. Which entry point the routes mirror for this check
+  is left to FW (review-harness `round-fv/probe/dcwrap.py`, files in
+  `round-fv/gen/dcL`).
+- The minimum self-distance and footprints families on lazy XES uploads
+  with ties showed no tie sensitivity (80 of 80 seen each).
+- The temporal profile with business hours on a Polars frame was not
+  swept; Minera measures those pairs as the pandas variant does.
+- Unchanged: the declared items of FU1 and before; the Polars frequency
+  triples (library only) and the Null-dtype key rule of
+  `dfg_dataframe.cpp` stay carried.
+
+In the suite: `minera_powl_discovery_tests`
+(`frame_shapes_read_the_sorted_frame`), `minera_variant_statistics_tests`
+(`polars_frame_variants_follow_the_polars_sort`), `minera_declare_tests`
+(`polars_frame_sorts_by_its_own_index`, with the frame checks) and
+`minera_temporal_profile_parity_contracts_tests`
+(`temporal_profile_polars_frame_contract`) carry FV1's reference values.
+The full ctest suite passed 660 of 660 (28 minutes, -j2) before the last
+change to the frame checks; after it the 40 Declare, frame-check, token
+replay, concept drift, POWL, variant and temporal profile tests and the 66
+server and workbench tests passed. The Python script tests passed 406 of
+406, `tsc` was clean and vitest passed 10,732 of 10,732 (240 files). The
+16 replayable fixture manifests replayed with only the intended changes:
+38 active-source captures record POWL's `native_input_kind` as the frame
+shape, two CSV captures carry the Inductive timestamp message for POWL,
+three `csv-omitted-optional-bindings` captures now fail POWL on the absent
+timestamp column, and the three unsigned case id captures above; those
+captures and both manifests were refreshed.

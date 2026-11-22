@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FU (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–FV (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8678,6 +8678,72 @@ refuses, and were refreshed). The Mac was not
 reachable this round (no device served, the folder not approved), so no
 newer reviewer handoff was read. The generators, the comparers and the
 probes are in the project files under `review-harness/round-fu/`.
+
+Round FV re-reviewed FU on fresh banks and swept the other Polars inputs
+that group cases after a sort (Review FV1). FU's CI run 44972994921
+finished green and FU's fixes held (the spectrum, Alpha on text and Polars
+frames, the plusplus text pairs, the lazy families, the Declare workbench
+on lazy uploads). Fixed: FV1-1, POWL on the `dataframe` and `lazyframe`
+shapes (`/api/mine`, `/api/discover-workflow`) reads the frame sorted by
+case and timestamp (pandas stable, Polars' pdqsort) instead of the
+prepared log; FV1-2, `/api/variant-statistics` on a Polars session groups
+the cases after Polars' sort; FV1-3, Declare on a Polars frame with its own
+`@@index` sorts by it (unstably) instead of a row count; FV1-4, Declare on
+a Polars frame runs pm4py's frame checks with the case and activity keys
+(three columns, two text, one date, then the case and activity columns);
+FV1-5, the temporal profile on a Polars frame (`/api/mine`,
+`/api/analyze-behavior` discovery and conformance) pairs rows in Polars'
+partial order (`temporal_profile.cpp`, `polars_partial_order_table`): the
+unstable sort by case, start and completion with the row index after it
+(a frame's own `@@index`, and a CSV upload's format_dataframe order, kept
+unsorted), no pair for a row without a case, whole-second durations, the
+moments and each case's deviations in the pair frame's order (by the
+later row, then the earlier, or by the profile's entry first when the pair
+frame has no more rows than the profile), and an empty bucket for the
+missing case. Declared: the Polars conformance's buckets follow
+`unique()`, which has no fixed order; the Declare `dataframe` shape still
+answers where pm4py's frame check refuses (round BM's declaration). New
+areas without findings: the minimum self-distance and footprints on lazy
+XES uploads.
+
+FV's suite: the full ctest 660 of 660 (28 minutes, -j2) before the last
+frame-check change, then the 40 Declare, frame-check, POWL, variant and
+temporal profile tests and the 66 server and workbench tests; Python
+script tests 406 of 406; `tsc` clean; vitest 10,732 of 10,732; the 16
+replayable manifests with only the intended changes (POWL's
+`native_input_kind` on frame shapes, POWL failing on an absent timestamp
+column, unsigned case ids refused by the Polars Declare check), refreshed.
+Found at the end and left for FW: pm4py's Declare wrappers also check the
+selected timestamp column on a Polars frame (present, no empty value),
+the algorithm does not; Minera's `lazyframe` Declare answers there as the
+algorithm does (`round-fv/probe/dcwrap.py`).
+Harness and probes: `review-harness/round-fv/`.
+
+Next round (FW) should start by re-reviewing round FV:
+
+- FV's CI run;
+- FV1-1 to FV1-5 on fresh banks: `lazy2.py` with larger `NC`/`NE` and
+  `DUP` (POWL and variants on both frame shapes), `sdpowl.py`, `dc2.py`
+  with `IDX`, `TS` and `NULLS` on new seeds, `tplazy.py`, `tpconf.py` and
+  `tpcsv.py` and `tpstart.py` on larger frames (several thousand pairs,
+  where Polars' joins run in parallel), a start column on a CSV upload and
+  zeta near the deviations;
+- FV's leftover: decide whether the Declare routes mirror the selected
+  timestamp column check of `pm4py.discover_declare` and
+  `conformance_declare` on Polars frames (`round-fv/probe/dcwrap.py`; the
+  harness `dc2.py` compares with the wrappers; a fix needs the timestamp
+  selector in the Declare options, which the fixtures serialize);
+- new areas: the temporal profile with business hours on a Polars frame
+  (not swept in FV), the Declare `dataframe` shape against pm4py's frame
+  check (round BM declared it answers; decide whether to align it with
+  the `lazyframe` shape), other Polars inputs that join or group after a
+  sort (the remaining `std::stable_sort` on Polars paths), and the two
+  items carried from FU (the Polars frequency triples, library only, and
+  `dfg_dataframe.cpp`'s Null-dtype key rule);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FV (kept for its older items):
 
 Next round (FV) should start by re-reviewing round FU:
 

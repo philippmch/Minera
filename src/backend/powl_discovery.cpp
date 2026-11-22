@@ -19,6 +19,7 @@
 #include "powl/semantics.hpp"
 #include "minera/cancellation.hpp"
 #include "minera/frame_keys.hpp"
+#include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -2180,6 +2181,55 @@ EventLog normalize_powl_event_log(const EventLog& event_log,
   if (const auto keyed = powl_frame_keyed_log(event_log, options))
     return normalize_powl_event_log_impl(*keyed, powl_concept_name_options(options));
   return normalize_powl_event_log_impl(event_log, options);
+}
+
+namespace {
+
+bool powl_frame_view(const EventDataView& data) {
+  return data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable;
+}
+
+// pm4py's POWL projects a frame with project_univariate: sort by case and
+// timestamp, then each case's activities (Polars: LazyFrame.sort, unstable;
+// pandas: sort_values, stable). The Inductive miner reads a frame the same
+// way, so its projection supplies the log; the result keeps the selected
+// fields under the canonical keys.
+EventLog powl_frame_log(const EventDataView& data, const PowlDiscoveryOptions& options) {
+  InductiveMinerOptions projection;
+  projection.activity_key = options.activity_key;
+  projection.timestamp_key = options.timestamp_key;
+  projection.case_id_key = options.case_id_key;
+  return prepare_inductive_event_log(data, projection);
+}
+
+PowlDiscoveryOptions powl_canonical_keys(PowlDiscoveryOptions options) {
+  options.activity_key = "concept:name";
+  options.timestamp_key = "time:timestamp";
+  options.case_id_key = "case:concept:name";
+  return options;
+}
+
+}  // namespace
+
+PowlNode discover_powl(const EventDataView& data, const PowlDiscoveryOptions& options,
+                       const std::function<bool()>& cancelled) {
+  validate_options(options);
+  if (!powl_frame_view(data)) {
+    if (data.kind() != EventDataKind::kEventLog)
+      throw std::invalid_argument("POWL discovery reads an event log or a frame");
+    return discover_powl(*data.log(), options, cancelled);
+  }
+  return discover_powl(powl_frame_log(data, options), powl_canonical_keys(options), cancelled);
+}
+
+EventLog normalize_powl_event_log(const EventDataView& data, const PowlDiscoveryOptions& options) {
+  validate_options(options);
+  if (!powl_frame_view(data)) {
+    if (data.kind() != EventDataKind::kEventLog)
+      throw std::invalid_argument("POWL discovery reads an event log or a frame");
+    return normalize_powl_event_log(*data.log(), options);
+  }
+  return normalize_powl_event_log(powl_frame_log(data, options), powl_canonical_keys(options));
 }
 
 }  // namespace minera

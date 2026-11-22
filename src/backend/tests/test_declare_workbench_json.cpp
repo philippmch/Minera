@@ -1,6 +1,7 @@
 #include "minera/declare_workbench_json.hpp"
 #include "minera/log_conversion.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -171,7 +172,14 @@ void actual_trace_all_native_shapes_and_diagnostics_remain_separate_calls() {
   const auto expected = serialize_declare_workbench_conformance_json(results);
   const auto stream = event_log_to_event_stream(log);
   const auto table = event_log_to_table(log);
-  const auto lazy = event_log_to_lazy_table(log);
+  // pm4py's Polars path needs a date column (round FV): one shared time.
+  EventTable timed = table;
+  assert(std::find(timed.columns.begin(), timed.columns.end(), "time:timestamp") == timed.columns.end());
+  timed.columns.push_back("time:timestamp");
+  if (!timed.dtypes.empty()) timed.dtypes.push_back("datetime64[ns, UTC]");
+  for (auto& row : timed.rows)
+    row.push_back(EventAttribute{"time:timestamp", "2020-01-01T00:00:00Z", AttributeKind::kDate});
+  const auto lazy = LazyEventTable::from_table(timed);
   assert(serialize_declare_workbench_conformance_json(check_declare_conformance(stream,model)) == expected);
   assert(serialize_declare_workbench_conformance_json(check_declare_conformance(table,model)) == expected);
   assert(serialize_declare_workbench_conformance_json(check_declare_conformance(lazy,model)) == expected);

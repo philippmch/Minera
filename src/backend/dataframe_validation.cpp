@@ -78,6 +78,14 @@ void check_dataframe_columns(const EventTable& table,
   std::size_t strings = 0, dates = 0;
   for (std::size_t i = 0; i < table.columns.size(); ++i) {
     dtypes.push_back(inferred_dtype(table, i));
+    if (options.polars) {
+      const std::string_view kind = dtypes.back();
+      if (kind == "category" || kind.starts_with("Categorical") || kind.starts_with("Enum") ||
+          kind.starts_with("String") || kind == "Utf8")
+        dtypes.back() = "str";
+      else if (kind.starts_with("Datetime") || kind == "Date" || kind == "date")
+        dtypes.back() = "datetime64[us]";
+    }
     strings += string_dtype(dtypes.back());
     dates += date_dtype(dtypes.back());
   }

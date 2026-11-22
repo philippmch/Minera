@@ -1,3 +1,4 @@
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -263,6 +264,71 @@ void temporal_profile_conformance_json_contract() {
   assert(zero_json.find("e+18") == std::string::npos);
 }
 
+
+minera::EventTable polars_table(const std::vector<std::array<const char*, 3>>& rows) {
+  minera::EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  for (const auto& [case_id, activity, time] : rows) {
+    minera::EventTable::Row row(3);
+    if (case_id) row[0] = minera::EventAttribute{"case:concept:name", case_id};
+    row[1] = minera::EventAttribute{"concept:name", activity};
+    row[2] = minera::EventAttribute{"time:timestamp", std::string("2021-03-01T") + time + "+00:00",
+                                    minera::AttributeKind::kDate};
+    table.rows.push_back(std::move(row));
+  }
+  return table;
+}
+
+// Round FV: pm4py's temporal profile on a Polars frame pairs the rows in
+// Polars' partial order (an unstable sort of [case, start, completion] with
+// the row index after it), never pairs a row without a case, and measures in
+// whole seconds; the conformance lists one empty bucket for the missing case.
+// Expected values from pm4py 2.7.22 on the Polars LazyFrame (observed
+// black-box; the pandas frame gives 108 and 122.96 for (a, b)).
+void temporal_profile_polars_frame_contract() {
+  const auto ties = polars_table({
+      {"c0", "b", "08:07:00"}, {"c0", "d", "08:05:00"}, {"c2", "c", "08:00:00"}, {"c2", "e", "08:00:00"},
+      {"c2", "b", "08:02:00"}, {"c2", "d", "08:03:00"}, {"c2", "a", "08:05:00"}, {"c2", "d", "08:07:00"},
+      {"c2", "c", "08:09:00"}, {"c3", "e", "08:05:00"}, {"c3", "e", "08:05:00"}, {"c3", "a", "08:07:00"},
+      {"c3", "e", "08:09:00"}, {"c3", "b", "08:11:00"}, {"c3", "b", "08:11:00"}, {"c1", "c", "08:03:00"},
+      {"c1", "a", "08:03:00"}, {"c1", "a", "08:04:00"}, {"c1", "d", "08:04:00"}, {"c1", "a", "08:04:00"},
+      {"c1", "d", "08:04:00"}, {"c1", "b", "08:04:00"}});
+  const auto lazy = minera::discover_temporal_profile(minera::LazyEventTable::from_table(ties), {});
+  const auto* ab = lazy.find("a", "b");
+  assert(ab && ab->mean_seconds == 180.0 && ab->standard_deviation_seconds == 103.92304845413264);
+  const auto* da = lazy.find("d", "a");
+  assert(da && da->mean_seconds == 30.0 && da->standard_deviation_seconds == 60.0);
+  const auto* eb = lazy.find("e", "b");
+  assert(eb && eb->mean_seconds == 257.14285714285717 && eb->standard_deviation_seconds == 128.2853961179637);
+  assert(lazy.entries.size() == 23);
+  const auto pandas = minera::discover_temporal_profile(ties, {});
+  assert(pandas.find("a", "b")->mean_seconds == 108.0);
+
+  const auto fractions = polars_table({{"c1", "a", "08:00:00"}, {"c1", "b", "08:00:01.700000"},
+                                       {"c1", "b", "08:00:03.200000"}, {nullptr, "a", "08:00:00"},
+                                       {nullptr, "b", "08:00:05"}, {"c0", "a", "08:00:00.500000"},
+                                       {"c0", "b", "08:00:02.400000"}});
+  const minera::LazyEventTable fraction_frame = minera::LazyEventTable::from_table(fractions);
+  const auto whole = minera::discover_temporal_profile(fraction_frame, {});
+  assert(whole.entries.size() == 2);
+  assert(whole.find("a", "b")->mean_seconds == 1.6666666666666667 &&
+         whole.find("a", "b")->standard_deviation_seconds == 1.1547005383792517);
+  assert(whole.find("b", "b")->mean_seconds == 1.0 && whole.find("b", "b")->standard_deviation_seconds == 0.0);
+
+  minera::TemporalProfile profile;
+  profile.entries.push_back({"a", "b", 3, 1.0, 0.1});
+  const auto buckets = minera::conform_temporal_profile(minera::EventDataView(fraction_frame), profile, {});
+  assert(buckets.size() == 3);
+  std::size_t deviations = 0;
+  for (const auto& bucket : buckets)
+    for (const auto& deviation : bucket) {
+      ++deviations;
+      assert(deviation.case_id == "c1" && deviation.source == "a" && deviation.target == "b");
+      assert(deviation.elapsed_seconds == 3.0 && deviation.standard_deviation_distance == 20.0);
+    }
+  assert(deviations == 1);
+}
+
 }  // namespace
 
 int main() {
@@ -275,5 +341,6 @@ int main() {
   temporal_profile_conformance_dataframe_variant_contract();
   temporal_profile_conformance_dispatch_contract();
   temporal_profile_conformance_json_contract();
+  temporal_profile_polars_frame_contract();
   std::cout << "temporal-profile parity contract tests passed\n";
 }

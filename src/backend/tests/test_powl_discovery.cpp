@@ -2,6 +2,8 @@
 
 #include "minera/csv_event_log_importer.hpp"
 
+#include <algorithm>
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -9,6 +11,9 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 using namespace minera;
 
@@ -32,6 +37,83 @@ void append_trace(EventLog& event_log,
       trace.events.push_back(Event{"", activity});
     event_log.traces.push_back(std::move(trace));
   }
+}
+
+// An order-free rendering (pm4py builds XOR and partial-order children from
+// sets, so their order follows PYTHONHASHSEED): XOR and PO children sorted,
+// PO edges renumbered after the sort.
+std::string canon(const PowlNode& node) {
+  switch (node.kind()) {
+    case PowlNodeKind::kSilent: return "tau";
+    case PowlNodeKind::kTransition: return "T('" + node.label() + "')";
+    case PowlNodeKind::kLoop: {
+      std::string out = "*[";
+      for (std::size_t i = 0; i < node.children().size(); ++i) out += (i ? "," : "") + canon(node.children()[i]);
+      return out + "]";
+    }
+    case PowlNodeKind::kXor: {
+      std::vector<std::string> parts;
+      for (const auto& child : node.children()) parts.push_back(canon(child));
+      std::sort(parts.begin(), parts.end());
+      std::string out = "X[";
+      for (std::size_t i = 0; i < parts.size(); ++i) out += (i ? "," : "") + parts[i];
+      return out + "]";
+    }
+    case PowlNodeKind::kStrictPartialOrder: {
+      std::vector<std::string> parts;
+      for (const auto& child : node.children()) parts.push_back(canon(child));
+      std::vector<std::size_t> index(parts.size());
+      for (std::size_t i = 0; i < index.size(); ++i) index[i] = i;
+      std::stable_sort(index.begin(), index.end(), [&](std::size_t a, std::size_t b) { return parts[a] < parts[b]; });
+      std::vector<std::size_t> position(parts.size());
+      for (std::size_t i = 0; i < index.size(); ++i) position[index[i]] = i;
+      std::vector<std::pair<std::size_t, std::size_t>> edges;
+      for (const auto& [a, b] : node.order()) edges.emplace_back(position[a], position[b]);
+      std::sort(edges.begin(), edges.end());
+      std::string out = "PO[";
+      for (std::size_t i = 0; i < index.size(); ++i) out += (i ? "," : "") + parts[index[i]];
+      out += "|";
+      for (std::size_t i = 0; i < edges.size(); ++i)
+        out += (i ? "," : "") + std::to_string(edges[i].first) + ">" + std::to_string(edges[i].second);
+      return out + "]";
+    }
+  }
+  return "?";
+}
+
+// Round FV: pm4py's POWL reads a pandas frame sorted by case and timestamp
+// (stably) and a Polars frame after its unstable sort; an EventLog as it is.
+// The Inductive miner's 22-row tie frame; reference strings from pm4py
+// 2.7.22 (review-harness round-fv ut/powlut.py).
+void frame_shapes_read_the_sorted_frame() {
+  EventTable table;
+  table.columns = {"case:concept:name", "concept:name", "time:timestamp"};
+  table.dtypes = {"str", "str", "datetime64[us, UTC]"};
+  const std::vector<std::array<const char*, 3>> rows{
+      {"c0", "C", "0"}, {"c1", "A", "1"}, {"c1", "B", "1"}, {"c0", "A", "1"}, {"c0", "B", "1"},
+      {"c2", "A", "1"}, {"c1", "C", "0"}, {"c2", "A", "1"}, {"c0", "A", "0"}, {"c2", "C", "0"},
+      {"c1", "C", "0"}, {"c1", "C", "0"}, {"c2", "A", "1"}, {"c1", "C", "0"}, {"c1", "A", "0"},
+      {"c1", "B", "0"}, {"c1", "C", "0"}, {"c0", "C", "1"}, {"c0", "C", "1"}, {"c2", "C", "1"},
+      {"c2", "C", "0"}, {"c1", "B", "1"}};
+  EventLog frame_order;
+  for (const char* id : {"c0", "c1", "c2"}) {
+    Trace trace;
+    for (const auto& row : rows)
+      if (std::string(row[0]) == id) trace.events.push_back(Event{"", row[1]});
+    frame_order.traces.push_back(std::move(trace));
+  }
+  for (const auto& row : rows)
+    table.rows.push_back({EventAttribute{"case:concept:name", row[0]}, EventAttribute{"concept:name", row[1]},
+                          EventAttribute{"time:timestamp", std::string("2020-01-01T00:00:0") + row[2] + "Z",
+                                         AttributeKind::kDate}});
+  assert(canon(discover_powl(frame_order)) == "PO[*[PO[*[tau,T('B')],T('A')|1>0],tau],*[T('C'),tau]|]");
+  assert(canon(discover_powl(EventDataView(table), {})) ==
+         "*[PO[*[PO[*[tau,T('A')],T('C')|1>0],tau],*[tau,T('B')]|0>1],tau]");
+  const auto lazy = LazyEventTable::from_table(table);
+  assert(canon(discover_powl(EventDataView(lazy), {})) == "PO[*[T('A'),tau],*[T('C'),tau],*[tau,T('B')]|]");
+  assert(canon(discover_powl(EventDataView(frame_order), {})) == canon(discover_powl(frame_order)));
+  const auto normalized = normalize_powl_event_log(EventDataView(lazy));
+  assert(normalized.traces.size() == 3);
 }
 
 template <typename F> void throws(F&& f) {
@@ -724,5 +806,6 @@ int main() {
     assert(message.find("more than its memory bound allows") != std::string::npos);
   }
 
+  frame_shapes_read_the_sorted_frame();
   std::cout << "POWL discovery tests passed\n";
 }

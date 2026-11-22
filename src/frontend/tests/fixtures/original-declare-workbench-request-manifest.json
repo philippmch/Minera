@@ -5702,7 +5702,7 @@
         "bytes": 4495,
         "sha256": "29a3cef0717d227834c8ba61c6512b8e94e6d2798b1704e409a2506f6d5971eb"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-response.declare.json",
@@ -5720,15 +5720,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "82022",
+        "Content-Length": "80480",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "typed-diagnostics-exact-uint64-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-declare-workbench/captures/typed-diagnostics-exact-uint64-lazyframe.response.json",
-        "bytes": 82022,
-        "sha256": "855af55b9f50a702c2d3bb1062a052db012536b39e9ba02909648b9623c6a8eb",
-        "status": 200
+        "bytes": 80480,
+        "sha256": "599c46f4eb18df08ab109aba0c4047778efee1927e5aa6dbb26212ccf14520f3",
+        "status": 400
       },
       "family": "original_declare",
       "operation": "conformance",
@@ -5762,18 +5762,19 @@
           "format": "json"
         }
       },
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "the case ID column should be of type string."
+      },
       "native_calls": [
         {
           "name": "check_declare_conformance(source_lazy, model, options)",
-          "returned": true,
-          "error": null
-        },
-        {
-          "name": "declare_conformance_diagnostics(source_lazy, results, options)",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "the case ID column should be of type string."
+          }
         }
       ]
     },
@@ -6338,7 +6339,7 @@
         "bytes": 4531,
         "sha256": "e1db82cbf5f21f9b14a464c34161c11e7532fe7f322ac55a7a04a5205faa45dc"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-response.declare.json",
@@ -6356,15 +6357,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "40293",
+        "Content-Length": "40174",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "valid-flat-native-with-unavailable-source-log-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/original-declare-workbench/captures/valid-flat-native-with-unavailable-source-log-lazyframe.response.json",
-        "bytes": 40293,
-        "sha256": "d8e6d9c42bad65cc9d38d4b9e47d84a4656d9f08c9fde1a3023f4de5d736a767",
-        "status": 200
+        "bytes": 40174,
+        "sha256": "a4dcb163452ff97e5e1f229d763257b1e2d0954aa3a7956129de8619f401948d",
+        "status": 400
       },
       "family": "original_declare",
       "operation": "conformance",
@@ -6396,13 +6397,19 @@
           "format": "json"
         }
       },
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "native_error",
+        "message": "the case ID column should be of type string."
+      },
       "native_calls": [
         {
           "name": "check_declare_conformance(source_lazy, model, options)",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "the case ID column should be of type string."
+          }
         }
       ]
     },

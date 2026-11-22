@@ -1,5 +1,6 @@
 #pragma once
 
+#include "minera/event_data.hpp"
 #include "minera/event_log.hpp"
 #include "minera/powl.hpp"
 
@@ -70,5 +71,17 @@ struct PowlDiscoveryOptions {
 [[nodiscard]] PowlNode discover_powl(
     const EventLog& event_log, const PowlDiscoveryOptions& options,
     const std::function<bool()>& cancelled);
+
+// The same discovery on an upload's frame, as pm4py's POWL reads a pandas or
+// Polars frame: each case's activities after the frame is sorted by case and
+// timestamp (pandas stably, Polars with its unstable pdqsort), the
+// Inductive miner's frame projection (prepare_inductive_event_log). An
+// EventLog view (and an event stream, which pm4py's POWL does not read as a
+// frame) uses the log overloads above. Round FV, observed black-box.
+[[nodiscard]] PowlNode discover_powl(
+    const EventDataView& data, const PowlDiscoveryOptions& options,
+    const std::function<bool()>& cancelled = {});
+[[nodiscard]] EventLog normalize_powl_event_log(
+    const EventDataView& data, const PowlDiscoveryOptions& options = {});
 
 }  // namespace minera

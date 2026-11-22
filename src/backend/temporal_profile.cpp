@@ -26,6 +26,7 @@
 #include "frame_cells.hpp"
 #include "frame_temporal_profile.hpp"
 #include "frame_times.hpp"
+#include "polars_sort.hpp"
 
 namespace minera {
 namespace {
@@ -381,6 +382,12 @@ const std::string* table_value(const EventTable::Row& row, std::size_t column) {
 
 using PairRanks = std::vector<std::vector<std::int64_t>>;
 
+std::int64_t row_order(const EventTable::Row& row, std::size_t column) {
+  std::int64_t value = 0;
+  if (const auto* cell = table_value(row, column)) std::from_chars(cell->data(), cell->data() + cell->size(), value);
+  return value;
+}
+
 // The upload's timestamp column, which format_dataframe copies over
 // "time:timestamp" (round BL, observed black-box): the column whose cells
 // carry the timestamp role, else "time:timestamp" or "timestamp".
@@ -409,7 +416,12 @@ struct TemporalTableEvent {
   // The row's format_dataframe timestamp, on a CSV upload's rows.
   std::optional<ParsedExactTimestamp> frame_exact;
   double frame_instant = 0.0;
+  // The row's position after Polars' sort (polars_partial_order_table).
+  std::int64_t order = 0;
 };
+
+// The hidden column that carries each row's position after Polars' sort.
+constexpr const char* kPolarsPosition = "__minera_polars_position";
 
 // The table's rows as a log for pm4py's DataFrame algorithms: cases by
 // sorted id, each case's rows sorted by the target (start) timestamp, then
@@ -428,8 +440,10 @@ struct TemporalTableEvent {
 EventLog temporal_table_to_log(const EventTable& table,
                                const TemporalProfileOptions& options,
                                std::vector<std::size_t>* first_rows = nullptr,
-                               PairRanks* ranks = nullptr) {
+                               PairRanks* ranks = nullptr, PairRanks* orders = nullptr) {
   const auto columns = temporal_table_columns(table, options);
+  const auto order_column = std::find(table.columns.begin(), table.columns.end(), kPolarsPosition);
+  const bool has_order = order_column != table.columns.end();
   // pd.to_datetime reads an empty cell as NaT, as a missing one.
   const auto timestamp_value = [](const EventTable::Row& row, std::size_t column) {
     const auto* value = table_value(row, column);
@@ -491,7 +505,8 @@ EventLog temporal_table_to_log(const EventTable& table,
                                  source_instant.value_or(0.0), target_instant.value_or(0.0),
                                  source ? parse_timestamp_exact(*source) : std::nullopt,
                                  target ? parse_timestamp_exact(*target) : std::nullopt, row_index, rank,
-                                 frame_exact, frame_instant});
+                                 frame_exact, frame_instant,
+                                 has_order ? row_order(row, static_cast<std::size_t>(order_column - table.columns.begin())) : 0});
   }
   if (frame_timestamp) {
     // Each case's frame positions (the cases' blocks keep their relative
@@ -550,6 +565,10 @@ EventLog temporal_table_to_log(const EventTable& table,
     if (ranks && ranked) {
       ranks->emplace_back();
       for (const auto& item : events) ranks->back().push_back(item.rank);
+    }
+    if (orders && has_order) {
+      orders->emplace_back();
+      for (const auto& item : events) orders->back().push_back(item.order);
     }
     Trace trace;
     trace.case_id = case_id;
@@ -610,6 +629,9 @@ struct FrameProfileRow {
   // The row's "@@index" when the frame has one (a CSV upload): a row pairs
   // only with rows of a higher one; without it, with the later sorted rows.
   std::optional<std::int64_t> index;
+  // The row's position after Polars' sort, when it orders the pairs apart
+  // from the index (polars_partial_order_table).
+  std::optional<std::int64_t> order;
 };
 
 // pm4py's DataFrame arithmetic over cases given by sorted id, each case's rows
@@ -620,7 +642,8 @@ std::pair<std::int64_t, std::uint32_t> target_of(const FrameProfileRow& row) {
 
 TemporalProfile frame_arithmetic_profile(
     std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>>& ordered,
-    const std::function<bool()>& cancelled, const std::vector<BusinessHourSlot>* slots = nullptr);
+    const std::function<bool()>& cancelled, const std::vector<BusinessHourSlot>* slots = nullptr,
+    bool whole_seconds = false);
 
 }  // namespace
 
@@ -815,10 +838,21 @@ TemporalProfile discover_temporal_profile(
   return discover_temporal_profile_log(log, options);
 }
 
+namespace {
+TemporalProfile discover_temporal_profile_table(const EventTable& table, const TemporalProfileOptions& options,
+                                                bool whole_seconds);
+}  // namespace
+
 TemporalProfile discover_temporal_profile_dataframe(
     const EventTable& table, const TemporalProfileOptions& options) {
-  PairRanks ranks;
-  const auto log = temporal_table_to_log(table, options, nullptr, &ranks);
+  return discover_temporal_profile_table(table, options, false);
+}
+
+namespace {
+TemporalProfile discover_temporal_profile_table(const EventTable& table, const TemporalProfileOptions& options,
+                                                bool whole_seconds) {
+  PairRanks ranks, orders;
+  const auto log = temporal_table_to_log(table, options, nullptr, &ranks, &orders);
   // pm4py's DataFrame discovery (without business hours): Timedelta
   // durations, the compensated mean and Welford's deviation over the cases
   // by sorted id, each sorted by timestamp (round BI, observed black-box;
@@ -850,15 +884,109 @@ TemporalProfile discover_temporal_profile_dataframe(
                            split ? std::optional(target ? std::pair<std::int64_t, std::uint32_t>{target->seconds, target->nanoseconds}
                                                         : std::pair<std::int64_t, std::uint32_t>{0, 0})
                                  : std::nullopt,
-                           has_source, !split || target.has_value(), ranks.empty() ? std::nullopt : std::optional(ranks[t][e])});
+                           has_source, !split || target.has_value(), ranks.empty() ? std::nullopt : std::optional(ranks[t][e]),
+                           orders.empty() ? std::nullopt : std::optional(orders[t][e])});
       }
       ordered.push_back({&log.traces[t].case_id, &rows[t]});
     }
-    if (exact) return frame_arithmetic_profile(ordered, {}, options.use_business_hours ? &slots : nullptr);
+    if (exact) return frame_arithmetic_profile(ordered, {}, options.use_business_hours ? &slots : nullptr,
+                                               whole_seconds);
   }
   return discover_temporal_profile_ranked(log, normalized_table_options(options), {},
                                           ranks.empty() ? nullptr : &ranks, false);
 }
+
+// pm4py's temporal profile on a Polars frame pairs rows with Polars'
+// partial order: LazyFrame.sort([case, start, completion]) (the unstable
+// pdqsort, a missing value first; the start is the completion when the frame
+// has no start column), a row index after that sort unless the frame has its
+// own "@@index", and an inner join on the case column, which never matches a
+// missing case (round FV, XES uploads with tied timestamps, observed
+// black-box). The table gains that index as its "@@index" column, so the
+// DataFrame pairing (every row of a higher index) follows it, the positions
+// as a hidden column (the pair frame's order), and loses its rows without a
+// case.
+EventTable polars_partial_order_table(EventTable table, const TemporalProfileOptions& options) {
+  const auto columns = temporal_table_columns(table, options);
+  const auto has_column = [&](std::string_view name) {
+    return std::find(table.columns.begin(), table.columns.end(), name) != table.columns.end();
+  };
+  const auto dtype = [&](std::size_t at) {
+    return at < table.dtypes.size() ? std::string_view(table.dtypes[at]) : std::string_view();
+  };
+  const auto numeric = [](std::string_view kind) {
+    return kind.rfind("int", 0) == 0 || kind.rfind("uint", 0) == 0 || kind.rfind("float", 0) == 0 ||
+           kind.rfind("Int", 0) == 0 || kind.rfind("UInt", 0) == 0 || kind.rfind("Float", 0) == 0;
+  };
+  {
+    const bool case_numeric = numeric(dtype(columns.case_id));
+    struct Key {
+      const std::string* case_text = nullptr;
+      double case_number = 0;
+      std::optional<ParsedExactTimestamp> start, completion;
+      const std::string* start_text = nullptr;
+      const std::string* completion_text = nullptr;
+    };
+    std::vector<Key> keys(table.rows.size());
+    for (std::size_t row = 0; row < table.rows.size(); ++row) {
+      auto& key = keys[row];
+      key.case_text = table_value(table.rows[row], columns.case_id);
+      if (key.case_text && case_numeric) {
+        try { key.case_number = std::stod(*key.case_text); } catch (const std::exception&) {}
+      }
+      key.start_text = table_value(table.rows[row], columns.target_timestamp);
+      key.completion_text = table_value(table.rows[row], columns.source_timestamp);
+      if (key.start_text && key.start_text->empty()) key.start_text = nullptr;
+      if (key.completion_text && key.completion_text->empty()) key.completion_text = nullptr;
+      if (key.start_text) key.start = parse_timestamp_exact(*key.start_text);
+      if (key.completion_text) key.completion = parse_timestamp_exact(*key.completion_text);
+    }
+    // -1: lhs first, 1: rhs first, 0: tie; a missing value first.
+    const auto time_order = [](const std::string* lt, const std::optional<ParsedExactTimestamp>& l,
+                               const std::string* rt, const std::optional<ParsedExactTimestamp>& r) {
+      if (!lt || !rt) return lt == rt ? 0 : !lt ? -1 : 1;
+      if (l && r) {
+        if (l->seconds != r->seconds) return l->seconds < r->seconds ? -1 : 1;
+        if (l->nanoseconds != r->nanoseconds) return l->nanoseconds < r->nanoseconds ? -1 : 1;
+        return 0;
+      }
+      return *lt == *rt ? 0 : *lt < *rt ? -1 : 1;
+    };
+    // A frame with its own "@@index" (format_dataframe's on a CSV upload)
+    // stays in its row order: its pairs follow that order (round FV,
+    // observed black-box).
+    const bool own_index = has_column("@@index") || options.frame_index_rows;
+    std::vector<std::size_t> order(table.rows.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    if (!own_index) polars_sort::sort_unstable(order, [&](std::size_t a, std::size_t b) {
+      const auto& l = keys[a];
+      const auto& r = keys[b];
+      if (!l.case_text || !r.case_text) {
+        if (l.case_text || r.case_text) return !l.case_text;
+      } else if (case_numeric ? l.case_number != r.case_number : *l.case_text != *r.case_text) {
+        return case_numeric ? l.case_number < r.case_number : *l.case_text < *r.case_text;
+      }
+      if (const int by = time_order(l.start_text, l.start, r.start_text, r.start)) return by < 0;
+      return time_order(l.completion_text, l.completion, r.completion_text, r.completion) < 0;
+    });
+    std::vector<std::size_t> position(order.size());
+    for (std::size_t i = 0; i < order.size(); ++i) position[order[i]] = i;
+    const auto append = [&](const std::string& name) {
+      table.columns.push_back(name);
+      if (!table.dtypes.empty()) table.dtypes.push_back("int64");
+      if (!table.categorical_dtypes.empty()) table.categorical_dtypes.push_back(std::nullopt);
+      for (std::size_t row = 0; row < table.rows.size(); ++row)
+        table.rows[row].push_back(EventAttribute{name, std::to_string(position[row]), AttributeKind::kInt});
+    };
+    if (!own_index) append("@@index");
+    // The pair frame lists its pairs by these positions.
+    append(kPolarsPosition);
+  }
+  std::erase_if(table.rows, [&](const EventTable::Row& row) { return table_value(row, columns.case_id) == nullptr; });
+  table.index.reset();
+  return table;
+}
+}  // namespace
 
 TemporalProfile discover_temporal_profile(
     const EventStream& stream, const TemporalProfileOptions& options) {
@@ -872,7 +1000,7 @@ TemporalProfile discover_temporal_profile(
 
 TemporalProfile discover_temporal_profile(
     const LazyEventTable& table, const TemporalProfileOptions& options) {
-  return discover_temporal_profile_dataframe(table.materialize(), options);
+  return discover_temporal_profile_table(polars_partial_order_table(table.materialize(), options), options, true);
 }
 
 TemporalProfile discover_temporal_profile(
@@ -913,12 +1041,17 @@ double timedelta_seconds(const ParsedExactTimestamp& source, const ParsedExactTi
 // `ranks` as in discover_temporal_profile_ranked.
 TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile& profile,
                                       const TemporalProfileOptions& options, bool timedelta,
-                                      const PairRanks* ranks = nullptr) {
+                                      const PairRanks* ranks = nullptr, bool whole_seconds = false,
+                                      bool profile_major = false, const PairRanks* orders = nullptr) {
   if (options.activity_attribute.empty()) {
     throw std::invalid_argument(
         "temporal profile: activity attribute must not be empty");
   }
   const auto profile_lookup = build_profile_lookup(profile);
+  std::map<std::pair<std::string, std::string>, std::size_t> profile_positions;
+  if (profile_major)
+    for (std::size_t at = 0; at < profile.entries.size(); ++at)
+      profile_positions.try_emplace({profile.entries[at].source, profile.entries[at].target}, at);
   validate_slots(options);
   const auto slots = options.use_business_hours ? normalized_slots(options)
                                                 : std::vector<BusinessHourSlot>{};
@@ -943,7 +1076,15 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
     const auto& trace = log.traces[t];
     const auto* rank = ranks && t < ranks->size() && (*ranks)[t].size() == trace.events.size()
                            ? &(*ranks)[t] : nullptr;
+    const auto* order = orders && t < orders->size() && (*orders)[t].size() == trace.events.size()
+                            ? &(*orders)[t] : rank;
     std::vector<TemporalDeviation> deviations;
+    // On a Polars frame (whole_seconds) the deviations follow the order of
+    // the pair frame's join with the profile: by the later row's index, then
+    // the earlier row's, or first by the profile's entry when the pair frame
+    // has no more rows than the profile (Polars then probes the profile;
+    // round FV, observed black-box).
+    std::vector<std::tuple<std::size_t, std::int64_t, std::int64_t>> pair_ranks;
     std::vector<std::optional<ParsedExactTimestamp>> exact_sources, exact_targets;
     if (exact) {
       for (const auto& event : trace.events) {
@@ -987,9 +1128,13 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
                                       options.strict_attributes, utc_clock)
                 : target_time;
         if (!target_local) continue;
+        // Polars measures the flow with Duration.total_seconds(), whole
+        // seconds (round FV); the gap is never negative here.
         const double duration =
             exact && exact_sources[i] && exact_targets[j]
-                ? timedelta_seconds(*exact_sources[i], *exact_targets[j])
+                ? whole_seconds ? static_cast<double>(exact_targets[j]->seconds - exact_sources[i]->seconds -
+                                                      (exact_targets[j]->nanoseconds < exact_sources[i]->nanoseconds ? 1 : 0))
+                                : timedelta_seconds(*exact_sources[i], *exact_targets[j])
                 : elapsed_between(*source_time, *target_time, *source_local, *target_local, options,
                                   options.use_business_hours ? &slots : nullptr);
         const double difference = std::abs(duration - entry->mean_seconds);
@@ -1007,7 +1152,20 @@ TemporalConformanceResult conform_log(const EventLog& log, const TemporalProfile
         if (!(distance > options.zeta)) continue;
         deviations.push_back({trace.case_id, *source_activity,
                               *target_activity, duration, distance, sentinel});
+        if (whole_seconds && rank)
+          pair_ranks.emplace_back(profile_major ? profile_positions.at({*source_activity, *target_activity}) : 0,
+                                  (*order)[j], (*order)[i]);
       }
+    }
+    if (whole_seconds && rank && deviations.size() > 1) {
+      std::vector<std::size_t> order(deviations.size());
+      std::iota(order.begin(), order.end(), std::size_t{0});
+      std::stable_sort(order.begin(), order.end(),
+                       [&](std::size_t left, std::size_t right) { return pair_ranks[left] < pair_ranks[right]; });
+      std::vector<TemporalDeviation> sorted;
+      sorted.reserve(deviations.size());
+      for (const auto at : order) sorted.push_back(std::move(deviations[at]));
+      deviations = std::move(sorted);
     }
     result.push_back(std::move(deviations));
   }
@@ -1030,10 +1188,11 @@ namespace {
 // error, after the frame's own columns were checked (round DS, observed
 // black-box; the EventLog conformance lists every case without deviations).
 TemporalConformanceResult conform_table(const EventTable& table, const TemporalProfile& profile,
-                                        const TemporalProfileOptions& options, bool lazy) {
+                                        const TemporalProfileOptions& options, bool lazy, bool whole_seconds = false,
+                                        std::optional<std::size_t> pair_rows = std::nullopt) {
   std::vector<std::size_t> case_first_rows;
-  PairRanks ranks;
-  auto log = temporal_table_to_log(table, options, &case_first_rows, &ranks);
+  PairRanks ranks, orders;
+  auto log = temporal_table_to_log(table, options, &case_first_rows, &ranks, &orders);
   if (profile.entries.empty()) {
     if (lazy)
       throw std::invalid_argument("unable to find column \"" + options.activity_attribute +
@@ -1052,17 +1211,122 @@ TemporalConformanceResult conform_table(const EventTable& table, const TemporalP
   if (!std::is_sorted(first_rows.begin(), first_rows.end())) {
     std::sort(first_rows.begin(), first_rows.end());
     std::vector<Trace> ordered;
-    PairRanks ordered_ranks;
+    PairRanks ordered_ranks, ordered_orders;
     ordered.reserve(log.traces.size());
     for (const auto& [first, index] : first_rows) {
       ordered.push_back(std::move(log.traces[index]));
       if (!ranks.empty()) ordered_ranks.push_back(std::move(ranks[index]));
+      if (!orders.empty()) ordered_orders.push_back(std::move(orders[index]));
     }
     log.traces = std::move(ordered);
     ranks = std::move(ordered_ranks);
+    orders = std::move(ordered_orders);
+  }
+  // Without an "@@index" column (a CSV upload's frame order), the pair frame
+  // of a Polars frame counts the pairs of the log's ranked rows.
+  if (whole_seconds && !pair_rows && !ranks.empty()) {
+    const auto& source_attribute = configured_attribute(options.source_timestamp_attribute,
+                                                        options.source_completion_timestamp_attribute);
+    const auto& target_attribute = configured_attribute(options.target_timestamp_attribute,
+                                                        options.target_start_timestamp_attribute);
+    const auto instant = [](const Event& event, const std::string& attribute) {
+      const auto* value = selected_event_value(event, attribute, "timestamp");
+      return value ? parse_timestamp_exact(*value) : std::nullopt;
+    };
+    std::size_t count = 0;
+    for (std::size_t t = 0; t < log.traces.size(); ++t) {
+      const auto& events = log.traces[t].events;
+      if (ranks[t].size() != events.size()) continue;
+      for (std::size_t i = 0; i < events.size(); ++i) {
+        const auto completion = instant(events[i], source_attribute);
+        if (!completion) continue;
+        for (std::size_t j = 0; j < events.size(); ++j) {
+          if (ranks[t][j] <= ranks[t][i]) continue;
+          const auto start = instant(events[j], target_attribute);
+          if (start && std::tie(completion->seconds, completion->nanoseconds) <= std::tie(start->seconds, start->nanoseconds))
+            ++count;
+        }
+      }
+    }
+    pair_rows = count;
   }
   return conform_log(log, profile, normalized_table_options(options), true,
-                     ranks.empty() ? nullptr : &ranks);
+                     ranks.empty() ? nullptr : &ranks, whole_seconds,
+                     whole_seconds && pair_rows && *pair_rows <= profile.entries.size(),
+                     orders.empty() ? nullptr : &orders);
+}
+
+// The rows of pm4py's Polars pair frame over a polars_partial_order_table:
+// the pairs of rows of one case where the first has the lower "@@index" and
+// a completion no later than the second's start; nullopt when an index is
+// not an integer.
+std::optional<std::size_t> polars_pair_rows(const EventTable& table, const TemporalProfileOptions& options) {
+  const auto columns = temporal_table_columns(table, options);
+  const auto index_at = std::find(table.columns.begin(), table.columns.end(), "@@index");
+  if (index_at == table.columns.end()) return std::nullopt;
+  const auto index_column = static_cast<std::size_t>(index_at - table.columns.begin());
+  struct PairRow {
+    std::int64_t index = 0;
+    std::optional<ParsedExactTimestamp> completion, start;
+  };
+  std::map<std::string, std::vector<PairRow>> cases;
+  for (const auto& row : table.rows) {
+    const auto* case_id = table_value(row, columns.case_id);
+    const auto* index = table_value(row, index_column);
+    if (!case_id) continue;
+    PairRow item;
+    if (!index) return std::nullopt;
+    const auto [end, error] = std::from_chars(index->data(), index->data() + index->size(), item.index);
+    if (error != std::errc{} || end != index->data() + index->size()) return std::nullopt;
+    const auto exact = [&](std::size_t column) -> std::optional<ParsedExactTimestamp> {
+      const auto* value = table_value(row, column);
+      return value && !value->empty() ? parse_timestamp_exact(*value) : std::nullopt;
+    };
+    item.completion = exact(columns.source_timestamp);
+    item.start = exact(columns.target_timestamp);
+    cases[*case_id].push_back(item);
+  }
+  std::size_t count = 0;
+  for (const auto& [case_id, rows] : cases)
+    for (const auto& first : rows) {
+      if (!first.completion) continue;
+      for (const auto& second : rows)
+        if (first.index < second.index && second.start &&
+            std::tie(first.completion->seconds, first.completion->nanoseconds) <=
+                std::tie(second.start->seconds, second.start->nanoseconds))
+          ++count;
+    }
+  return count;
+}
+
+// pm4py's conformance on a Polars frame lists a case for every unique case
+// value (the missing one too, which Polars' unique() lists in no fixed
+// order), pairs rows in Polars' partial order (as the discovery) and
+// measures each pair in whole seconds; the inner join on the case column
+// never pairs a row without a case, so that case has no deviations (round
+// FV, observed black-box). The cases are listed by first row, as the
+// DataFrame conformance lists them.
+TemporalConformanceResult conform_lazy_table(EventTable table, const TemporalProfile& profile,
+                                             const TemporalProfileOptions& options) {
+  const auto columns = temporal_table_columns(table, options);
+  std::optional<std::size_t> missing_at;
+  {
+    std::set<std::string> seen;
+    for (const auto& row : table.rows) {
+      const auto* value = table_value(row, columns.case_id);
+      if (!value) {
+        missing_at = seen.size();
+        break;
+      }
+      seen.insert(*value);
+    }
+  }
+  auto paired = polars_partial_order_table(std::move(table), options);
+  auto result = conform_table(paired, profile, options, true, true,
+                              options.frame_index_rows ? std::nullopt : polars_pair_rows(paired, options));
+  if (missing_at) result.insert(result.begin() + static_cast<std::ptrdiff_t>(std::min(*missing_at, result.size())),
+                                std::vector<TemporalDeviation>{});
+  return result;
 }
 
 }  // namespace
@@ -1086,7 +1350,7 @@ TemporalConformanceResult conform_temporal_profile(
       return conform_temporal_profile_dataframe(*data.table(), profile,
                                                 options);
     case EventDataKind::kLazyEventTable:
-      return conform_table(data.lazy_table()->materialize(), profile, options, true);
+      return conform_lazy_table(data.lazy_table()->materialize(), profile, options);
   }
   throw std::invalid_argument("temporal profile: unsupported event-data input");
 }
@@ -1222,7 +1486,8 @@ std::optional<TemporalProfile> frame_temporal_profile(const frame_times::Frame& 
 
 TemporalProfile frame_arithmetic_profile(
     std::vector<std::pair<const std::string*, std::vector<FrameProfileRow>*>>& ordered,
-    const std::function<bool()>& cancelled, const std::vector<BusinessHourSlot>* slots) {
+    const std::function<bool()>& cancelled, const std::vector<BusinessHourSlot>* slots,
+    bool whole_seconds) {
   using Row = FrameProfileRow;
   struct Sums {
     std::uint64_t count = 0;
@@ -1230,6 +1495,27 @@ TemporalProfile frame_arithmetic_profile(
     double mean = 0.0, squares = 0.0;      // Welford
   };
   std::map<std::pair<std::string, std::string>, Sums> pairs;
+  const auto accumulate = [&](const std::string& source, const std::string& target, double value) {
+    auto& sums = pairs[{source, target}];
+    ++sums.count;
+    const double y = value - sums.compensation;
+    const double t = sums.sum + y;
+    sums.compensation = t - sums.sum - y;
+    sums.sum = t;
+    const double previous = sums.mean;
+    sums.mean += (value - previous) / static_cast<double>(sums.count);
+    sums.squares += (value - sums.mean) * (value - previous);
+  };
+  // On a Polars frame (whole_seconds) the pair frame lists its pairs by the
+  // later row's index, then the earlier row's, and the moments follow that
+  // order (round FV, observed black-box).
+  struct Deferred {
+    std::int64_t later = 0, earlier = 0;
+    const std::string* source = nullptr;
+    const std::string* target = nullptr;
+    double value = 0.0;
+  };
+  std::vector<Deferred> deferred;
   std::uint64_t visited = 0;
   for (auto& [case_id, rows] : ordered) {
     (void)case_id;
@@ -1268,23 +1554,26 @@ TemporalProfile frame_arithmetic_profile(
         // FL): BusinessHours on the frame's Timestamps, UTC on a CSV upload
         // (an offset is converted, observed black-box fl t4/c1.csv), each
         // read at its microsecond, floored.
+        // Polars measures the flow with Duration.total_seconds(), whole
+        // seconds truncated (round FV); the gap is never negative here.
         const double value =
             slots ? detail::business_elapsed_seconds_microseconds(
                         source.seconds * detail::kMicrosecondsPerSecond + source.nanoseconds / 1000,
                         target_seconds * detail::kMicrosecondsPerSecond + target_nanoseconds / 1000, *slots)
+                  : whole_seconds ? static_cast<double>(whole)
                   : static_cast<double>(whole) + static_cast<double>(fraction / 1000) * 1e-6 +
                         static_cast<double>(fraction % 1000) * 1e-9;
-        auto& sums = pairs[{*source.activity, *(*rows)[j].activity}];
-        ++sums.count;
-        const double y = value - sums.compensation;
-        const double t = sums.sum + y;
-        sums.compensation = t - sums.sum - y;
-        sums.sum = t;
-        const double previous = sums.mean;
-        sums.mean += (value - previous) / static_cast<double>(sums.count);
-        sums.squares += (value - sums.mean) * (value - previous);
+        if (whole_seconds && ranked)
+          deferred.push_back({(*rows)[j].order.value_or(*(*rows)[j].index), source.order.value_or(*source.index),
+                              source.activity, (*rows)[j].activity, value});
+        else
+          accumulate(*source.activity, *(*rows)[j].activity, value);
       }
   }
+  std::stable_sort(deferred.begin(), deferred.end(), [](const Deferred& left, const Deferred& right) {
+    return std::tie(left.later, left.earlier) < std::tie(right.later, right.earlier);
+  });
+  for (const auto& pair : deferred) accumulate(*pair.source, *pair.target, pair.value);
   TemporalProfile profile;
   for (const auto& [key, sums] : pairs) {
     TemporalProfileEntry entry;

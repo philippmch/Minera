@@ -4939,8 +4939,15 @@ void handle_structured_discovery(const httplib::Request& request,
         params.inductive.variant == minera::InductiveMinerVariant::kImf ? "imf" : "dfg";
     activity = params.inductive.activity_key;
   } else {
-    powl = minera::discover_powl(require_prepared_log(session), params.powl);
-    discovery_log = minera::normalize_powl_event_log(require_prepared_log(session), params.powl);
+    // A frame session reads its frame, as pm4py's POWL does (round FV).
+    const auto kind = session.active_source ? session.active_source->selected_kind() : minera::EventDataKind::kEventLog;
+    if (kind == minera::EventDataKind::kEventTable || kind == minera::EventDataKind::kLazyEventTable) {
+      powl = minera::discover_powl(session_selected_view(session), params.powl);
+      discovery_log = minera::normalize_powl_event_log(session_selected_view(session), params.powl);
+    } else {
+      powl = minera::discover_powl(require_prepared_log(session), params.powl);
+      discovery_log = minera::normalize_powl_event_log(require_prepared_log(session), params.powl);
+    }
     net = minera::to_petri_net(*powl);
     switch (params.powl.variant) {
       case minera::PowlDiscoveryVariant::kTree: variant = "tree"; break;
@@ -6641,9 +6648,15 @@ void handle_variant_statistics(const httplib::Request& request,
     };
     const auto options =
         minera::parse_variant_statistics_params(lookup, present);
+    // A Polars session counts its frame's variants as pm4py's get_variants
+    // does on a LazyFrame (round FV).
+    const bool lazy = session->active_source &&
+        session->active_source->selected_kind() == minera::EventDataKind::kLazyEventTable;
     response.set_content(
-        minera::variant_statistics_json(
-            minera::discover_variant_statistics_as_uploaded(require_prepared_log(*session), options)),
+        minera::variant_statistics_json(lazy
+            ? minera::discover_variant_statistics(
+                  *cached_source_view(*session, minera::EventDataKind::kLazyEventTable).lazy_table(), options)
+            : minera::discover_variant_statistics_as_uploaded(require_prepared_log(*session), options)),
         "application/json");
   } catch (const std::exception& error) {
     response.status = 400;
