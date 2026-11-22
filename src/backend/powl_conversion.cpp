@@ -1,6 +1,7 @@
 #include "minera/powl_conversion.hpp"
 
 #include "minera/conformance.hpp"
+#include "powl_petri_names.hpp"
 
 #include <algorithm>
 #include <cstddef>
@@ -13,6 +14,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <unordered_map>
 #include <vector>
@@ -1937,5 +1939,414 @@ ProcessTree to_process_tree(const PetriNet& input) {
 PetriNet to_petri_net(const PowlNode& node) { return PowlBuilder(node).run(); }
 
 PowlNode to_powl(const PetriNet& net) { return PetriToPowlBuilder(net, true).run(); }
+
+namespace detail {
+namespace {
+
+// The reference's convert_to_petri_net(powl) with its element names (round
+// GE, inferred black-box from the names on 1,500 random models): places
+// count p_3, p_4, ... (source and sink take the first two numbers), silent
+// transitions count on their own as <kind>_<n>. The root sits between two
+// places wired to source and sink by tau transitions; a choice puts its
+// children between its places; a loop makes its entry and exit places, an
+// init_loop and a loop transition, builds its do part, then makes its redo
+// place and builds its redo part, and leaves through a skip; a partial order
+// makes a tauSplit and a tauJoin, then per child (in list order) a start
+// place when it has no predecessor, an end place when it has no successor,
+// its in and out places, an init_par and a final_par transition, and builds
+// it; then one place per transitive-reduction edge in (source, target) index
+// order. A silent child is a skip. Then the simple reduction as PowlBuilder.
+class NamedPowlBuilder {
+ public:
+  struct Transition {
+    std::optional<std::string> label;
+    std::vector<std::size_t> inputs, outputs;
+    std::string name;
+    bool alive = true;
+  };
+
+  explicit NamedPowlBuilder(const PowlNode& root) : root_(root) {}
+
+  void run() {
+    places_ = {"source", "sink"};
+    consumers_order_.assign(2, {});
+    const auto in = place(), out = place();
+    hidden("tau", {0}, {in});
+    hidden("tau", {out}, {1});
+    build(root_, in, out);
+    reduce();
+  }
+
+  std::vector<std::string> places_;
+  std::vector<bool> removed_;
+  std::vector<Transition> transitions_;
+  // Each place's consumers in the order their arcs were made; a fold puts the
+  // new arc where the folded one was (as the reference's arc sets iterate).
+  std::vector<std::vector<std::size_t>> consumers_order_;
+
+ private:
+  const PowlNode& root_;
+  std::size_t place_counter_ = 2, hidden_counter_ = 0, visible_counter_ = 0;
+
+  std::size_t place() {
+    places_.push_back("p_" + std::to_string(++place_counter_));
+    consumers_order_.emplace_back();
+    return places_.size() - 1;
+  }
+  std::size_t hidden(const char* kind, std::vector<std::size_t> in, std::vector<std::size_t> out) {
+    for (const auto p : in) consumers_order_[p].push_back(transitions_.size());
+    transitions_.push_back({std::nullopt, std::move(in), std::move(out),
+                            std::string(kind) + "_" + std::to_string(++hidden_counter_), true});
+    return transitions_.size() - 1;
+  }
+  void add_input(std::size_t transition, std::size_t place) {
+    transitions_[transition].inputs.push_back(place);
+    consumers_order_[place].push_back(transition);
+  }
+  void visible(std::string label, std::size_t in, std::size_t out) {
+    // The reference names visible transitions by a random uuid4; a fixed
+    // uuid-shaped counter keeps the order deterministic.
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string suffix(12, '0');
+    auto value = visible_counter_++;
+    for (std::size_t i = 12; i-- > 0 && value != 0; value >>= 4) suffix[i] = hex[value & 15U];
+    consumers_order_[in].push_back(transitions_.size());
+    transitions_.push_back({std::move(label), {in}, {out}, "00000000-0000-4000-8000-" + suffix, true});
+  }
+
+  void build(const PowlNode& node, std::size_t in, std::size_t out) {
+    switch (node.kind()) {
+      case PowlNodeKind::kSilent:
+        hidden("skip", {in}, {out});
+        return;
+      case PowlNodeKind::kTransition:
+        visible(reference_frequency_label(node), in, out);
+        return;
+      case PowlNodeKind::kXor:
+        for (const auto& child : node.children()) build(child, in, out);
+        return;
+      case PowlNodeKind::kLoop: {
+        const auto entry = place(), exit = place();
+        hidden("init_loop", {in}, {entry});
+        const auto back = hidden("loop", {}, {entry});
+        build(node.children().at(0), entry, exit);
+        const auto redo = place();
+        add_input(back, redo);
+        build(node.children().at(1), exit, redo);
+        hidden("skip", {exit}, {out});
+        return;
+      }
+      case PowlNodeKind::kStrictPartialOrder: {
+        const auto& children = node.children();
+        const std::size_t n = children.size();
+        auto edges = node.transitive_reduction();
+        std::sort(edges.begin(), edges.end());
+        std::vector<bool> has_pred(n, false), has_succ(n, false);
+        for (const auto& [a, b] : edges) { has_succ[a] = true; has_pred[b] = true; }
+        const auto split = hidden("tauSplit", {in}, {});
+        const auto join = hidden("tauJoin", {}, {out});
+        std::vector<std::size_t> init(n), final(n);
+        for (std::size_t i = 0; i < n; ++i) {
+          std::optional<std::size_t> start, end;
+          if (!has_pred[i]) start = place();
+          if (!has_succ[i]) end = place();
+          const auto child_in = place(), child_out = place();
+          init[i] = hidden("init_par", start ? std::vector<std::size_t>{*start} : std::vector<std::size_t>{}, {child_in});
+          final[i] = hidden("final_par", {child_out}, end ? std::vector<std::size_t>{*end} : std::vector<std::size_t>{});
+          if (start) transitions_[split].outputs.push_back(*start);
+          if (end) add_input(join, *end);
+          build(children[i], child_in, child_out);
+        }
+        for (const auto& [a, b] : edges) {
+          const auto edge = place();
+          transitions_[final[a]].outputs.push_back(edge);
+          add_input(init[b], edge);
+        }
+        return;
+      }
+    }
+    throw std::invalid_argument("unknown POWL node kind");
+  }
+
+  std::vector<std::size_t> producers(std::size_t place) const {
+    std::vector<std::size_t> result;
+    for (std::size_t t = 0; t < transitions_.size(); ++t)
+      if (transitions_[t].alive)
+        for (const auto p : transitions_[t].outputs) if (p == place) result.push_back(t);
+    return result;
+  }
+  std::vector<std::size_t> consumers(std::size_t place) const {
+    std::vector<std::size_t> result;
+    for (std::size_t t = 0; t < transitions_.size(); ++t)
+      if (transitions_[t].alive)
+        for (const auto p : transitions_[t].inputs) if (p == place) result.push_back(t);
+    return result;
+  }
+  // Replaces `old` by the values not yet listed, where `old` was.
+  static void replace_in_place(std::vector<std::size_t>& values, std::size_t old,
+                               const std::vector<std::size_t>& replacements) {
+    std::vector<std::size_t> fresh;
+    for (const auto value : replacements)
+      if (value != old && std::find(values.begin(), values.end(), value) == values.end() &&
+          std::find(fresh.begin(), fresh.end(), value) == fresh.end())
+        fresh.push_back(value);
+    const auto at = std::find(values.begin(), values.end(), old);
+    const auto index = at - values.begin();
+    values.erase(at);
+    values.insert(values.begin() + index, fresh.begin(), fresh.end());
+  }
+  // The same folds as PowlBuilder::single_entry and single_exit.
+  bool single_entry() {
+    for (std::size_t t = 0; t < transitions_.size(); ++t) {
+      auto& silent = transitions_[t];
+      if (!silent.alive || silent.label || silent.inputs.size() != 1) continue;
+      const std::size_t p = silent.inputs.front();
+      const auto in = producers(p), out = consumers(p);
+      if (in.size() != 1 || out.size() != 1 || in.front() == t) continue;
+      replace_in_place(transitions_[in.front()].outputs, p, silent.outputs);
+      silent.alive = false;
+      removed_[p] = true;
+      return true;
+    }
+    return false;
+  }
+  bool single_exit() {
+    for (std::size_t t = 0; t < transitions_.size(); ++t) {
+      auto& silent = transitions_[t];
+      if (!silent.alive || silent.label || silent.outputs.size() != 1) continue;
+      const std::size_t p = silent.outputs.front();
+      const auto in = producers(p), out = consumers(p);
+      if (in.size() != 1 || out.size() != 1 || out.front() == t) continue;
+      const auto consumer = out.front();
+      replace_in_place(transitions_[consumer].inputs, p, silent.inputs);
+      for (const auto source : silent.inputs) {
+        auto& order = consumers_order_[source];
+        if (std::find(order.begin(), order.end(), consumer) != order.end())
+          order.erase(std::find(order.begin(), order.end(), t));
+        else
+          *std::find(order.begin(), order.end(), t) = consumer;
+      }
+      silent.alive = false;
+      removed_[p] = true;
+      return true;
+    }
+    return false;
+  }
+  void reduce() {
+    removed_.assign(places_.size(), false);
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      while (single_entry()) changed = true;
+      while (single_exit()) changed = true;
+    }
+  }
+};
+
+// A bipartite net graph for the structural match: nodes 0..P-1 are places,
+// P..P+T-1 transitions.
+struct MatchGraph {
+  std::size_t places = 0;
+  std::vector<std::string> initial;            // per node
+  std::vector<std::vector<std::size_t>> in, out;  // per node
+};
+
+std::vector<int> refine(const std::vector<const MatchGraph*>& graphs, std::vector<std::vector<int>> colors) {
+  std::size_t distinct = 0;
+  for (;;) {
+    std::map<std::tuple<int, std::vector<int>, std::vector<int>>, int> ids;
+    std::vector<std::vector<int>> next(graphs.size());
+    for (std::size_t g = 0; g < graphs.size(); ++g) {
+      const auto& graph = *graphs[g];
+      next[g].resize(colors[g].size());
+      for (std::size_t v = 0; v < colors[g].size(); ++v) {
+        std::vector<int> in, out;
+        for (const auto u : graph.in[v]) in.push_back(colors[g][u]);
+        for (const auto u : graph.out[v]) out.push_back(colors[g][u]);
+        std::sort(in.begin(), in.end());
+        std::sort(out.begin(), out.end());
+        const auto [it, inserted] = ids.emplace(std::make_tuple(colors[g][v], std::move(in), std::move(out)),
+                                                static_cast<int>(ids.size()));
+        (void)inserted;
+        next[g][v] = it->second;
+      }
+    }
+    colors = std::move(next);
+    if (ids.size() == distinct) break;
+    distinct = ids.size();
+  }
+  std::vector<int> flat;
+  for (const auto& c : colors) flat.insert(flat.end(), c.begin(), c.end());
+  return flat;
+}
+
+bool verify(const MatchGraph& a, const MatchGraph& b, const std::vector<std::size_t>& map) {
+  for (std::size_t v = 0; v < map.size(); ++v) {
+    if (a.initial[v] != b.initial[map[v]]) return false;
+    for (const auto side : {&MatchGraph::in, &MatchGraph::out}) {
+      std::vector<std::size_t> mapped;
+      for (const auto u : (a.*side)[v]) mapped.push_back(map[u]);
+      auto expected = (b.*side)[map[v]];
+      std::sort(mapped.begin(), mapped.end());
+      std::sort(expected.begin(), expected.end());
+      if (mapped != expected) return false;
+    }
+  }
+  return true;
+}
+
+// Individualization and refinement; small nets, few automorphisms.
+// `budget` bounds the refinements: symmetric silent branches match on the
+// first choice, and a net that needs a long search keeps Minera's own names.
+std::optional<std::vector<std::size_t>> match(const MatchGraph& a, const MatchGraph& b,
+                                              std::vector<int> colors_a, std::vector<int> colors_b,
+                                              std::size_t depth, std::size_t& budget) {
+  if (depth > a.initial.size() + 1 || budget == 0) return std::nullopt;
+  --budget;
+  const auto flat = refine({&a, &b}, {std::move(colors_a), std::move(colors_b)});
+  const std::size_t n = a.initial.size();
+  colors_a.assign(flat.begin(), flat.begin() + static_cast<std::ptrdiff_t>(n));
+  colors_b.assign(flat.begin() + static_cast<std::ptrdiff_t>(n), flat.end());
+  std::map<int, std::pair<std::vector<std::size_t>, std::vector<std::size_t>>> classes;
+  for (std::size_t v = 0; v < n; ++v) classes[colors_a[v]].first.push_back(v);
+  for (std::size_t v = 0; v < n; ++v) classes[colors_b[v]].second.push_back(v);
+  const std::pair<std::vector<std::size_t>, std::vector<std::size_t>>* pick = nullptr;
+  for (const auto& [color, members] : classes) {
+    (void)color;
+    if (members.first.size() != members.second.size()) return std::nullopt;
+    if (members.first.size() > 1 && (!pick || members.first.size() < pick->first.size())) pick = &members;
+  }
+  if (!pick) {
+    std::vector<std::size_t> map(n);
+    for (const auto& [color, members] : classes) { (void)color; map[members.first.front()] = members.second.front(); }
+    if (verify(a, b, map)) return map;
+    return std::nullopt;
+  }
+  const int fresh = static_cast<int>(flat.size()) + 1;
+  const auto chosen = pick->first.front();
+  for (const auto candidate : pick->second) {
+    auto next_a = colors_a, next_b = colors_b;
+    next_a[chosen] = fresh;
+    next_b[candidate] = fresh;
+    if (auto found = match(a, b, std::move(next_a), std::move(next_b), depth + 1, budget)) return found;
+    if (budget == 0) return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+MatchGraph graph_of(std::size_t places, std::size_t source, std::size_t sink,
+                    const std::vector<std::pair<std::optional<std::string>, std::pair<std::vector<std::size_t>, std::vector<std::size_t>>>>& transitions) {
+  MatchGraph graph;
+  graph.places = places;
+  const auto n = places + transitions.size();
+  graph.initial.resize(n);
+  graph.in.resize(n);
+  graph.out.resize(n);
+  for (std::size_t p = 0; p < places; ++p)
+    graph.initial[p] = std::string("P") + (p == source ? "s" : "") + (p == sink ? "k" : "");
+  for (std::size_t t = 0; t < transitions.size(); ++t) {
+    const auto v = places + t;
+    graph.initial[v] = transitions[t].first ? "T:" + *transitions[t].first : "S";
+    for (const auto p : transitions[t].second.first) { graph.in[v].push_back(p); graph.out[p].push_back(v); }
+    for (const auto p : transitions[t].second.second) { graph.out[v].push_back(p); graph.in[p].push_back(v); }
+  }
+  return graph;
+}
+
+}  // namespace
+
+std::optional<PowlPetriNames> powl_petri_names(const PowlNode& node, const PetriNet& net) {
+  if (!net.has_source() || !net.has_sink() || net.has_extended_arcs()) return std::nullopt;
+  NamedPowlBuilder named(node);
+  named.run();
+  // The named net, compacted to its live places and transitions.
+  std::vector<std::size_t> place_ids(named.places_.size(), 0);
+  std::vector<std::string> place_names;
+  for (std::size_t p = 0; p < named.places_.size(); ++p)
+    if (!named.removed_[p]) { place_ids[p] = place_names.size(); place_names.push_back(named.places_[p]); }
+  using Arcs = std::vector<std::pair<std::optional<std::string>, std::pair<std::vector<std::size_t>, std::vector<std::size_t>>>>;
+  Arcs named_arcs, net_arcs;
+  std::vector<std::string> transition_names;
+  for (const auto& t : named.transitions_) {
+    if (!t.alive) continue;
+    std::vector<std::size_t> in, out;
+    for (const auto p : t.inputs) in.push_back(place_ids[p]);
+    for (const auto p : t.outputs) out.push_back(place_ids[p]);
+    named_arcs.push_back({t.label, {std::move(in), std::move(out)}});
+    transition_names.push_back(t.name);
+  }
+  for (const auto& t : net.transitions()) {
+    std::optional<std::string> label;
+    if (t.activity) label = net.activities().at(*t.activity);
+    net_arcs.push_back({label, {t.inputs, t.outputs}});
+  }
+  if (place_names.size() != net.place_count() || named_arcs.size() != net_arcs.size()) return std::nullopt;
+  const auto a = graph_of(net.place_count(), net.source(), net.sink(), net_arcs);
+  const auto b = graph_of(place_names.size(), place_ids[0], place_ids[1], named_arcs);
+  std::vector<int> initial_a, initial_b;
+  std::map<std::string, int> initial_ids;
+  for (const auto& c : a.initial) initial_a.push_back(initial_ids.emplace(c, static_cast<int>(initial_ids.size())).first->second);
+  for (const auto& c : b.initial) initial_b.push_back(initial_ids.emplace(c, static_cast<int>(initial_ids.size())).first->second);
+  std::size_t budget = 2 * a.initial.size() + 64;
+  const auto map = match(a, b, std::move(initial_a), std::move(initial_b), 0, budget);
+  if (!map) return std::nullopt;
+  PowlPetriNames result;
+  const auto places = net.place_count(), transitions = net.transitions().size();
+  result.places.resize(places);
+  result.transitions.resize(transitions);
+  // The inverse maps: named place / transition -> the net's.
+  std::vector<std::size_t> net_place(places), net_transition(transitions);
+  for (std::size_t p = 0; p < places; ++p) {
+    result.places[p] = place_names[(*map)[p]];
+    net_place[(*map)[p]] = p;
+  }
+  for (std::size_t t = 0; t < transitions; ++t) {
+    const auto named_t = (*map)[places + t] - place_names.size();
+    result.transitions[t] = transition_names[named_t];
+    net_transition[named_t] = t;
+  }
+  // The arc orders of the named net, in the net's ids.
+  std::vector<std::size_t> live_transition(named.transitions_.size(), 0);
+  for (std::size_t t = 0, k = 0; t < named.transitions_.size(); ++t)
+    if (named.transitions_[t].alive) live_transition[t] = k++;
+  result.transition_outputs.resize(transitions);
+  result.place_outgoing.resize(places);
+  for (std::size_t t = 0; t < named.transitions_.size(); ++t) {
+    if (!named.transitions_[t].alive) continue;
+    auto& outputs = result.transition_outputs[net_transition[live_transition[t]]];
+    for (const auto p : named.transitions_[t].outputs) outputs.push_back(net_place[place_ids[p]]);
+  }
+  for (std::size_t p = 0; p < named.places_.size(); ++p) {
+    if (named.removed_[p]) continue;
+    auto& outgoing = result.place_outgoing[net_place[place_ids[p]]];
+    for (const auto t : named.consumers_order_[p])
+      if (named.transitions_[t].alive) outgoing.push_back(net_transition[live_transition[t]]);
+  }
+  return result;
+}
+
+PetriNet powl_replay_net(const PetriNet& net, const PowlPetriNames& names) {
+  PetriNetLiteralStorage storage;
+  storage.place_count = net.place_count();
+  storage.source_storage = net.source();
+  storage.sink_storage = net.sink();
+  storage.has_source = net.has_source();
+  storage.has_sink = net.has_sink();
+  storage.transitions = net.transitions();
+  storage.activities = net.activities();
+  storage.discovery_markings = net.discovery_markings();
+  storage.transition_names = net.transition_names();
+  storage.place_names = net.place_names();
+  for (std::size_t t = 0; t < storage.transitions.size() && t < names.transition_outputs.size(); ++t) {
+    auto& transition = storage.transitions[t];
+    auto sorted_new = names.transition_outputs[t], sorted_old = transition.outputs;
+    std::sort(sorted_new.begin(), sorted_new.end());
+    std::sort(sorted_old.begin(), sorted_old.end());
+    if (transition.output_weights.empty() && sorted_new == sorted_old) transition.outputs = names.transition_outputs[t];
+  }
+  return PetriNet::from_literal_storage(std::move(storage));
+}
+
+}  // namespace detail
 
 }  // namespace minera

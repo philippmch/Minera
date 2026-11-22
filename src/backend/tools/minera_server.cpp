@@ -106,6 +106,7 @@
 #include "../xes_frame_token_replay.hpp"
 #include "../token_replay_null_activity.hpp"
 #include "../heuristics_petri_names.hpp"
+#include "../powl_petri_names.hpp"
 #include "minera/pandas_read_csv.hpp"
 #include "minera/upload_case_relations.hpp"
 #include "minera/data_petri_net.hpp"
@@ -1983,7 +1984,21 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       // In the order the braced initializer evaluated them.
       const auto reachability = minera::final_marking_reachability(petri, cancelled);
       mine_progress_stage(net_name + ": token replay");
-      auto token_replay = minera::check_conformance(*conformance_log, petri, replay_options);
+      // pm4py's POWL net names break its routing ties, and its silent path
+      // search follows the arcs as the converter made them (round GE;
+      // powl_petri_names.hpp).
+      std::optional<minera::PetriNet> powl_replay_net;
+      if (is_powl && replay_options.place_names.empty() && replay_options.transition_names.empty() &&
+          !replay_options.nullable_transition_names && !replay_options.place_outgoing_transition_order) {
+        if (auto names = minera::detail::powl_petri_names(powl, petri)) {
+          powl_replay_net = minera::detail::powl_replay_net(petri, *names);
+          replay_options.place_names = std::move(names->places);
+          replay_options.nullable_transition_names = std::move(names->transitions);
+          replay_options.place_outgoing_transition_order = std::move(names->place_outgoing);
+        }
+      }
+      auto token_replay = minera::check_conformance(*conformance_log, powl_replay_net ? *powl_replay_net : petri,
+                                                    replay_options);
       // pm4py lists the frame's cases in the case-id order of the replayed
       // log (its own case key; see session_case_order).
       minera::order_trace_diagnostics(token_replay,

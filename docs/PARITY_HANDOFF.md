@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GD (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GE (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9057,6 +9057,87 @@ binary), Python script tests 406 of 406, and the 16 manifests replayed
 Inductive and POWL replays of a trace against its clock misfit, as
 pm4py's frame replay does).
 Harness and probes: `review-harness/round-gd/`.
+
+Round GE re-reviewed GD on fresh banks and aligned the session POWL
+model's token replay and Heuristics++'s intervals on XES frames with
+pm4py (Review GE1). GD's CI run 45056656265 (and 45056680276 for the
+handoff commit) passed on Linux, macOS and the Python, verifier and
+frontend jobs (Windows still building at GE's start); GC's Windows job
+in 45046061452 passed. No device was reachable at GE's start, so no newer
+reviewer handoff was read from the Mac. GD1 held on new banks
+(`gen/gengc.py`, seeds from 7500: geA, geC, geL, geN, geO, geR, geT, 280
+uploads with more missing-label-only cases, several silent transitions
+under Polars' None and routing ties; heL, heM, heN, 120 Heuristics++
+uploads): `cm/cmroutes2.py` with each model on both shapes gave equal
+replay totals for the heuristics, Alpha and Inductive models, the
+declared Alpha operand order (5 pandas, 61 Polars messages) and the
+declared footprints log-part errors (13 per shape) only, and one Polars
+POWL total (open from GD). Fixed: GE1-1, pm4py's POWL net names its
+places `p_N` from 3 (source and sink take 1 and 2) and its silent
+transitions `<kind>_N` on their own counter (tau, skip, init_loop, loop,
+tauSplit, tauJoin, init_par, final_par), in the order its converter
+builds and then folds them (a Python model matched pm4py's names on
+1,500 random POWL models); its token replay breaks routing ties by those
+names. Minera replayed with its own index names: the 9 open totals of GD
+(pandas gaL/f2306, gcB/f5213; Polars gaL/f2310, gaM/f2136, gaS/f2606,
+gaT/f2531, gbQ/f4708, gbQ/f4712, gcQ/f5716) now match. GE1-2, pm4py's
+shortest silent paths follow its arc sets, in practice the order the
+converter made the arcs with a folded arc's replacement in its place;
+the names alone moved gaL/f2321's pandas total off pm4py's, the arc
+order brings it back (internal `powl_petri_names.hpp`: the named
+construction matched onto Minera's net, whose indices stay, and
+`powl_replay_net`, which orders each transition's outputs as pm4py's).
+Both apply to the frame shapes and to the default log shape of
+`/api/mine`. GE1-3, Heuristics++ on a frame pairs lifecycle events into
+intervals case by case (Polars' cases in first-row order with the null
+case, pandas' after a missing lifecycle check over the whole frame): a
+complete takes the first open start of its activity and instance, an
+open start or another transition forms no interval and its missing time
+is never read, the first pair with a missing time raises Polars'
+`TypeError: unsupported operand type(s) for -: '<complete>' and
+'<start>'` (NoneType or datetime.datetime) or, after the scan, pandas'
+`ValueError: NaTType does not support timestamp`; a Polars missing
+lifecycle raises its `AttributeError` when the scan reaches it. Minera
+raised on any missing time or lifecycle up front: 5 probes per shape
+raised where pm4py succeeds, 16 Polars probes gave the other error
+(hdL/f7365 and f7375 among them). Before and after: POWL replay on
+1,710 uploads 1 pandas total and 0 Polars differed after the names (9
+before), 0 after the arc order; on the log shape the names fix gaL/f2330
+and change no other total; the 33 Heuristics++ probes 5 / 21 differed,
+after 0; `hpp`, `hpp_perf` and `hpp_min` on 520 bank uploads (he*, hd*
+and older) all equal on both shapes. Declared: pm4py's own silent-path ties follow its
+arc sets' memory order, which can differ between processes (the arc
+order model matched every pair in one run and missed 24 of 9,731 in
+another); Minera follows the creation order.
+
+GE's suite: the full ctest 668 of 668 (25 minutes, -j2, first run; the new
+`minera_server_mine_xes_frames_ge_tests` fails 12 of its checks on GD's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-ge/`.
+
+Next round (GF) should start by re-reviewing round GE:
+
+- GE's CI run (and GD's Windows jobs if they were still running);
+- GE1 on fresh banks: the POWL replay (`cmroutes2.py` with `MODEL=powl`
+  on both frame shapes, `cmroutes3.py` on the log shape) on new banks with
+  more loops, partial orders and silent routing, and Heuristics++ with
+  `concept:instance` pairs beside lifecycle and time gaps;
+- the default log shape of `/api/mine` on XES uploads against pm4py's
+  EventLog: 177 uploads' trace counts differ from
+  `read_xes(return_legacy_log_object=True)` (it keeps and replays empty
+  traces) and 178 empty logs give fitness 1 where pm4py has none; find
+  which reference the log shape follows (the legacy log or the converted
+  frame), then the heuristics, Alpha and Inductive routing ties on that
+  shape (GD's heuristics names apply on frames only);
+- the decorations (frequency and performance) of the POWL and heuristics
+  nets and the other routes replaying a cached net (`/api/compare-petri`
+  with `miner=powl`, the stochastic map's log source): pm4py's replay
+  ties go by its names, Minera's replay there by its own;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GE (kept for its older items):
 
 Next round (GE) should start by re-reviewing round GD:
 

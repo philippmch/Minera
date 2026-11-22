@@ -2788,13 +2788,6 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   if (start_at) {
     if (!detail::check_plus_frame_intervals(table, *case_at, *start_at, *timestamp_at, polars))
       return discover_heuristics_net(data, options);
-  } else if (plus && lifecycle_at) {
-    // Without one, to_interval lower-cases every event's transition in log
-    // order: a missing one (NaN or None) raises AttributeError.
-    if (std::any_of(table.rows.begin(), table.rows.end(),
-                    [&](const auto& row) { return value(row, *lifecycle_at) == nullptr; }))
-      throw HeuristicPandasError("builtins.AttributeError", std::string("'") + (polars ? "NoneType" : "float") +
-                                                                "' object has no attribute 'lower'");
   }
   if (!plus) {
     // The classic reads activities, and the performance decoration
@@ -2818,14 +2811,77 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     if (!timestamp_at || *timestamp_at >= row.size() || !row[*timestamp_at]) return true;
     return row[*timestamp_at]->is_null || is_typed_nat(*row[*timestamp_at]);
   };
-  // Heuristics++ reads each event's timestamp first: a pandas NaT has no
-  // timestamp(), and Polars' None is subtracted from None (complete less
-  // start; round GB, observed black-box).
-  if (plus && !start_at && std::any_of(table.rows.begin(), table.rows.end(), missing_time)) {
-    if (polars)
-      throw HeuristicPandasError("builtins.TypeError",
-                                 "unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
-    throw HeuristicPandasError("builtins.ValueError", "NaTType does not support timestamp");
+  // Heuristics++'s to_interval without a start column (round GE, observed
+  // black-box): case by case (Polars: the frame's first-row order, the
+  // missing case among them), event by event in row order, it lower-cases
+  // the event's transition (a missing one, NaN or None, raises
+  // AttributeError); a complete pairs with the first open start of its
+  // activity and instance, or with itself, and subtracts the start from the
+  // complete. Polars' None raises TypeError there; pandas' NaT subtracts, and
+  // the abstraction then reads each interval's timestamp(): NaT raises
+  // ValueError, after every transition was read. A start left open and any
+  // other transition form no interval, whatever their time. Without a
+  // lifecycle column every event is a complete paired with itself.
+  std::vector<bool> interval_free(table.rows.size(), false);
+  if (plus && !start_at) {
+    const auto instance_at = column_of(options.lifecycle_instance_attribute);
+    std::vector<std::optional<std::string>> case_order;
+    std::map<std::optional<std::string>, std::vector<std::size_t>> rows_of;
+    for (std::size_t r = 0; r < table.rows.size(); ++r) {
+      const auto* case_id = value(table.rows[r], *case_at);
+      const auto key = case_id ? std::optional<std::string>(*case_id) : std::nullopt;
+      auto& rows = rows_of[key];
+      if (rows.empty()) case_order.push_back(key);
+      rows.push_back(r);
+    }
+    if (lifecycle_at && !polars &&
+        std::any_of(table.rows.begin(), table.rows.end(),
+                    [&](const auto& row) { return value(row, *lifecycle_at) == nullptr; }))
+      throw HeuristicPandasError("builtins.AttributeError", "'float' object has no attribute 'lower'");
+    bool nat_interval = false;
+    const auto type_of = [](bool missing) { return std::string(missing ? "NoneType" : "datetime.datetime"); };
+    for (const auto& key : case_order) {
+      using StartKey = std::pair<std::optional<std::string>, std::string>;
+      std::map<StartKey, std::deque<std::size_t>> open;
+      for (const auto r : rows_of[key]) {
+        const auto& row = table.rows[r];
+        std::string lifecycle = "complete";
+        if (lifecycle_at) {
+          const auto* transition = value(row, *lifecycle_at);
+          if (!transition)
+            throw HeuristicPandasError("builtins.AttributeError", "'NoneType' object has no attribute 'lower'");
+          lifecycle = ascii_lower(*transition);
+        }
+        const auto* activity = value(row, *activity_at);
+        const auto* instance = instance_at ? value(row, *instance_at) : nullptr;
+        const StartKey start_key{activity ? std::optional<std::string>(*activity) : std::nullopt,
+                                 instance ? *instance : std::string()};
+        if (lifecycle == "start") {
+          open[start_key].push_back(r);
+          interval_free[r] = true;
+          continue;
+        }
+        if (lifecycle != "complete") {
+          interval_free[r] = true;
+          continue;
+        }
+        std::size_t start = r;
+        if (auto found = open.find(start_key); found != open.end() && !found->second.empty()) {
+          start = found->second.front();
+          found->second.pop_front();
+          interval_free[start] = false;
+        }
+        const bool complete_missing = missing_time(row), start_missing = missing_time(table.rows[start]);
+        if (complete_missing || start_missing) {
+          if (polars)
+            throw HeuristicPandasError("builtins.TypeError", "unsupported operand type(s) for -: '" +
+                                                                 type_of(complete_missing) + "' and '" +
+                                                                 type_of(start_missing) + "'");
+          nat_interval = true;
+        }
+      }
+    }
+    if (nat_interval) throw HeuristicPandasError("builtins.ValueError", "NaTType does not support timestamp");
   }
   // Python's str of the missing label, unique among the named activities.
   std::set<std::string> named;
@@ -2840,7 +2896,11 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   const bool timed = plus || performance;
   EventLog log;
   std::map<std::optional<std::string>, std::size_t> trace_of;
-  for (const auto& row : table.rows) {
+  for (std::size_t r = 0; r < table.rows.size(); ++r) {
+    const auto& row = table.rows[r];
+    // An open start or another transition without a time forms no interval
+    // (above); the log's interval pairing would reject its missing time.
+    if (interval_free[r] && missing_time(row)) continue;
     const auto* case_id = value(row, *case_at);
     const auto key = case_id ? std::optional<std::string>(*case_id) : std::nullopt;
     const auto [it, inserted] = trace_of.try_emplace(key, log.traces.size());

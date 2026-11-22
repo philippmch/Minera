@@ -38374,3 +38374,100 @@ responses (`xes-custom-clock-native-flat-dataframe` and `-lazyframe`: the
 Alpha, Inductive and POWL replays of a trace whose rows run against its
 clock now misfit, with precision 0, as pm4py's replay of the frame does),
 refreshed; the Python script tests passed 406 of 406.
+
+## Review GE1: the session POWL model's token replay ties and Heuristics++'s intervals on XES uploads (2026-11-22)
+
+Round GE re-reviewed round GD on fresh banks and aligned `/api/mine`'s
+token replay of the session POWL model (frame shapes and the default log
+shape of XES uploads) and Heuristics++'s interval pairing on frame shapes
+against pm4py's `token_replay.apply` with `pm4py.convert_to_petri_net` of
+pm4py's POWL model and `heuristics_miner.apply_heu(variant=PLUSPLUS)`.
+GD's CI run 45056656265 (d59ec53) passed on Linux, macOS and the Python,
+verifier and frontend jobs (Windows still building at GE's start). Observed
+black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no
+pyarrow; frames converted to Polars column by column), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"`,
+`PYTHONHASHSEED=0` and exact comparison of the replay totals or the error
+messages.
+
+Banks: rounds GA to GC's banks and GD's gd* banks (1,430 uploads) and new banks from
+`gen/gengc.py` on seeds from 7500: geA, geC, geL, geN, geO, geR, geT (280
+uploads: missing-label-only cases, several silent transitions under
+Polars' None, routing ties) and heL, heM, heN (120 Heuristics++ uploads
+with lifecycle and time gaps). GD1 held on them: the heuristics, Alpha and
+Inductive replay totals equal on both shapes, only the declared items
+(Alpha's operand order: 5 pandas, 61 Polars messages; the footprints
+route's log part on missing labels: 13 per shape) and one Polars POWL
+total (open from GD) left.
+
+Fixed:
+
+- **GE1-1. The POWL net's names break the replay's routing ties.**
+  pm4py's POWL to Petri net conversion names its places `p_N`, counting
+  from 3 (the source and the sink take 1 and 2), and its silent
+  transitions `<kind>_N` on a counter of their own (`tau`, `skip`,
+  `init_loop`, `loop`, `tauSplit`, `tauJoin`, `init_par`, `final_par`),
+  in the order its recursive construction makes them, then folds silent
+  transitions with a single input or output (a Python model of the naming
+  matched pm4py on 1,500 random POWL models); visible transitions take a
+  uuid. Its token replay sorts a marking's places by name and its silent
+  transitions by name, so a tie between silent routes goes by these
+  names. Minera replayed with its own index order: pandas gaL/f2306 and
+  gcB/f5213, Polars gaL/f2310, gaM/f2136, gaS/f2606, gaT/f2531, gbQ/f4708,
+  gbQ/f4712 and gcQ/f5716 differed (missing, remaining or produced tokens
+  off by 1 to 20). Minera now builds the same names for its POWL net
+  (internal `powl_petri_names.hpp`; the named construction is matched onto
+  Minera's net, whose indices and serialized form stay) and replays with
+  them.
+- **GE1-2. Shortest silent paths follow the converter's arc order.**
+  pm4py searches the shortest silent paths breadth first along its arc
+  sets, which iterate in practice in the order the converter made the
+  arcs, a folded arc's replacement taking the folded arc's place; with the
+  names alone gaL/f2321's pandas total was 363/359 against pm4py's
+  362/358. Minera orders each transition's outputs and each place's
+  consumers that way for the replay (`powl_replay_net`).
+- **GE1-3. Heuristics++ pairs intervals case by case.** pm4py's interval
+  conversion scans the frame's cases (Polars: first-row order with the
+  null case; pandas: after checking every lifecycle value first) and their
+  events in row order: a `complete` takes the first open `start` of the
+  same activity and instance (a missing activity matches a missing one),
+  else stands alone; an open `start` or another transition forms no
+  interval, so its missing time is never read. The first pair with a
+  missing time raises on Polars `TypeError: unsupported operand type(s)
+  for -: '<complete type>' and '<start type>'` (`NoneType` or
+  `datetime.datetime`); pandas subtracts NaT silently and raises
+  `ValueError: NaTType does not support timestamp` after the scan. A
+  missing lifecycle raises `AttributeError: 'NoneType' object has no
+  attribute 'lower'` on Polars when the scan reaches it, and on pandas
+  `'float' object has no attribute 'lower'` before the scan. Minera raised
+  on any missing time or lifecycle up front: 5 probes per shape raised
+  where pm4py succeeds, 16 Polars probes raised the other error (hdL/f7365
+  and f7375 among them).
+
+Before and after: the POWL replay on 1,710 uploads differed on 9 totals
+(GD), 1 after the names, 0 after the arc order on both shapes; on the
+default log shape the names fix gaL/f2330 and change no other total; the
+33 Heuristics++ probes differed 5 (pandas) and 21 (Polars) times, after 0;
+`hpp`, `hpp_perf` and `hpp_min` on 520 bank uploads per shape all equal.
+
+Declared:
+
+- pm4py's arc sets iterate in memory order, which can differ between
+  processes: the arc-order model matched every one of 9,731 silent-path
+  pairs in one run and missed 24 in another. Minera follows the creation
+  order, the order pm4py showed on every upload of the sweeps.
+- Open for round GF: the default log shape of `/api/mine` on XES against
+  pm4py's EventLog (177 uploads' trace counts differ from
+  `read_xes(return_legacy_log_object=True)`, which keeps and replays empty
+  traces, and 178 empty logs' fitness, Minera 1 where pm4py has none);
+  the decorations and the other routes that replay a cached POWL or
+  heuristics net with Minera's own names.
+- Unchanged: the declared items of GD1 and before.
+
+In the suite: the new `minera_server_mine_xes_frames_ge_tests` (POWL replay
+totals on four uploads with routing ties, one of them the arc-order tie;
+Heuristics++ on eight lifecycle and time gap cases; both shapes; 12 of its
+checks fail on GD's binary, and the arc-order check fails on names alone)
+carries the reference values. The full ctest passed 668 of 668 (25
+minutes, -j2) on the first run. The fixture replay left all 2,673
+responses unchanged; the Python script tests passed 406 of 406.

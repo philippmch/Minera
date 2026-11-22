@@ -364,14 +364,31 @@ void handle_active_source_mining(const httplib::Request& request,
             }
           }
         }
+        // pm4py's POWL net names its places p_N and its silent transitions
+        // <kind>_N, and its replay breaks routing ties by those names (round
+        // GE; powl_petri_names.hpp), whatever the session's shape.
+        // Its silent path search follows the arcs in the order the converter
+        // made them (powl_replay_net).
+        std::optional<minera::PetriNet> powl_replay_net;
+        if (name == "powl" && session->powl && options.place_names.empty() &&
+            options.transition_names.empty() && !options.nullable_transition_names &&
+            !options.place_outgoing_transition_order) {
+          if (auto names = minera::detail::powl_petri_names(*session->powl, petri)) {
+            powl_replay_net = minera::detail::powl_replay_net(petri, *names);
+            options.place_names = std::move(names->places);
+            options.nullable_transition_names = std::move(names->transitions);
+            options.place_outgoing_transition_order = std::move(names->place_outgoing);
+          }
+        }
+        const auto& replay_petri = powl_replay_net ? *powl_replay_net : petri;
         const auto& replayed = frame_log ? frame_log->log : log;
         const auto reachability = minera::final_marking_reachability(petri, cancelled);
         // A missing label fires a silent transition: Polars' None (pm4py's
         // match of a null activity), and NaN on Alpha's net, whose only
         // silent transition is the missing label's own (the frame's object).
         auto token_replay = frame_log && (frame_log->polars || name == "alpha")
-            ? minera::detail::check_conformance_null_silent(replayed, petri, options)
-            : minera::check_conformance(replayed, petri, options);
+            ? minera::detail::check_conformance_null_silent(replayed, replay_petri, options)
+            : minera::check_conformance(replayed, replay_petri, options);
         conformance.push_back({name, true, std::move(token_replay), minera::check_footprints(log, petri), std::nullopt});
         // pm4py lists the frame's cases in the case-id order of the replayed
         // log (the model's own case key; see session_case_order); the frame
