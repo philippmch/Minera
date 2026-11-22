@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GB (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GC (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8936,6 +8936,96 @@ GB's suite: the full ctest 665 of 665 (26 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged (no fixture refresh; frontend untouched).
 Harness and probes: `review-harness/round-gb/`.
+
+Round GC re-reviewed GB on fresh banks and aligned the conversion of a
+heuristics net with a missing label, Heuristics++'s interval input,
+Alpha's and the temporal profile's start keys of numbers, booleans and
+mixed values, the implicit start column and token replay's missing
+columns, on the frame shapes of XES uploads (Review GC1). GB's CI run
+45033653968 passed on Linux, macOS and the Python, verifier and frontend
+jobs (Windows still running at GC's start). GB's fixes held on new banks
+from `gen/gengc.py` (gcI, gcF, gcB, gcX, gcD, gcT, gcP, gcQ, gcN, gcW: 450
+uploads per shape with lifecycle gaps, start timestamp columns, integer,
+float, boolean and mixed start columns; hS, hG, hL, hK, hM, hA: 240
+Heuristics++ uploads): `optval.py` `hpp`, `hpp_perf`, `hpp_min` and the
+seven start-key sets, `cm/conv.py` (482 conversions per shape plus 708
+where both raise), `wb/cskel.py` with noise 0.2 and `wb/wfopt.py`
+(heuristics thresholds, Alpha+ `remove_unconnected`, Heuristics++, the
+performance view, temporal conformance with zeta 0.5 and 1.5; 670 uploads
+per shape) all agree. Fixed: GC1-1, the heuristics net's conversion names
+a node's join place "pre_" + its name, so a missing label with an
+incoming dependency raises `TypeError: can only concatenate str (not
+"float")` (pandas) or `(not "NoneType")` (Polars), and otherwise Polars'
+None is a silent transition (`/api/mine`'s conversion and
+`/api/discover-workflow`, which returns the converted net, so its error is
+pm4py's); GC1-2, Heuristics++ with a start_timestamp column keeps the log
+as it is and reads each start as the frame's Python object (pandas
+Timestamp or NaT, an object column's datetime, str or NaN, Polars
+datetime, str or None), raising at the first failing step: CPython's
+sort of each trace by its starts, completion against the later starts,
+the performance subtraction, then `timestamp()` on each start and
+completion (internal `heuristic_plus_frame_intervals.hpp`); without one, a
+missing lifecycle transition raises `AttributeError: 'float'|'NoneType'
+object has no attribute 'lower'`; GC1-3, a start key of numbers, booleans
+or mixed values follows read_xes' dtype (internal `frame_key_column.hpp`:
+dates datetime64, integers int64 or float64 beside a gap, booleans bool or
+object beside a gap, text str, other mixes object): Alpha sorts it by
+pandas' Categorical order (numbers before text, gaps last; a date beside
+a number raises `'values' is not ordered`) or by Polars' order (nulls
+first, String by bytes), and the temporal profile raises pandas' `Invalid
+comparison between dtype=int64|float64|bool and ndarray`, an object
+column's value-wise `'<=' not supported between instances of 'Timestamp'
+and ...` or `cannot subtract DatetimeArray from ndarray[object]`, and
+Polars' `- not allowed on i64|f64|bool and datetime[μs, UTC]` plan
+error; GC1-4, without a start key Alpha, the temporal profile and its
+conformance (`/api/analyze-behavior`) read the frame's start_timestamp
+column, as pm4py's directly-follows and partial-order frames do
+(`conform_temporal_profile_xes_frame`); GC1-5, GB1-3's text-start check
+raises the comparison error only when a case's later present start fails
+to parse as a date, else the subtraction error; GC1-6, token replay of
+`/api/mine` on a frame without the case or activity column raises
+pandas' `KeyError` for the case, then `KeyError: 'Column not found:
+...'`, or Polars' `ColumnNotFoundError` at `group_by`. Probed and kept:
+Polars 1.44.1 sorts by one column stably on ties (1,800 frames up to
+6,000 rows and 24 up to 150,000, Datetime, Int64 and String with nulls,
+lazy and eager), and by two columns with a Null-dtype key stably too (800
+frames), so the remaining `std::stable_sort` sites (the variants and
+sequence filters with a None case key, the LTL fallback, the temporal
+lazy arrival and finish order, `sort_by_keys` with a Null key) match.
+Declared: temporal conformance on Polars lists the cases through
+`select(unique())`, whose order changes from run to run in pm4py itself
+(8 orders in 8 runs); sweeps compare its deviations as a multiset.
+
+GC's suite: the full ctest 666 of 666 (39 minutes, -j2, first run; the new
+`minera_server_mine_xes_frames_gc_tests` fails 24 of its checks on GB's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged (no fixture refresh; frontend untouched).
+Harness and probes: `review-harness/round-gc/`.
+
+Next round (GD) should start by re-reviewing round GC:
+
+- GC's CI run (and GB's Windows job if it was still running);
+- GC1 on fresh banks: `optval.py` start-key and Heuristics++ sets,
+  `cm/conv.py`, `wb/wfopt.py` with `gen/gengc.py` (more mixed start
+  columns, int and bool keys beside gaps, starts after completions);
+- token replay of the cached heuristics model on XES frames
+  (`cm/cmroutes.py`, round GC's r1 sweep): pm4py replays the frame's
+  variants (`pandas_utils.get_traces`: pandas groupby sorted without the
+  null case, Polars group_by in first-row order with the null group),
+  sorts the variants by count and tuple (a `TypeError` between a missing
+  label and a name; Polars' None label replays a silent transition), and
+  Minera's `/api/mine` replays `cached_model_log` instead (null-case
+  traces counted: gbN/f4834 and gcB/f5249 report 8 traces where pm4py
+  has 7; gcW/f5921 produced and consumed off by 4 on both shapes; the
+  sweep needs a per-upload timeout: r1 stalled inside pm4py after gcW,
+  likely on the reference footprints' reachability graph);
+- `/api/discover-graph` footprints of the cached heuristics model: it
+  answers "cached POWL model is unavailable" when POWL failed on the
+  upload, where pm4py computes the heuristics net's footprints;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GC (kept for its older items):
 
 Next round (GC) should start by re-reviewing round GB:
 

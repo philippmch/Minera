@@ -76,6 +76,7 @@
 #include "../secure_temp.hpp"
 #include "../gzip_codec.hpp"
 #include "../json_utf8.hpp"
+#include "../xes_frame_checks.hpp"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
@@ -4519,7 +4520,12 @@ void handle_behavior_analysis(const httplib::Request& request,
       if (conform) {
         if (!request.has_param("temporal_profile_json")) throw std::invalid_argument("temporal_profile_json is required");
         profile = minera::parse_temporal_profile_json(request.get_param_value("temporal_profile_json"));
-        conformance = minera::conform_temporal_profile(input(), *profile, params.temporal_profile);
+        conformance = session->active_source && session->active_source->file().format == "xes" &&
+                              (adapter == "dataframe" || adapter == "lazyframe")
+            ? minera::conform_temporal_profile_xes_frame(input(), *profile, params.temporal_profile,
+                                                         request.has_param("temporal_target_timestamp_attribute") ||
+                                                         request.has_param("temporal_target_start_timestamp_attribute"))
+            : minera::conform_temporal_profile(input(), *profile, params.temporal_profile);
       } else if (session->active_source && session->active_source->file().format == "xes" &&
                  (adapter == "dataframe" || adapter == "lazyframe")) {
         // An XES upload's frame as /api/mine reads it (round GB).

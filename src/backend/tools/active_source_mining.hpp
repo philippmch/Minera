@@ -334,6 +334,8 @@ void handle_active_source_mining(const httplib::Request& request,
         if (!params.token_replay_activity_attribute_supplied)
           options.activity_attribute = name == "alpha" ? params.alpha.activity_attribute : name == "inductive" ? params.inductive.activity_key : name == "heuristic" ? params.heuristic.activity_attribute : params.powl.activity_key;
         options = minera::tools::default_replay_input_options(log, std::move(options), params.token_replay_activity_attribute_supplied);
+        // pm4py replays an XES session's frame (round GC): its missing columns raise.
+        if (xes_frame) minera::detail::check_xes_frame_replay_columns(data(), options.case_id_attribute, options.activity_attribute);
         options_overrides[name + "_conformance"] = active_source_token_replay_options_json(options);
         options.cancelled = cancelled;
         const auto reachability = minera::final_marking_reachability(petri, cancelled);

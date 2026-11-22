@@ -153,6 +153,15 @@ struct TemporalDeviation {
 
 using TemporalConformanceResult = std::vector<std::vector<TemporalDeviation>>;
 
+// pm4py's temporal conformance on the frame of an XES upload (round GC,
+// observed black-box): without a start key, the frame's own
+// "start_timestamp" column is read as if it were given, with the start
+// column's errors of discover_temporal_profile_xes_frame; otherwise
+// conform_temporal_profile.
+[[nodiscard]] TemporalConformanceResult conform_temporal_profile_xes_frame(
+    const EventDataView& data, const TemporalProfile& profile, const TemporalProfileOptions& options = {},
+    bool explicit_start_key = false);
+
 // Detailed conformance preserves one result bucket per input case, including
 // empty buckets. The legacy check function below remains a flattened view.
 [[nodiscard]] TemporalConformanceResult conform_temporal_profile_log(

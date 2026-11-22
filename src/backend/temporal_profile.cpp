@@ -1080,8 +1080,15 @@ TemporalProfile discover_temporal_profile_xes_frame(
     // routes pass the timestamp when none is given. The timestamp given as
     // the start key reads the same in pandas, while Polars selects it once
     // without the start alias.
-    const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
+    // Without a start key, the frame's own start column is read as if it
+    // were given (round GC, observed black-box).
     const auto timestamp = source_timestamp_key(options);
+    if (!explicit_start_key && timestamp != "start_timestamp" && detail::xes_frame_has_column(data, "start_timestamp")) {
+      auto implicit = options;
+      implicit.target_timestamp_attribute = "start_timestamp";
+      return discover_temporal_profile_xes_frame(data, implicit, true);
+    }
+    const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
     const bool explicit_start =
         !start.empty() && (start != timestamp || (explicit_start_key && data.kind() == EventDataKind::kLazyEventTable));
     detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
@@ -1089,6 +1096,25 @@ TemporalProfile discover_temporal_profile_xes_frame(
                                     explicit_start ? start : std::string("start_timestamp"), explicit_start);
   }
   return discover_temporal_profile(data, options);
+}
+
+TemporalConformanceResult conform_temporal_profile_xes_frame(
+    const EventDataView& data, const TemporalProfile& profile, const TemporalProfileOptions& options,
+    bool explicit_start_key) {
+  const bool frame = data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable;
+  const auto timestamp = source_timestamp_key(options);
+  if (!frame || explicit_start_key || timestamp == "start_timestamp" ||
+      !detail::xes_frame_has_column(data, "start_timestamp"))
+    return conform_temporal_profile(data, profile, options);
+  auto implicit = options;
+  implicit.target_timestamp_attribute = "start_timestamp";
+  // The start column's errors, once the frame holds the columns the
+  // conformance reads first.
+  if (detail::xes_frame_has_column(data, options.case_id_attribute) &&
+      detail::xes_frame_has_column(data, options.activity_attribute) && detail::xes_frame_has_column(data, timestamp))
+    detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
+                                    options.activity_attribute, timestamp, "start_timestamp", true);
+  return conform_temporal_profile(data, profile, implicit);
 }
 
 TemporalProfile discover_temporal_profile(

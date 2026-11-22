@@ -5,6 +5,7 @@
 #include "exact_mean.hpp"
 #include "exact_stdev.hpp"
 #include "frame_times.hpp"
+#include "heuristic_plus_frame_intervals.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
@@ -2779,13 +2780,22 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   if (plus && !activity_at) throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
   if (plus && !timestamp_at) throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
   const auto lifecycle_at = column_of("lifecycle:transition");
-  // Interval input (a start column, a lifecycle with gaps) stays on the older
-  // path.
-  if (plus && (column_of("start_timestamp") ||
-               (lifecycle_at && std::any_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
-                  return value(row, *lifecycle_at) == nullptr;
-                }))))
-    return discover_heuristics_net(data, options);
+  // Heuristics++'s interval input (round GC, observed black-box): with a
+  // start_timestamp column every event holds the key, so pm4py's
+  // to_interval keeps the log as it is (the lifecycle unread) and the
+  // abstraction reads each start as the frame's Python object.
+  const auto start_at = plus ? column_of("start_timestamp") : std::nullopt;
+  if (start_at) {
+    if (!detail::check_plus_frame_intervals(table, *case_at, *start_at, *timestamp_at, polars))
+      return discover_heuristics_net(data, options);
+  } else if (plus && lifecycle_at) {
+    // Without one, to_interval lower-cases every event's transition in log
+    // order: a missing one (NaN or None) raises AttributeError.
+    if (std::any_of(table.rows.begin(), table.rows.end(),
+                    [&](const auto& row) { return value(row, *lifecycle_at) == nullptr; }))
+      throw HeuristicPandasError("builtins.AttributeError", std::string("'") + (polars ? "NoneType" : "float") +
+                                                                "' object has no attribute 'lower'");
+  }
   if (!plus) {
     // The classic reads activities, and the performance decoration
     // timestamps, only in directly-follows pairs: a case of two or more
@@ -2811,7 +2821,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // Heuristics++ reads each event's timestamp first: a pandas NaT has no
   // timestamp(), and Polars' None is subtracted from None (complete less
   // start; round GB, observed black-box).
-  if (plus && std::any_of(table.rows.begin(), table.rows.end(), missing_time)) {
+  if (plus && !start_at && std::any_of(table.rows.begin(), table.rows.end(), missing_time)) {
     if (polars)
       throw HeuristicPandasError("builtins.TypeError",
                                  "unsupported operand type(s) for -: 'NoneType' and 'NoneType'");
@@ -2856,7 +2866,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       event.timestamp_source_key = timestamp_key;
     }
     if (plus) {
-      if (lifecycle_at) {
+      if (lifecycle_at && !start_at) {
         event.lifecycle = *value(row, *lifecycle_at);
         event.lifecycle_state = FirstClassAttributeState::kPresent;
       }
@@ -2893,7 +2903,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       std::map<NamePair, std::uint64_t> follows;
       std::map<std::string, std::vector<std::string>> targets;
       for (const auto& trace : log.traces) {
-        const auto converted = to_intervals(trace, projected, false, false);
+        const auto converted = to_intervals(trace, projected, start_at.has_value(), false);
         const auto& intervals = converted.sorted;
         for (const auto& interval : converted.performance_order) {
           if (known.insert(interval.activity).second) order.push_back(interval.activity);

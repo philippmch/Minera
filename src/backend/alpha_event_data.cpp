@@ -12,6 +12,7 @@
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
 #include "alpha_python_nan.hpp"
+#include "frame_key_column.hpp"
 #include "polars_sort.hpp"
 #include "xes_frame_checks.hpp"
 
@@ -243,7 +244,11 @@ PetriNet discover_classic_table(const EventTable& table,
                           text_dtype(selected_dtype(table, options.timestamp_attribute)) &&
                           (!has_start || text_dtype(selected_dtype(table, start)));
   const auto frame_text = [&](std::string_view selector) { return detail::xes_frame_text_column(table, selector); };
-  const bool text_start = explicit_frame_start && has_start && frame_text(start);
+  // Round GC: a start column the frame holds sorts by its ranks
+  // (frame_key_column.hpp), whatever its values (numbers, booleans, dates
+  // beside text).
+  const bool ranked_start = explicit_frame_start && has_start;
+  std::vector<python::Scalar> start_cells;
   const bool text_completion = explicit_frame_start && has_completion && frame_text(options.timestamp_attribute);
   struct Row {
     std::optional<std::string> case_id;
@@ -252,6 +257,7 @@ PetriNet discover_classic_table(const EventTable& table,
     double completion = std::numeric_limits<double>::infinity();
     std::optional<std::string> start_text;
     std::optional<std::string> completion_text;
+    std::size_t start_rank = 0;
   };
   std::vector<Row> rows;
   const auto value = [](const EventAttribute* field) -> std::optional<std::string> {
@@ -296,8 +302,7 @@ PetriNet discover_classic_table(const EventTable& table,
         row.start = row.completion;
       } else {
         const auto* begin = select_field(record, start, FirstClassAttributeRole::kTimestamp, false, true);
-        if (text_start) row.start_text = value(begin);
-        else row.start = instant(begin);
+        start_cells.push_back(detail::frame_key_cell(value(begin) ? begin : nullptr));
       }
     } else if (reads_time && text_times) {
       row.completion_text = value(select_field(record, options.timestamp_attribute,
@@ -330,6 +335,11 @@ PetriNet discover_classic_table(const EventTable& table,
     }
     rows.push_back(std::move(row));
   }
+  if (ranked_start && reads_time && start_cells.size() == rows.size()) {
+    const auto column = detail::frame_key_column(std::move(start_cells));
+    const auto ranks = polars ? detail::frame_key_polars_ranks(column) : detail::frame_key_pandas_ranks(column);
+    for (std::size_t index = 0; index < rows.size(); ++index) rows[index].start_rank = ranks[index];
+  }
   // -1: left first, 1: right first, 0: tie; a missing value last for
   // pandas and first for Polars.
   const auto compare_missing = [&](bool left_missing, bool right_missing) {
@@ -351,10 +361,12 @@ PetriNet discover_classic_table(const EventTable& table,
     if (const int by = compare_text(left.case_id, right.case_id)) return by;
     if (!reads_time) return 0;
     if (explicit_frame_start) {
-      const bool start_as_text = has_start ? text_start : text_completion;
-      if (const int by = start_as_text ? compare_text(left.start_text, right.start_text)
-                                       : compare_instant(left.start, right.start))
+      if (ranked_start) {
+        if (left.start_rank != right.start_rank) return left.start_rank < right.start_rank ? -1 : 1;
+      } else if (const int by = text_completion ? compare_text(left.start_text, right.start_text)
+                                                : compare_instant(left.start, right.start)) {
         return by;
+      }
       return text_completion ? compare_text(left.completion_text, right.completion_text)
                              : compare_instant(left.completion, right.completion);
     }
@@ -539,10 +551,14 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result_xes_frame(const EventDataVie
 }
 
 PetriNet discover_petri_net_xes_frame(const EventDataView& data,
-                                      const AlphaMinerOptions& options) {
+                                      const AlphaMinerOptions& given) {
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
-  if (options.short_loops || (!polars && data.kind() != EventDataKind::kEventTable))
-    return discover_petri_net(data, options);
+  if (given.short_loops || (!polars && data.kind() != EventDataKind::kEventTable))
+    return discover_petri_net(data, given);
+  // The frame's own start column when no start key is given (round GC).
+  auto options = given;
+  if (options.start_timestamp_attribute.empty() && detail::xes_frame_has_column(data, "start_timestamp"))
+    options.start_timestamp_attribute = "start_timestamp";
   const std::string activity = options.activity_attribute.empty()
                                    ? "concept:name" : options.activity_attribute;
   const std::string start = options.start_timestamp_attribute.empty()

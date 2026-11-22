@@ -427,6 +427,14 @@ class HeuristicPandasError : public std::invalid_argument {
   std::string reference_type_;
 };
 
+// Whether a net's missing label (null_activity) is Polars' None rather than
+// pandas' NaN: its name is Python's str of the value, "None" or "nan" (made
+// unique with trailing \x1f).
+[[nodiscard]] inline bool heuristics_null_activity_is_none(const HeuristicsNet& net) {
+  return net.null_activity && *net.null_activity < net.activities.size() &&
+         net.activities[*net.null_activity].rfind("None", 0) == 0;
+}
+
 // PLUSPLUS's public pandas entry point. It uses the pandas concurrency
 // projection and materializes a missing start column plus @@diff durations.
 // Declared timestamp dtypes are authoritative; object columns raise the public

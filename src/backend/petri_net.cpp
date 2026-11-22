@@ -1,4 +1,5 @@
 #include "minera/petri_net.hpp"
+#include "minera/heuristic_miner.hpp"
 #include "minera/petri_net_reduction.hpp"
 #include "minera/process_tree_petri.hpp"
 
@@ -556,6 +557,19 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
     active.resize(n);
     for (std::size_t i = 0; i < n; ++i) active[i] = i;
   }
+  // The missing label of an XES upload's frame (round FZ). pm4py names a
+  // node's join place "pre_" + its name, so a missing label with an incoming
+  // dependency raises TypeError (NaN on pandas, None on Polars); its
+  // transition takes the label as given, and Polars' None is a silent
+  // transition (round GC, observed black-box).
+  const auto null_activity = heuristics.null_activity && *heuristics.null_activity < n &&
+                                     contains(active, *heuristics.null_activity)
+                                 ? heuristics.null_activity : std::nullopt;
+  const bool null_is_none = null_activity && heuristics_null_activity_is_none(heuristics);
+  if (null_activity && std::any_of(heuristics.edges.begin(), heuristics.edges.end(),
+                                   [&](const auto& edge) { return edge.target == *null_activity; }))
+    throw HeuristicPandasError("builtins.TypeError", std::string("can only concatenate str (not \"") +
+                                   (null_is_none ? "NoneType" : "float") + "\") to str");
   for (const std::size_t a : active) {
     auto in_alts = alternatives(a, false);
     if (contains(heuristics.start_activities, a)) {
@@ -572,7 +586,8 @@ PetriNet to_petri_net(const HeuristicsNet& heuristics) {
     // GCC results expect.
     auto outputs = merge(std::move(out_alts), false);
     auto inputs = merge(std::move(in_alts), true);
-    net.add_transition(a, std::move(inputs), std::move(outputs));
+    net.add_transition(null_is_none && a == *null_activity ? std::nullopt : std::optional<std::size_t>(a),
+                       std::move(inputs), std::move(outputs));
   }
   PetriNetReductionOptions reduction_options;
   reduction_options.preserve_join_bridges = true;
