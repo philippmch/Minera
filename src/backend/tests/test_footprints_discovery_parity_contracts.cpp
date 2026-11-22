@@ -1,6 +1,8 @@
 #include "footprints/discovery_registry.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <cstdio>
 #include <cstddef>
 #include <initializer_list>
 #include <map>
@@ -49,6 +51,21 @@ void expect_invalid(Function&& function) {
   try {
     function();
   } catch (const std::invalid_argument&) {
+    rejected = true;
+  }
+  assert(rejected);
+}
+
+template <typename Function>
+void expect_message(Function&& function, const std::string& message) {
+  bool rejected = false;
+  try {
+    function();
+  } catch (const std::invalid_argument& error) {
+    if (std::string(error.what()) != message) {
+      std::fprintf(stderr, "unexpected message: %s\n", error.what());
+      assert(false);
+    }
     rejected = true;
   }
   assert(rejected);
@@ -282,14 +299,22 @@ void table_selector_and_null_contract() {
   assert(lazy.dfg.at({"E", "L"}) == 1);
   assert(lazy.dfg.at({"L", "X"}) == 1);
 
-  // The eager adapter rejects a null activity or case id. The Polars adapter,
-  // like the reference, keeps a null activity as an activity (never in a
-  // pair) and groups null case ids into one case without pairs.
+  // Both adapters keep a null activity as an activity, never in a pair
+  // (round FX). The pandas adapter takes each case's first and last activity
+  // that is not NaN and leaves rows without a case id out of the cases (their
+  // activities still count); the Polars adapter keeps the null as a case's
+  // first or last activity and groups null case ids into one case.
   auto null_activity = make_table();
   null_activity.rows.front()[1] = null_cell("concept:name");
-  expect_invalid([&] {
-    (void)EntireDataframeFootprintsDiscovery::apply(null_activity);
-  });
+  const auto eager_null_activity = EntireDataframeFootprintsDiscovery::apply(null_activity);
+  assert(eager_null_activity.dfg.size() == 1 && eager_null_activity.dfg.at({"C", "D"}) == 1);
+  assert(eager_null_activity.activities_include_null &&
+         !eager_null_activity.start_activities_include_null &&
+         !eager_null_activity.end_activities_include_null);
+  assert((eager_null_activity.activities == std::set<std::string>{"A", "C", "D"}));
+  assert((eager_null_activity.start_activities == std::set<std::string>{"A", "C"}));
+  assert((eager_null_activity.end_activities == std::set<std::string>{"A", "D"}));
+  assert(*eager_null_activity.min_trace_length == 2);
   const auto lazy_null_activity = PolarsLazyframesFootprintsDiscovery::apply(
       LazyEventTable::from_table(null_activity));
   assert(lazy_null_activity.dfg.size() == 1 &&
@@ -301,24 +326,137 @@ void table_selector_and_null_contract() {
   assert(*lazy_null_activity.min_trace_length == 2);
   auto null_case = make_table();
   null_case.rows.front()[0] = null_cell("case:concept:name");
-  expect_invalid([&] {
-    (void)EntireDataframeFootprintsDiscovery::apply(null_case);
-  });
+  const auto eager_null_case = EntireDataframeFootprintsDiscovery::apply(null_case);
+  assert(eager_null_case.dfg.size() == 1 && eager_null_case.dfg.at({"C", "D"}) == 1);
+  assert(!eager_null_case.activities_include_null);
+  assert((eager_null_case.activities == std::set<std::string>{"A", "B", "C", "D"}));
+  assert((eager_null_case.start_activities == std::set<std::string>{"A", "C"}));
+  assert((eager_null_case.end_activities == std::set<std::string>{"A", "D"}));
+  assert(*eager_null_case.min_trace_length == 1);
   const auto lazy_null_case = PolarsLazyframesFootprintsDiscovery::apply(
       LazyEventTable::from_table(null_case));
   assert(lazy_null_case.dfg.size() == 1 && *lazy_null_case.min_trace_length == 1);
   assert((lazy_null_case.start_activities == std::set<std::string>{"A", "B", "C"}));
   assert((lazy_null_case.end_activities == std::set<std::string>{"A", "B", "D"}));
 
+  // Without rows (or, for pandas, without any case id) the minimum trace
+  // length is NaN or None, which pm4py converts to an int (round FX).
   EventTable empty;
   empty.columns = {"case:concept:name", "concept:name", "time:timestamp"};
-  expect_invalid([&] {
+  expect_message([&] {
     (void)EntireDataframeFootprintsDiscovery::apply(empty);
-  });
-  expect_invalid([&] {
+  }, "ValueError: cannot convert float NaN to integer");
+  expect_message([&] {
     (void)PolarsLazyframesFootprintsDiscovery::apply(
         LazyEventTable::from_table(empty));
-  });
+  }, "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
+  auto no_case = make_table();
+  for (auto& row : no_case.rows) row[0] = null_cell("case:concept:name");
+  expect_message([&] {
+    (void)EntireDataframeFootprintsDiscovery::apply(no_case);
+  }, "ValueError: cannot convert float NaN to integer");
+  assert(*PolarsLazyframesFootprintsDiscovery::apply(LazyEventTable::from_table(no_case)).min_trace_length == 4);
+
+  // Missing columns: the pandas variant's KeyError names the missing labels
+  // of [case, activity, timestamp] (all of them as an Index when none is
+  // there); the Polars variant lists every missing column, sorted.
+  auto without = [](EventTable table, std::initializer_list<const char*> drop) {
+    for (const auto* name : drop) {
+      const auto at = static_cast<std::size_t>(
+          std::find(table.columns.begin(), table.columns.end(), name) - table.columns.begin());
+      table.columns.erase(table.columns.begin() + static_cast<std::ptrdiff_t>(at));
+      for (auto& row : table.rows) row.erase(row.begin() + static_cast<std::ptrdiff_t>(at));
+    }
+    return table;
+  };
+  expect_message([&] {
+    (void)EntireDataframeFootprintsDiscovery::apply(without(make_table(), {"case:concept:name", "time:timestamp"}));
+  }, "KeyError: \"['case:concept:name', 'time:timestamp'] not in index\"");
+  expect_message([&] {
+    (void)EntireDataframeFootprintsDiscovery::apply(
+        without(make_table(), {"case:concept:name", "concept:name", "time:timestamp"}));
+  }, "KeyError: \"None of [Index(['case:concept:name', 'concept:name', 'time:timestamp'], dtype='str')] are in the [columns]\"");
+  auto start = DiscoveryParameters{};
+  start.start_timestamp_key = "aa";
+  expect_message([&] {
+    (void)PolarsLazyframesFootprintsDiscovery::apply(
+        LazyEventTable::from_table(without(make_table(), {"time:timestamp", "concept:name"})), start);
+  }, "The provided Polars LazyFrame does not contain the following required columns: aa, concept:name, time:timestamp");
+  // The pandas variant has no start timestamp.
+  assert(EntireDataframeFootprintsDiscovery::apply(make_table(), start).dfg.at({"A", "B"}) == 1);
+
+  // The Polars variant with the start timestamp column equal to the
+  // timestamp column groups by a column its plan no longer has.
+  start.start_timestamp_key = "time:timestamp";
+  expect_message([&] {
+    (void)PolarsLazyframesFootprintsDiscovery::apply(LazyEventTable::from_table(make_table()), start);
+  }, "unable to find column \"time:timestamp\"; valid columns: [\"case:concept:name\", \"concept:name\"]\n\n"
+     "Resolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n"
+     "SELECT [col(\"case:concept:name\"), col(\"concept:name\")]\n"
+     "  SORT BY [col(\"case:concept:name\"), col(\"time:timestamp\"), col(\"time:timestamp\"), col(\"@@index\")]\n"
+     "    ROW INDEX name: @@index, offset: 0\n"
+     "      SELECT [col(\"case:concept:name\"), col(\"concept:name\"), col(\"time:timestamp\")]\n"
+     "        DF [\"case:concept:name\", \"concept:name\", \"time:timestamp\", \"@@index\"]; PROJECT */4 COLUMNS\n\n"
+     "This error occurred with the following context stack:\n"
+     "\t[1] 'with_columns'\n\t[2] 'filter'\n\t[3] 'filter'\n\t[4] 'group_by'\n");
+
+  // Keys naming one column twice (round FX, pm4py 2.7.22 black-box on this
+  // table with PYTHONHASHSEED=0): the pandas selection holds the label twice,
+  // the Polars plan shifts one column into the same "<key>_2" twice.
+  const std::string context =
+      "\n\nThis error occurred with the following context stack:\n"
+      "\t[1] 'with_columns'\n\t[2] 'filter'\n\t[3] 'filter'\n\t[4] 'group_by'\n";
+  const std::string duplicate_tail =
+      "_2' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that multiple expressions are returning "
+      "the same default column name. If this is the case, try renaming the columns with `.alias(\"new_name\")` to "
+      "avoid duplicate column names.\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n";
+  const std::string frame =
+      "DF [\"case:concept:name\", \"concept:name\", \"time:timestamp\", \"@@index\"]; PROJECT */4 COLUMNS";
+  auto case_activity = DiscoveryParameters{};
+  case_activity.activity_key = "case:concept:name";
+  expect_message([&] {
+    (void)PolarsLazyframesFootprintsDiscovery::apply(LazyEventTable::from_table(make_table()), case_activity);
+  }, "the name 'case:concept:name" + duplicate_tail +
+     "SELECT [col(\"case:concept:name\")]\n"
+     "   WITH_COLUMNS:\n   [col(\"time:timestamp\").alias(\"start_timestamp\")] \n"
+     "    SORT BY [col(\"case:concept:name\"), col(\"time:timestamp\"), col(\"@@index\")]\n"
+     "      ROW INDEX name: @@index, offset: 0\n"
+     "        SELECT [col(\"case:concept:name\"), col(\"time:timestamp\")]\n"
+     "          " + frame + context);
+  expect_message([&] {
+    (void)EntireDataframeFootprintsDiscovery::apply(make_table(), case_activity);
+  }, "ValueError: The column label 'case:concept:name' is not unique.");
+  case_activity.sort_required = false;
+  expect_message([&] {
+    (void)EntireDataframeFootprintsDiscovery::apply(make_table(), case_activity);
+  }, "ValueError: Grouper for 'case:concept:name' not 1-dimensional");
+
+  auto start_activity = DiscoveryParameters{};
+  start_activity.start_timestamp_key = "concept:name";
+  expect_message([&] {
+    (void)PolarsLazyframesFootprintsDiscovery::apply(LazyEventTable::from_table(make_table()), start_activity);
+  }, "the name 'concept:name" + duplicate_tail +
+     "SELECT [col(\"case:concept:name\"), col(\"concept:name\")]\n"
+     "  SORT BY [col(\"case:concept:name\"), col(\"concept:name\"), col(\"time:timestamp\"), col(\"@@index\")]\n"
+     "    ROW INDEX name: @@index, offset: 0\n"
+     "      SELECT [col(\"case:concept:name\"), col(\"concept:name\"), col(\"time:timestamp\")]\n"
+     "        " + frame + context);
+  assert(EntireDataframeFootprintsDiscovery::apply(make_table(), start_activity).dfg.at({"A", "B"}) == 1);
+
+  auto timestamp_activity = DiscoveryParameters{};
+  timestamp_activity.timestamp_key = "concept:name";
+  timestamp_activity.start_timestamp_key = "time:timestamp";
+  expect_message([&] {
+    (void)PolarsLazyframesFootprintsDiscovery::apply(LazyEventTable::from_table(make_table()), timestamp_activity);
+  }, "the name 'concept:name" + duplicate_tail +
+     "SELECT [col(\"case:concept:name\"), col(\"concept:name\")]\n"
+     "  SORT BY [col(\"case:concept:name\"), col(\"time:timestamp\"), col(\"concept:name\"), col(\"@@index\")]\n"
+     "    ROW INDEX name: @@index, offset: 0\n"
+     "      SELECT [col(\"case:concept:name\"), col(\"concept:name\"), col(\"time:timestamp\")]\n"
+     "        " + frame + context);
+  expect_message([&] {
+    (void)EntireDataframeFootprintsDiscovery::apply(make_table(), timestamp_activity);
+  }, "ValueError: The column label 'concept:name' is not unique.");
 }
 
 void entire_event_log_discovery_contract() {

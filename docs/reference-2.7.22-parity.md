@@ -37483,3 +37483,149 @@ shape of an XES upload timed by `clock` raises `KeyError:
 'time:timestamp'`, refreshed with its manifest). A first replay also
 showed the header-only CSV on `lazyframe` refused by the column rule,
 which is why the rule holds for XES uploads only.
+
+## Review FX1: footprints discovery on frame shapes, concept drift on unnamed traces (2026-11-22)
+
+Round FX re-reviewed round FW on fresh banks and swept the footprints
+workbench's frame variants and concept drift on XES uploads with gaps
+(unnamed traces, unnamed events, events without a timestamp, logs without
+events). FW's CI run 44992448995 (bc9c66d) passed on Linux and macOS
+(build and ctest), the parity verifier, the Python script tests and the
+frontend; its Windows job had built and was still in ctest when this round
+was written. Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy
+2.4.6, polars 1.44.1, no pyarrow; the harness converts frames to Polars
+column by column), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3
+X86_V4 AVX512_ICL AVX512_SPR"`, `PYTHONHASHSEED=0` and exact comparison.
+
+Re-review of FW (fresh seeds): Declare discovery and conformance on the
+`dataframe` and `lazyframe` shapes of new XES banks (dI, dJ: 30 of 30
+discovery and 30 of 30 conformance equal on each shape; dG, dH: 30 of 30
+refused alike on each shape), the refusal messages on the gap banks (140
+of 140 conformance messages equal on both shapes, 140 of 140 discovery
+messages on `lazyframe`, 125 of 140 on `dataframe` with the 15 others the
+declared hash-seed operand order), the temporal profile with business
+hours on Polars and pandas frames (bE: 12 of 12 refused alike on Polars,
+12 of 12 exact on pandas; bF with a start attribute: 10 of 10 exact, the
+conformance in `unique()`'s declared order on 9). FW's leftover header-only
+CSV is no gap: with the default keys pm4py answers an empty model on both
+shapes, as Minera does (FW's probe had named an alias case column).
+
+Fixed:
+
+- **FX1-1. Footprints discovery on the frame variants**
+  (`/api/footprints-workbench` with `discovery_variant=entire_dataframe` or
+  `polars_lazyframes`, every `mining_input_shape`). pm4py's pandas variant
+  selects `[case, activity, timestamp]` (a `KeyError` names the missing
+  labels in that order, or the whole selection when none is there; the
+  start key plays no part), groups by case (rows without a case id are
+  left out of the cases, their activities still count), takes each case's
+  first and last activity that is present (a case of unnamed events adds
+  none), counts directly-follows pairs of physically adjacent rows of one
+  case with both activities present, and takes the smallest case size
+  (`ValueError: cannot convert float NaN to integer` when no case is
+  left). Its Polars variant names every missing column of case, activity,
+  timestamp and start key, sorted, in its own message (`The provided
+  Polars LazyFrame does not contain the following required columns: ...`),
+  keeps rows without a case id as one group whose unnamed events count as
+  first and last activities, and raises `TypeError: int() argument must
+  be ... not 'NoneType'` on a frame without rows. Its plan (traced
+  black-box through its LazyFrame calls) selects the set {case, activity,
+  timestamp[, start]}, adds a row index and sorts by `[case, start,
+  timestamp, @@index]` (without a start key by `[case, timestamp,
+  @@index]`, then aliases the timestamp as `start_timestamp`; without
+  `sort_required` neither index nor sort), selects the set {case,
+  activity} and shifts `[case, activity]` within each case into `<key>_2`
+  columns, plus the start key when it names the case, activity or
+  timestamp column and then the timestamp when it names the case or
+  activity column. Polars resolves that at the first collect: a shifted
+  column the second select dropped is a `ColumnNotFoundError` (a start key
+  equal to the timestamp key: `unable to find column "time:timestamp";
+  valid columns: [...]`), two shifts of one column a duplicate name (`the
+  name 'concept:name_2' passed to `LazyFrame.with_columns` is
+  duplicate`), each with the resolved plan, whose sets list their columns
+  in Python's hash-seed order (Minera follows seed 0 with
+  `detail::python_str_set_order`, now shared with the Alpha miner's set
+  order) and whose `DF` line lists the frame's first four columns in
+  read_xes's order (each key's first appearance over the events, an
+  event's own attributes before its trace's `case:` attributes; Minera's
+  table had placed `case:concept:name` at the first event even when that
+  trace had no name). The pandas variant with two of case, activity and
+  timestamp naming one column raises `ValueError: The column label 'X' is
+  not unique.` (without `sort_required`: `Grouper for 'X' not
+  1-dimensional`). On an XES upload a column without any value is no
+  column of the frame (FW1-2's rule, now `xes_frame_columns.hpp`), and a
+  log without events has no column at all. Minera refused rows without a
+  case id or an activity with its own message, answered on missing
+  columns (an empty or partial frame), on colliding keys and on a start
+  key equal to the timestamp key, and kept unnamed events as activities of
+  the pandas start and end sets. Before (FW's binary): on the gap banks
+  fA and fB (140 uploads, both shapes, 280 calls per variant) the pandas
+  variant agreed on 48 (190 refused by Minera alone, 42 refused with
+  another message) and the Polars variant on 238 (34 other messages, 8
+  answered where pm4py refused); on keys drawn at random from each
+  upload's columns (gK, 100 uploads with randomly named attributes, 4 key
+  sets each, 800 calls per variant) pandas agreed on 114 (270 refused by
+  Minera alone, 174 answered where pm4py refused, 242 other messages) and
+  Polars on 272 (528 answered where pm4py refused). After: fA and fB 560 of 560 equal
+  (with `sort_required=false` 560 of 560), the start key equal to the
+  timestamp key 332 of 332 (fA and the column-order probes), another case
+  column 560 of 560, and the random key sets 3,008 of 3,008 (gK, the
+  clean bank gN, fA, fB and the probes; every refusal with pm4py's exact
+  message, plans included). A Python model of the plan rule predicted the
+  error of all 640 key combinations over four columns, with and without
+  sorting, and of the 128 pandas ones.
+- **FX1-2. Concept drift on an XES upload with unnamed traces**
+  (`/api/concept-drift` after an upload). pm4py's BOSE detector groups the
+  frame by case with `np.unique(return_index=True)`, numpy's stable object
+  argsort, which compares a missing case id (NaN) with a named one and
+  raises Python's `TypeError`, its operands in the order of the first such
+  comparison (`['c1', NaN, 'c2']` gives `'str' and 'float'`, `['c2', 'c1',
+  NaN]` `'float' and 'str'`; round FW's `numpy_object_stable_argsort`).
+  An upload whose traces all lack a name has no case column (`KeyError:
+  'case:concept:name'`, as before). Minera answered with each unnamed trace
+  as its own case. Before: 10 of 10 drift probes with a mix of named and
+  unnamed traces answered where pm4py raised. After: 10 of 10 raise alike,
+  and on the gap banks (fA, fB, gC, gA, gT and the probes, 235 uploads)
+  219 agree (169 refused alike, 50 equal change points); the 16 others are
+  the declared hash order of the activity set (round CV1: a missing
+  activity is a float in `sorted(set(...))`, which names the two types in
+  the order the set yields them).
+
+Declared or unchanged:
+
+- The footprints Polars plan lists its sets in the order of
+  `PYTHONHASHSEED`; Minera follows seed 0. The pandas variant is
+  unaffected.
+- The concept drift `TypeError` on a missing activity names the two types
+  in the activity set's hash order (CV1's declaration, more frequent on
+  XES uploads with unnamed events).
+- Found and left for FY: the `/api/mine` families on the frame shapes of
+  XES uploads with gaps differ from pm4py's algorithm applies in many
+  messages and in some answers (the transition system refuses rows
+  without a case id or an activity where pm4py answers, Inductive and
+  POWL refuse rows without a timestamp where pm4py answers, the heuristics
+  answer an unnamed event where pm4py raises `TypeError: 'float' object is
+  not subscriptable`, Inductive and POWL name a missing case id or
+  activity where pm4py raises np.unique's `TypeError`, the log skeleton
+  names a missing activity where pm4py raises `KeyError: nan`, and on a
+  log without events or traces without names the frame has no such
+  column). Round BM declared these uploads against the `discover_*`
+  wrappers; the routes mirror the algorithm applies (round FU), so they
+  need the same treatment as FX1-1. Harness: `famgap.py` with the banks
+  gC (unnamed traces), gA (unnamed events) and gT (missing timestamps).
+- Unchanged: the declared items of FW1 and before.
+
+In the suite: `minera_footprints_discovery_parity_contracts_tests` (gaps,
+missing columns, empty frames, the plan errors and colliding keys on both
+variants), the new `minera_server_footprints_frames_tests` (the XES column
+rule and unnamed traces through the route on both shapes; 14 of its 16
+checks fail on FW's binary) and `minera_server_concept_drift_upload_tests`
+(FX1-2 checks) carry the reference values. The full ctest passed 661 of
+661 (26 minutes, -j2) on the first run. The fixture replay gave
+one change, as intended (`native-discovery-engaged-start-timestamp`: the
+Polars variant with the start key equal to the timestamp key on the log
+shape now raises pm4py's `ColumnNotFoundError` with the unsorted plan,
+checked against pm4py on the same upload; refreshed, its two result
+captures removed), and every other response unchanged. The Python script
+tests passed 406 of 406 and the footprints capture vitest files 336 of
+336.

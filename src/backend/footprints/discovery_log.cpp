@@ -14,7 +14,10 @@
 #include <utility>
 #include <vector>
 
+#include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
+#include "../polars_column_hint.hpp"
+#include "../python_str_set.hpp"
 
 namespace minera::footprints_detail {
 namespace {
@@ -113,15 +116,6 @@ const EventAttribute* cell_value(const EventTable::Row& row,
   return &*row[column];
 }
 
-std::string required_cell_value(const EventTable::Row& row, std::size_t column,
-                                std::string_view description) {
-  const auto* cell = cell_value(row, column);
-  if (!cell)
-    throw std::invalid_argument(std::string(description) +
-                                " selector is missing from a row");
-  return cell->value;
-}
-
 std::optional<std::size_t> exact_column(const EventTable& table,
                                         std::string_view name) {
   const auto found = std::find(table.columns.begin(), table.columns.end(), name);
@@ -158,6 +152,137 @@ std::optional<double> parse_sort_timestamp(const TableRow& row) {
   return parse_timestamp(row.timestamp);
 }
 
+// pm4py's frame variants name the columns a frame lacks (round FX, observed
+// black-box): the pandas variant selects [case, activity, timestamp], so a
+// KeyError names the missing labels in that order (or the whole selection
+// when none is there); the Polars variant names every missing column of
+// those and the start timestamp, sorted, in pm4py's own Exception.
+void require_footprint_columns(const EventTable& table, const std::string& case_key,
+                               const std::string& activity_key, const std::string& timestamp_key,
+                               const std::optional<std::string>& start_key, bool lazy) {
+  const std::set<std::string> columns(table.columns.begin(), table.columns.end());
+  if (!lazy) {
+    require_frame_columns(columns, {case_key, activity_key, timestamp_key});
+    return;
+  }
+  std::set<std::string> missing;
+  for (const auto* key : {&case_key, &activity_key, &timestamp_key})
+    if (!columns.contains(*key)) missing.insert(*key);
+  if (start_key && !columns.contains(*start_key)) missing.insert(*start_key);
+  if (missing.empty()) return;
+  std::string message = "The provided Polars LazyFrame does not contain the following required columns: ";
+  bool first = true;
+  for (const auto& key : missing) {
+    if (!first) message += ", ";
+    message += key;
+    first = false;
+  }
+  throw std::invalid_argument(message);
+}
+
+std::string polars_quoted(const std::string& name) {
+  std::string out = "\"";
+  for (const char c : name) {
+    if (c == '"' || c == '\\') out += '\\';
+    out += c;
+  }
+  return out + "\"";
+}
+
+// The Polars variant's plan (round FX, observed black-box by tracing its
+// LazyFrame calls): select the set {case, activity, timestamp[, start]},
+// add a row index, sort by [case, start, timestamp, @@index] (without a
+// start key by [case, timestamp, @@index], then alias the timestamp as
+// start_timestamp; without sort_required neither the index nor the sort),
+// select the set {case, activity}, and shift [case,
+// activity] within each case into "<key>_2" columns, plus the start key
+// when it names the case, activity or timestamp column and then the
+// timestamp when it names the case or activity column. Polars resolves that
+// with_columns at the first collect (the DFG's group_by): a shifted column
+// the second select dropped is a ColumnNotFoundError, two shifts of one
+// column a duplicate name. The sets list their columns in the order of
+// Python's hash seed; Minera follows seed 0.
+void polars_footprints_plan_check(const EventTable& table, const std::string& case_key,
+                                  const std::string& activity_key, const std::string& timestamp_key,
+                                  const std::optional<std::string>& start_key, bool sort_required) {
+  std::vector<std::string> shifted{case_key, activity_key};
+  if (start_key && (*start_key == case_key || *start_key == activity_key || *start_key == timestamp_key))
+    shifted.push_back(*start_key);
+  if (timestamp_key == case_key || timestamp_key == activity_key) shifted.push_back(timestamp_key);
+  std::optional<std::string> missing, duplicate;
+  for (std::size_t i = 0; i < shifted.size(); ++i) {
+    if (shifted[i] != case_key && shifted[i] != activity_key) {
+      if (!missing) missing = shifted[i];
+    } else if (!duplicate && std::find(shifted.begin(), shifted.begin() + static_cast<std::ptrdiff_t>(i),
+                                       shifted[i]) != shifted.begin() + static_cast<std::ptrdiff_t>(i)) {
+      duplicate = shifted[i];
+    }
+  }
+  if (!missing && !duplicate) return;
+  const auto kept = detail::python_str_set_order({case_key, activity_key});
+  std::vector<std::string> selected{case_key, activity_key, timestamp_key};
+  if (start_key) selected.push_back(*start_key);
+  selected = detail::python_str_set_order(selected);
+  std::vector<std::string> sort_keys{case_key};
+  if (start_key) sort_keys.push_back(*start_key);
+  sort_keys.push_back(timestamp_key);
+  sort_keys.push_back("@@index");
+  const auto cols = [](const std::vector<std::string>& names) {
+    std::string out;
+    for (const auto& name : names) out += (out.empty() ? "" : ", ") + std::string("col(") + polars_quoted(name) + ")";
+    return out;
+  };
+  std::string frame = "DF [";
+  for (std::size_t i = 0; i < std::min<std::size_t>(4, table.columns.size()); ++i) {
+    if (i) frame += ", ";
+    frame += polars_quoted(table.columns[i]);
+  }
+  if (table.columns.size() > 4) frame += ", ...";
+  frame += "]; PROJECT */" + std::to_string(table.columns.size()) + " COLUMNS";
+  std::string plan = "SELECT [" + cols(kept) + "]\n";
+  std::string pad = "  ";
+  if (!start_key) {
+    plan += "   WITH_COLUMNS:\n   [col(" + polars_quoted(timestamp_key) + ").alias(\"start_timestamp\")] \n";
+    pad = "    ";
+  }
+  if (sort_required) {
+    plan += pad + "SORT BY [" + cols(sort_keys) + "]\n" + pad + "  ROW INDEX name: @@index, offset: 0\n";
+    pad += "    ";
+  }
+  plan += pad + "SELECT [" + cols(selected) + "]\n" + pad + "  " + frame;
+  std::string message;
+  if (missing) {
+    message = "unable to find column " + polars_quoted(*missing) + "; valid columns: [";
+    for (std::size_t i = 0; i < kept.size(); ++i) message += (i ? ", " : "") + polars_quoted(kept[i]);
+    message += "]";
+    if (const auto hint = detail::polars_column_hint(*missing, kept))
+      message += "\n\nDid you mean " + polars_quoted(*hint) + "?";
+  } else {
+    message = "the name '" + *duplicate +
+              "_2' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that multiple expressions are "
+              "returning the same default column name. If this is the case, try renaming the columns with "
+              "`.alias(\"new_name\")` to avoid duplicate column names.";
+  }
+  message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n" + plan +
+             "\n\nThis error occurred with the following context stack:\n"
+             "\t[1] 'with_columns'\n\t[2] 'filter'\n\t[3] 'filter'\n\t[4] 'group_by'\n";
+  throw std::invalid_argument(message);
+}
+
+// The pandas variant with two of the case, activity and timestamp keys
+// naming one column: its frame selection holds that label twice, so sorting
+// by it fails, or without sorting the case grouping (round FX, observed
+// black-box; the start key plays no part).
+void pandas_footprints_label_check(const std::string& case_key, const std::string& activity_key,
+                                   const std::string& timestamp_key, bool sort_required) {
+  std::optional<std::string> duplicate;
+  if (case_key == activity_key || case_key == timestamp_key) duplicate = case_key;
+  else if (activity_key == timestamp_key) duplicate = activity_key;
+  if (!duplicate) return;
+  throw std::invalid_argument(sort_required ? "ValueError: The column label '" + *duplicate + "' is not unique."
+                                            : "ValueError: Grouper for '" + *duplicate + "' not 1-dimensional");
+}
+
 std::vector<TableRow> read_table_rows(const EventTable& table,
                                       const DiscoveryParameters& parameters,
                                       bool lazy_ordering) {
@@ -166,20 +291,25 @@ std::vector<TableRow> read_table_rows(const EventTable& table,
   const auto activity_key = require_selector(parameters.activity_key, "activity");
   const auto timestamp_key = require_selector(parameters.timestamp_key,
                                               "timestamp");
+  std::optional<std::string> start_key;
+  if (lazy_ordering && parameters.start_timestamp_key)
+    start_key = require_selector(*parameters.start_timestamp_key, "start timestamp");
+  require_footprint_columns(table, case_key, activity_key, timestamp_key, start_key, lazy_ordering);
+  if (lazy_ordering)
+    polars_footprints_plan_check(table, case_key, activity_key, timestamp_key, start_key, parameters.sort_required);
+  else pandas_footprints_label_check(case_key, activity_key, timestamp_key, parameters.sort_required);
   const auto case_column = resolve_column(table, case_key, "case");
   const auto activity_column = resolve_column(table, activity_key, "activity");
   const auto timestamp_column = resolve_column(table, timestamp_key, "timestamp");
   std::optional<std::size_t> start_timestamp_column;
-  if (lazy_ordering && parameters.start_timestamp_key) {
-    const auto start_key = require_selector(*parameters.start_timestamp_key,
-                                            "start timestamp");
-    start_timestamp_column =
-        resolve_column(table, start_key, "start timestamp");
-  }
+  if (start_key) start_timestamp_column = resolve_column(table, *start_key, "start timestamp");
 
-  if (table.rows.empty())
+  // Without rows the Polars variant takes the int of a missing minimum trace
+  // length (round FX, observed black-box); the pandas variant's NaN minimum
+  // is refused in footprint_from_table_rows.
+  if (lazy_ordering && table.rows.empty())
     throw std::invalid_argument(
-        "event table footprint discovery requires at least one row");
+        "TypeError: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'");
 
   std::vector<TableRow> rows;
   rows.reserve(table.rows.size());
@@ -187,14 +317,13 @@ std::vector<TableRow> read_table_rows(const EventTable& table,
     const auto& row = table.rows[row_index];
     TableRow item;
     item.input_order = row_index;
-    if (lazy_ordering && !cell_value(row, case_column))
-      item.case_null = true;
+    // Both variants keep rows without a case id or an activity (round FX,
+    // observed black-box: the pandas variant reads them as NaN).
+    if (const auto* case_cell = cell_value(row, case_column))
+      item.case_id = case_cell->value;
     else
-      item.case_id = required_cell_value(row, case_column, "case");
+      item.case_null = true;
     const auto* activity_cell = cell_value(row, activity_column);
-    if (!activity_cell && !lazy_ordering)
-      throw std::invalid_argument(
-          "activity selector contains a null or missing row value");
     item.activity_null = !activity_cell;
     if (activity_cell) item.activity = activity_cell->value;
     const auto timestamp_cell = cell_value(row, timestamp_column);
@@ -312,14 +441,23 @@ using CaseKey = std::pair<bool, std::string>;
 
 CaseKey case_key(const TableRow& row) { return {row.case_null, row.case_id}; }
 
-Footprint footprint_from_table_rows(const std::vector<TableRow>& rows) {
+// The pandas variant (`pandas`) groups by the case column, which leaves out
+// the rows without a case id (their activities still count), takes each
+// case's first and last activity that is not NaN (NaN when the case has
+// none) and the minimum group size, whose NaN without any case it cannot
+// convert to an int; the Polars variant keeps a null case as a group and a
+// null activity as its first or last (round FX, observed black-box).
+Footprint footprint_from_table_rows(const std::vector<TableRow>& rows, bool pandas = false) {
   Footprint result;
   result.min_trace_length = 0;
+  const auto grouped = [pandas](const TableRow& row) { return !pandas || !row.case_null; };
+  if (pandas && std::none_of(rows.begin(), rows.end(), grouped))
+    throw std::invalid_argument("ValueError: cannot convert float NaN to integer");
   if (rows.empty()) return result;
 
   std::map<CaseKey, std::size_t> case_lengths;
   for (const auto& row : rows) {
-    ++case_lengths[case_key(row)];
+    if (grouped(row)) ++case_lengths[case_key(row)];
     if (row.activity_null)
       result.activities_include_null = true;
     else
@@ -334,19 +472,37 @@ Footprint footprint_from_table_rows(const std::vector<TableRow>& rows) {
     }
   }
 
+  if (pandas) {
+    // Each case's first and last row with an activity.
+    std::map<CaseKey, std::pair<std::optional<std::size_t>, std::optional<std::size_t>>> ends;
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+      if (!grouped(rows[i])) continue;
+      auto& [first, last] = ends[case_key(rows[i])];
+      if (rows[i].activity_null) continue;
+      if (!first) first = i;
+      last = i;
+    }
+    for (const auto& [key, positions] : ends) {
+      (void)key;
+      if (positions.first) result.start_activities.insert(rows[*positions.first].activity);
+      else result.start_activities_include_null = true;
+      if (positions.second) result.end_activities.insert(rows[*positions.second].activity);
+      else result.end_activities_include_null = true;
+    }
+  }
   std::map<CaseKey, std::size_t> last_position;
   for (std::size_t i = 0; i < rows.size(); ++i)
     last_position[case_key(rows[i])] = i;
   std::set<CaseKey> first_seen;
   for (std::size_t i = 0; i < rows.size(); ++i) {
     const auto& row = rows[i];
-    if (first_seen.insert(case_key(row)).second) {
+    if (!pandas && first_seen.insert(case_key(row)).second) {
       if (row.activity_null)
         result.start_activities_include_null = true;
       else
         result.start_activities.insert(row.activity);
     }
-    if (last_position.at(case_key(row)) == i) {
+    if (!pandas && last_position.at(case_key(row)) == i) {
       if (row.activity_null)
         result.end_activities_include_null = true;
       else
@@ -413,7 +569,7 @@ std::vector<Footprint> TraceByTraceFootprintsDiscovery::apply(
 
 Footprint EntireDataframeFootprintsDiscovery::apply(
     const EventTable& table, const DiscoveryParameters& parameters) {
-  return footprint_from_table_rows(read_table_rows(table, parameters, false));
+  return footprint_from_table_rows(read_table_rows(table, parameters, false), true);
 }
 
 Footprint PolarsLazyframesFootprintsDiscovery::apply(

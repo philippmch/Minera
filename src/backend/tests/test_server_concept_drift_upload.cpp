@@ -20,6 +20,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <initializer_list>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -264,6 +265,37 @@ int main(int argc, char** argv) {
   check("XES, int attribute",
         drift("drift_sub_log_size=2&drift_window_size=1&drift_num_permutations=10&drift_activity_attribute=num&drift_seed=0"),
         "ERR \"TypeError: sequence item 0: expected str instance, numpy.int64 found\"}");
+  // Review FX1-2: an unnamed trace is a NaN case id in read_xes's frame, which
+  // np.unique's stable object sort compares with a named one (TypeError,
+  // operands in that sort's order); with every trace unnamed the frame has
+  // no case column (KeyError). pm4py 2.7.22 black-box (review-harness
+  // round-fx, dr/).
+  const auto trace = [](const char* name, int minute) {
+    std::string out = "<trace>";
+    if (name) out += std::string("<string key=\"concept:name\" value=\"") + name + "\"/>";
+    for (const char* activity : {"a", "b"})
+      out += std::string("<event><string key=\"concept:name\" value=\"") + activity +
+             "\"/><date key=\"time:timestamp\" value=\"2021-03-01T08:" + (minute < 10 ? "0" : "") +
+             std::to_string(minute++) + ":00.000+00:00\"/></event>";
+    return out + "</trace>";
+  };
+  const auto unnamed = [&](std::initializer_list<const char*> names) {
+    std::string log = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<log xes.version=\"1849-2016\" xmlns=\"http://www.xes-standard.org/\">\n";
+    int minute = 0;
+    for (const auto* name : names) { log += trace(name, minute); minute += 3; }
+    log += "\n</log>\n";
+    httplib::MultipartFormDataItems items = {{"log", log, "fx2.xes", "application/xml"}, {"include_traces", "false", "", ""}};
+    const auto result = client.Post("/api/mine", items);
+    if (!result || result->status != 200) return std::string("mine failed");
+    return drift("drift_seed=0");
+  };
+  check("XES, named then unnamed trace", unnamed({"c1", nullptr, "c2"}),
+        "ERR \"TypeError: '<' not supported between instances of 'str' and 'float'\"}");
+  check("XES, two named then an unnamed trace", unnamed({"c2", "c1", nullptr}),
+        "ERR \"TypeError: '<' not supported between instances of 'float' and 'str'\"}");
+  check("XES, unnamed then named trace", unnamed({nullptr, "c1"}),
+        "ERR \"TypeError: '<' not supported between instances of 'float' and 'str'\"}");
+  check("XES, every trace unnamed", unnamed({nullptr, nullptr}), "ERR \"KeyError: 'case:concept:name'\"}");
   ::kill(server, SIGTERM);
   int status = 0;
   ::waitpid(server, &status, 0);

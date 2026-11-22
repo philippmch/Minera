@@ -22,6 +22,7 @@
 #include "concept_drift_table_limits.hpp"
 #include "exact_count_ratio.hpp"
 #include "root_cause_trace_key.hpp"
+#include "numpy_object_sort.hpp"
 #include "python_scalar.hpp"
 
 namespace minera {
@@ -1269,6 +1270,30 @@ BoseTableRun run_bose_table(const EventTable& table, const ConceptDriftTableOpti
   struct Group { std::size_t first; std::size_t count; };
   std::map<EventAttribute, Group, ScalarLess> groups;
   std::optional<Group> null_group;
+  // np.unique(return_index=True) sorts an object case column stably: a NaN
+  // case id next to a named one raises Python's TypeError, its operands in
+  // the order numpy's stable object argsort compares them (round FX,
+  // observed black-box: XES uploads with unnamed traces).
+  {
+    const bool numeric_nan = !table.dtypes.empty() && table.dtypes[standard_case].starts_with("float");
+    bool missing = false, named = false;
+    for (const auto& row : table.rows) (missing_table_cell(row[standard_case]) ? missing : named) = true;
+    if (missing && named && !numeric_nan) {
+      std::vector<python::Scalar> cases;
+      cases.reserve(table.rows.size());
+      for (const auto& row : table.rows)
+        cases.push_back(missing_table_cell(row[standard_case])
+                            ? python::real(std::numeric_limits<double>::quiet_NaN())
+                            : python::from_attribute(*row[standard_case]));
+      try {
+        (void)detail::numpy_object_stable_argsort(cases.size(), [&](std::size_t a, std::size_t b) {
+          return python::compare(cases[a], cases[b]);
+        });
+      } catch (const python::TypeError& error) {
+        throw std::invalid_argument(std::string("TypeError: ") + error.what());
+      }
+    }
+  }
   for (std::size_t i = 0; i < table.rows.size(); ++i) {
     if (missing_table_cell(table.rows[i][standard_case])) {
       // NumPy numeric unique groups NaNs last. Object/extension nulls cannot

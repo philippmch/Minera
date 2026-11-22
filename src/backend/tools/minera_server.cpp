@@ -101,6 +101,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "csv_frame_table.hpp"
+#include "../xes_frame_columns.hpp"
 #include "minera/pandas_read_csv.hpp"
 #include "minera/upload_case_relations.hpp"
 #include "minera/data_petri_net.hpp"
@@ -7600,6 +7601,11 @@ void handle_concept_drift(const httplib::Request& request,
       upload_frame = session->active_source->file().format == "csv"
                          ? formatted_csv_frame_table(*session->active_source)
                          : formatted_xes_frame_table(*session->active_source);
+      // read_xes's frame has no column for an attribute nobody carries
+      // (round FX: the case column of an upload whose traces are all
+      // unnamed is a KeyError).
+      if (upload_frame && session->active_source->file().format != "csv")
+        minera::detail::drop_xes_frame_columns(*upload_frame, session->active_source->checked_table());
       if (upload_frame) frame = &*upload_frame;
     }
     const auto result = frame ? minera::detect_concept_drift_table(*frame, options)

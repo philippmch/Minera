@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FW (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–FX (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8759,6 +8759,74 @@ Declare on the `dataframe` shape of an XES upload timed by `clock` raises
 column rule refusing a header-only CSV on `lazyframe`, so the rule holds
 for XES uploads only.
 Harness and probes: `review-harness/round-fw/`.
+
+Round FX re-reviewed FW on fresh banks and swept the footprints workbench's
+frame variants and concept drift on XES uploads with gaps (Review FX1).
+FW's CI run 44992448995 passed on Linux and macOS (Windows still in ctest
+at the time), and FW's fixes held (Declare on both frame shapes 30 of 30
+and 30 of 30 on new banks, refusals alike, the business-hours temporal
+profile exact or refused alike). FW's header-only CSV lead is no gap
+(pm4py answers an empty model with the default keys). Fixed: FX1-1, the
+footprints frame variants follow pm4py's pandas and Polars variants on
+gaps (rows without a case id leave the pandas cases but count their
+activities, Polars keeps them as one group, the pandas start and end skip
+unnamed events), missing columns (pandas `KeyError` in selection order,
+Polars names them sorted, the XES column rule of FW1-2 now
+`xes_frame_columns.hpp`), frames without rows (pandas NaN `ValueError`,
+Polars `int()` `TypeError`) and the Polars plan errors (a shifted column
+the plan dropped, e.g. a start key equal to the timestamp key, or two
+shifts of one column from colliding keys, with the resolved plan: its sets
+in seed-0 hash order via the new shared `python_str_set.hpp`, its `DF`
+line in read_xes's column order, no sort nodes without `sort_required`),
+and the pandas variant's duplicate-label `ValueError`s; FX1-2, concept
+drift on an XES upload mixing named and unnamed traces raises np.unique's
+`TypeError` with numpy's stable object argsort deciding the operands.
+Declared: the plan's hash-seed set order (seed 0 modelled). New area found
+and left for FY: the `/api/mine` families on frame shapes of XES uploads
+with gaps (below).
+
+FX's suite: the full ctest 661 of 661 (26 minutes, -j2, first run), Python script tests 406 of
+406, the footprints capture vitest files 336 of 336, and the 16 manifests
+with one intended change (`native-discovery-engaged-start-timestamp`, the
+Polars variant with the start key equal to the timestamp key on the log
+shape raises pm4py's `ColumnNotFoundError` with the unsorted plan),
+refreshed, its two stale result captures removed.
+Harness and probes: `review-harness/round-fx/`.
+
+Next round (FY) should start by re-reviewing round FX:
+
+- FX's CI run (and FW's Windows job);
+- FX1-1 on fresh banks: `fpkeys.py` with new `SEED`s on `gen/genrk.py`
+  banks (random attribute names, collisions, start keys, both sort modes),
+  `fpcmp.py` with `OPTS` on `gen/genfp.py` banks with higher gap rates,
+  CSV uploads (the frame order and header-only files), and a check that
+  the plan's `DF` line holds for CSV frames and for the log shape;
+- FX1-2: `driftsum.py` on new banks (unnamed traces at the start, middle
+  and end, both shapes of the upload);
+- the new area: the `/api/mine` families on the `dataframe` and
+  `lazyframe` shapes of XES uploads with gaps against pm4py's algorithm
+  applies (`famgap.py` with `SHAPE`; banks gC, gA, gT from `gen/genfp.py`
+  with one gap kind each). Seen on `dataframe`: the transition system
+  refuses rows without a case id or an activity where pm4py answers;
+  Inductive and POWL refuse rows without a timestamp where pm4py answers,
+  and name a missing case id or activity where pm4py raises np.unique's
+  `TypeError` (`project_univariate`); the heuristics answer an unnamed
+  event where pm4py raises `TypeError: 'float' object is not
+  subscriptable`; the log skeleton names a missing activity where pm4py
+  raises `KeyError: nan`; on a log without events or with no trace named
+  the frame lacks those columns (`KeyError`s of various shapes) while
+  Minera answers or names its own error. Round BM's declaration compared
+  the `discover_*` wrappers; the families mirror the algorithm applies
+  (round FU), so compare there, value by value where both answer;
+- the remaining `std::stable_sort` on Polars paths (`polars_case_filter.cpp`
+  kCount, `polars_attributes_filter.cpp` top activities,
+  `polars_variants_filter.cpp`, `polars_sequence_filters.cpp`,
+  `polars_sort.hpp`, `polars_ltl_filter.cpp`, `temporal_lazy_reference.cpp`),
+  the two items carried from FU;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FX (kept for its older items):
 
 Next round (FX) should start by re-reviewing round FW:
 

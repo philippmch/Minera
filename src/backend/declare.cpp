@@ -6,6 +6,7 @@
 #include "numpy_object_sort.hpp"
 #include "polars_sort.hpp"
 #include "python_scalar.hpp"
+#include "xes_frame_columns.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -516,36 +517,8 @@ LazyEventTable promoted_selector_table(const LazyEventTable& source,
       source.dtypes(), source.index(), source.categorical_dtypes());
 }
 
-// The frame pm4py builds from an XES upload has a column only for the
-// attributes some event (or trace) carries; Minera's table keeps the first
-// class columns even when every cell is missing. The frame checks see the
-// table without such columns (round FW, observed black-box: an upload whose
-// traces are all unnamed fails the column count, or raises KeyError on the
-// case column when other text columns make up the count).
 const EventTable& present_columns(const EventTable& table, std::optional<EventTable>& storage) {
-  std::vector<bool> keep(table.columns.size(), false);
-  for (const auto& row : table.rows)
-    for (std::size_t column = 0; column < row.size() && column < keep.size(); ++column)
-      if (row[column] && !row[column]->is_null) keep[column] = true;
-  if (std::all_of(keep.begin(), keep.end(), [](bool value) { return value; })) return table;
-  EventTable& present = storage.emplace();
-  present.attributes = table.attributes;
-  present.metadata = table.metadata;
-  for (std::size_t column = 0; column < table.columns.size(); ++column) {
-    if (!keep[column]) continue;
-    present.columns.push_back(table.columns[column]);
-    if (column < table.dtypes.size()) present.dtypes.push_back(table.dtypes[column]);
-    if (column < table.categorical_dtypes.size()) present.categorical_dtypes.push_back(table.categorical_dtypes[column]);
-  }
-  if (present.dtypes.size() != present.columns.size()) present.dtypes.clear();
-  if (present.categorical_dtypes.size() != present.columns.size()) present.categorical_dtypes.clear();
-  present.rows.reserve(table.rows.size());
-  for (const auto& row : table.rows) {
-    auto& kept = present.rows.emplace_back();
-    for (std::size_t column = 0; column < row.size() && column < keep.size(); ++column)
-      if (keep[column]) kept.push_back(row[column]);
-  }
-  return present;
+  return detail::xes_frame_present_columns(table, storage);
 }
 
 // pm4py's Declare on a Polars frame reads each case after

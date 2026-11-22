@@ -26184,7 +26184,7 @@
         "bytes": 2335,
         "sha256": "5c2278b02e22fa817a63ccce1cbfa2e2d306a11ff627815ffbfa8e734c90b862"
       },
-      "expected_status": 200,
+      "expected_status": 400,
       "uploads": {
         "model_file": {
           "filename": "owned-normative.footprint.json",
@@ -26202,15 +26202,15 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "59299",
+        "Content-Length": "59154",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "native-discovery-engaged-start-timestamp.response.json",
         "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-engaged-start-timestamp.response.json",
-        "bytes": 59299,
-        "sha256": "744494fdf7f75725269d1223b80c500156290e25954084cf0bbecba88ec1b759",
-        "status": 200
+        "bytes": 59154,
+        "sha256": "79d40a21c86dc9859a9cc405b07c1aacf5c533e6259f3c99d92f1c82a65b70a7",
+        "status": 400
       },
       "family": "original_footprints",
       "operation": "log_extensive",
@@ -26225,26 +26225,12 @@
           "sha256": "6b7ec0ed4d629fe041b8a2718fe4e49b961226c3a25f9cbfe023b6d21c28c32f",
           "format": "json"
         },
-        "observed_json": {
-          "filename": "native-discovery-engaged-start-timestamp.observed_json.json",
-          "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-engaged-start-timestamp.observed_json.json",
-          "bytes": 439,
-          "sha256": "8de7873978b9ef4ffb7e26055355428610b9135623936a6313b430bfc5c7a466",
-          "format": "json"
-        },
         "source_xes": {
           "filename": "native-discovery-engaged-start-timestamp.source_xes.xes",
           "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-engaged-start-timestamp.source_xes.xes",
           "bytes": 920,
           "sha256": "8417583dea268f1dfe21310c159d6ff62e48331493ebb8fa399c629ce4a31797",
           "format": "xes"
-        },
-        "result_json": {
-          "filename": "native-discovery-engaged-start-timestamp.result_json.json",
-          "path": "src/frontend/tests/fixtures/original-footprints-workbench/captures/native-discovery-engaged-start-timestamp.result_json.json",
-          "bytes": 159,
-          "sha256": "4f0ac826d622fa903df88f62e9b0d621040be902a46570e02db6e13df1c631bc",
-          "format": "json"
         }
       },
       "model": {
@@ -26262,8 +26248,12 @@
         "sha256": "f39a6cb28f0fd65aff120f3e4a7f76c3d1a6c4eb68dc44437bb817039ca646a6"
       },
       "tree": null,
-      "executed": true,
-      "error": null,
+      "executed": false,
+      "error": {
+        "type": "preparation_error",
+        "message": "unable to find column \"time:timestamp\"; valid columns: [\"case:concept:name\", \"concept:name\"]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\nSELECT [col(\"case:concept:name\"), col(\"concept:name\")]\n  SELECT [col(\"case:concept:name\"), col(\"concept:name\"), col(\"time:timestamp\")]\n    DF [\"concept:name\", \"time:timestamp\", \"case:concept:name\", \"case:customer\"]; PROJECT */4 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'with_columns'\n\t[2] 'filter'\n\t[3] 'filter'\n\t[4] 'group_by'\n",
+        "exception_type": "invalid_argument"
+      },
       "native_calls": [
         {
           "name": "prepare_active_event_source(request, bytes, dataset, imports)",
@@ -26283,15 +26273,12 @@
           "name": "discover_footprints(lazy, discovery_options)",
           "stage": "preparation",
           "input_kind": "LazyEventTable",
-          "returned": true,
-          "error": null
-        },
-        {
-          "name": "check_footprints_log_extensive(observed, model)",
-          "stage": "primary",
-          "input_kind": "Footprint",
-          "returned": true,
-          "error": null
+          "returned": false,
+          "error": {
+            "type": "native_error",
+            "message": "unable to find column \"time:timestamp\"; valid columns: [\"case:concept:name\", \"concept:name\"]\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\nSELECT [col(\"case:concept:name\"), col(\"concept:name\")]\n  SELECT [col(\"case:concept:name\"), col(\"concept:name\"), col(\"time:timestamp\")]\n    DF [\"concept:name\", \"time:timestamp\", \"case:concept:name\", \"case:customer\"]; PROJECT */4 COLUMNS\n\nThis error occurred with the following context stack:\n\t[1] 'with_columns'\n\t[2] 'filter'\n\t[3] 'filter'\n\t[4] 'group_by'\n",
+            "exception_type": "invalid_argument"
+          }
         },
         {
           "name": "to_xes(source_log)",
