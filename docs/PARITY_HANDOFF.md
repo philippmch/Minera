@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FZ (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GA (2026-11-05 to 2026-11-22, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8861,6 +8861,69 @@ FZ's suite: the full ctest 663 of 663 (33 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged (no fixture refresh; frontend untouched).
 Harness and probes: `review-harness/round-fz/`.
+
+Round GA re-reviewed FZ on fresh banks and aligned Alpha+, the log
+skeleton's conformance and the heuristics' AND-measure node order on the
+frame shapes of XES uploads (Review GA1). FZ's CI run 45016289288 passed
+on Linux and macOS, the frontend, the Python tests and the verifier
+(Windows still in ctest at GA's push). FZ's fixes held:
+Alpha, the temporal profile and the log skeleton on six new gap banks
+(gaM, gaH, gaL, gaA, gaT, gaS; 280 uploads per shape) on both shapes; the
+heuristics' thresholds (dependency, AND, length-two loop, noise, minimum
+counts) on the same banks; footprints on CSV uploads (csA, csB, csG; 180
+uploads, both variants and shapes, plus the plan's `DF` line). Fixed:
+GA1-1, the heuristics' AND measure meets the nodes in the order the
+dependency pass creates them (rows by first lead of a cleaned DFG pair,
+accepted edges adding source then target), so the first node mixing the
+missing label with a named successor decides the `TypeError` operands;
+GA1-2, Alpha+ on frames converts to an event log (trace per case value in
+first-row order, null case one trace, row order, NaN or None labels;
+`IndexError` without rows, `KeyError` for missing case then activity),
+pandas' NaN one directly-follows key but never equal to itself (no
+length-one loop, never closes "a b a"; internal `alpha_python_nan.hpp`),
+Polars' None a transition without a label (`null_label`); GA1-3, the log
+skeleton's conformance lists the groupby's cases (pandas sorted ids
+without the null case, Polars first-row order with the null case and
+merged names), keeps Polars' None and raises the deviation sort's
+`TypeError` via `python_list_sort.hpp`. Declared: Alpha+'s place growth
+follows Python set order, and the missing label's hash there is an object
+address (one upload per shape differs; a Python emulation of Minera's
+construction on the frame's own objects reproduces pm4py on all 230).
+Sweeps must set `PYTHONHASHSEED=0`: without it Alpha+ differs on uploads
+whose set order matters (the ref picks a random seed).
+
+GA's suite: the full ctest 664 of 664 (26 minutes, -j2, first run; the new
+`minera_server_mine_xes_frames_ga_tests` fails 36 of its checks on FZ's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged (no fixture refresh; frontend untouched). Harness and probes: `review-harness/round-ga/`.
+
+Next round (GB) should start by re-reviewing round GA:
+
+- GA's CI run (and FZ's if it was still running);
+- GA1 on fresh banks: `famval.py` (FAMS alpha,heuristic,temporal_profile,
+  log_skeleton), `optval.py` with `OPTS=aplus,aplus_ru` and `lsconf.py`
+  (with and without `NOISE`) on new `gen/genfz.py` banks, more NaN/None
+  repeats inside traces (length-one and length-two loops through the
+  missing label), and the Python emulation `apm/emucheck.py` for Alpha+
+  where set order decides;
+- the families' options still on the older path for these frames: the
+  Heuristics++ variant and the performance decoration (pm4py raises on
+  most frames with gaps; ten classic performance results differ), Alpha's
+  and the temporal profile's explicit start keys (`a_szzz`, `a_sst`,
+  `a_sres`, `a_sts`, `tp_szzz`, `tp_sts`, `tp_sres` in `optval.py`: a text
+  start column answers in Minera where pm4py raises; Polars messages
+  differ);
+- the workbench routes that read the log skeleton, heuristics and Alpha
+  models of an XES session (same discovery, not swept);
+- the remaining `std::stable_sort` on Polars paths (`polars_case_filter.cpp`
+  kCount, `polars_attributes_filter.cpp` top activities,
+  `polars_variants_filter.cpp`, `polars_sequence_filters.cpp`,
+  `polars_sort.hpp`, `polars_ltl_filter.cpp`, `temporal_lazy_reference.cpp`),
+  the two items carried from FU;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GA (kept for its older items):
 
 Next round (GA) should start by re-reviewing round FZ:
 

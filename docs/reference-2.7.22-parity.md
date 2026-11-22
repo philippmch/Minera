@@ -37853,3 +37853,122 @@ of its checks fail on FY's binary) carries the reference values. The full
 ctest passed 663 of 663 (33 minutes, -j2) on the first run. The fixture
 replay gave no change (2,673 responses unchanged), and the Python script
 tests passed 406 of 406.
+
+## Review GA1: the heuristics' node order, Alpha+ and the log skeleton's conformance on frame shapes of XES uploads (2026-11-22)
+
+Round GA re-reviewed round FZ on fresh banks and aligned Alpha+
+(`alpha_variant=plus`), the log skeleton's conformance
+(`log_skeleton_conformance`) and the order in which the heuristics' AND
+measure meets the nodes on the `dataframe` and `lazyframe` shapes of XES
+uploads with gaps, against pm4py's algorithm applies on read_xes's frame
+and its Polars copy. FZ's CI run 45016289288 (48a5a7e) passed on Linux
+and macOS (build and ctest), the parity verifier, the Python script tests
+and the frontend (Windows still running at the time). Observed black-box
+on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow;
+frames converted to Polars column by column), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4
+AVX512_ICL AVX512_SPR"`, `PYTHONHASHSEED=0` and exact comparison of the
+canonical results (as in FZ1; Alpha+'s transitions and places with their
+arcs and markings; the conformance results per case with every deviation,
+the totals and the fitness) or of the error messages.
+
+Re-review of FZ (fresh seeds of `gen/genfz.py`): six new banks (gaM mixed
+gaps at 20/15/25 % with tied timestamps, up to 15 traces of 10 events over
+six activities; gaH at 60/50/50 %; gaL rare gaps with 30 traces of up to
+14 events over 12 activities; gaA unnamed events only; gaT missing
+timestamps only; gaS tiny logs over three activities with shared trace
+names; 280 uploads per shape). Alpha, the temporal profile and the log
+skeleton agree on every upload of both shapes, answers and refusals alike;
+the heuristics on all but one upload per shape, whose AND-measure
+`TypeError` named its operands the other way round (GA1-1). With options
+on the same banks: the heuristics' dependency, AND, length-two-loop and
+pre-cleaning noise thresholds, the minimum edge and activity counts and
+the defaults agree on every upload of both shapes; the temporal profile
+with the resource as its activity key likewise. Footprints on CSV
+uploads (new `gen/gencsv.py` banks csA, csB with shuffled rows, tied
+timestamps and header-only files, csG with empty cells; 180 uploads) agree
+in both variants on both shapes (334 values and 26 refusals alike per
+variant), and the plan's `DF` line holds for CSV frames and the log shape.
+
+Fixed:
+
+- **GA1-1. The heuristics' AND measure in node-creation order.** pm4py
+  visits the nodes in the order its dependency pass creates them: rows in
+  the order their activity first leads a pair of the cleaned
+  directly-follows graph, and within a row each accepted edge (not a
+  length-two loop edge) adding its source, then its target. The first
+  node whose accepted successors mix the missing label with a named one
+  decides the `TypeError`'s operands. Minera visited the nodes in the order
+  they first appear in the log, so an upload whose activity `d` is created
+  by `a -> d` before `e` (which appears first) named `'str' and 'float'`
+  where pm4py names `'float' and 'str'`.
+- **GA1-2. Alpha+ on XES frames.** pm4py converts the frame to an event
+  log: one trace per case value in first-row order (the rows without a
+  case id one trace), events in row order, a row without an activity the
+  label NaN (pandas) or None (Polars, a transition without a label). A
+  frame without rows or columns raises `IndexError: list index out of
+  range`; a missing case column, then a missing activity column,
+  `KeyError`. On pandas the label NaN is one key of the directly-follows
+  counts but never equal to itself: it is never a length-one loop (a
+  repeated NaN still follows itself, so it sits on no place) and never
+  closes an "a b a" pattern (`b nan b` alone leaves `b` and NaN
+  concurrent). Polars' None is equal to itself and loops like any label.
+  Minera refused 154 of these uploads per shape (an activity required on
+  every event), named the missing columns its own way on 48 and answered
+  two that pm4py refuses. New: `discover_alpha_plus_result_xes_frame`,
+  `AlphaPlusDiscoveryResult::null_label` (shown as `null`), and the
+  internal `alpha_python_nan.hpp`.
+- **GA1-3. The log skeleton's conformance on XES frames.** pm4py checks
+  the cases of the groupby its discovery reads: on pandas the sorted case
+  ids (the rows without one left out), on Polars the first-row order (the
+  rows without one a case of their own, traces sharing a name one case).
+  A Polars row without an activity is the label None; a pandas one raises
+  `KeyError: nan` (the discovery's error). When the activity-frequency
+  deviations of a case name None beside a named activity, pm4py's sort of
+  the deviations raises `TypeError: '<' not supported between instances
+  of 'NoneType' and 'str'` (or `'str' and 'NoneType'`), the operands as
+  CPython's list sort meets the pair: the relation families first, then
+  the case's activities in first-occurrence order, then the model's
+  activities the case lacks. Minera checked one result per session trace
+  and refused the Polars null activity. New:
+  `check_log_skeleton_conformance_xes_frame`; the deviation JSON shows the
+  null activity as `null`.
+
+Before (FZ's binary, the six fresh banks, 280 uploads per shape; answers
+or refusals alike, values compared where both answer): the heuristics 279
+of 280 on each shape; Alpha+ 76 on each shape; the log skeleton's
+conformance 261 on `dataframe` (13 value differences, 6 refusals where
+pm4py answers) and 115 on `lazyframe` (141 refusals, 19 results in another
+case order, 5 value differences). After: the heuristics 280 of 280; Alpha+
+279 of 280 on each shape (also with `remove_unconnected`); the
+conformance 280 of 280 on each shape, also with a noise threshold of 0.3;
+the hand-made uploads of the new ctest equal.
+
+Declared or unchanged:
+
+- Alpha+ on the remaining upload of each shape (gaM/f2128): pm4py grows
+  its places in the iteration order of Python sets, and the missing
+  label's hash there is its object's address (a NaN object on pandas,
+  None on Polars), which no other interpreter or build shares. Minera
+  orders the label as the string `nan` or `None` under the seed-0 string
+  hash. A Python emulation of Minera's Alpha+ construction run on the
+  frame's own objects reproduces pm4py on all 230 answering uploads, and
+  with the label as a string reproduces Minera's answer.
+- Not yet aligned on these frames, left for the next round: the
+  Heuristics++ variant and the performance decoration (pm4py raises on
+  most frames with gaps where Minera answers or names its own error, and
+  ten classic performance results differ in values), and Alpha's and the
+  temporal profile's explicit start keys on these frames (a missing
+  column, the timestamp itself, a text column: pm4py raises on 154
+  uploads per shape with the text column where Minera answers, and the
+  Polars messages differ on 13).
+- `connect_all` is a native-only option (no pm4py parameter).
+- Unchanged: the declared items of FZ1 and before.
+
+In the suite: the new `minera_server_mine_xes_frames_ga_tests` (the node
+order, Alpha+ with gaps, missing columns, a frame without rows and the
+NaN loop rules, the conformance's case lists, the Polars null activity
+and the sort `TypeError`, through `/api/mine` on both shapes; 36 of its
+checks fail on FZ's binary) carries the reference values.
+The full ctest passed 664 of 664 (26 minutes, -j2) on the first run. The
+fixture replay gave no change (2,673 responses unchanged), and the Python
+script tests passed 406 of 406.

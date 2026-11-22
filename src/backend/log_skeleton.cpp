@@ -16,6 +16,7 @@
 #include <utility>
 
 #include "polars_missing_column.hpp"
+#include "python_list_sort.hpp"
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
 
@@ -712,17 +713,34 @@ LogSkeletonModel discover_log_skeleton(const EventDataView& data,
 // count read the whole frame, so on pandas the rows without a case id still
 // count their activities, and a missing activity in a trace (NaN, which the
 // counts leave out) raises KeyError: nan.
-LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
-                                                 const LogSkeletonOptions& options, bool null_labels) {
-  if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable)
-    return discover_log_skeleton(data, options);
+namespace {
+
+// The frame of an XES upload as pm4py's log skeleton groups it (rounds FY,
+// GA): the present columns, the case groups (row positions) and, on pandas,
+// the activity counts of the rows without a case id.
+struct SkeletonFrame {
+  std::optional<EventTable> materialized, storage;
+  const EventTable* table = nullptr;
+  bool polars = false;
+  std::size_t case_at = 0, activity_at = 0;
+  std::vector<std::vector<std::size_t>> groups;
+  std::map<std::string, std::size_t> outside;
+
+  const EventAttribute* cell(std::size_t row, std::size_t at) const {
+    const auto& values = table->rows[row];
+    if (at >= values.size() || !values[at] || values[at]->is_null) return nullptr;
+    return &*values[at];
+  }
+};
+
+void read_skeleton_frame(const EventDataView& data, const LogSkeletonOptions& options, SkeletonFrame& frame) {
   validate_activity_key(options.activity_key);
   validate_case_selector_key(options.case_id_key);
-  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
-  std::optional<EventTable> materialized;
-  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
-  std::optional<EventTable> storage;
-  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  frame.polars = data.kind() == EventDataKind::kLazyEventTable;
+  const EventTable* source =
+      frame.polars ? &frame.materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  frame.table = &detail::xes_frame_present_columns(*source, frame.storage, frame.polars);
+  const auto& table = *frame.table;
   const auto column_of = [&](const std::string& name) -> std::optional<std::size_t> {
     const auto found = std::find(table.columns.begin(), table.columns.end(), name);
     if (found == table.columns.end()) return std::nullopt;
@@ -730,7 +748,7 @@ LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
   };
   const std::string case_key = options.case_id_key;
   const std::string activity_key = options.activity_key;
-  if (polars) {
+  if (frame.polars) {
     for (const auto& key : {case_key, activity_key})
       if (!column_of(key))
         throw std::invalid_argument(detail::polars_df_missing_column_error(key, table.columns, {"select", "group_by"}));
@@ -739,55 +757,79 @@ LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
     if (!column_of(activity_key))
       throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr("Column not found: " + activity_key));
   }
-  const auto case_at = *column_of(case_key);
-  const auto activity_at = *column_of(activity_key);
-  const auto cell = [](const EventTable::Row& row, std::size_t at) -> const EventAttribute* {
-    if (at >= row.size() || !row[at] || row[at]->is_null) return nullptr;
-    return &*row[at];
-  };
-  std::vector<std::vector<std::size_t>> groups;
-  std::map<std::string, std::size_t> outside;
-  if (polars) {
+  frame.case_at = *column_of(case_key);
+  frame.activity_at = *column_of(activity_key);
+  if (frame.polars) {
     std::map<std::optional<std::string>, std::size_t> index;
     for (std::size_t row = 0; row < table.rows.size(); ++row) {
-      const auto* id = cell(table.rows[row], case_at);
+      const auto* id = frame.cell(row, frame.case_at);
       const auto [it, added] = index.emplace(
-          id ? std::optional<std::string>(python::identity(python::from_attribute(*id))) : std::nullopt, groups.size());
-      if (added) groups.emplace_back();
-      groups[it->second].push_back(row);
+          id ? std::optional<std::string>(python::identity(python::from_attribute(*id))) : std::nullopt,
+          frame.groups.size());
+      if (added) frame.groups.emplace_back();
+      frame.groups[it->second].push_back(row);
     }
-  } else {
-    std::vector<std::vector<python::Scalar>> keys;
-    keys.reserve(table.rows.size());
-    for (const auto& row : table.rows) {
-      const auto* id = cell(row, case_at);
-      keys.push_back({id ? python::from_attribute(*id) : python::real(std::numeric_limits<double>::quiet_NaN())});
-      if (!id)
-        if (const auto* activity = cell(row, activity_at)) ++outside[activity->value];
-    }
-    for (auto& group : python::groupby(keys)) groups.push_back(std::move(group.rows));
+    return;
   }
+  std::vector<std::vector<python::Scalar>> keys;
+  keys.reserve(table.rows.size());
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    const auto* id = frame.cell(row, frame.case_at);
+    keys.push_back({id ? python::from_attribute(*id) : python::real(std::numeric_limits<double>::quiet_NaN())});
+    if (!id)
+      if (const auto* activity = frame.cell(row, frame.activity_at)) ++frame.outside[activity->value];
+  }
+  for (auto& group : python::groupby(keys)) frame.groups.push_back(std::move(group.rows));
+}
+
+// A case's activities: a missing one is None on Polars (with `null_labels`)
+// and NaN on pandas, which the model's counts leave out (KeyError: nan).
+void skeleton_frame_sequence(const SkeletonFrame& frame, const std::vector<std::size_t>& rows,
+                             const LogSkeletonOptions& options, bool null_labels,
+                             std::vector<const std::string*>& sequence) {
+  sequence.clear();
+  for (const auto row : rows) {
+    const auto* activity = frame.cell(row, frame.activity_at);
+    if (!activity) {
+      if (!frame.polars) throw std::invalid_argument("KeyError: nan");
+      if (null_labels) {
+        sequence.push_back(&kLogSkeletonNullActivity);
+        continue;
+      }
+      throw std::invalid_argument("log skeleton: event activity selector is missing or null: '" +
+                                  options.activity_key + "'");
+    }
+    sequence.push_back(&activity->value);
+  }
+}
+
+}  // namespace
+
+// pm4py's log skeleton discovery on the frame of an XES upload (round FY,
+// observed black-box). The traces come from a groupby over the case column
+// (pandas: groupby(case)[activity], sorted cases, rows without a case id
+// left out, KeyError for a missing case column, then "Column not found" for
+// a missing activity column; Polars: select(case, activity).group_by(case,
+// maintain_order=True), first-row order, the rows without a case id one
+// case, a missing column failing the plan). The activity counts and the row
+// count read the whole frame, so on pandas the rows without a case id still
+// count their activities, and a missing activity in a trace (NaN, which the
+// counts leave out) raises KeyError: nan.
+LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
+                                                 const LogSkeletonOptions& options, bool null_labels) {
+  if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable)
+    return discover_log_skeleton(data, options);
+  SkeletonFrame frame;
+  read_skeleton_frame(data, options, frame);
   VariantCollector variants;
   std::vector<const std::string*> sequence;
-  for (const auto& rows : groups) {
-    sequence.clear();
-    for (const auto row : rows) {
-      const auto* activity = cell(table.rows[row], activity_at);
-      if (!activity) {
-        if (!polars) throw std::invalid_argument("KeyError: nan");
-        if (null_labels) {
-          sequence.push_back(&kLogSkeletonNullActivity);
-          continue;
-        }
-        throw std::invalid_argument("log skeleton: event activity selector is missing or null: '" + activity_key + "'");
-      }
-      sequence.push_back(&activity->value);
-    }
+  for (const auto& rows : frame.groups) {
+    skeleton_frame_sequence(frame, rows, options, null_labels, sequence);
     variants.add(sequence);
   }
-  if (polars) return discover_from_variants(variants.finish(), options);
-  for (const auto& [name, count] : outside) variants.add_name(name);
-  return discover_from_variants(variants.finish(), options, &outside, table.rows.size());
+  if (frame.polars) return discover_from_variants(variants.finish(), options);
+  for (const auto& [name, count] : frame.outside) variants.add_name(name);
+  return discover_from_variants(variants.finish(), options, &frame.outside, frame.table->rows.size());
 }
 
 std::vector<std::size_t> log_skeleton_case_order(const EventDataView& data,
@@ -844,6 +886,11 @@ class SkeletonChecker {
     rule_of_.assign(names_.size(), nullptr);
     for (const auto& rule : activ_freq_) rule_of_[rule.activity] = rule.allowed;
   }
+
+  // Sort the deviations as pm4py's Python list (round GA): a missing
+  // activity (None) among the activity-frequency deviations beside a named
+  // one raises TypeError.
+  void python_null_order(bool enabled) { python_null_order_ = enabled; }
 
   // The trace's labels as ids, interning labels the model does not name.
   void intern(const std::vector<const std::string*>& trace, std::vector<std::uint32_t>& ids) {
@@ -906,6 +953,7 @@ class SkeletonChecker {
       std::size_t constraints = 0;
       // trace_skel.get_trace_info returns an activity-frequency Counter; its
       // iteration is over distinct activities, not every event occurrence.
+      if (python_null_order_) first_seen_ = present_;
       std::sort(present_.begin(), present_.end(), [&](std::uint32_t left, std::uint32_t right) {
         return *names_[left] < *names_[right];
       });
@@ -945,6 +993,7 @@ class SkeletonChecker {
         }
       }
       result.no_constr_total += constraints;
+      if (python_null_order_) raise_null_order(result);
     }
     std::sort(result.deviations.begin(), result.deviations.end(), [](const auto& a, const auto& b) {
       if (a.constraint != b.constraint) return a.constraint < b.constraint;
@@ -988,6 +1037,51 @@ class SkeletonChecker {
   std::vector<const std::string*> names_;
   Family families_[kPairFamilies];
   bool activ_freq_considered_ = false;
+  bool python_null_order_ = false;
+  std::vector<std::uint32_t> first_seen_;
+
+  // pm4py sorts its deviation list with a (constraint, detail) key: one
+  // entry per pair family that deviates (family order), then the activity
+  // frequencies, the trace's activities in first-occurrence order before the
+  // model's absent ones (model order; pm4py's own model order varies from
+  // run to run). Two activity-frequency entries compare their activities,
+  // and None beside a text raises TypeError for the first such pair that
+  // CPython's list.sort meets.
+  void raise_null_order(const LogSkeletonConformance& result) const {
+    struct Entry {
+      std::string constraint;
+      bool frequency = false;
+      bool null = false;
+      std::string name;
+    };
+    std::vector<Entry> entries;
+    for (std::size_t f = 0; f < kPairFamilies; ++f)
+      if (std::any_of(result.deviations.begin(), result.deviations.end(),
+                      [&](const auto& deviation) { return deviation.constraint == families_[f].name; }))
+        entries.push_back({families_[f].name});
+    bool null = false, named = false;
+    const auto frequency = [&](const std::string& name) {
+      const bool missing = name == kLogSkeletonNullActivity;
+      (missing ? null : named) = true;
+      entries.push_back({"activ_freq", true, missing, name});
+    };
+    for (const auto activity : first_seen_) {
+      const auto* allowed = rule_of_[activity];
+      if (!allowed || std::find(allowed->begin(), allowed->end(), counts_[activity]) == allowed->end())
+        frequency(*names_[activity]);
+    }
+    for (const auto& rule : activ_freq_)
+      if (!rule.allowed->empty() && rule.allowed->front() > 0 && counts_[rule.activity] == 0) frequency(*rule.name);
+    if (!null || !named) return;
+    auto less = [](const Entry& a, const Entry& b) {
+      if (a.constraint != b.constraint) return a.constraint < b.constraint;
+      if (a.null != b.null)
+        throw std::invalid_argument(std::string("TypeError: '<' not supported between instances of '") +
+                                    (a.null ? "NoneType" : "str") + "' and '" + (b.null ? "NoneType" : "str") + "'");
+      return a.name < b.name;
+    };
+    detail::python_list_sort(entries, less);
+  }
   std::vector<FrequencyRule> activ_freq_;
   std::vector<const std::vector<std::size_t>*> rule_of_;
   std::vector<std::size_t> counts_, first_, last_;
@@ -1080,6 +1174,34 @@ std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
   return check_log_skeleton_conformance(
       event_data_log(data, options.activity_key, options.case_id_key), model,
       options);
+}
+
+std::vector<LogSkeletonConformance> check_log_skeleton_conformance_xes_frame(
+    const EventDataView& data, const LogSkeletonModel& model,
+    const LogSkeletonOptions& options) {
+  if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable)
+    return check_log_skeleton_conformance(data, model, options);
+  SkeletonFrame frame;
+  read_skeleton_frame(data, options, frame);
+  SkeletonChecker checker(model, options);
+  checker.python_null_order(frame.polars);
+  std::vector<LogSkeletonConformance> result;
+  result.reserve(frame.groups.size());
+  std::unordered_map<std::vector<std::uint32_t>, std::size_t, IdSequenceHash> checked;
+  std::vector<const std::string*> labels;
+  std::vector<std::uint32_t> ids;
+  for (const auto& rows : frame.groups) {
+    skeleton_frame_sequence(frame, rows, options, true, labels);
+    checker.intern(labels, ids);
+    const auto found = checked.find(ids);
+    if (found != checked.end()) {
+      result.push_back(result[found->second]);
+      continue;
+    }
+    result.push_back(checker.check(ids));
+    checked.emplace(ids, result.size() - 1);
+  }
+  return result;
 }
 
 LogSkeletonVariantConformance check_log_skeleton_conformance(

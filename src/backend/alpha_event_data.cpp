@@ -2,13 +2,16 @@
 
 #include <algorithm>
 #include <limits>
+#include <map>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string_view>
 #include <utility>
 
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
+#include "alpha_python_nan.hpp"
 #include "polars_sort.hpp"
 #include "xes_frame_checks.hpp"
 
@@ -437,6 +440,67 @@ PetriNet discover_petri_net(const EventDataView& data,
 PetriNet discover_petri_net(const EventStream& data,
                             const AlphaMinerOptions& options) {
   return discover_petri_net(EventDataView(data), options);
+}
+
+AlphaPlusDiscoveryResult discover_alpha_plus_result_xes_frame(const EventDataView& data,
+                                                              const AlphaMinerOptions& options) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (!polars && data.kind() != EventDataKind::kEventTable) return discover_alpha_plus_result(data, options);
+  std::optional<EventTable> materialized;
+  const EventTable* source = polars
+      ? &materialized.emplace(data.lazy_table()->materialize(options.max_rows_to_materialize))
+      : data.table();
+  std::optional<EventTable> storage;
+  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  if (table.columns.empty() || table.rows.empty()) throw std::invalid_argument("IndexError: list index out of range");
+  const std::string activity_key = options.activity_attribute.empty() ? "concept:name" : options.activity_attribute;
+  const auto column_of = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto case_at = column_of(options.case_id_attribute);
+  if (!case_at) throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(options.case_id_attribute));
+  const auto activity_at = column_of(activity_key);
+  if (!activity_at) throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(activity_key));
+  const auto value = [](const EventTable::Row& row, std::size_t at) -> const std::string* {
+    if (at >= row.size() || !row[at] || row[at]->is_null) return nullptr;
+    return &row[at]->value;
+  };
+  // Python's str of the missing label, apart from the named activities.
+  std::set<std::string> named;
+  for (const auto& row : table.rows)
+    if (const auto* activity = value(row, *activity_at)) named.insert(*activity);
+  std::string null_label = polars ? "None" : "nan";
+  while (named.contains(null_label)) null_label += '\x1f';
+  bool any_missing = false;
+  EventLog log;
+  std::map<std::optional<std::string>, std::size_t> trace_of;
+  for (const auto& row : table.rows) {
+    const auto* case_id = value(row, *case_at);
+    const auto key = case_id ? std::optional<std::string>(*case_id) : std::nullopt;
+    const auto [it, inserted] = trace_of.try_emplace(key, log.traces.size());
+    if (inserted) {
+      Trace trace;
+      trace.case_id = key.value_or("");
+      trace.case_id_state = key ? FirstClassAttributeState::kPresent : FirstClassAttributeState::kNull;
+      trace.case_id_source_key = options.case_id_attribute;
+      log.traces.push_back(std::move(trace));
+    }
+    Event event;
+    const auto* activity = value(row, *activity_at);
+    any_missing = any_missing || !activity;
+    event.activity = activity ? *activity : null_label;
+    event.activity_state = FirstClassAttributeState::kPresent;
+    log.traces[it->second].events.push_back(std::move(event));
+  }
+  auto projected = options;
+  projected.activity_attribute = "concept:name";
+  auto result = !polars && any_missing
+      ? detail::discover_alpha_plus_result_python_nan(log, projected, null_label)
+      : discover_alpha_plus_result(log, projected);
+  if (polars && any_missing) result.null_label = null_label;
+  return result;
 }
 
 PetriNet discover_petri_net_xes_frame(const EventDataView& data,

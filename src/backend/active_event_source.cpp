@@ -593,7 +593,7 @@ std::string relation_json(const LogSkeletonPair& relation) {
 std::string skeleton_conformance_json(const LogSkeletonConformance& result) {
   return object_json({{"deviations", array_json(result.deviations, [](const auto& deviation) {
     return object_json({{"constraint", quote(deviation.constraint)}, {"relation", relation_json(deviation.relation)},
-        {"activity", quote(deviation.activity)}, {"observed_frequency", std::to_string(deviation.observed_frequency)},
+        {"activity", skeleton_label_json(deviation.activity)}, {"observed_frequency", std::to_string(deviation.observed_frequency)},
         {"allowed_frequencies", integers_json(deviation.allowed_frequencies)}});
   })}, {"no_dev_total", std::to_string(result.no_dev_total)},
       {"no_constr_total", std::to_string(result.no_constr_total)}, {"dev_fitness", real_json(result.dev_fitness)},

@@ -2806,16 +2806,40 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
   if (null_at == net.activities.end()) return net;
   const auto null_id = static_cast<std::size_t>(null_at - net.activities.begin());
-  // Each node (first appearance) sorts the successors its dependencies
-  // accept (DFG order) by name for the AND measure: a missing label beside a
-  // named one raises TypeError.
-  std::vector<std::string> appearance;
-  std::set<std::string> seen;
+  // Each node sorts the successors its dependencies accept (DFG order) by
+  // name for the AND measure: a missing label beside a named one raises
+  // TypeError. The nodes take their turns in the order the dependency pass
+  // creates them (round GA): rows in the order their source first leads a
+  // pair of the cleaned DFG, each row's targets in pair order, an accepted
+  // edge adding its source, then its target.
   std::map<std::pair<std::string, std::string>, std::size_t> pair_order;
+  std::vector<std::pair<std::string, std::string>> pairs;
   for (const auto& trace : log.traces)
-    for (std::size_t e = 0; e < trace.events.size(); ++e) {
-      if (seen.insert(trace.events[e].activity).second) appearance.push_back(trace.events[e].activity);
-      if (e) pair_order.try_emplace({trace.events[e - 1].activity, trace.events[e].activity}, pair_order.size());
+    for (std::size_t e = 1; e < trace.events.size(); ++e)
+      if (pair_order.try_emplace({trace.events[e - 1].activity, trace.events[e].activity}, pair_order.size()).second)
+        pairs.emplace_back(trace.events[e - 1].activity, trace.events[e].activity);
+  std::vector<std::string> rows;
+  for (const auto& pair : pairs)
+    if (net.cleaned_dfg.contains(pair) && std::find(rows.begin(), rows.end(), pair.first) == rows.end())
+      rows.push_back(pair.first);
+  const auto id_of = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(net.activities.begin(), net.activities.end(), name);
+    if (found == net.activities.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - net.activities.begin());
+  };
+  const auto accepted = [&](const std::pair<std::string, std::string>& pair) {
+    const auto source = id_of(pair.first), target = id_of(pair.second);
+    if (!source || !target) return false;
+    return std::any_of(net.edges.begin(), net.edges.end(), [&](const auto& edge) {
+      return edge.source == *source && edge.target == *target && !edge.length_two_loop;
+    });
+  };
+  std::vector<std::string> appearance;
+  for (const auto& row : rows)
+    for (const auto& pair : pairs) {
+      if (pair.first != row || !net.cleaned_dfg.contains(pair) || !accepted(pair)) continue;
+      for (const auto* name : {&pair.first, &pair.second})
+        if (std::find(appearance.begin(), appearance.end(), *name) == appearance.end()) appearance.push_back(*name);
     }
   for (const auto& name : appearance) {
     const auto found = std::find(net.activities.begin(), net.activities.end(), name);

@@ -109,6 +109,9 @@ struct AlphaPlusDiscoveryResult {
   std::vector<std::uint64_t> final_marking;
   std::vector<AlphaDetachedMarking> detached_initial_marking;
   std::vector<AlphaDetachedMarking> detached_final_marking;
+  // The label that stands for a missing activity (Python's None, on a
+  // Polars frame; round GA): the JSON shows it as null.
+  std::optional<std::string> null_label;
 };
 // Preserves markings on places removed by boundary cleanup. Marking vectors
 // index live net places; detached entries never identify live same-name places.
@@ -193,6 +196,15 @@ enumerate_alpha_plus_cleanup_alternatives(
 // whose first and last rows are boundary activities (its pairs never count).
 // Alpha+ (short_loops) stays on discover_petri_net.
 [[nodiscard]] PetriNet discover_petri_net_xes_frame(
+    const EventDataView& data, const AlphaMinerOptions& options = {});
+// pm4py's Alpha+ on the frame of an XES upload (round GA, observed
+// black-box): the frame converts to an event log, one trace per case value
+// in first-row order (the rows without a case id one trace), events in row
+// order; a row without an activity is the label NaN on pandas ("nan") and
+// None on Polars (null_label). A frame without rows or columns raises
+// IndexError, a missing case column, then a missing activity column,
+// KeyError. Other inputs as discover_alpha_plus_result.
+[[nodiscard]] AlphaPlusDiscoveryResult discover_alpha_plus_result_xes_frame(
     const EventDataView& data, const AlphaMinerOptions& options = {});
 
 }  // namespace minera

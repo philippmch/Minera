@@ -161,6 +161,17 @@ using LogSkeletonVariantConformance =
 [[nodiscard]] std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
     const EventDataView& data, const LogSkeletonModel& model,
     const LogSkeletonOptions& options = {});
+// pm4py's log skeleton conformance on the frame of an XES upload (round GA,
+// observed black-box): one result per case of the groupby discovery reads
+// (pandas: sorted case ids, rows without one left out; Polars: first-row
+// order, the rows without one a case of their own, a name shared by traces
+// one case), a Polars row without an activity the label None. When the
+// activity-frequency deviations of a case name None beside a named
+// activity, sorting them raises TypeError as CPython's list.sort meets the
+// pair. Other inputs as check_log_skeleton_conformance.
+[[nodiscard]] std::vector<LogSkeletonConformance> check_log_skeleton_conformance_xes_frame(
+    const EventDataView& data, const LogSkeletonModel& model,
+    const LogSkeletonOptions& options = {});
 
 // The variant-list conformance result is keyed by activity sequence, matching
 // the dictionary-shaped contract: duplicate keys overwrite earlier entries

@@ -69,7 +69,12 @@ void handle_active_source_mining(const httplib::Request& request,
   std::optional<minera::PetriNet> alpha;
   std::optional<minera::AlphaPlusDiscoveryResult> alpha_plus;
   run("alpha", selected, [&](bool& native_returned) {
-    if (params.alpha.short_loops) {alpha_plus = minera::discover_alpha_plus_result(data(), params.alpha); alpha = alpha_plus->net;}
+    // Alpha+ converts an XES upload's frame to an event log as pm4py's does (round GA).
+    if (params.alpha.short_loops) {
+      alpha_plus = xes_frame ? minera::discover_alpha_plus_result_xes_frame(data(), params.alpha)
+                             : minera::discover_alpha_plus_result(data(), params.alpha);
+      alpha = alpha_plus->net;
+    }
     else alpha = xes_frame ? minera::discover_petri_net_xes_frame(data(), params.alpha)
                            : minera::discover_petri_net(data(), params.alpha);
     session->nets.emplace("alpha", *alpha);
@@ -168,6 +173,16 @@ void handle_active_source_mining(const httplib::Request& request,
     return minera::serialize_active_source_skeleton_json(*skeleton);
   });
   if (skeleton) run("log_skeleton_conformance", selected, [&](bool& native_returned) {
+    if (xes_frame) {
+      // The cases of pm4py's groupby, in its order (round GA). The analysis
+      // presentation keeps its one result per trace of the session log.
+      const auto frame = minera::check_log_skeleton_conformance_xes_frame(data(), *skeleton, params.log_skeleton);
+      native_returned = true;
+      try {skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);}
+      catch (const minera::OperationCancelled&) {throw;}
+      catch (const std::exception&) {}
+      return minera::serialize_active_source_skeleton_json(*skeleton, &frame);
+    }
     skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);
     native_returned = true;
     const auto ordered = in_constraint_order(*skeleton_conformance, skeleton_order());

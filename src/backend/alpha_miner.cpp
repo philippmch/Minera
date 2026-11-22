@@ -1,4 +1,5 @@
 #include "minera/alpha_miner.hpp"
+#include "alpha_python_nan.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -156,8 +157,11 @@ void set_classic_relations(Footprint& fp,
 
 // Builds the footprint over the interned log. Activities marked in `exclude`
 // (the Alpha+ length-one-loop removal) are read as absent from every trace.
+// `never_equal` names a label that compares unequal to itself (Python's NaN
+// on a pandas frame, round GA): it never closes an "a b a" pattern.
 Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
-                          bool short_loops) {
+                          bool short_loops,
+                          std::optional<std::size_t> never_equal = std::nullopt) {
   const std::size_t n = log.names.size();
   Footprint fp;
   fp.short_loops = short_loops;
@@ -182,7 +186,8 @@ Footprint build_footprint(const IdLog& log, const std::vector<bool>* exclude,
         targets.push_back(sequence[i]);
       }
       fp.follows[sequence[i - 1]][sequence[i]] = true;
-      if (short_loops && i >= 2 && sequence[i - 2] == sequence[i]) {
+      if (short_loops && i >= 2 && sequence[i - 2] == sequence[i] &&
+          sequence[i] != never_equal) {
         fp.two_loop[sequence[i]][sequence[i - 1]] = true;
       }
     }
@@ -600,7 +605,8 @@ using AlphaPlusCleanupChooser =
 AlphaPlusDiscoveryResult alpha_plus_with_cleanup_choices(
     const EventLog& log, const AlphaMinerOptions& options,
     const AlphaPlusCleanupChooser& choose_index,
-    std::vector<std::optional<std::string>>* chosen_names) {
+    std::vector<std::optional<std::string>>* chosen_names,
+    const std::optional<std::string>& python_nan = std::nullopt) {
   check_alpha_row_limit(log, options);
   const std::string selector = options.activity_attribute.empty()
                                    ? "concept:name"
@@ -634,21 +640,28 @@ AlphaPlusDiscoveryResult alpha_plus_with_cleanup_choices(
     sequence.push_back(end_label);
   }
   const std::size_t n = ids.names.size();
-  const Footprint full = build_footprint(boundary_log, nullptr, true);
+  // Python's NaN label follows itself in the directly-follows counts (one
+  // dictionary key) but is never a length-one loop: nan == nan is False.
+  std::optional<std::size_t> nan_id;
+  if (python_nan) {
+    const auto found = std::find(ids.names.begin(), ids.names.end(), *python_nan);
+    if (found != ids.names.end()) nan_id = static_cast<std::size_t>(found - ids.names.begin());
+  }
+  const Footprint full = build_footprint(boundary_log, nullptr, true, nan_id);
   std::vector<bool> loops(n, false);
-  for (std::size_t a = 0; a < n; ++a) loops[a] = full.follows[a][a];
+  for (std::size_t a = 0; a < n; ++a) loops[a] = full.follows[a][a] && a != nan_id;
   // Reserved boundary labels can themselves be loops; a trace whose every
   // label is a loop then has no reduced endpoints and fails publicly.
   for (const auto& sequence : boundary_log.traces)
     if (std::all_of(sequence.begin(), sequence.end(),
                     [&](std::size_t label) { return loops[label]; }))
       throw std::invalid_argument("Alpha+: boundary reduction leaves an empty trace");
-  const auto reduced = build_footprint(boundary_log, &loops, true);
+  const auto reduced = build_footprint(boundary_log, &loops, true, nan_id);
   if (reduced.starts.empty() || reduced.ends.empty())
     throw std::invalid_argument("Alpha+: boundary reduction leaves no endpoints");
   const auto& boundary_exclude = loops;
   const std::vector<Place> boundary_pairs = maximal_places(
-      build_footprint(boundary_log, &boundary_exclude, true));
+      build_footprint(boundary_log, &boundary_exclude, true, nan_id));
 
   // Retain the last immediate non-loop predecessor of each loop label while
   // accumulating all immediate non-loop successors, in original trace order.
@@ -860,6 +873,14 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result(const EventLog& log,
   return alpha_plus_with_cleanup_choices(
       log, options, [](const auto&) { return std::size_t{0}; }, nullptr);
 }
+
+namespace detail {
+AlphaPlusDiscoveryResult discover_alpha_plus_result_python_nan(
+    const EventLog& log, const AlphaMinerOptions& options, const std::string& nan_label) {
+  return alpha_plus_with_cleanup_choices(
+      log, options, [](const auto&) { return std::size_t{0}; }, nullptr, nan_label);
+}
+}  // namespace detail
 
 std::vector<AlphaPlusCleanupAlternative> enumerate_alpha_plus_cleanup_alternatives(
     const EventLog& log, const AlphaMinerOptions& options) {

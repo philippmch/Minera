@@ -16,17 +16,20 @@ void text(std::ostream& out, std::string_view value) {
   }
   out << '"';
 }
+// `null_label` stands for Python's None (round GA) and shows as null.
 void names(std::ostream& out,
-           const std::vector<std::optional<std::string>>& values) {
+           const std::vector<std::optional<std::string>>& values,
+           const std::optional<std::string>& null_label = std::nullopt) {
   out << '[';
   for (std::size_t i = 0; i < values.size(); ++i) {
     if (i) out << ',';
-    if (values[i]) text(out, *values[i]);
+    if (values[i] && values[i] != null_label) text(out, *values[i]);
     else out << "null";
   }
   out << ']';
 }
-void place_name(std::ostream& out, const AlphaPlaceName& name) {
+void place_name(std::ostream& out, const AlphaPlaceName& name,
+                const std::optional<std::string>& null_label) {
   if (!name.boundary.empty()) {
     if (!name.before.empty() || !name.after.empty())
       throw std::invalid_argument("Alpha+ result: boundary name also has pair members");
@@ -34,20 +37,21 @@ void place_name(std::ostream& out, const AlphaPlaceName& name) {
     text(out, name.boundary);
   } else {
     out << "{\"before\":";
-    names(out, name.before);
+    names(out, name.before, null_label);
     out << ",\"after\":";
-    names(out, name.after);
+    names(out, name.after, null_label);
   }
   out << '}';
 }
-void detached(std::ostream& out, const std::vector<AlphaDetachedMarking>& markings) {
+void detached(std::ostream& out, const std::vector<AlphaDetachedMarking>& markings,
+              const std::optional<std::string>& null_label) {
   out << '[';
   for (std::size_t i = 0; i < markings.size(); ++i) {
     if (!markings[i].tokens)
       throw std::invalid_argument("Alpha+ result: detached marking must contain tokens");
     if (i) out << ',';
     out << "{\"name\":";
-    place_name(out, markings[i].name);
+    place_name(out, markings[i].name, null_label);
     out << ",\"tokens\":" << markings[i].tokens << '}';
   }
   out << ']';
@@ -73,7 +77,7 @@ std::string alpha_plus_result_json(const AlphaPlusDiscoveryResult& result) {
   for (std::size_t i = 0; i < count; ++i) {
     if (i) out << ',';
     out << "{\"id\":" << i << ",\"name\":";
-    place_name(out, result.place_names[i]);
+    place_name(out, result.place_names[i], result.null_label);
     out << ",\"initial\":" << result.initial_marking[i]
         << ",\"final\":" << result.final_marking[i] << '}';
   }
@@ -88,7 +92,9 @@ std::string alpha_plus_result_json(const AlphaPlusDiscoveryResult& result) {
     if (transition.activity) {
       if (*transition.activity >= result.net.activities().size())
         throw std::invalid_argument("Alpha+ result: invalid transition activity");
-      text(out, result.net.activities()[*transition.activity]);
+      const auto& label = result.net.activities()[*transition.activity];
+      if (label == result.null_label) out << "null";
+      else text(out, label);
     } else out << "null";
     out << ",\"inputs\":";
     arcs(out, transition.inputs, count);
@@ -97,9 +103,9 @@ std::string alpha_plus_result_json(const AlphaPlusDiscoveryResult& result) {
     out << '}';
   }
   out << "],\"detached_initial_marking\":";
-  detached(out, result.detached_initial_marking);
+  detached(out, result.detached_initial_marking, result.null_label);
   out << ",\"detached_final_marking\":";
-  detached(out, result.detached_final_marking);
+  detached(out, result.detached_final_marking, result.null_label);
   out << '}';
   return out.str();
 }
