@@ -15,6 +15,7 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <deque>
 #include <functional>
 #include <limits>
@@ -2388,6 +2389,69 @@ HeuristicsNet discover_plus_plus_pandas(
     }
   } else {
     started = *original_start;
+  }
+  // Text, number and boolean columns (read_csv's dtypes on CSV rows) fail
+  // where pm4py compares each completion with its case's next start and then
+  // subtracts them, before any .dt: rows sorted by case and start (a missing
+  // start last), pairs with both cells present only (round FT, observed
+  // black-box). Two numeric columns pass both and reach the .dt below.
+  if (!data.dtypes.empty()) {
+    const auto& completion_dtype = data.dtypes[completed];
+    const auto& start_dtype = data.dtypes[started];
+    const auto numeric_name = [](const std::string& dtype) -> const char* {
+      if (dtype == "int64" || dtype == "uint64") return "int";
+      if (dtype == "float64") return "float";
+      return nullptr;
+    };
+    std::string message;
+    if (completion_dtype == "str" && start_dtype == "str")
+      message = "unsupported operand type(s) for -: 'str' and 'str'";
+    else if (completion_dtype == "bool" && start_dtype == "bool")
+      message = "numpy boolean subtract, the `-` operator, is not supported, use the bitwise_xor, "
+                "the `^` operator, or the logical_xor function instead.";
+    else if (completion_dtype == "str" && numeric_name(start_dtype))
+      message = std::string("'<=' not supported between instances of 'str' and '") +
+                numeric_name(start_dtype) + "'";
+    else if (start_dtype == "str" && numeric_name(completion_dtype))
+      message = std::string("'>=' not supported between instances of 'str' and '") +
+                numeric_name(completion_dtype) + "'";
+    if (!message.empty()) {
+      const auto present = [&](const EventTable::Row& row, std::size_t index) {
+        return index < row.size() && row[index] && !row[index]->is_null;
+      };
+      const auto number = [](const EventAttribute& cell) {
+        if (const auto* integer = std::get_if<std::int64_t>(&cell.typed_value))
+          return static_cast<long double>(*integer);
+        if (const auto* unsigned_integer = std::get_if<std::uint64_t>(&cell.typed_value))
+          return static_cast<long double>(*unsigned_integer);
+        if (const auto* real = std::get_if<double>(&cell.typed_value))
+          return static_cast<long double>(*real);
+        return static_cast<long double>(std::strtold(cell.value.c_str(), nullptr));
+      };
+      const bool numeric_start = numeric_name(start_dtype) != nullptr;
+      std::map<std::string, std::vector<std::size_t>> cases;
+      for (std::size_t row = 0; row < data.rows.size(); ++row)
+        if (present(data.rows[row], *case_column))
+          cases[data.rows[row][*case_column]->value].push_back(row);
+      bool paired = false;
+      for (auto& [name, rows] : cases) {
+        (void)name;
+        std::stable_sort(rows.begin(), rows.end(), [&](std::size_t a, std::size_t b) {
+          const bool has_a = present(data.rows[a], started);
+          const bool has_b = present(data.rows[b], started);
+          if (!has_a || !has_b) return has_a && !has_b;
+          const auto& x = *data.rows[a][started];
+          const auto& y = *data.rows[b][started];
+          if (numeric_start) return number(x) < number(y);
+          if (start_dtype == "bool") return x.value < y.value;
+          return x.value < y.value;
+        });
+        for (std::size_t k = 0; k + 1 < rows.size() && !paired; ++k)
+          paired = present(data.rows[rows[k]], completed) && present(data.rows[rows[k + 1]], started);
+        if (paired) break;
+      }
+      if (paired) throw HeuristicPandasError("builtins.TypeError", message);
+    }
   }
   validate_datetime(completed);
   if (!data.dtypes.empty() && data.dtypes[started] == "object" &&

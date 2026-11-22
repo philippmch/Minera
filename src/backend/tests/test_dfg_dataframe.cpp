@@ -935,7 +935,41 @@ void review_fs_polars_partial_order_and_overlap() {
   }
 }
 
+// Round FT: Polars' sort by case and timestamp is unstable. On a frame of
+// more than 20 rows in an XES upload's trace order, c2's tied a and d (both
+// at 06:13:00) come out as d, a, so the lazy adapter counts d->a and a->c
+// where the stable order gives a->d and d->c (pm4py's Polars
+// get_dfg_graph on the same rows; observed black-box).
+void review_ft_polars_graph_tie_order() {
+  std::istringstream text(
+      "case,act,ts\n"
+      "c4,a,2020-01-01 06:11:00\nc4,b,2020-01-01 06:11:30\nc4,d,2020-01-01 06:21:30.000001\n"
+      "c4,b,2020-01-01 06:21:31\nc4,c,2020-01-01 06:31:31\nc3,c,2020-01-01 05:43:30\n"
+      "c3,d,2020-01-01 05:44:30\nc0,c,2020-01-01 07:18:00\nc0,d,2020-01-01 07:18:30.999999\n"
+      "c0,b,2020-01-01 07:18:31.000500\nc0,c,2020-01-01 07:18:32\nc0,d,2020-01-01 07:18:32\n"
+      "c0,c,2020-01-01 07:18:33\nc2,a,2020-01-01 06:23:01\nc2,a,2020-01-01 06:13:00\n"
+      "c2,d,2020-01-01 06:13:00\nc2,c,2020-01-01 06:24:01\nc2,c,2020-01-01 06:23:00\n"
+      "c1,b,2020-01-01 06:41:00\nc1,b,2020-01-01 06:42:00.999999\nc1,b,2020-01-01 06:42:00.000001\n"
+      "c1,c,2020-01-01 06:42:00\n");
+  CsvImportOptions import_options;
+  import_options.case_id_column = "case";
+  import_options.activity_column = "act";
+  import_options.timestamp_column = "ts";
+  const auto table = import_csv_event_data(text, import_options).table;
+  DfgTableOptions options;
+  options.activity_attribute = "act";
+  options.case_id_attribute = "case";
+  options.timestamp_attribute = "ts";
+  const DfgFrequency polars{{{"a", "b"}, 1}, {{"a", "c"}, 2}, {{"b", "b"}, 1}, {{"b", "c"}, 3},
+                            {{"b", "d"}, 1}, {{"c", "a"}, 1}, {{"c", "b"}, 1}, {{"c", "d"}, 3},
+                            {{"d", "a"}, 1}, {{"d", "b"}, 2}, {{"d", "c"}, 1}};
+  assert(discover_polars_dfg(LazyEventTable::from_table(table), options).frequency == polars);
+  const auto pandas = discover_pandas_dfg(table, options).frequency;
+  assert(pandas.at({"a", "d"}) == 1 && pandas.at({"d", "c"}) == 2 && !pandas.count({"d", "a"}));
+}
+
 int main() {
+  review_ft_polars_graph_tie_order();
   review_fs_polars_partial_order_and_overlap();
   review_fr_polars_mixed_datetime_units();
   graph_measure_selectors_and_ordering();

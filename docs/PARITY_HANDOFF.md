@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–FS (2026-11-05 to 2026-11-21, cloud container)
+## Review-fix loop, rounds T–FT (2026-11-05 to 2026-11-21, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -8591,6 +8591,76 @@ replay gave 2,673 responses unchanged. The Mac was not reachable this
 round (no folder access), so no newer reviewer handoff was read. The
 generators, the comparers and the probes are in the project files under
 `review-harness/round-fs/`.
+
+Round FT re-reviewed FS on fresh banks and swept new areas (Review FT1).
+FS's CI run 44954362892 finished green. FS's fixes held
+(the plusplus intervals with dense nanoseconds, on XES uploads and with
+lifecycle columns; trace-based correlation keys on XES uploads and with
+one activity; the footprints with start keys on XES uploads; the Polars
+partial order with `dfg_keep_first_following` and `dfg_strict`). Fixed:
+FT1-1, the interval eventually-follows on a CSV upload sorts and compares
+starts and completions at nanoseconds, and a completion key naming the
+CSV's own timestamp header reads the event timestamp; FT1-2, correlation
+exact time matching is networkx's minimum weight full matching, i.e.
+SciPy's `linear_sum_assignment` with `sys.maxsize` for invalid pairs and
+the targets in CPython set order, whose absorption of small costs Minera
+now follows (`src/backend/scipy_lsap.hpp`); FT1-3, the classic variants
+start each event at time:timestamp when another completion key is given
+without a start key; FT1-4, the Polars graph DFG and concurrency sort
+with the unstable pdqsort model of round BX (`polars_sort.hpp`), which
+shows on frames over 20 rows such as an XES upload's; FT1-5, classic_split
+cuts its samples after sorting the exact instants (nanoseconds); FT1-6,
+the Polars partial order and concurrency sort a missing start first and
+the concurrency skips a missing start or completion in its horizontal
+max/min; FT1-7, the plusplus `pandas_mutable` workflow shape on CSV rows
+(kept as text) raises pm4py's subtraction or comparison `TypeError`
+before the `.dt` error when a case has a completion and a next start.
+Declared: the classic frequency DFGs that still differ are the LP ties of
+round BQ; the Polars keep-once standard deviation varies in its last
+digits in pm4py itself from run to run. New areas without findings: the
+CSV dataframe DFG, partial order and concurrency on larger frames;
+streaming correlation and footprints take no timestamp keys.
+
+In the suite: `minera_correlation_miner_tests`
+(`review_ft_exact_time_matching_assignment`,
+`review_ft_classic_default_start_key`,
+`review_ft_split_samples_sort_at_nanoseconds`), `minera_overlap_tests`
+(`eventually_follows_csv_nanoseconds_reference`),
+`minera_dfg_dataframe_tests` (`review_ft_polars_graph_tie_order`) and
+`minera_heuristic_variants_tests` (`review_ft_plusplus_pandas_text_columns`)
+carry FT1's reference values. The full ctest passed 660 of 660 on the
+first run (39 minutes, -j2), the Python script tests passed 406 of 406,
+the fixture replay gave 2,673 responses unchanged. The Mac was not
+reachable this round (no device served, the folder not approved), so no
+newer reviewer handoff was read. The generators, the comparers and the
+probes are in the project files under `review-harness/round-ft/`.
+
+Next round (FU) should start by re-reviewing round FT:
+
+- FT's CI run;
+- FT1-1 to FT1-7 on fresh banks: `efg/efgns.py` with `DENSE=1` and
+  `XES=1` on new seeds (also completion keys with a CSV's own header),
+  `corr/corrss.py` with exact time matching on larger groups (the
+  `sys.maxsize` absorption) and sample sizes, `corr/etm/etmmodel.py` on
+  wider matrices, `po/dfgpox.py` with `NC`/`NE` up to a few thousand rows
+  (the pdqsort's 2,000-row recursion and 128-row blocks) and `MISS`,
+  `dfg/dfgstart.py` and `po/dfgpo2.py` with `NC`/`NE`,
+  `heu/mut/mutprobe.py` with mixed columns, boolean columns and blanks;
+- new areas: the Polars frequency triples (`discover_triples_table`
+  still sorts stably; library only, no route reaches it) and the other
+  Polars sorts by case and timestamp outside the filters (any
+  `std::stable_sort` on a Polars path; `dfg_dataframe.cpp`'s unstable
+  sort does not yet apply `sort_by_keys`' rule for a Null-dtype key, an
+  all-null start column), the
+  other workflow input shapes with CSV text columns (alpha, classic
+  heuristics on `dataframe`/`lazyframe`), the temporal profile and
+  performance spectrum on XES uploads with ties, and any other route
+  whose reference reaches SciPy's `linear_sum_assignment` (spy for the
+  call while sweeping, as corr/etm/spy2.py did);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round FT (kept for its older items):
 
 Next round (FT) should start by re-reviewing round FS:
 

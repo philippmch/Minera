@@ -36975,3 +36975,140 @@ The full ctest passed 658 of 660 on the first run (24 minutes, -j2; the
 two older expectations and a parser slip in the new route test, then
 green), the Python script tests passed 406 of 406, the fixture replay
 gave 2,673 responses unchanged.
+
+## Review FT1: interval EFG and correlation timestamps at nanoseconds, exact time matching, Polars sort ties and missing starts, plusplus text columns (2026-11-21)
+
+Round FT re-reviewed round FS on fresh banks and swept new areas. FS's CI
+run 44954362892 (2979a6f) finished green.
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars
+1.44.1, scipy and networkx from requirements_stable.txt, no pyarrow),
+every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL
+AVX512_SPR"` and exact float comparison.
+
+Re-review of FS (fresh seeds): the plusplus intervals with dense
+nanosecond cells on CSV uploads and on XES uploads (htA, htB: 100
+plusplus and 53 classic results equal, 47 raised alike) and with
+lifecycle columns (lcB, lcD, lcY on `/api/mine`: 200 equal; the pandas
+shape on XES uploads, lcY: 60 equal); trace-based correlation keys on
+XES uploads, with one activity and with supplied completion keys (ctA,
+ssO: equal, raised alike, or the declared LP ties); the classic
+precede/succeed counts with several samples (corrss, below); the
+footprints with start keys on XES and CSV uploads (ftA, ftB: 50 of 50
+equal in each of the four variants); the partial order and concurrency
+with `dfg_keep_first_following` and `dfg_strict` (poA: pandas 96 equal,
+4 raised alike, Polars 100 equal). No difference in FS's fixes.
+
+Fixed:
+
+- **FT1-1. Interval eventually-follows on a CSV upload** (`/api/mine`
+  with `eventually_follows_start_attribute`). pm4py's interval EFG (the
+  log variant on the frame's EventLog) sorts each trace by its start
+  Timestamps and counts "b follows a" when b starts no earlier than a
+  completes, both on the exact instants, nanoseconds included; Minera cut
+  them to microseconds, so a B starting at :10.000000001 followed an A
+  completing at :10.000000002. A completion key naming the CSV's own
+  timestamp header (`ts`) is an attribute of the frame's events too;
+  Minera raised "missing completion timestamp attribute". efA: 5 of 30
+  results differed and 8 raised only in Minera; after the fix efB, efC
+  (dense nanoseconds) and efY (XES uploads): 162 equal, 48 raised alike.
+- **FT1-2. Exact time matching** (correlation classic and classic_split,
+  `exact_time_matching`, every adapter). pm4py builds a complete
+  bipartite graph from the source completions (first nodes, in list
+  order) to the target starts, weighs an edge with target start minus
+  source completion, or `sys.maxsize` when the target starts first, and
+  takes networkx's `minimum_weight_full_matching`, which is SciPy's
+  `linear_sum_assignment` with the targets as columns in the order of a
+  CPython set of their node numbers (ordered by the number masked with
+  the table size). The `sys.maxsize` weights absorb the real ones next to
+  them in floating point, so the matching is SciPy's, not a minimum one:
+  [271, 301, 361] against [180, 781, 782] gives 495.5, where a minimum
+  matching gives 450.5. The duration is `statistics.mean` of the valid
+  pairs. Minera solved a true minimum assignment with a large constant.
+  A model of SciPy's shortest augmenting path (Crouse 2016: one row at a
+  time, columns in a reversed remaining list, a tie in the path cost
+  resolved toward a free column, a tall matrix transposed first) gave
+  SciPy's assignment on 3,000 random matrices, and the full model gave
+  pm4py's duration on 2,300 of 2,300 groups (corr/etm/). Before the fix
+  (ssA, ssB) 8 of 70 classic performance DFGs differed per adapter
+  (together with FT1-3).
+- **FT1-3. The classic start key with another completion key**
+  (correlation classic and classic_split). pm4py's classic variants
+  default the start key to time:timestamp, not to the completion key: on
+  a CSV upload with the completion key `ts` and no start key, each event
+  starts at its time:timestamp and completes at `ts` (A 0-10, B 12-20 pair
+  at 2 seconds, not at 10). Minera started each event at its completion.
+- **FT1-4. Polars sort ties on larger frames** (`/api/dfg-dataframe`,
+  Polars graph and concurrency). Polars sorts by case and timestamps with
+  its unstable multithreaded pdqsort (modelled in round BX), so on a frame
+  of more than 20 rows tied rows leave their input order; an XES upload's
+  frame is in trace order, not sorted. Minera sorted stably. pxA, pxB: 2
+  of 100 graphs differed (c2's tied a and d at 06:13:00 came out as d, a);
+  pxD (frames of up to 180 rows): 5 of 60 concurrency results differed.
+- **FT1-5. classic_split samples at nanoseconds** (correlation
+  classic_split on a CSV upload). pm4py sorts the frame by its own
+  timestamps, nanoseconds included, before it cuts the samples, and by the
+  start before it groups a sample; Minera sorted the microsecond-rounded
+  floats, so d completing at :30.000000000 and d at :30.000000001 swapped
+  and a different d shared a's sample (seed 600: 10.876543 in Minera,
+  28.876543 in pm4py). ssC: 2 of 80 performance DFGs differed.
+- **FT1-6. Polars partial order and concurrency with missing starts**
+  (`/api/dfg-dataframe`, Polars backend, an XES upload where some events
+  lack the start key). Polars sorts a missing start first, so those rows
+  take the first indices of their case and pair as sources (their
+  completion is present); Minera sorted them last. The concurrency takes
+  the latest start and the earliest completion with `max_horizontal` and
+  `min_horizontal`, which skip a missing value, so only the prefilter's
+  right start and left completion must be present; Minera required all
+  four. pxC (30% of events without `st`): 9 of 80 concurrency results and
+  at least 4 partial orders differed.
+- **FT1-7. Plusplus on CSV rows with text timestamps**
+  (`/api/discover-workflow-input`, `input_shape=pandas_mutable`). The
+  route keeps a CSV's columns as text; pm4py's `apply_heu_pandas`
+  compares each completion with its case's next start (rows sorted by
+  case and start, a missing start last) and subtracts them before it
+  reads `.dt`, so two text columns raise `TypeError: unsupported operand
+  type(s) for -: 'str' and 'str'` once a case has such a pair with both
+  cells present (a text column beside a number column raises the
+  comparison's TypeError, two boolean columns numpy's boolean subtract
+  error); Minera raised the `.dt` AttributeError for every CSV. The rows
+  keep a blank cell as empty text, which pairs like any other text.
+  mutprobe: 9 of 9 equal after the fix against pm4py on the text frame.
+
+Declared or unchanged:
+
+- Classic and classic_split frequency DFGs that differ where the
+  probability and duration matrices are equal are the declared LP ties
+  (round BQ): lpclass classified ssC2, ssD and ssX (64 runs), every one at
+  the optimum of pm4py's cost matrix in both; the trace-based ones on XES
+  uploads alike (tbtie: 3 of 3).
+- The Polars graph's standard deviation with `dfg_keep_once_per_case`
+  varies in its last digits from run to run in pm4py itself (six runs of
+  the same frame gave three values per edge, the per-case unique rows
+  come in hash order); Minera's value is one of them.
+- heulc's pandas comparison used the formatted frame; the workflow route
+  is given the CSV rows as text (FT1-7), so the reference is pm4py on
+  that frame.
+- Streaming correlation and footprints take no timestamp keys (the routes
+  read the stream's own events), so FS1's key questions do not arise.
+- Unchanged: the declared items of FS1 and before.
+
+Results after the fixes (exact): eventually-follows (efB, efC, efY
+above); correlation (ssC2, ssD on CSV and ssX on XES uploads with sample
+sizes below the event count, exact time matching and supplied keys, ssO
+with one activity: equal, raised alike, or the declared LP ties); the
+dataframe DFG on XES uploads (pxA3, pxB3, pxC, pxD2, pxE2, pxF2, frames of
+up to 360 rows: graph, partial order with its activities, concurrency,
+pandas and Polars equal or raised alike, apart from 13 keep-once
+deviations as above) and on CSV uploads with larger frames (dsL: 100 of
+100, poL: 200 of 200 equal).
+
+In the suite: `minera_correlation_miner_tests`
+(`review_ft_exact_time_matching_assignment`,
+`review_ft_classic_default_start_key`,
+`review_ft_split_samples_sort_at_nanoseconds`), `minera_overlap_tests`
+(`eventually_follows_csv_nanoseconds_reference`),
+`minera_dfg_dataframe_tests` (`review_ft_polars_graph_tie_order`) and
+`minera_heuristic_variants_tests` (`review_ft_plusplus_pandas_text_columns`)
+carry FT1's reference values. The full ctest passed 660 of 660 on the
+first run (39 minutes, -j2), the Python script tests passed 406 of 406,
+the fixture replay gave 2,673 responses unchanged.

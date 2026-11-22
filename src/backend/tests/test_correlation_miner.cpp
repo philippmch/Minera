@@ -421,7 +421,101 @@ void review_fs_nested_interval_precedence() {
   }
 }
 
+// Round FT: pm4py's exact time matching is networkx's minimum weight full
+// matching, i.e. SciPy's linear_sum_assignment on (target start - source
+// completion), sys.maxsize for a target that starts before the source
+// completes, with the targets as columns in CPython set order. The maxsize
+// entries absorb the real costs next to them, so the matching is SciPy's,
+// not a minimum one: the reference values below are pm4py's on the same
+// events (observed black-box).
+void review_ft_exact_time_matching_assignment() {
+  CorrelationMinerOptions options;
+  options.exact_time_matching = true;
+  EventLog atomic;
+  atomic.traces = {trace("1", {event_at("A", 271.0), event_at("A", 301.0), event_at("A", 361.0),
+                               event_at("B", 180.0), event_at("B", 781.0), event_at("B", 782.0)})};
+  const auto first = discover_correlation_miner(atomic, options);
+  assert_near(first.duration_matrix.at(kAB), 495.5);
+  assert_near(first.duration_matrix.at(kBA), 91.0);
+
+  options.start_timestamp_attribute = "start";
+  EventLog early;
+  early.traces = {trace("1", {interval_event("A", 100.0, 100.0), interval_event("A", 101.0, 101.0),
+                              interval_event("B", 95.0, 100.0), interval_event("B", 110.0, 115.0)})};
+  assert_near(discover_correlation_miner(early, options).duration_matrix.at(kAB), 10.0);
+
+  // Four targets after five sources wrap the set's table: the last target
+  // is the first column.
+  EventLog wrapped;
+  wrapped.traces = {trace("1", {interval_event("A", 10.0, 10.0), interval_event("A", 20.0, 20.0),
+                                interval_event("A", 30.0, 30.0), interval_event("A", 40.0, 40.0),
+                                interval_event("A", 50.0, 50.0), interval_event("B", 15.0, 16.0),
+                                interval_event("B", 5.0, 6.0), interval_event("B", 45.0, 46.0),
+                                interval_event("B", 60.0, 61.0)})};
+  const auto wrap = discover_correlation_miner(wrapped, options);
+  assert_near(wrap.duration_matrix.at(kAB), 20.0 / 3.0);
+  assert_near(wrap.duration_matrix.at(kBA), 4.0);
+}
+
+// Round FT: with another completion key and no start key, pm4py's classic
+// variants start each event at its time:timestamp (A 0-10, B 12-20 pair at
+// 2 seconds, not at the 10 between the completions; observed black-box).
+void review_ft_classic_default_start_key() {
+  const auto timed = [](std::string activity, double start, double complete) {
+    Event event = event_at(std::move(activity), start);
+    event.attributes.push_back({"ts", format_timestamp(complete), AttributeKind::kDate});
+    return event;
+  };
+  EventLog log;
+  log.traces = {trace("1", {timed("A", 0.0, 10.0), timed("B", 12.0, 20.0)})};
+  CorrelationMinerOptions options;
+  options.timestamp_attribute = "ts";
+  options.reference_timestamp_key = "ts";
+  for (const auto variant : {CorrelationVariant::kClassic, CorrelationVariant::kClassicSplit}) {
+    options.variant = variant;
+    options.sample_size = 2;
+    const auto result = discover_correlation_miner(log, options);
+    assert_near(result.duration_matrix.at(kAB), 2.0);
+    assert_near(result.performance_dfg.at(kAB), 2.0);
+  }
+  // The native contract (no reference key) keeps the completion as start.
+  options.reference_timestamp_key.clear();
+  options.variant = CorrelationVariant::kClassic;
+  assert_near(discover_correlation_miner(log, options).duration_matrix.at(kAB), 10.0);
+}
+
+// Round FT: pm4py sorts the frame's own timestamps, at a CSV upload's
+// nanoseconds, before it cuts classic_split's samples: d completing at
+// :30.000000000 comes before d at :30.000000001, so the first sample pairs a
+// with the d that starts at :29 (pm4py: 28.876543045043945; observed
+// black-box).
+void review_ft_split_samples_sort_at_nanoseconds() {
+  const auto ns = [](std::string activity, const char* complete, const char* start) {
+    Event event;
+    event.activity = std::move(activity);
+    event.timestamp = complete;
+    event.attributes.push_back({"st", start, AttributeKind::kDate});
+    return event;
+  };
+  EventLog log;
+  log.traces = {trace("c0", {ns("a", "2020-01-01T06:20:30.123456789+05:30", "2020-01-01T06:20:30.000000500+05:30"),
+                             ns("d", "2020-01-01T06:20:30.000000001+05:30", "2020-01-01T06:20:10.999999999+05:30"),
+                             ns("d", "2020-01-01T06:20:30+05:30", "2020-01-01T06:20:29+05:30"),
+                             ns("a", "2020-01-01T06:20:00.123456789+05:30", "2020-01-01T06:18:30+05:30")})};
+  CorrelationMinerOptions options;
+  options.variant = CorrelationVariant::kClassicSplit;
+  options.sample_size = 2;
+  options.start_timestamp_attribute = "st";
+  const auto result = discover_correlation_miner(log, options);
+  const DfgActivityPair ad{"a", "d"};
+  assert_near(result.duration_matrix.at(ad), 28.876543045043945);
+  assert_near(result.performance_dfg.at(ad), 28.876543045043945);
+}
+
 int main() {
+  review_ft_exact_time_matching_assignment();
+  review_ft_classic_default_start_key();
+  review_ft_split_samples_sort_at_nanoseconds();
   review_fs_nested_interval_precedence();
   review_fs_trace_based_reference_keys();
   classic_matches_reference_fixture();

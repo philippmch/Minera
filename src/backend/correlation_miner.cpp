@@ -17,20 +17,29 @@
 
 #include "minera/directly_follows_graph.hpp"
 #include "minera/timestamp.hpp"
+#include "exact_mean.hpp"
 #include "frame_times.hpp"
+#include "scipy_lsap.hpp"
 
 namespace minera {
 namespace {
 
 constexpr double kMissingCost = 100000000000.0;
-constexpr double kInvalidMatchingCost = 1.0e18;
 constexpr double kComparisonTolerance = 1.0e-12;
+
+// An instant as (seconds, nanoseconds) since the epoch.
+using ExactInstant = std::pair<std::int64_t, std::int64_t>;
 
 struct PreparedEvent {
   std::string activity;
   double start = 0.0;
   double complete = 0.0;
   std::size_t input_index = 0;
+  // pm4py sorts the frame's own timestamps, which keep a CSV upload's
+  // nanoseconds; the instants it then compares and subtracts are the
+  // microsecond-rounded floats above (round FT, observed black-box).
+  ExactInstant start_exact{0, 0};
+  ExactInstant complete_exact{0, 0};
 };
 
 using PreparedEvents = std::vector<PreparedEvent>;
@@ -343,30 +352,43 @@ double python_epoch_seconds(std::string_view raw, double parsed) {
   return parsed;
 }
 
-double selected_timestamp(const std::vector<EventAttribute>& fields,
-                          std::string_view selector,
-                          std::string_view description) {
+struct SelectedInstant {
+  double seconds = 0.0;
+  ExactInstant exact{0, 0};
+};
+
+SelectedInstant selected_instant(std::string_view raw, std::string_view selector,
+                                 std::string_view description) {
+  const auto parsed = parse_timestamp(raw);
+  if (!parsed)
+    throw std::invalid_argument("correlation miner " + std::string(description) +
+                                " selector '" + std::string(selector) +
+                                "' contains an invalid timestamp");
+  SelectedInstant result{python_epoch_seconds(raw, *parsed), {0, 0}};
+  if (const auto exact = parse_timestamp_exact(raw)) {
+    result.exact = {exact->seconds, static_cast<std::int64_t>(exact->nanoseconds)};
+  } else {
+    const double whole = std::floor(*parsed);
+    result.exact = {static_cast<std::int64_t>(whole),
+                    static_cast<std::int64_t>(std::llround((*parsed - whole) * 1e9))};
+  }
+  return result;
+}
+
+SelectedInstant selected_timestamp(const std::vector<EventAttribute>& fields,
+                                   std::string_view selector,
+                                   std::string_view description) {
   const auto raw = require_value(
       select_flat_field(fields, selector, SelectorRole::kTimestamp),
       description, selector);
-  const auto parsed = parse_timestamp(raw);
-  if (!parsed)
-    throw std::invalid_argument("correlation miner " + std::string(description) +
-                                " selector '" + std::string(selector) +
-                                "' contains an invalid timestamp");
-  return python_epoch_seconds(raw, *parsed);
+  return selected_instant(raw, selector, description);
 }
 
-double selected_event_timestamp(const Event& event, std::string_view selector,
-                                std::string_view description) {
+SelectedInstant selected_event_timestamp(const Event& event, std::string_view selector,
+                                         std::string_view description) {
   const auto raw = selected_event_value(event, selector,
                                         SelectorRole::kTimestamp, description);
-  const auto parsed = parse_timestamp(raw);
-  if (!parsed)
-    throw std::invalid_argument("correlation miner " + std::string(description) +
-                                " selector '" + std::string(selector) +
-                                "' contains an invalid timestamp");
-  return python_epoch_seconds(raw, *parsed);
+  return selected_instant(raw, selector, description);
 }
 
 std::string completion_selector(const CorrelationMinerOptions& options) {
@@ -392,7 +414,7 @@ PreparedEvent prepare_event(const Event& event,
                          ? selected_event_timestamp(event, *start_key,
                                                     "start timestamp")
                          : complete;
-  return {activity, start, complete, input_index};
+  return {activity, start.seconds, complete.seconds, input_index, start.exact, complete.exact};
 }
 
 PreparedEvent prepare_flat_record(
@@ -409,7 +431,7 @@ PreparedEvent prepare_flat_record(
                          ? selected_timestamp(record.fields, *start_key,
                                               "start timestamp")
                          : complete;
-  return {activity, start, complete, input_index};
+  return {activity, start.seconds, complete.seconds, input_index, start.exact, complete.exact};
 }
 
 PreparedEvent prepare_flat_row(
@@ -591,10 +613,10 @@ PreparedInput prepare_event_table(const EventTable& table,
   if (options.variant == CorrelationVariant::kClassicSplit) {
     std::stable_sort(prepared.raw_flat.begin(), prepared.raw_flat.end(),
                      [](const auto& left, const auto& right) {
-                       if (left.complete != right.complete)
-                         return left.complete < right.complete;
-                       if (left.start != right.start)
-                         return left.start < right.start;
+                       if (left.complete_exact != right.complete_exact)
+                         return left.complete_exact < right.complete_exact;
+                       if (left.start_exact != right.start_exact)
+                         return left.start_exact < right.start_exact;
                        return left.input_index < right.input_index;
                      });
   }
@@ -607,9 +629,9 @@ struct PairStatistics {
 };
 
 bool event_less(const PreparedEvent& left, const PreparedEvent& right) {
-  if (left.start != right.start) return left.start < right.start;
-  if (left.complete != right.complete) {
-    return left.complete < right.complete;
+  if (left.start_exact != right.start_exact) return left.start_exact < right.start_exact;
+  if (left.complete_exact != right.complete_exact) {
+    return left.complete_exact < right.complete_exact;
   }
   return left.input_index < right.input_index;
 }
@@ -672,90 +694,37 @@ double greedy_duration(const PreparedEvents& source,
                   mean_or_zero(reverse_lifo_delays(source, target)));
 }
 
-// Minimum-weight full matching for a rectangular bipartite graph. The smaller
-// partition is covered. Invalid (complete > start) pairs receive a finite high
-// cost so the full assignment remains feasible, then are discarded exactly as
-// in the reference behavior before the mean is calculated.
+// pm4py's exact time matching (round FT, observed black-box: spied calls and
+// 2,300 random lists): a complete bipartite networkx graph with the source
+// completions as nodes 0..n-1 and the target starts as nodes n..n+m-1, an edge
+// weighing start - completion when the target starts at or after the source
+// completes and sys.maxsize otherwise, solved by networkx's
+// minimum_weight_full_matching, i.e. SciPy's linear_sum_assignment on a float64
+// matrix whose rows are the sources in list order and whose columns are the
+// targets in the order of a CPython set of their node ids. sys.maxsize
+// absorbs the small weights added to it, which makes many assignments tie;
+// SciPy's own path picks among them. The valid matched pairs are averaged
+// with statistics.mean.
 double exact_duration(const PreparedEvents& source,
                       const PreparedEvents& target) {
   if (source.empty() || target.empty()) return 0.0;
-
-  const bool source_is_rows = source.size() <= target.size();
-  const std::size_t row_count =
-      source_is_rows ? source.size() : target.size();
-  const std::size_t column_count =
-      source_is_rows ? target.size() : source.size();
-
-  const auto directed_delay = [&](std::size_t row,
-                                  std::size_t column) {
-    const auto source_index = source_is_rows ? row : column;
-    const auto target_index = source_is_rows ? column : row;
-    return target[target_index].start - source[source_index].complete;
-  };
-  const auto assignment_cost = [&](std::size_t row,
-                                   std::size_t column) {
-    const double delay = directed_delay(row, column);
-    return delay >= 0.0 ? delay : kInvalidMatchingCost;
-  };
-
-  // Rectangular Hungarian algorithm, one-based internally.
-  std::vector<double> row_potential(row_count + 1, 0.0);
-  std::vector<double> column_potential(column_count + 1, 0.0);
-  std::vector<std::size_t> column_match(column_count + 1, 0);
-  std::vector<std::size_t> previous_column(column_count + 1, 0);
-  for (std::size_t row = 1; row <= row_count; ++row) {
-    column_match[0] = row;
-    std::size_t current_column = 0;
-    const double infinity = std::numeric_limits<double>::infinity();
-    std::vector<double> minimum(column_count + 1, infinity);
-    std::vector<bool> used(column_count + 1, false);
-    do {
-      used[current_column] = true;
-      const std::size_t current_row = column_match[current_column];
-      double delta = infinity;
-      std::size_t next_column = 0;
-      for (std::size_t column = 1; column <= column_count; ++column) {
-        if (used[column]) continue;
-        const double reduced =
-            assignment_cost(current_row - 1, column - 1) -
-            row_potential[current_row] - column_potential[column];
-        if (reduced < minimum[column] - kComparisonTolerance) {
-          minimum[column] = reduced;
-          previous_column[column] = current_column;
-        }
-        if (minimum[column] < delta - kComparisonTolerance) {
-          delta = minimum[column];
-          next_column = column;
-        }
-      }
-      for (std::size_t column = 0; column <= column_count; ++column) {
-        if (used[column]) {
-          row_potential[column_match[column]] += delta;
-          column_potential[column] -= delta;
-        } else {
-          minimum[column] -= delta;
-        }
-      }
-      current_column = next_column;
-    } while (column_match[current_column] != 0);
-
-    do {
-      const std::size_t next_column =
-          previous_column[current_column];
-      column_match[current_column] = column_match[next_column];
-      current_column = next_column;
-    } while (current_column != 0);
-  }
-
+  constexpr double kSysMaxsize = 9223372036854775807.0;
+  const std::size_t n = source.size();
+  const std::size_t m = target.size();
+  const auto columns = detail::scipy_lsap::cpython_consecutive_int_set_order(n, m);
+  std::vector<double> cost(n * m);
+  for (std::size_t i = 0; i < n; ++i)
+    for (std::size_t c = 0; c < m; ++c) {
+      const auto& to = target[columns[c] - n];
+      cost[i * m + c] = to.start >= source[i].complete ? to.start - source[i].complete
+                                                       : kSysMaxsize;
+    }
   std::vector<double> delays;
-  delays.reserve(row_count);
-  for (std::size_t column = 1; column <= column_count; ++column) {
-    if (column_match[column] == 0) continue;
-    const double delay =
-        directed_delay(column_match[column] - 1, column - 1);
-    if (delay >= 0.0) delays.push_back(delay);
+  for (const auto& [row, column] : detail::scipy_lsap::linear_sum_assignment(cost, n, m)) {
+    const auto& to = target[columns[column] - n];
+    if (to.start >= source[row].complete) delays.push_back(to.start - source[row].complete);
   }
-  return mean_or_zero(delays);
+  return delays.empty() ? 0.0 : detail::exact_mean(delays);
 }
 
 // pm4py walks the two start-sorted lists once: for each source in turn it
@@ -1149,6 +1118,18 @@ CorrelationMinerResult discover_with_reference_keys(
       }
       return discover_prepared(prepared, projected);
     }
+  }
+  // pm4py's classic variants default the start key to time:timestamp, not to
+  // the completion key: with another completion key and no start key, each
+  // event starts at its time:timestamp and completes at that key (round FT,
+  // observed black-box, frames, streams and EventLogs alike).
+  if (options.variant != CorrelationVariant::kTraceBased &&
+      !options.reference_timestamp_key.empty() &&
+      options.reference_timestamp_key != "time:timestamp" &&
+      options.start_timestamp_attribute.empty()) {
+    auto started = options;
+    started.start_timestamp_attribute = "time:timestamp";
+    return discover_prepared(prepare(input, started), started);
   }
   return discover_prepared(prepare(input, options), options);
 }

@@ -5556,6 +5556,55 @@ void review_fs_nanosecond_ordering() {
   }
 }
 
+// Round FT: CSV rows keep their columns as text, and pm4py's apply_heu_pandas
+// compares each completion with its case's next start (rows sorted by case
+// and start, a missing start last) and subtracts them before any .dt, so two
+// text columns raise TypeError once a case has such a pair with both cells
+// present; without one the .dt error stays (observed black-box). The rows
+// keep a blank cell as empty text; `nan` marks blanks missing, as read_csv's
+// NaN, for the cases without a pair.
+void review_ft_plusplus_pandas_text_columns() {
+  const auto error_of = [](const std::string& csv, std::optional<std::string> start, bool nan = false) {
+    std::istringstream text(csv);
+    CsvImportOptions import_options;
+    import_options.case_id_column = "case";
+    import_options.activity_column = "act";
+    import_options.timestamp_column = "ts";
+    auto table = import_csv_event_data(text, import_options).table;
+    if (nan)
+      for (auto& row : table.rows)
+        for (auto& cell : row)
+          if (cell && cell->value.empty()) cell->is_null = true;
+    auto options = plus_options();
+    options.activity_attribute = "act";
+    options.case_id_attribute = "case";
+    options.timestamp_attribute = "ts";
+    options.start_timestamp_attribute = std::move(start);
+    try {
+      (void)discover_plus_plus_pandas(table, options);
+    } catch (const HeuristicPandasError& error) {
+      return error.reference_type() + ": " + error.what();
+    }
+    return std::string("no error");
+  };
+  const std::string pair = "builtins.TypeError: unsupported operand type(s) for -: 'str' and 'str'";
+  const std::string accessor = "builtins.AttributeError: Can only use .dt accessor with datetimelike values";
+  const std::string text =
+      "case,act,ts,ts2\nc1,a,2020-01-01 00:00:00,x\nc0,b,2020-01-01 00:00:01,y\nc1,c,2020-01-01 00:00:02,z\n";
+  assert(error_of(text, std::nullopt) == pair);
+  assert(error_of(text, "ts2") == pair);
+  assert(error_of(text, "missing") == pair);
+  // One row per case: no pair.
+  assert(error_of("case,act,ts\nc0,a,2020-01-01 00:00:00\nc1,a,2020-01-01 00:00:01\n", std::nullopt) == accessor);
+  // Sorted by start, the next start is missing: no pair with both cells.
+  const std::string late = "case,act,ts,ts2\nc0,a,2020-01-01 00:00:05,\nc0,b,2020-01-01 00:00:01,y\n";
+  assert(error_of(late, "ts2", true) == accessor);
+  // As empty text the blank start sorts first and pairs.
+  assert(error_of(late, "ts2") == pair);
+  // The completion of the first row by start is missing.
+  assert(error_of("case,act,ts,ts2\nc0,a,,x\nc0,b,2020-01-01 00:00:01,y\n", "ts2", true) == accessor);
+}
+
 int main(int argc, char** argv) {
   std::optional<std::string> classic_flat_evidence;
   std::optional<std::string> classic_object_evidence;
@@ -5591,6 +5640,7 @@ int main(int argc, char** argv) {
           "--heuristic-inputless-evidence PATH]");
     }
   }
+  review_ft_plusplus_pandas_text_columns();
   interval_abstraction_and_strict_threshold();
   plusplus_frequency_representation_preserves_integer_type();
   plusplus_computed_public_fields_acceptance();

@@ -25,6 +25,7 @@
 #include "full_double.hpp"
 #include "numpy_object_sort.hpp"
 #include "performance_arithmetic.hpp"
+#include "polars_sort.hpp"
 
 namespace minera {
 namespace {
@@ -561,7 +562,8 @@ std::vector<TableRow> read_rows(const EventTable& table,
 // the frame's order, which does not keep the order of a case's rows (round
 // BM, observed black-box).
 void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options,
-               bool nulls_first = false, bool pandas = false) {
+               bool nulls_first = false, bool pandas = false,
+               bool polars_unstable = false) {
   if (!options.sort_caseid_required) return;
   if (pandas && !options.sort_timestamp_along_case_id) {
     std::vector<std::size_t> present, missing;
@@ -590,6 +592,27 @@ void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options,
     if (lhs->nanoseconds != rhs->nanoseconds) return lhs->nanoseconds < rhs->nanoseconds ? -1 : 1;
     return 0;
   };
+  // Polars' sort by case and timestamps is unstable: tied rows leave their
+  // input order the way its parallel pdqsort moves them, which shows on an
+  // XES upload's frame (trace order) with more than 20 rows (round FT,
+  // observed black-box).
+  if (polars_unstable && options.sort_timestamp_along_case_id) {
+    std::vector<std::size_t> order(rows.size());
+    std::iota(order.begin(), order.end(), std::size_t{0});
+    polars_sort::sort_unstable(order, [&](std::size_t a, std::size_t b) {
+      const auto& lhs = rows[a];
+      const auto& rhs = rows[b];
+      if (lhs.case_value != rhs.case_value) return lhs.case_value < rhs.case_value;
+      if (const int by = compare(lhs.start_exact, rhs.start_exact)) return by < 0;
+      return compare(lhs.completion_exact, rhs.completion_exact) < 0;
+    });
+    std::vector<TableRow> sorted;
+    sorted.reserve(rows.size());
+    for (const auto i : order) sorted.push_back(std::move(rows[i]));
+    rows = std::move(sorted);
+    for (std::size_t i = 0; i < rows.size(); ++i) rows[i].generated_index = i;
+    return;
+  }
   std::stable_sort(rows.begin(), rows.end(), [&](const TableRow& lhs,
                                                  const TableRow& rhs) {
     if (lhs.case_value != rhs.case_value) {
@@ -1136,7 +1159,7 @@ DfgTableResult discover_table_dfg(const EventTable& table,
                         false, options.measure == DfgTableMeasure::kCost, false,
                         backend == DfgTableBackend::kPandas,
                         requires_completion);
-  sort_rows(rows, options, polars, !polars);
+  sort_rows(rows, options, polars, !polars, polars);
   assign_generated_indices(rows);
   const auto pairs = graph_pairs(rows, options, backend);
 
@@ -1352,7 +1375,10 @@ DfgPartialOrderResult discover_partial_table(const EventTable& table,
     throw std::invalid_argument(std::string("Invalid comparison between dtype=datetime64[") +
                                 (nanoseconds ? "ns" : "us") + ", UTC] and ndarray");
   }
-  sort_rows(rows, options, false, backend == DfgTableBackend::kPandas);
+  // Polars sorts a missing start first, and its sort is unstable (round FT,
+  // observed black-box).
+  sort_rows(rows, options, backend == DfgTableBackend::kPolars,
+            backend == DfgTableBackend::kPandas, backend == DfgTableBackend::kPolars);
   assign_generated_indices(rows);
   if (options.business_hours) (void)normalized_slots(options);
 
@@ -1433,7 +1459,7 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
       row.index_is_generated = true;
     }
   }
-  sort_rows(rows, options, false, backend == DfgTableBackend::kPandas);
+  sort_rows(rows, options, !pandas, pandas, !pandas);
   assign_generated_indices(rows);
   if (options.business_hours) (void)normalized_slots(options);
 
@@ -1488,8 +1514,12 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
         continue;
       if (backend == DfgTableBackend::kPolars && !index_less(left, right))
         continue;
-      if (!same_case(left, right, pandas) || !left.completion ||
-          !right.start || !left.start || !right.completion)
+      // Polars takes the latest start and the earliest completion with
+      // max_horizontal and min_horizontal, which skip a missing value: only
+      // the prefilter's right start and left completion are required (round
+      // FT, observed black-box).
+      if (!same_case(left, right, pandas) || !left.completion || !right.start ||
+          (pandas && (!left.start || !right.completion)))
         continue;
       // Only the lazy adapter applies this one-sided prefilter before it
       // calculates interval overlap.
@@ -1497,8 +1527,9 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
       if (!pandas && instant_less(*right.start, polars_instant(right.start_exact, polars_microseconds),
                                   *left.completion, polars_instant(left.completion_exact, polars_microseconds)))
         continue;
-      double maximum_start = std::max(*left.start, *right.start);
-      double minimum_completion = std::min(*left.completion, *right.completion);
+      double maximum_start = left.start ? std::max(*left.start, *right.start) : *right.start;
+      double minimum_completion =
+          right.completion ? std::min(*left.completion, *right.completion) : *left.completion;
       // pandas takes each instant's Timestamp.timestamp() (a float rounded
       // to the microsecond) and compares their difference (round BM,
       // observed black-box).
@@ -1513,16 +1544,20 @@ DfgConcurrentResult discover_concurrent_table(const EventTable& table,
       // Polars measures the overlap in whole seconds, truncated toward zero,
       // and compares that with 0 (round FS, observed black-box: an overlap
       // of -0.7 seconds is 0, so concurrent unless strict).
-      if (!pandas && left.start_exact && right.start_exact && left.completion_exact &&
-          right.completion_exact) {
-        const auto left_start = *polars_instant(left.start_exact, polars_microseconds);
+      if (!pandas && right.start_exact && left.completion_exact &&
+          (left.start_exact || !left.start) && (right.completion_exact || !right.completion)) {
         const auto right_start = *polars_instant(right.start_exact, polars_microseconds);
         const auto left_completion = *polars_instant(left.completion_exact, polars_microseconds);
-        const auto right_completion = *polars_instant(right.completion_exact, polars_microseconds);
-        const auto& latest_start =
-            instant_less(0.0, left_start, 0.0, right_start) ? right_start : left_start;
-        const auto& earliest_completion =
-            instant_less(0.0, right_completion, 0.0, left_completion) ? right_completion : left_completion;
+        auto latest_start = right_start;
+        if (left.start) {
+          const auto left_start = *polars_instant(left.start_exact, polars_microseconds);
+          if (!instant_less(0.0, left_start, 0.0, right_start)) latest_start = left_start;
+        }
+        auto earliest_completion = left_completion;
+        if (right.completion) {
+          const auto right_completion = *polars_instant(right.completion_exact, polars_microseconds);
+          if (instant_less(0.0, right_completion, 0.0, left_completion)) earliest_completion = right_completion;
+        }
         overlap = polars_whole_seconds(latest_start, earliest_completion);
       }
       if (options.strict ? overlap <= 0.0 : overlap < 0.0) continue;

@@ -4,7 +4,9 @@
 #include <optional>
 #include <stdexcept>
 #include <string_view>
+#include <utility>
 
+#include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
 
 namespace minera {
@@ -23,24 +25,44 @@ std::vector<EventuallyFollowsEdge> edges_of(const std::vector<std::uint64_t>& co
   return edges;
 }
 
-std::int64_t required_time(const Event& event, const std::string& key,
-                           const char* role) {
+// An instant as (UTC seconds, nanoseconds). A CSV upload's cells keep their
+// nanoseconds, as the Timestamps of pm4py's EventLog of the frame do; other
+// logs hold Python datetimes (microseconds).
+using Instant = std::pair<std::int64_t, std::int64_t>;
+
+Instant required_time(const Event& event, const std::string& key,
+                      const char* role, bool exact) {
   const std::string* text = nullptr;
   if (key.empty() || key == "timestamp" || key == "time:timestamp") {
     text = &event.timestamp;
   } else {
     text = event.attribute(key);
+    // The timestamp column under its own header (a CSV upload's) is an
+    // attribute of the frame's events too (round FT, observed black-box).
+    if (text == nullptr && !event.timestamp_source_key.empty() &&
+        key == event.timestamp_source_key)
+      text = &event.timestamp;
   }
   if (text == nullptr || text->empty()) {
     throw std::invalid_argument(std::string("eventually follows: event is missing ") +
                                 role + " timestamp attribute '" + key + "'");
+  }
+  if (exact) {
+    if (const auto parsed = parse_timestamp_exact(*text))
+      return {parsed->seconds, static_cast<std::int64_t>(parsed->nanoseconds)};
   }
   const auto parsed = parse_timestamp_microseconds(*text);
   if (!parsed) {
     throw std::invalid_argument(std::string("eventually follows: invalid ") + role +
                                 " timestamp '" + *text + "'");
   }
-  return *parsed;
+  auto seconds = *parsed / 1'000'000;
+  auto fraction = *parsed % 1'000'000;
+  if (fraction < 0) {
+    fraction += 1'000'000;
+    --seconds;
+  }
+  return {seconds, fraction * 1'000};
 }
 
 }  // namespace
@@ -72,10 +94,13 @@ std::vector<EventuallyFollowsEdge> discover_eventually_follows(
                                              ? std::string("time:timestamp")
                                              : options.start_timestamp_attribute;
     struct Interval {
-      std::int64_t start = 0;
-      std::int64_t end = 0;
+      Instant start;
+      Instant end;
       std::size_t id = 0;
     };
+    // Round FT: a CSV upload's starts and completions are ordered and
+    // compared at their nanoseconds (observed black-box).
+    const bool exact = log.dataframe_columns && log.dataframe_columns->csv_text;
     std::vector<Interval> events;
     for (const auto& trace : log.traces) {
       events.clear();
@@ -83,8 +108,8 @@ std::vector<EventuallyFollowsEdge> discover_eventually_follows(
       for (const auto& event : trace.events) {
         const auto id = graph.activity_id(event.activity);
         if (!id) continue;
-        events.push_back({required_time(event, start_attribute, "start"),
-                          required_time(event, options.timestamp_attribute, "completion"),
+        events.push_back({required_time(event, start_attribute, "start", exact),
+                          required_time(event, options.timestamp_attribute, "completion", exact),
                           *id});
       }
       std::stable_sort(events.begin(), events.end(),

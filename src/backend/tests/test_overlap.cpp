@@ -1,10 +1,12 @@
 #include "minera/overlap.hpp"
 #include "minera/eventually_follows.hpp"
+#include "minera/dataframe_columns.hpp"
 
 #undef NDEBUG
 #include <cassert>
 #include <cstdio>
 #include <map>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -191,9 +193,41 @@ void inverted_interval_reference() {
   assert(discover_concurrent_activity_overlap(envelope, options).empty());
 }
 
+// Round FT: a CSV upload's frame keeps nanoseconds, and pm4py's interval EFG
+// (statistics.eventually_follows.log on its EventLog) orders and compares
+// them there: B starting at :10.000000001 does not follow A completing at
+// :10.000000002 (pm4py: {}), though both read :10.000000 at microseconds.
+// The CSV's own timestamp header names the completion too (observed
+// black-box).
+void eventually_follows_csv_nanoseconds_reference() {
+  const auto ev = [](const char* activity, const char* start, const char* complete) {
+    Event e;
+    e.activity = activity;
+    e.timestamp = complete;
+    e.timestamp_source_key = "ts";
+    e.attributes.push_back({"st", start, AttributeKind::kDate});
+    return e;
+  };
+  EventLog log;
+  log.traces.push_back(Trace{"c1", {ev("A", "2020-01-01T00:00:10Z", "2020-01-01T00:00:10.000000002Z"),
+                                    ev("B", "2020-01-01T00:00:10.000000001Z", "2020-01-01T00:00:11Z")}});
+  const auto graph = discover_directly_follows_graph(log);
+  EventuallyFollowsOptions options;
+  options.start_timestamp_attribute = "st";
+  // Without a frame (microseconds) the pair counts.
+  assert(discover_eventually_follows(log, graph, options).size() == 1);
+  log.dataframe_columns = std::make_shared<DataFrameColumns>();
+  assert(discover_eventually_follows(log, graph, options).empty());
+  options.timestamp_attribute = "ts";
+  assert(discover_eventually_follows(log, graph, options).empty());
+  log.traces[0].events[0].timestamp = "2020-01-01T00:00:10.000000001Z";
+  assert(discover_eventually_follows(log, graph, options).size() == 1);
+}
+
 }  // namespace
 
 int main() {
+  eventually_follows_csv_nanoseconds_reference();
   eventually_follows_interval_reference();
   eventually_follows_timestamp_order_reference();
   inverted_interval_reference();
