@@ -391,6 +391,17 @@ struct HeuristicClassicDfgInput {
 // and decorations stay on discover_heuristics_net.
 [[nodiscard]] HeuristicsNet discover_heuristics_net_xes_frame(
     const EventDataView& data, const HeuristicMinerOptions& options = {});
+
+// Heuristics++ on a CSV upload mined as a pandas DataFrame or a Polars
+// LazyFrame (round GI, observed black-box): the lifecycle instances are the
+// frame's typed cells, paired by the column's pandas dtype as on the
+// upload's log shape (each NaN of a float64 column its own key) or, on
+// Polars, with every gap the one null; the table's text paired every gap
+// and kept "1" apart from "1.0". Other variants and kinds stay on
+// discover_heuristics_net.
+[[nodiscard]] HeuristicsNet discover_heuristics_net_csv_frame(
+    const EventDataView& data, const HeuristicMinerOptions& options,
+    const DataFrameColumns& columns);
 // Discovers a heuristics net from an event log. The dependency of a over b is
 // (|a>b| - |b>a|) / (|a>b| + |b>a| + 1); self-loops use |a>a| / (|a>a| + 1).
 [[nodiscard]] HeuristicsNet discover_heuristics_net(

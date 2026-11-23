@@ -2616,6 +2616,17 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_gh_tests minera_server)
     add_test(NAME minera_server_review_gh_tests
              COMMAND minera_server_review_gh_tests $<TARGET_FILE:minera_server>)
+    # Review GI: Heuristics++ on CSV uploads' int start columns and frame
+    # shapes; empty-log alignments of supplied nets, the Petri alignment
+    # workbench, the export and the decomposed fitness.
+    add_executable(minera_server_review_gi_tests
+      src/backend/tests/test_server_review_gi.cpp)
+    target_include_directories(minera_server_review_gi_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_gi_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_gi_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_gi_tests minera_server minera_export)
+    add_test(NAME minera_server_review_gi_tests
+             COMMAND minera_server_review_gi_tests $<TARGET_FILE:minera_server> $<TARGET_FILE:minera_export>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

@@ -38844,3 +38844,148 @@ its heuristics and POWL nets; 11 of its 15 checks fail on GG's binary)
 carries the reference values. The full ctest passed 671 of 671 (27
 minutes, -j2) on the first run. The fixture replay left all 2,673
 responses unchanged; the Python script tests passed 406 of 406.
+
+## Review GI1: Heuristics++ on CSV uploads' big-int start columns and frame shapes, empty-log alignments of supplied nets, the workbench and the export (2026-11-23)
+
+Round GI re-reviewed round GH: Heuristics++ (`heuristic_variant=plusplus`)
+on CSV uploads with other columns, on the log shape against
+`heuristics_miner.apply_heu(variant=PLUSPLUS)` on
+`convert_to_event_log(format_dataframe(read_csv))` and on the frame shapes
+(`mining_input_shape=dataframe|lazyframe`) against the same call on
+`format_dataframe`'s frame and on its Polars copy as a LazyFrame; the other
+consumers of alignments of an upload without traces (`/api/align` and the
+decomposed alignment fitness on a supplied net, the Petri alignment
+workbench, the `minera_export` CLI's model alignments, the mine analysis'
+conformance summary); and the Alpha and Inductive models' footprints and
+token replay on the log shape. GH's CI run 45090146735 (d1ba3d0) passed on
+Linux, macOS and the Python, verifier and frontend jobs; its Windows ctest
+job was still running at GI's end; GG's run 45082708237 finished green,
+Windows included. Observed black-box on pm4py 2.7.22
+(pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` and
+`PYTHONHASHSEED=0`.
+
+Banks: 720 CSV Heuristics++ uploads from `gen/genhcsv2.py` (GH's
+generator with more column kinds; icA to icG, seeds 10700-11419): instance
+columns of ints, floats, text, mixed cells, bools, dates, mixed dates, ints
+beyond uint64 or below int64 and offset dates; lifecycle columns of the
+standard words, dates, upper case, numbers and mixed cells; start columns
+of dates, text, ints, ints beyond int64 (uint64), beyond uint64 or below
+int64 (object columns of Python ints), floats, offset dates and
+millisecond dates; gaps in each; renamed case, activity and timestamp
+headers. GH's 1,161 CSV uploads (hcA to hcH and gcsv) on the frame shapes
+for the first time; 12 hand-made CSV probes; an empty XES upload and a
+PNML net without transitions.
+
+Fixed:
+
+- **GI1-1. Heuristics++ on a CSV upload's log shape with a start column of
+  ints beyond int64.** read_csv types ints above int64 as a uint64
+  column, and ints beyond uint64 or below int64 as an object column of
+  Python ints (NaN in its gaps). The log shape keeps the log as it is
+  (GH1-1) and the abstraction compares each completion with the starts:
+  `TypeError: '<=' not supported between instances of 'Timestamp' and
+  'int'` (`'float'` where the first compared start is a gap), the starts
+  sorted by their exact values. Minera reported its own start-timestamp
+  message on these columns (70 uploads).
+- **GI1-2. Heuristics++ on a CSV upload's frame shapes.** pm4py reads
+  `format_dataframe`'s frame, whose columns keep read_csv's dtypes (every
+  fully parsed date column a UTC datetime column), or its Polars copy:
+  - with a `start_timestamp` column every event holds the start key, so
+    `to_interval` keeps the frame as it is and the abstraction reads each
+    start as the frame's Python object and raises as on an XES upload's
+    frame (GC1): a date column's NaT `ValueError: NaTType does not support
+    timestamp`, a text, int, uint64, float or bool column `TypeError: '<='
+    not supported between instances of 'Timestamp' and 'str'` (`'int'`,
+    `'float'`, `'bool'`), on Polars `datetime.datetime` against `str`,
+    `int`, `float`, `bool` or `NoneType`;
+  - without one, case by case in the frame's order, it lower-cases each
+    event's `lifecycle:transition`: a missing cell raises `AttributeError:
+    'float' object has no attribute 'lower'` (`'NoneType'` on Polars), a
+    cell of an int, float, bool or date column its type's name (`int`,
+    `float`, `bool`, `Timestamp` or `datetime.datetime`);
+  - the lifecycle instances pair by the frame's dtype, as on the log shape
+    (GH1-1): a float64 column holds each NaN as its own float, so a missing
+    or NaN instance pairs with nothing, and "1" beside "1.0" is one
+    instance; Polars' copy holds every gap as the one null (a missing start
+    pairs with a missing complete) and the floats by value.
+  Minera read the table's text: before, per shape, 314 uploads raised
+  another message and 292 raised only in pm4py; on the DataFrame shape
+  three performance decorations and one minimum-count matrix differed
+  (NaN instances paired), and on GH's uploads the LazyFrame shape gave 13
+  different results ("1" and "1.0" kept apart).
+- **GI1-3. Alignments of an upload without traces on a supplied net, in
+  the workbench and in the export.** GH1-2 failed the alignments of an
+  empty log on a net that is not easy sound for the mined heuristics net
+  only. pm4py checks easy soundness before reading the log for every net,
+  so `/api/align` with `miner=imported` (a PNML net without transitions,
+  its final marking unreachable), `/api/align-petri-workbench` and the
+  export's model alignments (`--check-pnml` and the mined nets) now report
+  the uncomputed result (`computed: false`) where they returned an empty
+  computed alignment; a sound net (the Inductive net of the same upload)
+  still aligns nothing with fitness 1. A net with weighted arcs is checked
+  by the reference's own easy-soundness rules for them, as the imported
+  net's other alignments are. pm4py's decomposed
+  alignments raise `ValueError: m must be a positive integer` on a net
+  without transitions whatever the log, so `/api/evaluate`'s
+  alignment-based fitness with `evaluation_alignment_variant=recompos_maximal`
+  of an empty log fails on such a net (Minera's message names the missing
+  transitions) and stays 0 on the Inductive net, as pm4py's.
+
+Before and after, on the 720 bank uploads (per option set `hpp`,
+`hpp_perf`, `hpp_min`: edges with dependency, frequency and performance,
+activities, start and end activities):
+
+| shape | before | after |
+|---|---|---|
+| log | 114 equal, 536 failing alike, 70 other messages | 114 equal, 606 failing alike |
+| DataFrame | 114 equal (111 performance, 113 minimum), 314 other messages, 292 failing in pm4py only | 114 equal, 606 failing alike |
+| LazyFrame | 114 equal, 314 other messages, 292 failing in pm4py only | 114 equal, 561 failing alike, 45 declared (below) |
+
+GH's 1,161 CSV uploads after: 836 equal and 317 failing alike on each
+shape and option set; 8 untimed uploads fail on both sides with other
+messages (the declared AE2-7 extension: pm4py's `format_dataframe` finds
+no date column, Minera reports the missing timestamp). The 12 probes
+equal or failing alike on every shape but the two declared Polars object
+columns.
+
+Re-reviewed without a difference:
+
+- the Inductive model's log shape on the gg and gh banks: footprints 387
+  of 387 equal, token replay 327 equal and 60 empty logs (the declared
+  fitness), 33 uploads failing in the mine (an event without a label,
+  declared);
+- the Alpha model's log shape on the same banks: token replay totals 327
+  equal and 60 empty logs (the declared fitness), footprints 269 equal on
+  bounded nets and 118 failing on both sides on unbounded ones (Minera's
+  unboundedness error, pm4py past the sweep's 20-second bound), 33
+  failing in the mine, as in GH1;
+- the mine analysis' conformance summary holds no alignments (token
+  replay and footprints only), so an upload without traces is unaffected
+  there.
+
+Declared:
+
+- Polars' copy of a CSV object column (ints beyond uint64 or below int64)
+  needs pyarrow in pm4py's environment, which the pinned reference
+  environment does not hold (installing it changes pandas' string storage
+  and sort order); the harness copies such a column as text, so its 45
+  start columns raise `'<=' not supported between instances of
+  'datetime.datetime' and 'str'` in pm4py and Minera's start-timestamp
+  message. Minera does not model these LazyFrame cells.
+- The decomposed alignment fitness of an empty log on a net without
+  transitions fails with Minera's message ("decomposed alignment requires
+  a net with at least one transition") for pm4py's `ValueError: m must be
+  a positive integer`.
+- Unchanged: the declared items of GH1 and before.
+
+In the suite: the new `minera_server_review_gi_tests` (Heuristics++ on CSV
+uploads: uint64, object and int start columns, a NaT start, a lifecycle
+gap and int, date and bool lifecycle columns on all three shapes, NaN and
+float instance pairs on both frame shapes; the empty upload's alignments
+on a supplied net without transitions through `/api/align`, the decomposed
+fitness, the Petri alignment workbench and the export; 26 of its 43 checks
+fail on GH's server binary) carries the reference values. The full ctest
+passed 672 of 672 (36 minutes, -j2) on the first run. The fixture replay
+left all 2,673 responses unchanged; the Python script tests passed 406 of
+406.

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GH (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GI (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9242,6 +9242,61 @@ GH's suite: the full ctest 671 of 671 (27 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gh/`.
+
+Round GI re-reviewed GH and aligned Heuristics++ on CSV uploads' frame
+shapes and big-int start columns, and the alignments of an upload without
+traces on supplied nets, in the Petri alignment workbench and in the export
+(Review GI1). GH's CI run 45090146735 passed on Linux, macOS and the
+Python, verifier and frontend jobs (Windows ctest still running at GI's
+end); GG's run 45082708237 finished green, Windows included. No device was reachable, so no newer reviewer handoff was read from
+the Mac. New banks: `gen/genhcsv2.py` (720 CSV Heuristics++ uploads icA to
+icG, seeds 10700-11419, with date, mixed, big-int and offset instance
+columns, date, upper-case and numeric lifecycle columns, and start columns
+of uint64, object (beyond uint64 or below int64), float and offset cells),
+GH's 1,161 CSV uploads on the frame shapes, 12 CSV probes. Fixed: GI1-1, a
+CSV start column of ints beyond int64 (uint64, or an object column of
+Python ints with NaN gaps) raises pm4py's Timestamp TypeError on the log
+shape, the starts compared exactly; GI1-2, the frame shapes
+(`mining_input_shape=dataframe|lazyframe`) raise pm4py's errors before any
+interval (start column cells as the frame's objects, lifecycle cells
+lower-cased case by case: `float`/`NoneType` for a gap, the column's type
+otherwise) and pair instances by the frame's dtype (a float64 column's NaN
+pairs with nothing, Polars' null with a null, 1 with 1.0); GI1-3, an empty
+log's alignments on a net that is not easy sound fail for supplied nets
+too (`/api/align` with `miner=imported`, `/api/align-petri-workbench`, the
+export's model alignments), and the decomposed fitness of an empty log
+fails on a net without transitions. After: the 720 uploads 114 equal and
+606 failing alike per shape and option set (45 declared Polars object
+columns on the LazyFrame shape), where the frame shapes differed on 606
+and the log shape on 70 before; GH's uploads 836 equal and 317 failing
+alike per shape (8 untimed, declared AE2-7). The Inductive model's log
+shape footprints 387 of 387 equal; the Alpha model's as in GH. Declared:
+Polars' copy of a CSV object column (needs pyarrow), the decomposed
+empty-log message.
+
+GI's suite: the full ctest 672 of 672 (36 minutes, -j2, first run; the new
+`minera_server_review_gi_tests` fails 26 of its 43 checks on GH's server
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gi/`.
+
+Next round (GJ) should start by re-reviewing round GI:
+
+- GI's CI run (and GH's Windows ctest job if it was still running);
+- GI1 on fresh banks: Heuristics++ on CSV frame shapes with a configured
+  start-timestamp key or business hours (`check_plus_plus_csv_frame`
+  leaves both on the older path), with text instance columns holding NA
+  words ("NA", "null", "None") and zero-padded ints, and through
+  `/api/discover-workflow` as well as `/api/mine`;
+- the routes reading a CSV frame's Heuristics++ net (token replay, the
+  heuristics Petri conversion, the performance view), whose net now pairs
+  instances by the frame's dtype;
+- the decomposed alignments' other variants and the anti-alignments on an
+  upload without traces;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GI (kept for its older items):
 
 Next round (GI) should start by re-reviewing round GH:
 

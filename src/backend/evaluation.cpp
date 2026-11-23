@@ -734,6 +734,11 @@ ReplayFitnessResult evaluate_replay_fitness(
       out.token_result.fitness = 0.0;
       out.token_result.activity_attribute = alignment_options.activity_attribute;
     } else if (decomposed_options) {
+      // The reference's decomposition raises on a net without transitions
+      // whatever the log (ValueError: m must be a positive integer), so an
+      // empty log fails there as a non-empty one does (round GI).
+      if (net.transitions().empty())
+        throw std::invalid_argument("decomposed alignment requires a net with at least one transition");
       out.decomposed_alignment_result = DecomposedAlignmentResult{};
     } else {
       out.alignment_result.variant = alignment_options.variant;

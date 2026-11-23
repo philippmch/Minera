@@ -26,6 +26,7 @@
 
 #include "pnml_model_options.hpp"
 #include "imported_alignment.hpp"
+#include "heuristic_plus_csv_frame.hpp"
 #include "replay_input_options.hpp"
 
 #include <algorithm>
@@ -768,6 +769,16 @@ minera::EventDataView session_selected_view(const MinedSession& session) {
   const auto kind = session.active_source->selected_kind();
   if (kind != minera::EventDataKind::kEventLog) return cached_source_view(session, kind);
   return session.active_source->selected_view();
+}
+
+// The frame columns of a CSV upload mined as a pandas or Polars frame
+// (round GI), else nullptr.
+const minera::DataFrameColumns* csv_frame_columns(const MinedSession& session) {
+  if (!session.active_source || session.active_source->file().format != "csv") return nullptr;
+  const auto kind = session.active_source->selected_kind();
+  if (kind != minera::EventDataKind::kEventTable && kind != minera::EventDataKind::kLazyEventTable) return nullptr;
+  const auto& log = session.active_source->checked_log();
+  return log.dataframe_columns && log.dataframe_columns->csv_text ? log.dataframe_columns.get() : nullptr;
 }
 
 // Whether the session holds an XES upload mined as a pandas or Polars frame:
@@ -5296,7 +5307,10 @@ void handle_workflow_discovery(const httplib::Request& request,
       } else net = xes_frame ? minera::discover_petri_net_xes_frame(discovery_input, params.alpha)
                              : minera::discover_petri_net(discovery_input, params.alpha);
     } else {
-      heuristic = minera::observe_exact_heuristic_call(discovery_input,params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(discovery_input, params.heuristic) : minera::discover_heuristics_net(discovery_input, params.heuristic);});
+      if (!xes_frame && session->active_source)
+        minera::tools::check_plus_plus_csv_frame(*session->active_source, params.heuristic);  // round GI
+      const auto* csv_columns = csv_frame_columns(*session);
+      heuristic = minera::observe_exact_heuristic_call(discovery_input,params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(discovery_input, params.heuristic) : csv_columns ? minera::discover_heuristics_net_csv_frame(discovery_input, params.heuristic, *csv_columns) : minera::discover_heuristics_net(discovery_input, params.heuristic);});
       try{net = minera::to_petri_net(*heuristic);minera::record_exact_petri_net(net);}
       catch(const std::exception& e){minera::record_exact_optional_artifact("conversion",e.what(),true);throw;}
     }
@@ -7337,7 +7351,10 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     }
     auto attribute_projection = minera::tools::evaluation_input_log(evaluated, options.activity_attribute);
     const auto& alignment_log = attribute_projection ? *attribute_projection : evaluated;
-    const auto result = minera::check_alignment(alignment_log, document.net, options);
+    auto result = minera::check_alignment(alignment_log, document.net, options);
+    // An input without traces fails on a net that is not easy sound, as the
+    // reference's log alignments check it first (round GI).
+    minera::tools::fail_empty_log_alignment_on_unsound_net(result, document.net, options);
     minera::DirectlyFollowsGraph graph;
     for (const auto& label : document.net.activities()) graph.ensure_activity(label);
     std::vector<std::vector<std::string>> traces;
@@ -7714,18 +7731,9 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     // The reference's log alignments check easy soundness before reading
     // the log, so a session without traces fails on a net whose final
     // marking is unreachable as a non-empty log does (round GH, observed
-    // black-box: a heuristics net without transitions). A supplied model's
-    // reference path checks it already.
-    if (miner != "imported" && alignment.computed && alignment.trace_count == 0) {
-      minera::EventLog probe;
-      probe.traces.push_back(minera::Trace{});
-      const auto soundness = minera::check_alignment(probe, selected, options);
-      if (!soundness.computed) {
-        alignment.computed = false;
-        alignment.exhausted = soundness.exhausted;
-        alignment.time_limit_reached = soundness.time_limit_reached;
-      }
-    }
+    // black-box: a heuristics net without transitions; round GI: a supplied
+    // model too).
+    minera::tools::fail_empty_log_alignment_on_unsound_net(alignment, selected, options);
     auto graph = session->graph;
     register_activity_selector_values(graph, *alignment_log,
                                       options.activity_attribute);

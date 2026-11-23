@@ -7884,6 +7884,14 @@ int run_export_impl(int argc, char** argv, ExactExportState& exact) {
                                          *alignment_log, petri,
                                          model_alignment_options)
                                    : minera::check_alignment(log, petri))};
+      // A log without traces fails on a net that is not easy sound, as the
+      // reference's log alignments check it before reading the log (round GI).
+      if (result.alignments) {
+        const bool own_options = is_imported || is_powl || is_inductive || is_alpha ||
+                                 alignment_option_used || document;
+        minera::tools::fail_empty_log_alignment_on_unsound_net(
+            *result.alignments, petri, own_options ? model_alignment_options : minera::AlignmentOptions{});
+      }
       minera::order_trace_diagnostics(result.token_replay, xes_case_order(*conformance_log));
       minera::set_model_soundness(result, reachability);
       return result;

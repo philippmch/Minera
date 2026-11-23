@@ -90,7 +90,10 @@ void handle_active_source_mining(const httplib::Request& request,
   std::optional<minera::HeuristicsNet> heuristics;
   run("heuristic", selected, [&](bool& native_returned) {
     // An XES upload's frame converts to an EventLog the way pm4py's does (round FZ).
-    heuristics = minera::observe_exact_heuristic_call(data(),params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(data(), params.heuristic) : minera::discover_heuristics_net(data(), params.heuristic);});
+    // A CSV upload's frame raises Heuristics++'s errors as pm4py's does (round GI).
+    if (!xes_frame) minera::tools::check_plus_plus_csv_frame(*session->active_source, params.heuristic);
+    const auto* csv_columns = csv_frame_columns(*session);
+    heuristics = minera::observe_exact_heuristic_call(data(),params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(data(), params.heuristic) : csv_columns ? minera::discover_heuristics_net_csv_frame(data(), params.heuristic, *csv_columns) : minera::discover_heuristics_net(data(), params.heuristic);});
     native_returned = true;
     try{auto bytes=minera::workflow_input_heuristics_json(*heuristics);minera::record_exact_optional_artifact("legacy_heuristics_json",bytes);return bytes;}
     catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_heuristics_json",e.what(),true);throw;}

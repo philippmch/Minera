@@ -6,6 +6,7 @@
 #include "exact_stdev.hpp"
 #include "frame_times.hpp"
 #include "heuristic_plus_frame_intervals.hpp"
+#include "minera/csv_event_log_importer.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/log_conversion.hpp"
 #include "minera/timestamp.hpp"
@@ -781,7 +782,7 @@ PlusAbstraction build_plus_abstraction(
     const auto type = csv_start_column->type;
     bool modelled = type == DataFrameColumnType::kDate || type == DataFrameColumnType::kString ||
                     type == DataFrameColumnType::kFloat64 || type == DataFrameColumnType::kInt64 ||
-                    type == DataFrameColumnType::kBool;
+                    type == DataFrameColumnType::kBool || type == DataFrameColumnType::kObject;
     std::vector<detail::PlusCell> starts, completes;
     std::vector<std::vector<std::size_t>> traces;
     for (const auto& trace : log.traces) {
@@ -806,6 +807,12 @@ PlusAbstraction build_plus_abstraction(
           if (const auto* value = std::get_if<std::int64_t>(&typed.typed_value)) {
             start.kind = detail::PlusCellKind::kInt;
             start.micros = *value;
+          } else if (std::holds_alternative<std::uint64_t>(typed.typed_value) ||
+                     (type == DataFrameColumnType::kObject && typed.kind == AttributeKind::kInt)) {
+            // A uint64 column's int beyond int64, or an object column's
+            // Python int of any size (round GI).
+            start.kind = detail::PlusCellKind::kInt;
+            start.text = typed.value;
           } else if (const auto* flag = std::get_if<bool>(&typed.typed_value)) {
             start.kind = detail::PlusCellKind::kBool;
             start.micros = *flag ? 1 : 0;
@@ -2936,6 +2943,39 @@ HeuristicsNet discover_heuristics_net(
     const EventDataView& data,
     const HeuristicMinerOptions& options) {
   return discover_heuristics_net(classic_event_log(data, options), options);
+}
+
+HeuristicsNet discover_heuristics_net_csv_frame(
+    const EventDataView& data, const HeuristicMinerOptions& options,
+    const DataFrameColumns& columns) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (options.variant != HeuristicMinerVariant::kPlusPlus || (data.kind() != EventDataKind::kEventTable && !polars))
+    return discover_heuristics_net(data, options);
+  // The table holds each cell as its text; the frame holds it typed by the
+  // column, a pandas NA text or an empty cell as a gap. Polars' copy holds
+  // every gap as the one null, so a float column's 1 and 1.0 pair and a
+  // missing instance pairs with a missing one (kPythonFrame).
+  auto log = classic_event_log(data, options);
+  const DataFrameColumn* instance_column = nullptr;
+  for (const auto& column : columns.columns)
+    if (column.key == options.lifecycle_instance_attribute && column.role == FirstClassAttributeRole::kNone)
+      instance_column = &column;
+  if (instance_column)
+    for (auto& trace : log.traces)
+      for (auto& event : trace.events)
+        for (auto& cell : event.attributes) {
+          if (cell.key != options.lifecycle_instance_attribute || cell.is_null) continue;
+          if (cell.value.empty() || is_pandas_csv_na_text(cell.value)) {
+            cell.is_null = true;
+          } else {
+            auto typed = csv_dataframe_cell(*instance_column, cell.value);
+            typed.key = cell.key;
+            cell = std::move(typed);
+          }
+        }
+  return discover_plus_plus(log, options,
+                            polars ? InstanceKeyMode::kPythonFrame
+                                   : csv_instance_mode(columns, options.lifecycle_instance_attribute));
 }
 
 HeuristicsNet discover_heuristics_net_xes_frame(

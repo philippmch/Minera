@@ -21,6 +21,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstdio>
 #include <map>
 #include <optional>
@@ -30,8 +31,9 @@
 
 namespace minera::detail {
 
-// kInt and kBool: a CSV start column of ints or bools (the value in micros);
-// kFloat: a float64 CSV start column's number (in `number`).
+// kInt and kBool: a CSV start column of ints or bools (the value in micros;
+// an int beyond int64, of a uint64 or object column, as its decimal text in
+// `text`); kFloat: a float64 CSV start column's number (in `number`).
 enum class PlusCellKind { kTimestamp, kNaT, kDatetime, kText, kNaN, kNone, kInt, kBool, kFloat };
 
 struct PlusCell {
@@ -40,6 +42,26 @@ struct PlusCell {
   std::string text;
   double number = 0.0;
 };
+
+// Python's `a < b` on two ints given as decimal text (an optional '-', no
+// leading zeros).
+inline bool plus_decimal_less(const std::string& a, const std::string& b) {
+  const bool na = !a.empty() && a[0] == '-', nb = !b.empty() && b[0] == '-';
+  if (na != nb) return na;
+  const auto da = a.substr(na ? 1 : 0), db = b.substr(nb ? 1 : 0);
+  const bool less = da.size() != db.size() ? da.size() < db.size() : da < db;
+  return na ? (da != db && !less) : less;
+}
+
+inline std::string plus_int_text(const PlusCell& cell) {
+  return cell.kind == PlusCellKind::kInt && !cell.text.empty() ? cell.text : std::to_string(cell.micros);
+}
+
+inline long double plus_number(const PlusCell& cell) {
+  if (cell.kind == PlusCellKind::kFloat) return cell.number;
+  if (cell.kind == PlusCellKind::kInt && !cell.text.empty()) return std::strtold(cell.text.c_str(), nullptr);
+  return static_cast<long double>(cell.micros);
+}
 
 inline const char* plus_cell_type(PlusCellKind kind) {
   switch (kind) {
@@ -130,13 +152,22 @@ inline bool plus_compare(const PlusCell& a, const PlusCell& b, bool or_equal) {
     return false;
   if (a.kind == PlusCellKind::kText && b.kind == PlusCellKind::kText) return or_equal ? a.text <= b.text : a.text < b.text;
   if (a.kind == PlusCellKind::kNaN && b.kind == PlusCellKind::kNaN) return false;
-  const auto floating = [](PlusCellKind kind) { return kind == PlusCellKind::kNaN || kind == PlusCellKind::kFloat; };
-  if (floating(a.kind) && floating(b.kind)) {
-    if (a.kind == PlusCellKind::kNaN || b.kind == PlusCellKind::kNaN) return false;
-    return or_equal ? a.number <= b.number : a.number < b.number;
-  }
+  // Numbers (ints, bools, floats, NaN of an object column of ints) compare
+  // by value; a comparison with NaN is false (round GI).
   const auto integral = [](PlusCellKind kind) { return kind == PlusCellKind::kInt || kind == PlusCellKind::kBool; };
-  if (integral(a.kind) && integral(b.kind)) return or_equal ? a.micros <= b.micros : a.micros < b.micros;
+  const auto numeric = [&](PlusCellKind kind) {
+    return integral(kind) || kind == PlusCellKind::kNaN || kind == PlusCellKind::kFloat;
+  };
+  if (numeric(a.kind) && numeric(b.kind)) {
+    if (a.kind == PlusCellKind::kNaN || b.kind == PlusCellKind::kNaN) return false;
+    if (integral(a.kind) && integral(b.kind)) {
+      if (a.text.empty() && b.text.empty()) return or_equal ? a.micros <= b.micros : a.micros < b.micros;
+      const auto x = plus_int_text(a), y = plus_int_text(b);
+      return or_equal ? !plus_decimal_less(y, x) : plus_decimal_less(x, y);
+    }
+    const auto x = plus_number(a), y = plus_number(b);
+    return or_equal ? x <= y : x < y;
+  }
   throw HeuristicPandasError("builtins.TypeError", std::string("'") + (or_equal ? "<=" : "<") +
                                                        "' not supported between instances of '" +
                                                        plus_cell_type(a.kind) + "' and '" + plus_cell_type(b.kind) + "'");
