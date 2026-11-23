@@ -717,6 +717,10 @@ PetriNet build_heuristics_petri_net(const HeuristicsNet& heuristics, detail::Heu
 }  // namespace
 
 PetriNet to_petri_net(const HeuristicsNet& heuristics) {
+  // A node whose value is no str with an incoming edge (round GM).
+  if (heuristics.petri_conversion_type)
+    throw HeuristicPandasError("builtins.TypeError", "can only concatenate str (not \"" +
+                                                         *heuristics.petri_conversion_type + "\") to str");
   return build_heuristics_petri_net(heuristics, nullptr);
 }
 

@@ -34,6 +34,13 @@ const std::string& selected_activity(const Event& event,
   // BN), as the heuristics miner reads it.
   if (!event.activity_source_key.empty() && event.activity_source_key == activity_attribute)
     return event.activity;
+  // Its resource and lifecycle columns likewise (round GM).
+  if (!event.resource_source_key.empty() && event.resource_source_key == activity_attribute &&
+      event.resource_state == FirstClassAttributeState::kPresent)
+    return event.resource;
+  if (!event.lifecycle_source_key.empty() && event.lifecycle_source_key == activity_attribute &&
+      event.lifecycle_state == FirstClassAttributeState::kPresent)
+    return event.lifecycle;
   throw std::invalid_argument(
       "model decoration: event is missing activity attribute '" +
       std::string(activity_attribute) + "'");

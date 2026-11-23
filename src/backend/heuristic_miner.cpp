@@ -1103,8 +1103,11 @@ std::optional<std::vector<std::vector<double>>> legacy_classic_waits(const Event
 // Polars' copy holds Datetime, String, Int64, Float64 and Boolean columns
 // as such and an object column as String (str() of each cell), a gap and
 // None as None. nullopt for other kinds.
+// How pandas types the column (round GM: `dtype`, when given).
+enum class ClassicFrameDtype { kDatetime, kString, kInt, kFloat, kBool, kObject, kNoneObject, kNaNFloat };
+
 std::optional<std::vector<detail::PlusCell>> classic_frame_cells(const EventTable& table, std::size_t column,
-                                                                 bool polars) {
+                                                                 bool polars, ClassicFrameDtype* dtype_out = nullptr) {
   using detail::PlusCell;
   using detail::PlusCellKind;
   enum class Cell { kGap, kNone, kDict, kDate, kText, kInt, kFloat, kBool };
@@ -1161,7 +1164,7 @@ std::optional<std::vector<detail::PlusCell>> classic_frame_cells(const EventTabl
     }
     kinds.push_back(kind);
   }
-  enum class Dtype { kDatetime, kString, kInt, kFloat, kBool, kObject, kNoneObject, kNaNFloat };
+  using Dtype = ClassicFrameDtype;
   const int families = int(dict) + int(date) + int(text) + int(integer || real) + int(boolean);
   Dtype dtype = Dtype::kObject;
   if (families == 0) dtype = gap ? Dtype::kNaNFloat : Dtype::kNoneObject;
@@ -1170,6 +1173,7 @@ std::optional<std::vector<detail::PlusCell>> classic_frame_cells(const EventTabl
   else if (text) dtype = Dtype::kString;
   else if (integer || real) dtype = real || gap || none ? Dtype::kFloat : Dtype::kInt;
   else dtype = gap || none ? Dtype::kObject : Dtype::kBool;
+  if (dtype_out) *dtype_out = dtype;
   std::vector<PlusCell> cells;
   cells.reserve(table.rows.size());
   for (std::size_t r = 0; r < table.rows.size(); ++r) {
@@ -3944,9 +3948,13 @@ HeuristicsNet discover_heuristics_net(
   return discover_heuristics_net(classic_event_log(data, options), options);
 }
 
+std::optional<HeuristicsNet> csv_frame_typed_heuristics(const EventDataView& data, const HeuristicMinerOptions& options,
+                                                        const DataFrameColumns& columns);
+
 HeuristicsNet discover_heuristics_net_csv_frame(
     const EventDataView& data, const HeuristicMinerOptions& options,
     const DataFrameColumns& columns) {
+  if (auto typed = csv_frame_typed_heuristics(data, options, columns)) return std::move(*typed);
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
   // The classic performance view with business hours or a start key reads
   // the frame's cells (round GK).
@@ -4010,6 +4018,352 @@ HeuristicsNet discover_heuristics_net_csv_frame(
   return discover_plus_plus(log, options,
                             polars ? InstanceKeyMode::kPythonFrame
                                    : csv_instance_mode(columns, options.lifecycle_instance_attribute));
+}
+
+// Python's repr of an XES value as read_xes's frame holds it (round GM): a
+// <list> with children {'value': None, 'children': [('k', v), ...]}, a
+// scalar with children {'value': v, 'children': {'k': v, ...}} (or pairs),
+// a valueless string or id None; text, ints, floats and booleans as Python
+// prints them. nullopt for other kinds (dates among the children).
+std::optional<std::string> xes_frame_value_repr(const EventAttribute& value) {
+  if (value.xes_public_shape == XesPublicShape::kNone) return std::string("None");
+  const bool xes_list = value.xes_public_shape == XesPublicShape::kWrapper;
+  const bool wrapped = xes_list || (value.container == AttributeContainerKind::kScalar &&
+                                    (value.scalar_wrapper || value.scalar_children_list || !value.children.empty()));
+  const auto scalar = [](const EventAttribute& cell) -> std::optional<std::string> {
+    if (cell.is_null) return std::string("None");
+    switch (cell.kind) {
+      case AttributeKind::kString:
+      case AttributeKind::kId: return python_str_repr(cell.value);
+      case AttributeKind::kInt:
+        if (const auto* number = std::get_if<std::int64_t>(&cell.typed_value)) return std::to_string(*number);
+        return std::nullopt;
+      case AttributeKind::kFloat:
+        if (const auto* number = std::get_if<double>(&cell.typed_value)) return python::float_repr(*number);
+        return std::nullopt;
+      case AttributeKind::kBoolean:
+        if (const auto* truth = std::get_if<bool>(&cell.typed_value)) return std::string(*truth ? "True" : "False");
+        return std::nullopt;
+      default: return std::nullopt;
+    }
+  };
+  if (!wrapped) {
+    if (value.container != AttributeContainerKind::kScalar) return std::nullopt;
+    return scalar(value);
+  }
+  std::string head = "None";
+  if (!xes_list) {
+    const auto own = scalar(value);
+    if (!own) return std::nullopt;
+    head = *own;
+  }
+  std::vector<std::pair<std::string, std::string>> children;
+  const bool pairs = xes_list ? value.container == AttributeContainerKind::kList : value.scalar_children_list;
+  for (const auto& child : value.children) {
+    if (child.xes_public_shape == XesPublicShape::kAbsent) continue;
+    const auto item = xes_frame_value_repr(child);
+    if (!item) return std::nullopt;
+    if (!pairs) {
+      // Later duplicate keys replace earlier values, as in a dictionary.
+      const auto existing = std::find_if(children.begin(), children.end(),
+                                         [&](const auto& entry) { return entry.first == child.key; });
+      if (existing != children.end()) {
+        existing->second = *item;
+        continue;
+      }
+    }
+    children.emplace_back(child.key, *item);
+  }
+  std::string body;
+  for (const auto& [key, item] : children) {
+    if (!body.empty()) body += ", ";
+    body += pairs ? "(" + python_str_repr(key) + ", " + item + ")" : python_str_repr(key) + ": " + item;
+  }
+  return "{'value': " + head + ", 'children': " + (pairs ? "[" + body + "]" : "{" + body + "}") + "}";
+}
+
+// An activity column of an XES upload's frame as pm4py's classic heuristics
+// miner reads it (round GM, observed black-box): each cell the Python
+// object read_xes's frame holds (classic_frame_cells: text str, a gap NaN, a
+// valueless value None in an object column, ints int (float in a float64
+// column), floats, booleans, dates Timestamp in a datetime64 column (a gap
+// NaT) and datetime.datetime in an object column, <list>s with children
+// dicts), or the Polars copy's (an object column str() of each cell, typed
+// columns Int64, Float64, Boolean and Datetime as such, a gap or None None).
+struct FrameActivityCell {
+  std::string type;      // Python type name
+  std::string label;     // Python str of the value
+  std::string identity;  // equal in Python <=> equal identity
+  long double number = 0.0L;
+  bool nan = false;
+  std::int64_t micros = 0;
+  bool missing = false;  // pandas' NaN gap, Polars' None
+};
+
+struct FrameTypedActivities {
+  std::vector<FrameActivityCell> cells;  // one per row
+  std::vector<std::string> names;        // the node of each row: the first label seen of its value
+  std::map<std::string, const FrameActivityCell*> value_of;  // node name -> its first value
+  bool dict = false;
+  std::optional<std::string> missing_name;
+};
+
+// nullopt when every cell is text or missing (the frame's own text path) or
+// a kind is not modelled.
+// `force`: a column of None alone, which the frame's own path leaves out.
+std::optional<FrameTypedActivities> frame_typed_activities(const EventTable& table, std::size_t column, bool polars,
+                                                           bool force = false) {
+  using detail::PlusCellKind;
+  auto dtype = ClassicFrameDtype::kObject;
+  const auto cells = classic_frame_cells(table, column, false, &dtype);
+  if (!cells) return std::nullopt;
+  const bool object = dtype == ClassicFrameDtype::kObject || dtype == ClassicFrameDtype::kNoneObject;
+  const bool float64 = dtype == ClassicFrameDtype::kFloat || dtype == ClassicFrameDtype::kNaNFloat;
+  // The frame's own text path reads text and cells it holds null (a NaN
+  // float is a gap here too).
+  bool other = force || dtype != ClassicFrameDtype::kString;
+  for (std::size_t r = 0; r < cells->size() && !other; ++r) {
+    const auto kind = (*cells)[r].kind;
+    const auto& row = table.rows[r];
+    const bool held = column < row.size() && row[column] && !row[column]->is_null &&
+                      row[column]->xes_public_shape != XesPublicShape::kAbsent;
+    other = kind != PlusCellKind::kText && (kind != PlusCellKind::kNaN || held);
+  }
+  if (!other) return std::nullopt;
+  FrameTypedActivities out;
+  out.cells.reserve(cells->size());
+  const auto raw = [&](std::size_t r) -> const EventAttribute& { return *table.rows[r][column]; };
+  for (std::size_t r = 0; r < cells->size(); ++r) {
+    const auto& cell = (*cells)[r];
+    FrameActivityCell value;
+    const auto set_number = [&](long double number, const std::string& label) {
+      value.number = number;
+      value.label = label;
+      value.identity = "n" + label;
+    };
+    switch (cell.kind) {
+      case PlusCellKind::kText:
+        value.type = "str";
+        value.label = cell.text;
+        break;
+      case PlusCellKind::kNaN: {
+        value.type = "float";
+        value.label = "nan";
+        value.nan = value.missing = true;
+        // Python keys NaN by the object (observed black-box): each cell of a
+        // float64 column is its own, so is an object column's parsed NaN
+        // float, while its gaps share numpy's NaN, as do a str column's.
+        const auto& row = table.rows[r];
+        const bool held = column < row.size() && row[column] && !row[column]->is_null &&
+                          row[column]->xes_public_shape != XesPublicShape::kAbsent;
+        value.identity = float64 || (object && held) ? "nan#" + std::to_string(r) : "nan";
+        break;
+      }
+      case PlusCellKind::kNone:
+        value.type = "NoneType";
+        value.label = "None";
+        value.missing = polars;
+        break;
+      case PlusCellKind::kInt:
+        value.type = "int";
+        set_number(static_cast<long double>(cell.micros), std::to_string(cell.micros));
+        break;
+      case PlusCellKind::kFloat: {
+        value.type = "float";
+        value.number = cell.number;
+        value.label = python::float_repr(cell.number);
+        value.identity = std::trunc(cell.number) == cell.number && std::fabs(cell.number) < 9.2e18
+                             ? "n" + std::to_string(static_cast<long long>(cell.number))
+                             : "f" + value.label;
+        break;
+      }
+      case PlusCellKind::kBool:
+        value.type = "bool";
+        value.number = cell.micros ? 1.0L : 0.0L;
+        value.label = cell.micros ? "True" : "False";
+        value.identity = cell.micros ? "n1" : "n0";
+        break;
+      case PlusCellKind::kTimestamp:
+      case PlusCellKind::kDatetime:
+        value.type = cell.kind == PlusCellKind::kTimestamp ? "Timestamp" : "datetime.datetime";
+        value.micros = cell.micros;
+        value.label = detail::plus_python_datetime_str(raw(r).value);
+        value.identity = "d" + std::to_string(cell.micros);
+        break;
+      case PlusCellKind::kNaT:
+        value.type = "NaTType";
+        value.label = "NaT";
+        break;
+      default:
+        if (cell.kind != kDictCell) return std::nullopt;
+        {
+          const auto repr = xes_frame_value_repr(raw(r));
+          if (!repr) return std::nullopt;
+          value.type = "dict";
+          value.label = *repr;
+          out.dict = true;
+        }
+        break;
+    }
+    if (polars) {
+      // Polars' copy: None for a gap, None or NaT; an object column's cells
+      // str() of each; typed columns keep their values (dates datetime).
+      if (value.type == "float" && value.nan) value = FrameActivityCell{};
+      if (value.type.empty() || value.type == "NoneType" || value.type == "NaTType") {
+        value = FrameActivityCell{};
+        value.type = "NoneType";
+        value.label = "None";
+        value.missing = true;
+      } else if (object) {
+        value.type = "str";
+        value.nan = false;
+        value.identity.clear();
+      } else if (value.type == "Timestamp") {
+        value.type = "datetime.datetime";
+      }
+    }
+    if (value.identity.empty()) value.identity = (value.type == "str" ? "s" : value.type + ":") + value.label;
+    out.cells.push_back(std::move(value));
+  }
+  // One node per Python-equal value, named after the first seen in row
+  // order (the frame's activity counts).
+  std::map<std::string, std::string> label_of;  // identity -> name
+  std::map<std::string, std::string> identity_of;  // name -> identity
+  out.names.reserve(out.cells.size());
+  for (const auto& value : out.cells) {
+    auto [at, inserted] = label_of.emplace(value.identity, value.label);
+    if (inserted) {
+      // Values Python tells apart that print alike (a str '1' beside an int
+      // 1) are nodes of one name in pm4py: made unique here.
+      while (!identity_of.emplace(at->second, value.identity).second) at->second += '\x1f';
+      out.value_of.emplace(at->second, &value);
+      if (value.missing && value.nan == !polars && !out.missing_name) out.missing_name = at->second;
+    }
+    out.names.push_back(at->second);
+  }
+  return out;
+}
+
+// Python's a < b on two activity values (TypeError where Python has none).
+bool frame_activity_less(const FrameActivityCell& a, const FrameActivityCell& b) {
+  const auto number = [](const std::string& type) { return type == "int" || type == "float" || type == "bool"; };
+  if (a.type == "str" && b.type == "str") return a.label < b.label;
+  if (number(a.type) && number(b.type)) return !a.nan && !b.nan && a.number < b.number;
+  const auto stamp = [](const std::string& type) { return type == "Timestamp" || type == "NaTType"; };
+  if (stamp(a.type) && stamp(b.type)) return a.type == "Timestamp" && b.type == "Timestamp" && a.micros < b.micros;
+  if (a.type == "datetime.datetime" && b.type == "datetime.datetime") return a.micros < b.micros;
+  throw HeuristicPandasError("builtins.TypeError",
+                             "'<' not supported between instances of '" + a.type + "' and '" + b.type + "'");
+}
+
+// The type pm4py's Petri conversion fails on: the first node in `appearance`
+// whose value is no str with an incoming edge (check_typed_conversion).
+std::optional<std::string> typed_conversion_type(const HeuristicsNet& net, const std::vector<std::string>& appearance,
+                                                 const std::function<std::string(const std::string&)>& python_type) {
+  try {
+    check_typed_conversion(net, appearance, python_type);
+  } catch (const HeuristicPandasError& error) {
+    const std::string message = error.what();
+    const auto open = message.find('"'), close = message.rfind('"');
+    if (open != std::string::npos && close > open) return message.substr(open + 1, close - open - 1);
+  }
+  return std::nullopt;
+}
+
+// A typed activity column's net after mining (round GM): the AND measure
+// sorts each node's successors as Python sorts their values, nodes in the
+// dependency pass's order; the Petri conversion fails on a node whose value
+// is no str with an incoming edge; pandas' NaN node is the missing label.
+void finish_typed_frame_net(HeuristicsNet& net, const EventLog& log, const FrameTypedActivities& typed) {
+  const auto value_of = [&](const std::string& name) -> const FrameActivityCell& { return *typed.value_of.at(name); };
+  const auto appearance = check_successor_sort(net, log, [&](std::size_t a, std::size_t b) {
+    return frame_activity_less(value_of(net.activities[a]), value_of(net.activities[b]));
+  });
+  net.petri_conversion_type = typed_conversion_type(net, appearance, [&](const std::string& name) {
+    const auto found = typed.value_of.find(name);
+    return found == typed.value_of.end() ? std::string("str") : found->second->type;
+  });
+  if (typed.missing_name) {
+    const auto at = std::find(net.activities.begin(), net.activities.end(), *typed.missing_name);
+    if (at != net.activities.end()) net.null_activity = static_cast<std::size_t>(at - net.activities.begin());
+  }
+}
+
+// A custom activity key naming another column of a CSV upload's frame
+// shapes (round GM, observed black-box): pm4py's classic miner reads that
+// column of format_dataframe's frame, each cell the Python object read_csv
+// typed it as (a gap NaN), or the Polars copy's, as on an XES upload's frame
+// (frame_typed_activities); pairs in the frame's case and time order.
+std::optional<HeuristicsNet> csv_frame_typed_heuristics(const EventDataView& data, const HeuristicMinerOptions& options,
+                                                        const DataFrameColumns& columns) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  const auto& key = options.activity_attribute;
+  if (options.variant != HeuristicMinerVariant::kClassic || standard_activity_attribute(key) ||
+      (data.kind() != EventDataKind::kEventTable && !polars) || classic_cell_clock(options, true))
+    return std::nullopt;
+  const auto column_named = [&](const std::string& name) {
+    return std::find_if(columns.columns.begin(), columns.columns.end(),
+                        [&](const DataFrameColumn& column) { return column.key == name; });
+  };
+  // The upload's timestamp column (under its header or as time:timestamp)
+  // is the frame's own clock; another timestamp key stays on Minera's path.
+  if (classic_custom_clock(options)) {
+    const auto clock = column_named(options.timestamp_attribute);
+    if (clock == columns.columns.end() || clock->role != FirstClassAttributeRole::kTimestamp) return std::nullopt;
+  }
+  const auto listed = column_named(key);
+  if (listed == columns.columns.end() || listed->role == FirstClassAttributeRole::kCaseId) return std::nullopt;
+  auto log = classic_event_log(data, options);
+  if (!log.dataframe_columns) log.dataframe_columns = std::make_shared<const DataFrameColumns>(columns);
+  const auto framed = dataframe_frame_event_log(log);
+  EventTable cells;
+  cells.columns = {key};
+  for (const auto& trace : framed.traces)
+    for (const auto& event : trace.events) {
+      auto& row = cells.rows.emplace_back(1);
+      for (const auto& attribute : event.attributes) {
+        if (attribute.key != key) continue;
+        const auto* number = std::get_if<double>(&attribute.typed_value);
+        // read_csv's gaps (an empty cell or pandas' NA text): one NaN object
+        // in an object column.
+        if (!attribute.is_null && !(number && std::isnan(*number)) && !attribute.value.empty() &&
+            !is_pandas_csv_na_text(attribute.value))
+          row[0] = attribute;
+        break;
+      }
+    }
+  if (cells.rows.empty()) return std::nullopt;
+  auto typed = frame_typed_activities(cells, 0, polars, true);
+  if (!typed) return std::nullopt;
+  EventLog projected_log;
+  projected_log.attributes = log.attributes;
+  std::size_t r = 0;
+  for (const auto& trace : log.traces) {
+    auto& copy = projected_log.traces.emplace_back(trace);
+    for (auto& event : copy.events) {
+      event.activity = typed->names[r++];
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key.clear();
+      event.activity_attribute.reset();
+    }
+  }
+  // The noise cleaning reads each directly-follows pair's first element as
+  // text.
+  r = 0;
+  for (const auto& trace : log.traces) {
+    for (std::size_t e = 1; e < trace.events.size(); ++e)
+      if (const auto& cell = typed->cells[r + e - 1]; cell.type != "str")
+        throw HeuristicPandasError("builtins.TypeError", "'" + cell.type + "' object is not subscriptable");
+    r += trace.events.size();
+  }
+  auto projected = options;
+  projected.activity_attribute = "concept:name";
+  auto net = options.decoration == HeuristicNetDecoration::kPerformance
+                 ? discover_classic_dfg(build_classic_input(projected_log, projected, false, nullptr, !polars), projected)
+                 : discover_heuristics_net(projected_log, projected);
+  finish_typed_frame_net(net, projected_log, *typed);
+  net.activity_attribute = key;
+  return net;
 }
 
 HeuristicsNet discover_heuristics_net_xes_frame(
@@ -4116,6 +4470,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     if (!detail::check_plus_frame_intervals(table, *case_at, *start_at, *timestamp_at, polars, options.use_business_hours))
       return discover_heuristics_net(data, options);
   }
+  std::optional<FrameTypedActivities> typed;
   if (!plus) {
     // The classic reads activities, and the performance decoration
     // timestamps, only in directly-follows pairs: a case of two or more
@@ -4130,12 +4485,25 @@ HeuristicsNet discover_heuristics_net_xes_frame(
         break;
       }
     }
-    if (repeated && !activity_at) throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
+    // A column of None alone is a column of pandas' frame and its Polars
+    // copy too (round GM).
+    const auto activity_none_at = activity_at ? std::nullopt : none_column(activity_key);
+    if (repeated && !activity_at && !activity_none_at)
+      throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
+    // An activity column of other kinds than text reads each cell's Python
+    // object (round GM); pandas counts the activities first, where a dict
+    // is unhashable.
+    if (activity_at || activity_none_at) {
+      typed = frame_typed_activities(activity_at ? table : *source, activity_at ? *activity_at : *activity_none_at,
+                                     polars, !activity_at);
+      if (!typed && !activity_at) return discover_heuristics_net(data, options);
+      if (typed && typed->dict && !polars) throw HeuristicPandasError("builtins.TypeError", "unhashable type: 'dict'");
+    }
     // Another timestamp column raises at the first pair, after the start
     // key (classic_cell_waits).
     if (repeated && performance && !timestamp_at && !custom_clock)
       throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
-    if (!activity_at) return finish(discover_heuristics_net(EventLog{}, projected));
+    if (!activity_at && !typed) return finish(discover_heuristics_net(EventLog{}, projected));
   }
   const auto missing_time = [&](const EventTable::Row& row) {
     if (!timestamp_at || *timestamp_at >= row.size() || !row[*timestamp_at]) return true;
@@ -4223,10 +4591,11 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // Python's str of the missing label, unique among the named activities.
   std::set<std::string> named;
   bool any_missing = false;
-  for (const auto& row : table.rows) {
-    if (const auto* activity = value(row, *activity_at)) named.insert(*activity);
-    else any_missing = true;
-  }
+  if (!typed)
+    for (const auto& row : table.rows) {
+      if (const auto* activity = value(row, *activity_at)) named.insert(*activity);
+      else any_missing = true;
+    }
   std::string null_label = polars ? "None" : "nan";
   while (named.contains(null_label)) null_label += '\x1f';
   const std::string null_type = polars ? "NoneType" : "float";
@@ -4252,8 +4621,12 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       log.traces.push_back(std::move(trace));
     }
     Event event;
-    const auto* activity = value(row, *activity_at);
-    event.activity = activity ? *activity : null_label;
+    if (typed) {
+      event.activity = typed->names[r];
+    } else {
+      const auto* activity = value(row, *activity_at);
+      event.activity = activity ? *activity : null_label;
+    }
     event.activity_state = FirstClassAttributeState::kPresent;
     if (timed && timestamp_at) {
       if (missing_time(row)) {
@@ -4419,6 +4792,13 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       for (std::size_t e = 1; e < trace.events.size(); ++e)
         if (trace.events[e - 1].activity == null_label)
           throw HeuristicPandasError("builtins.TypeError", "'" + null_type + "' object is not subscriptable");
+  // A typed column likewise: the first pair in log order whose first
+  // element is no str (round GM).
+  if (typed)
+    for (const auto& rows : trace_rows)
+      for (std::size_t e = 1; e < rows.size(); ++e)
+        if (const auto& cell = typed->cells[rows[e - 1]]; cell.type != "str")
+          throw HeuristicPandasError("builtins.TypeError", "'" + cell.type + "' object is not subscriptable");
   auto net = finish([&] {
     if (!performance) return discover_heuristics_net(log, projected);
     if (cell_waits) {
@@ -4432,6 +4812,10 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     decorated.activity_ids_are_local = !standard_activity_attribute(projected.activity_attribute);
     return decorated;
   }());
+  if (typed) {
+    finish_typed_frame_net(net, log, *typed);
+    return net;
+  }
   const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
   if (null_at == net.activities.end()) return net;
   const auto null_id = static_cast<std::size_t>(null_at - net.activities.begin());
@@ -4499,6 +4883,10 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     });
   }
   net.null_activity = null_id;
+  // The Petri conversion fails on the missing label with an incoming edge
+  // (round GM, observed black-box).
+  if (std::any_of(net.edges.begin(), net.edges.end(), [&](const auto& edge) { return edge.target == null_id; }))
+    net.petri_conversion_type = null_type;
   return net;
 }
 

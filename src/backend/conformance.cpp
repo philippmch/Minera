@@ -3124,6 +3124,25 @@ ReplayActivity selected_replay_activity(
     if (event.has_activity())
       return replay_activity_from_legacy_string(event.activity);
   }
+  // The resource and lifecycle projections stand for the fields they were
+  // read from (round GM: a CSV log's org:resource column as the heuristics
+  // net's activity key, which /api/mine replays); a missing or null cell is
+  // no key of pm4py's event (convert_to_event_log drops NaN).
+  const auto projected_field = [&](const std::string& source_key, const std::optional<EventAttribute>& cell,
+                                   std::string_view canonical, FirstClassAttributeState state,
+                                   const std::string& value) -> std::optional<ReplayActivity> {
+    if ((source_key.empty() && !cell) || !detail::projection_names(source_key, cell, canonical, selector))
+      return std::nullopt;
+    if (!detail::present_projection(value, state)) throw TokenReplayKeyError(std::string(selector));
+    if (cell && !cell->is_null) return replay_activity_from_attribute(*cell, selector);
+    return replay_activity_from_legacy_string(value);
+  };
+  if (auto found = projected_field(event.resource_source_key, event.resource_attribute, "org:resource",
+                                   event.resource_state, event.resource))
+    return std::move(*found);
+  if (auto found = projected_field(event.lifecycle_source_key, event.lifecycle_attribute, "lifecycle:transition",
+                                   event.lifecycle_state, event.lifecycle))
+    return std::move(*found);
   throw TokenReplayKeyError(std::string(selector));
 }
 

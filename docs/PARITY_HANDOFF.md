@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GL (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GM (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9430,6 +9430,80 @@ GL's suite: the full ctest 675 of 675 (38 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gl/`.
+
+Round GM re-reviewed GL and aligned a custom activity key naming a typed
+column on XES uploads' frame shapes and CSV uploads' three shapes with
+pm4py (Review GM1), and kept XES frame columns of None alone. GL's CI run
+45165980512 passed every job, macOS and Windows included. No device was
+reachable, so no newer reviewer handoff was read from the Mac. New banks:
+GL's `gen/gengl.py` with `AC2`/`A2K` (300 XES uploads gmA-gmC, seeds
+22000-22299: `act2` of every XES kind, text-heavy mixes, all events
+carrying it); about 60 XES probes (`pout/`). Fixed: GM1-1, pm4py's classic
+heuristics miner on read_xes's frame reads the key's column as pandas
+typed it (classic_frame_cells): a dict is unhashable (pandas counts the
+activities first), the first directly-follows pair whose first element is
+no str raises `'<type>' object is not subscriptable`, the AND measure sorts
+each node's successors as Python sorts their values (`'<' not supported
+between instances of 'str' and 'int'`), equal numbers (1, 1.0, True) are
+one node named by the first in row order, each NaN of a float64 column (and
+an object column's parsed NaN float) is its own node while gaps share one,
+values that print alike but differ (str '1', int 1) stay two nodes of one
+name, and the heuristics Petri conversion record raises `can only
+concatenate str (not "<type>") to str` for a node of another type with an
+incoming edge (a NaN or None node included: `HeuristicsNet::
+petri_conversion_type`, raised by `to_petri_net`); Polars' copy holds an
+object column as str() text and every gap as None; a column of None alone
+(or None and gaps) is a column of both frames; GM1-2, a CSV upload's
+frames read another column as the key the same way, each cell as read_csv
+typed it (ints int, a gap or NA text NaN, the timestamp column Timestamps,
+datetime on Polars), with the performance view on the upload's own
+timestamp column; Minera refused the resource and lifecycle columns
+("event is missing activity attribute") and read the others as text;
+GM1-3, `/api/mine`'s token replay and decorations of the CSV log shape read
+the resource and lifecycle columns as the activity key too (KeyError
+before; a missing cell stays a KeyError, as convert_to_event_log drops NaN);
+GM1-4, XES frame columns whose cells are valueless (None) count as present
+for every family (pandas keeps a column of None alone, of None and gaps as
+float64 NaN): the Polars Alpha, log skeleton, transition system and
+temporal profile refusals now name the column as pm4py does. The XES log
+shape's `_post` cases (GL) are pm4py's: its token replay raises KeyError
+for an event without the key. After: XES frames with `act2` (glD, glK, glL,
+gmA-gmC, 13 option sets with both decorations and the conversion record)
+4,414 of 4,414 pandas and 4,976 of 4,976 Polars judgments equal (381 and
+147 of 1,800 differed on GL's binary); CSV frames with seven typed keys
+(glM, kcE, kcT) 3,018 of 3,022 per shape (1,954 differed), the log shape
+with the replay 2,593 of 2,600 (367 differed); the left cases are uploads
+with missing timestamps (declared below). /api/mine's families on gl
+banks with the default keys: Polars temporal profile refusals 54 to 39
+differing; the rest is carried (below).
+
+GM's suite: the full ctest 676 of 676 (43 minutes, -j2, first run; the new
+`minera_server_review_gm_tests` fails 29 of its 42 checks on GL's server
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gm/`.
+
+Next round (GN) should start by re-reviewing round GM:
+
+- GM's CI run;
+- GM1 on fresh banks: typed custom activity keys with business hours, a
+  start key or another timestamp key on XES and CSV frames (left on
+  Minera's path), the Heuristics++ variant with such a key, and
+  `/api/discover-workflow` on the same sessions;
+- CSV uploads with missing timestamps and a custom activity key (kcT
+  j13663, j13675, j13690, j13695: frames read the case and st2 columns on
+  Minera's path; the log shape's replay and sort order);
+- /api/mine's other families on XES frames whose time:timestamp and
+  columns hold other kinds (gl banks, default keys, glA/glC/glF/glG/glK:
+  pandas Alpha 138, temporal profile 137, Inductive and POWL 34 of 250
+  differ; Polars 67, 53 and 37): messages for typed timestamps ("Alpha:
+  invalid selected timestamp", pandas' own TypeErrors), None against NaN,
+  an elist read as '' instead of None, distinct NaN objects;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1, and the
+  anti- and multi-alignments of an upload without traces declared in GJ).
+
+Previous list for round GM (kept for its older items):
 
 Next round (GM) should start by re-reviewing round GL:
 

@@ -244,10 +244,12 @@ std::string workflow_input_heuristics_json(const HeuristicsNet& net) {
   text(out, net.activity_attribute); out << ",\"timestamp_attribute\":"; text(out, net.timestamp_attribute);
   out << ",\"activity_ids_are_local\":"; boolean(out, net.activity_ids_are_local);
   out << ",\"activities\":";
-  // A missing label (round FZ) shows as null.
+  // A missing label (round FZ) shows as null; a name made unique with
+  // trailing \x1f (values that print alike, round GM) shows as printed.
   std::size_t activity_index = 0;
   array(out, net.activities, [&](const auto& value) {
-    if (net.null_activity == activity_index++) out << "null"; else text(out, value);
+    if (net.null_activity == activity_index++) out << "null";
+    else text(out, value.substr(0, value.find_last_not_of('\x1f') + 1));
   });
   out << ",\"edges\":";
   array(out, net.edges, [&](const auto& edge) {

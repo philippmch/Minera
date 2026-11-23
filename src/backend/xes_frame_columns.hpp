@@ -18,6 +18,20 @@
 
 namespace minera::detail {
 
+// Whether an event (or its trace) carries the column's key: a value, or a
+// valueless one (a valueless string or id, None in pandas' frame; round GM,
+// observed black-box: read_xes keeps a column of None alone, and of None and
+// gaps as float64 NaN). The table's null cells of the first-class columns
+// are values only when the XES held the key without a value (kNull); an
+// unnamed trace's case:concept:name cell stands for no key.
+inline bool xes_frame_cell_present(const std::string& column, const std::optional<EventAttribute>& cell) {
+  if (!cell) return false;
+  if (!cell->is_null) return true;
+  if (cell->first_class_state == FirstClassAttributeState::kNull) return true;
+  return column != "case:concept:name" && column != "concept:name" && column != "time:timestamp" &&
+         column != "org:resource" && column != "lifecycle:transition";
+}
+
 // `table`, or `storage` holding it without the columns that have no value.
 // With `read_order`, the columns also follow read_xes's order: the first
 // appearance of each key over the events, an event's own attributes before
@@ -32,7 +46,7 @@ inline const EventTable& xes_frame_present_columns(const EventTable& table, std:
   for (const auto& row : table.rows)
     for (const bool case_columns : {false, true})
       for (std::size_t column = 0; column < row.size() && column < keep.size(); ++column)
-        if (is_case(column) == case_columns && !keep[column] && row[column] && !row[column]->is_null) {
+        if (is_case(column) == case_columns && !keep[column] && xes_frame_cell_present(table.columns[column], row[column])) {
           keep[column] = true;
           order.push_back(column);
         }

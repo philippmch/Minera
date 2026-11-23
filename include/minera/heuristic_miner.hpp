@@ -280,6 +280,14 @@ struct HeuristicsNet {
   // `activities` is Python's str of it (made unique), which the Petri
   // conversion keeps as its label; the JSON shows it as null.
   std::optional<std::size_t> null_activity;
+  // pm4py's Petri conversion names a node's join place "pre_" + its value: a
+  // node whose value is no str (a typed custom activity key's int, bool,
+  // date, None, or a missing label's NaN or None on an XES upload's frame)
+  // with an incoming edge makes it raise TypeError "can only concatenate str
+  // (not \"<type>\") to str", the type of the first such node in the
+  // dependency pass's order (round GM, observed black-box); to_petri_net
+  // raises it.
+  std::optional<std::string> petri_conversion_type;
 };
 
 struct HeuristicMinerOptions {
