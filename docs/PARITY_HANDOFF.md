@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GK (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GL (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9374,6 +9374,83 @@ cut of GK1-1 dropped a CSV start's nanoseconds, now kept). The new
 server binary) passes, Python script tests 406 of 406, and the 16
 manifests replayed 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gk/`.
+
+Round GL re-reviewed GK and aligned the classic heuristics performance
+view with every XES value kind and with another timestamp key, and a
+custom typed activity key on an XES upload's log shape, with pm4py
+(Review GL1). GK's CI run 45148894611 passed every job, macOS and Windows
+included (`minera_cancellation_hooks_tests` did not abort again). No
+device was reachable, so no newer reviewer handoff was read from the Mac.
+New banks: `gen/gengl.py` (1,100 XES uploads glA-glL, seeds 20000-21099:
+typed start, time, `ts2` and `act2` values of every XES kind, lists,
+valueless strings, NaN floats, offsets, traces without names) on the log
+and frame shapes; `gen/genhcsv3.py` with `ST2=1` (60 CSV uploads glM,
+seeds 21200-21259); 59 XES and 11 CSV probes. Fixed: GL1-1, the XES log
+shape's classic performance view reads every value kind as the legacy log
+holds it (a <list> a dict or None, a valueless string None, NaN floats,
+ids) and another timestamp key's value as the complete (the start stays
+time:timestamp): two numbers raise `AttributeError: 'int' object has no
+attribute 'total_seconds'` (float when either is one); GL1-2, a custom
+typed activity key on the XES log shape follows pm4py: a dict is
+unhashable, a pair without the key raises KeyError (single-event traces
+are skipped), a pair whose first element is no str is not subscriptable,
+the AND measure sorts each node's successors in the dependency pass's
+order (`'<' not supported between instances of 'str' and 'int'`), equal
+numbers (1, 1.0, True) are one node named by the first, and `/api/mine`'s
+net conversion raises `can only concatenate str (not "int") to str`; on
+CSV logs the eager `'<'` rule gave way to the same successor sort and
+conversion check; GL1-3, the XES frame shapes measure another timestamp
+column's cells against time:timestamp (or the start key) on read_xes's
+frame and its Polars copy, every column typed as read_xes types it (dates
+with None NaT, text with None NaN, numbers with a gap float64, booleans
+with a gap object, mixes object with dicts, None and NaN, a column of None
+alone too), pandas' own TypeError for Timestamp - int, NaT beside an int a
+zero wait, a missing start column's KeyError before the timestamp
+column's; a time:timestamp column of other kinds no longer leaves the
+default, business-hours or start-key view on Minera's own clock; GL1-4,
+CSV uploads' three shapes measure another timestamp column the same way
+(format_dataframe parses the date columns). After: XES log shape glA-glE
+21,525 runs (25 option sets, both decorations, `/api/mine` and
+`/api/discover-workflow`) with none differing (3,978 before), glF-glL
+31,200 with none; XES frames with `ts2` (glG, glH, glJ, glL) 2,400 of
+2,400 per shape (489 of 1,800 differed on glH, glJ, glL); XES frames with GK's
+option sets on glF, glG, glK 5,400 of 5,400 per shape (960 of 4,500
+differed); CSV glM with another timestamp key 720 of 720 per shape (396 of
+540 differed; GK's start-key and business-hours sets on glM 360 of 360
+on the log and DataFrame shapes); the routes on a classic net mined with business hours or a
+start key (CSV kcE, kcT, kcZ, three shapes: token replay and footprints)
+equal but for 7 unbounded nets whose footprints fail on both sides.
+Carried: a custom typed activity key on XES frame shapes (pandas' and
+Polars' labels and their errors: 381 and 147 of 1,800 differ) and
+`/api/mine`'s steps after the net with such a key on the log shape (token
+replay, decorations).
+
+GL's suite: the full ctest 675 of 675 (38 minutes, -j2, first run; the new
+`minera_server_review_gl_tests` fails all 47 of its checks on GK's server
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gl/`.
+
+Next round (GM) should start by re-reviewing round GL:
+
+- GL's CI run;
+- GL1 on fresh banks: another timestamp key with offset dates in pandas
+  object columns under business hours (read on their own wall clock),
+  the frequency decoration with custom keys, a timestamp key naming a
+  role column (resource, lifecycle, case) on all shapes;
+- the custom typed activity key on XES frame shapes (carried: str() labels
+  of Polars' cells, pandas' object-column types in the subscript, sort
+  and conversion errors) and on CSV frames;
+- `/api/mine`'s steps after a net mined with a typed custom activity key on
+  the XES log shape (token replay, decorations);
+- columns of None alone on XES frames for the other families (Alpha,
+  Inductive, Declare, temporal profile): pandas keeps them, Minera's
+  present columns drop them;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1, and the
+  anti- and multi-alignments of an upload without traces declared in GJ).
+
+Previous list for round GL (kept for its older items):
 
 Next round (GL) should start by re-reviewing round GK:
 

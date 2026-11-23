@@ -730,6 +730,33 @@ std::optional<CsvCellReader> csv_log_cell_reader(const DataFrameColumns& frame, 
   });
 }
 
+// A pandas object column's dict cell (an XES <list> with children, or a
+// scalar with children): the classic waits name it 'dict' (round GL).
+constexpr auto kDictCell = static_cast<detail::PlusCellKind>(64);
+
+const char* classic_cell_type(detail::PlusCellKind kind) {
+  return kind == kDictCell ? "dict" : detail::plus_cell_type(kind);
+}
+
+// check_plus_business_hours with dict cells (round GL).
+void check_classic_business_hours(const detail::PlusCell& d1, const detail::PlusCell& d2) {
+  for (const auto* cell : {&d1, &d2})
+    if (cell->kind == kDictCell)
+      throw HeuristicPandasError("builtins.AttributeError", "'dict' object has no attribute 'replace'");
+    else if (!detail::plus_date_like(cell->kind) && cell->kind != detail::PlusCellKind::kNaT)
+      break;
+  detail::check_plus_business_hours(d1, d2);
+}
+
+// A date cell's wall clock for BusinessHours: a pandas object column's
+// Python datetime keeps its own offset (`text`, its XES value), any other
+// date is UTC.
+std::int64_t classic_wall_micros(const detail::PlusCell& cell) {
+  if (cell.kind == detail::PlusCellKind::kDatetime && !cell.text.empty())
+    if (const auto wall = detail::local_wall_timestamp_microseconds(cell.text)) return *wall;
+  return cell.micros;
+}
+
 // pm4py's classic performance DFG with business hours or a configured start
 // key (round GK, observed black-box on pandas, on Polars and on the event
 // log of either): trace by trace, each directly-follows pair (earlier,
@@ -744,6 +771,10 @@ std::optional<CsvCellReader> csv_log_cell_reader(const DataFrameColumns& frame, 
 // microsecond (frame_elapsed_seconds, 1.118 s is 1.1179999999999999), on
 // Polars' Python datetimes (`python_seconds`) the microseconds / 1e6 of the
 // instants truncated to the microsecond (observed black-box, round GK).
+// Two numbers subtract and their difference has no total_seconds (an int
+// for ints and booleans, else a float), pandas' Timestamp minus an int
+// raises its own TypeError, and NaT beside an int (not a bool) gives NaT
+// (round GL, observed black-box).
 std::vector<std::vector<double>> classic_cell_waits(const std::vector<std::vector<detail::PlusCell>>& start,
                                                     const std::vector<std::vector<detail::PlusCell>>& complete,
                                                     bool business_hours, const std::vector<BusinessHourSlot>& slots,
@@ -751,6 +782,11 @@ std::vector<std::vector<double>> classic_cell_waits(const std::vector<std::vecto
                                                     bool python_seconds) {
   using detail::PlusCellKind;
   const auto subtractable = [](PlusCellKind kind) { return detail::plus_date_like(kind) || kind == PlusCellKind::kNaT; };
+  const auto number = [](PlusCellKind kind) {
+    return kind == PlusCellKind::kInt || kind == PlusCellKind::kBool || kind == PlusCellKind::kFloat ||
+           kind == PlusCellKind::kNaN;
+  };
+  const auto real = [](PlusCellKind kind) { return kind == PlusCellKind::kFloat || kind == PlusCellKind::kNaN; };
   std::vector<std::vector<double>> waits(complete.size());
   for (std::size_t t = 0; t < complete.size(); ++t) {
     waits[t].assign(complete[t].size(), 0.0);
@@ -760,13 +796,28 @@ std::vector<std::vector<double>> classic_cell_waits(const std::vector<std::vecto
       const auto& earlier = complete[t][i - 1];
       double wait = 0.0;
       if (business_hours) {
-        detail::check_plus_business_hours(earlier, later);
-        wait = detail::business_elapsed_seconds_microseconds(earlier.micros, later.micros, slots);
+        check_classic_business_hours(earlier, later);
+        wait = detail::business_elapsed_seconds_microseconds(classic_wall_micros(earlier), classic_wall_micros(later),
+                                                             slots);
       } else {
+        if (number(later.kind) && number(earlier.kind))
+          throw HeuristicPandasError("builtins.AttributeError",
+                                     std::string("'") + (real(later.kind) || real(earlier.kind) ? "float" : "int") +
+                                         "' object has no attribute 'total_seconds'");
+        // NaT beside an int is NaT (a zero wait).
+        if ((later.kind == PlusCellKind::kNaT && earlier.kind == PlusCellKind::kInt) ||
+            (later.kind == PlusCellKind::kInt && earlier.kind == PlusCellKind::kNaT)) {
+          waits[t][i] = 0.0;
+          continue;
+        }
+        if (later.kind == PlusCellKind::kTimestamp && earlier.kind == PlusCellKind::kInt)
+          throw HeuristicPandasError("builtins.TypeError",
+                                     "Addition/subtraction of integers and integer-arrays with Timestamp is no longer "
+                                     "supported.  Instead of adding/subtracting `n`, use `n * obj.freq`");
         if (!subtractable(later.kind) || !subtractable(earlier.kind))
           throw HeuristicPandasError("builtins.TypeError", std::string("unsupported operand type(s) for -: '") +
-                                                               detail::plus_cell_type(later.kind) + "' and '" +
-                                                               detail::plus_cell_type(earlier.kind) + "'");
+                                                               classic_cell_type(later.kind) + "' and '" +
+                                                               classic_cell_type(earlier.kind) + "'");
         if (later.kind != PlusCellKind::kNaT && earlier.kind != PlusCellKind::kNaT) {
           if (python_seconds) {
             wait = detail::epoch_seconds_from_microseconds(later.micros - earlier.micros);
@@ -784,22 +835,31 @@ std::vector<std::vector<double>> classic_cell_waits(const std::vector<std::vecto
 
 // The waits of a CSV log (or a CSV frame's log, `frame` its columns) with
 // business hours or a configured start key; nullopt when a cell is not
-// modelled (Minera's own path then).
+// modelled (Minera's own path then). Another timestamp key reads its own
+// column as the complete, typed like a start column, the start staying
+// time:timestamp (round GL, observed black-box): a key no column holds
+// raises KeyError at the first pair, after the start key's.
 std::optional<std::vector<std::vector<double>>> csv_classic_waits(const EventLog& log, const DataFrameColumns& frame,
                                                                   const HeuristicMinerOptions& options, bool polars) {
   const std::string key = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
                               ? *options.start_timestamp_attribute
                               : "time:timestamp";
-  const auto reader = csv_log_cell_reader(
-      frame, key, polars,
-      log.traces.empty() || log.traces.front().events.empty() ? std::string_view{}
-                                                              : std::string_view(log.traces.front().events.front().activity_source_key));
+  const std::string_view activity_header =
+      log.traces.empty() || log.traces.front().events.empty()
+          ? std::string_view{}
+          : std::string_view(log.traces.front().events.front().activity_source_key);
+  const auto reader = csv_log_cell_reader(frame, key, polars, activity_header);
+  const bool custom_time = !standard_timestamp_attribute(options.timestamp_attribute);
+  const auto complete_reader =
+      custom_time ? csv_log_cell_reader(frame, options.timestamp_attribute, polars, activity_header) : std::nullopt;
   std::vector<std::vector<detail::PlusCell>> starts, completes;
   for (const auto& trace : log.traces) {
     auto& start_row = starts.emplace_back();
     auto& complete_row = completes.emplace_back();
     for (const auto& event : trace.events) {
-      const auto complete = csv_timestamp_cell(event, polars);
+      const auto complete = !custom_time     ? csv_timestamp_cell(event, polars)
+                            : complete_reader ? (*complete_reader)(trace, event)
+                                              : std::optional<detail::PlusCell>(detail::PlusCell{});
       if (!complete) return std::nullopt;
       complete_row.push_back(*complete);
       if (reader) {
@@ -817,109 +877,162 @@ std::optional<std::vector<std::vector<double>>> csv_classic_waits(const EventLog
                                                                  "Heuristics Miner")
                          : std::vector<BusinessHourSlot>{};
   return classic_cell_waits(starts, completes, options.use_business_hours, slots,
-                            reader ? std::nullopt : std::optional<std::string>(python_str_repr(key)), polars);
+                            !reader ? std::optional<std::string>(python_str_repr(key))
+                            : custom_time && !complete_reader
+                                ? std::optional<std::string>(python_str_repr(options.timestamp_attribute))
+                                : std::nullopt,
+                            polars);
+}
+
+// The classic performance view with another timestamp key (round GL): the
+// frame's cells too (csv_classic_waits, discover_heuristics_net_xes_frame).
+bool classic_custom_clock(const HeuristicMinerOptions& options) {
+  return options.variant == HeuristicMinerVariant::kClassic &&
+         options.decoration == HeuristicNetDecoration::kPerformance &&
+         !standard_timestamp_attribute(options.timestamp_attribute) &&
+         !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty());
 }
 
 // pm4py's classic performance DFG on an XES upload's log shape, the hybrid
-// legacy log whose events hold only the keys they carry (round GK,
-// observed black-box): each directly-follows pair reads start(later) and
-// then complete(earlier) (complete first with business hours), a key the
-// event lacks raising KeyError, then measures them as classic_cell_waits
-// does (a non-date raises TypeError, or check_plus_business_hours' errors).
-// Taken only where Minera's own path would fail on a missing or non-date
-// cell; nullopt otherwise, when a cell is not modelled (a null, a NaT, a
-// container, an unparsable date, a custom timestamp key) or when an event
-// of a pair lacks its activity (the frequency DFG raises first).
-std::optional<std::vector<std::vector<double>>> legacy_classic_waits(const EventLog& log,
-                                                                     const HeuristicMinerOptions& options) {
-  using detail::PlusCell;
-  using detail::PlusCellKind;
-  const std::string start_key = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
-                                    ? *options.start_timestamp_attribute
-                                    : "time:timestamp";
-  const bool business_hours = options.use_business_hours;
-  bool modelled = true, failing = false;
-  const auto date_cell = [&](const std::string& text) {
-    PlusCell cell;
-    const auto micros = business_hours ? detail::local_wall_timestamp_microseconds(text)
-                                       : parse_timestamp_microseconds(text);
-    if (!micros) modelled = false;
-    cell.kind = PlusCellKind::kDatetime;
-    cell.micros = micros.value_or(0);
-    return cell;
-  };
-  const auto typed = [&](const EventAttribute& attribute) {
-    PlusCell cell;
-    if (attribute.is_null || attribute.container != AttributeContainerKind::kScalar) {
-      modelled = false;
-      return cell;
+// legacy log whose events hold only the keys they carry, each value as its
+// XES importer types it (round GK; every kind since round GL, observed
+// black-box): a date a datetime (its wall clock in UTC), a string or id a
+// str, a valueless string or id and a <list> without children None, any
+// other <list> (and a scalar with children) a dict, ints, floats (NaN
+// included) and booleans as such; a <container> or an unparsable date is
+// not stored. Each directly-follows pair, trace by trace, reads
+// start(later) and then complete(earlier) (complete first with business
+// hours), a key the event lacks raising KeyError. The start key defaults to
+// time:timestamp whatever the timestamp key (round GL). Without business
+// hours start - complete: two datetimes give the wait, two numbers an int
+// or float without total_seconds (AttributeError), anything else
+// TypeError; with business hours both values' replace(tzinfo=None) runs
+// first (str: TypeError, other non-dates: AttributeError). Returns nullopt
+// when a value the first failing pair (or any pair, when none fails) reads
+// is not modelled or when an event of a pair lacks its activity (the
+// frequency DFG raises first), and when no pair fails under the standard
+// timestamp key (Minera's own path measures those waits); `waits` with a
+// custom timestamp key, whose own path reads that key as the start.
+enum class LegacyKind { kAbsent, kDatetime, kStr, kInt, kFloat, kBool, kNone, kDict, kUnmodelled };
+
+struct LegacyValue {
+  LegacyKind kind = LegacyKind::kAbsent;
+  std::int64_t micros = 0;
+};
+
+const char* legacy_type_name(LegacyKind kind) {
+  switch (kind) {
+    case LegacyKind::kDatetime: return "datetime.datetime";
+    case LegacyKind::kStr: return "str";
+    case LegacyKind::kInt: return "int";
+    case LegacyKind::kFloat: return "float";
+    case LegacyKind::kBool: return "bool";
+    case LegacyKind::kNone: return "NoneType";
+    case LegacyKind::kDict: return "dict";
+    default: return "object";
+  }
+}
+
+bool legacy_number(LegacyKind kind) {
+  return kind == LegacyKind::kInt || kind == LegacyKind::kFloat || kind == LegacyKind::kBool;
+}
+
+// An XES attribute as pm4py's iterparse importer stores it in the event dict.
+LegacyValue legacy_attribute_value(const EventAttribute& attribute, bool business_hours) {
+  LegacyValue out;
+  if (attribute.container != AttributeContainerKind::kScalar || attribute.scalar_wrapper ||
+      !attribute.children.empty()) {
+    if (attribute.xes_public_shape == XesPublicShape::kNone) out.kind = LegacyKind::kNone;
+    else if (attribute.xes_public_shape == XesPublicShape::kWrapper || attribute.scalar_wrapper)
+      out.kind = LegacyKind::kDict;
+    else out.kind = LegacyKind::kUnmodelled;
+    return out;
+  }
+  if (attribute.is_null) {
+    out.kind = LegacyKind::kNone;
+    return out;
+  }
+  switch (attribute.kind) {
+    case AttributeKind::kDate: {
+      if (is_typed_nat(attribute)) {
+        out.kind = LegacyKind::kUnmodelled;
+        return out;
+      }
+      const auto micros = business_hours ? detail::local_wall_timestamp_microseconds(attribute.value)
+                                         : parse_timestamp_microseconds(attribute.value);
+      out.kind = micros ? LegacyKind::kDatetime : LegacyKind::kUnmodelled;
+      out.micros = micros.value_or(0);
+      return out;
     }
-    switch (attribute.kind) {
-      case AttributeKind::kDate:
-        if (is_typed_nat(attribute)) modelled = false;
-        return date_cell(attribute.value);
-      case AttributeKind::kString:
-      case AttributeKind::kId: cell.kind = PlusCellKind::kText; break;
-      case AttributeKind::kInt: cell.kind = PlusCellKind::kInt; break;
-      case AttributeKind::kFloat: cell.kind = PlusCellKind::kFloat; break;
-      case AttributeKind::kBoolean: cell.kind = PlusCellKind::kBool; break;
-      default: modelled = false; return cell;
-    }
-    cell.text = attribute.value;
-    failing = true;
-    return cell;
-  };
-  // A first-class field as the event dict holds it: nullopt when absent.
-  const auto field = [&](bool present, FirstClassAttributeState state, const std::optional<EventAttribute>& attribute,
-                         const std::string& text) -> std::optional<PlusCell> {
-    if (!present) {
-      failing = true;
-      return std::nullopt;
-    }
-    if (state == FirstClassAttributeState::kNull) modelled = false;
-    if (attribute) return typed(*attribute);
-    PlusCell cell;
-    cell.kind = PlusCellKind::kText;
-    cell.text = text;
-    failing = true;
-    return cell;
-  };
-  const auto timestamp_cell = [&](const Event& event) -> std::optional<PlusCell> {
-    if (!event.timestamp_source_key.empty() && event.timestamp_source_key != "time:timestamp") modelled = false;
-    if (!event.has_timestamp()) {
-      failing = true;
-      return std::nullopt;
-    }
-    if (event.timestamp_state == FirstClassAttributeState::kNull) modelled = false;
-    if (event.timestamp_attribute) return typed(*event.timestamp_attribute);
-    return date_cell(event.timestamp);
-  };
+    case AttributeKind::kString:
+    case AttributeKind::kId: out.kind = LegacyKind::kStr; return out;
+    case AttributeKind::kInt: out.kind = LegacyKind::kInt; return out;
+    case AttributeKind::kFloat: out.kind = LegacyKind::kFloat; return out;
+    case AttributeKind::kBoolean: out.kind = LegacyKind::kBool; return out;
+    default: out.kind = LegacyKind::kUnmodelled; return out;
+  }
+}
+
+// event[key] of the legacy event dict (kAbsent when the event lacks it).
+LegacyValue legacy_event_value(const Event& event, const std::string& key, bool business_hours) {
   const auto key_of = [](const std::string& source, std::string_view standard) {
     return source.empty() ? std::string(standard) : source;
   };
-  const auto start_cell = [&](const Event& event) -> std::optional<PlusCell> {
-    if (start_key == "time:timestamp") return timestamp_cell(event);
-    if (const auto* attribute = selected_start_attribute(event, start_key)) return typed(*attribute);
-    if (event.has_activity() && start_key == key_of(event.activity_source_key, "concept:name"))
-      return field(true, event.activity_state, event.activity_attribute, event.activity);
-    if (event.has_resource() && start_key == key_of(event.resource_source_key, "org:resource"))
-      return field(true, event.resource_state, event.resource_attribute, event.resource);
-    if (event.has_lifecycle() && start_key == key_of(event.lifecycle_source_key, "lifecycle:transition"))
-      return field(true, event.lifecycle_state, event.lifecycle_attribute, event.lifecycle);
-    failing = true;
-    return std::nullopt;
+  const auto attribute_value = [&]() {
+    for (const auto& attribute : event.attributes)
+      if (attribute.key == key) return legacy_attribute_value(attribute, business_hours);
+    return LegacyValue{};
   };
-  std::vector<std::vector<std::optional<PlusCell>>> starts, completes;
-  for (const auto& trace : log.traces) {
-    auto& start_row = starts.emplace_back();
-    auto& complete_row = completes.emplace_back();
-    for (const auto& event : trace.events) {
-      if (trace.events.size() > 1 && !event.has_activity()) return std::nullopt;
-      complete_row.push_back(timestamp_cell(event));
-      start_row.push_back(start_cell(event));
+  // A first-class key the event holds as no scalar (a <list>) stays among
+  // its attributes.
+  const auto field = [&](bool present, FirstClassAttributeState state, const std::optional<EventAttribute>& attribute,
+                         bool date) {
+    LegacyValue out;
+    if (!present) return attribute_value();
+    if (attribute) return legacy_attribute_value(*attribute, business_hours);
+    if (state == FirstClassAttributeState::kNull) {
+      out.kind = LegacyKind::kNone;
+      return out;
     }
-  }
-  if (!modelled || !failing) return std::nullopt;
+    if (!date) {
+      out.kind = LegacyKind::kStr;
+      return out;
+    }
+    const auto micros = business_hours ? detail::local_wall_timestamp_microseconds(event.timestamp)
+                                       : parse_timestamp_microseconds(event.timestamp);
+    out.kind = micros ? LegacyKind::kDatetime : LegacyKind::kUnmodelled;
+    out.micros = micros.value_or(0);
+    return out;
+  };
+  if (key == key_of(event.timestamp_source_key, "time:timestamp"))
+    return field(event.has_timestamp(), event.timestamp_state, event.timestamp_attribute, true);
+  if (key == key_of(event.activity_source_key, "concept:name"))
+    return field(event.has_activity(), event.activity_state, event.activity_attribute, false);
+  if (key == key_of(event.resource_source_key, "org:resource"))
+    return field(event.has_resource(), event.resource_state, event.resource_attribute, false);
+  if (key == key_of(event.lifecycle_source_key, "lifecycle:transition"))
+    return field(event.has_lifecycle(), event.lifecycle_state, event.lifecycle_attribute, false);
+  return attribute_value();
+}
+
+std::optional<std::vector<std::vector<double>>> legacy_classic_waits(const EventLog& log,
+                                                                     const HeuristicMinerOptions& options,
+                                                                     bool keyed = false) {
+  const std::string start_key = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
+                                    ? *options.start_timestamp_attribute
+                                    : "time:timestamp";
+  const std::string time_key = standard_timestamp_attribute(options.timestamp_attribute)
+                                   ? std::string("time:timestamp")
+                                   : options.timestamp_attribute;
+  const bool custom_time = time_key != "time:timestamp";
+  const bool business_hours = options.use_business_hours;
+  // The frequency DFG raises KeyError first on a pair without its activity
+  // (legacy_keyed_heuristics checks a custom key's pairs itself).
+  if (!keyed)
+    for (const auto& trace : log.traces)
+      if (trace.events.size() > 1)
+        for (const auto& event : trace.events)
+          if (!event.has_activity()) return std::nullopt;
   const auto slots = business_hours ? detail::normalize_business_hour_slots(options.business_hour_slots,
                                                                             options.business_hour_slots_explicit,
                                                                             "Heuristics Miner")
@@ -927,117 +1040,190 @@ std::optional<std::vector<std::vector<double>>> legacy_classic_waits(const Event
   const auto missing = [](const std::string& key) {
     return HeuristicPandasError("builtins.KeyError", python_str_repr(key));
   };
-  std::vector<std::vector<double>> waits(completes.size());
-  for (std::size_t t = 0; t < completes.size(); ++t) {
-    waits[t].assign(completes[t].size(), 0.0);
-    for (std::size_t i = 1; i < completes[t].size(); ++i) {
-      const auto& later = starts[t][i];
-      const auto& earlier = completes[t][i - 1];
+  std::vector<std::vector<double>> waits(log.traces.size());
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& events = log.traces[t].events;
+    waits[t].assign(events.size(), 0.0);
+    for (std::size_t i = 1; i < events.size(); ++i) {
       double wait = 0.0;
       if (business_hours) {
-        if (!earlier) throw missing("time:timestamp");
-        if (!later) throw missing(start_key);
-        detail::check_plus_business_hours(*earlier, *later);
-        wait = detail::business_elapsed_seconds_microseconds(earlier->micros, later->micros, slots);
+        const auto earlier = legacy_event_value(events[i - 1], time_key, true);
+        if (earlier.kind == LegacyKind::kUnmodelled) return std::nullopt;
+        if (earlier.kind == LegacyKind::kAbsent) throw missing(time_key);
+        const auto later = legacy_event_value(events[i], start_key, true);
+        if (later.kind == LegacyKind::kUnmodelled) return std::nullopt;
+        if (later.kind == LegacyKind::kAbsent) throw missing(start_key);
+        for (const auto* value : {&earlier, &later}) {
+          if (value->kind == LegacyKind::kDatetime) continue;
+          if (value->kind == LegacyKind::kStr)
+            throw HeuristicPandasError("builtins.TypeError", "str.replace() takes no keyword arguments");
+          throw HeuristicPandasError("builtins.AttributeError", std::string("'") + legacy_type_name(value->kind) +
+                                                                    "' object has no attribute 'replace'");
+        }
+        wait = detail::business_elapsed_seconds_microseconds(earlier.micros, later.micros, slots);
       } else {
-        if (!later) throw missing(start_key);
-        if (!earlier) throw missing("time:timestamp");
-        if (!detail::plus_date_like(later->kind) || !detail::plus_date_like(earlier->kind))
+        const auto later = legacy_event_value(events[i], start_key, false);
+        if (later.kind == LegacyKind::kUnmodelled) return std::nullopt;
+        if (later.kind == LegacyKind::kAbsent) throw missing(start_key);
+        const auto earlier = legacy_event_value(events[i - 1], time_key, false);
+        if (earlier.kind == LegacyKind::kUnmodelled) return std::nullopt;
+        if (earlier.kind == LegacyKind::kAbsent) throw missing(time_key);
+        if (later.kind == LegacyKind::kDatetime && earlier.kind == LegacyKind::kDatetime) {
+          wait = detail::epoch_seconds_from_microseconds(later.micros - earlier.micros);
+        } else if (legacy_number(later.kind) && legacy_number(earlier.kind)) {
+          const bool real = later.kind == LegacyKind::kFloat || earlier.kind == LegacyKind::kFloat;
+          throw HeuristicPandasError("builtins.AttributeError", std::string("'") + (real ? "float" : "int") +
+                                                                    "' object has no attribute 'total_seconds'");
+        } else {
           throw HeuristicPandasError("builtins.TypeError", std::string("unsupported operand type(s) for -: '") +
-                                                               detail::plus_cell_type(later->kind) + "' and '" +
-                                                               detail::plus_cell_type(earlier->kind) + "'");
-        wait = detail::epoch_seconds_from_microseconds(later->micros - earlier->micros);
+                                                               legacy_type_name(later.kind) + "' and '" +
+                                                               legacy_type_name(earlier.kind) + "'");
+        }
       }
       waits[t][i] = std::max(0.0, wait);
     }
   }
+  if (!custom_time && !keyed) return std::nullopt;
   return waits;
 }
 
 // An XES frame column's cells as Python reads them for the classic
-// performance view (round GK): plus_frame_cells for dates and text; numbers
-// and booleans as pandas types the column (ints without a gap int64, with a
-// gap or beside floats float64; booleans without a gap bool; any other mix
-// object, each cell its own type, a gap NaN) and as Polars' copy holds it
-// (Int64, Float64, Boolean; an object column String; a gap None). nullopt
-// for other kinds.
+// performance view (round GK; every XES kind since round GL, observed
+// black-box): pandas types the column from its present cells, a gap being
+// an event without the key (or a NaN float, or a typed NaT) and None a
+// valueless string or id or a <list> without children:
+//   - dates (and None): datetime64, each date a Timestamp, a gap or None NaT;
+//   - text (and None): str, a gap or None NaN;
+//   - ints and floats: int64 without a gap or None, else float64 (NaN);
+//   - booleans: bool without a gap or None, else object;
+//   - None alone: object (None), float64 (NaN) beside a gap;
+//   - any other mix object: each cell its own type (a date a Python
+//     datetime, a <list> with children or a scalar with children a dict),
+//     None None, a gap NaN.
+// Polars' copy holds Datetime, String, Int64, Float64 and Boolean columns
+// as such and an object column as String (str() of each cell), a gap and
+// None as None. nullopt for other kinds.
 std::optional<std::vector<detail::PlusCell>> classic_frame_cells(const EventTable& table, std::size_t column,
                                                                  bool polars) {
   using detail::PlusCell;
   using detail::PlusCellKind;
-  if (auto cells = detail::plus_frame_cells(table, column, polars)) return cells;
-  const auto missing = [&](const EventTable::Row& row) {
-    if (column >= row.size() || !row[column] || row[column]->is_null) return true;
-    const auto* number = std::get_if<double>(&row[column]->typed_value);
-    return number && std::isnan(*number) && row[column]->kind == AttributeKind::kFloat;
-  };
-  bool any_missing = false, has_int = false, has_float = false, has_bool = false, has_other = false;
+  enum class Cell { kGap, kNone, kDict, kDate, kText, kInt, kFloat, kBool };
+  std::vector<Cell> kinds;
+  kinds.reserve(table.rows.size());
+  bool gap = false, none = false, dict = false, date = false, text = false, integer = false, real = false,
+       boolean = false;
   for (const auto& row : table.rows) {
-    if (missing(row)) {
-      any_missing = true;
-      continue;
+    Cell kind = Cell::kGap;
+    if (column < row.size() && row[column] && row[column]->xes_public_shape != XesPublicShape::kAbsent) {
+      const auto& cell = *row[column];
+      const auto* number = std::get_if<double>(&cell.typed_value);
+      if (cell.xes_public_shape == XesPublicShape::kNone || (cell.is_null && cell.container == AttributeContainerKind::kScalar &&
+                                                             !cell.scalar_wrapper && cell.children.empty())) {
+        kind = Cell::kNone;
+      } else if (cell.xes_public_shape == XesPublicShape::kWrapper || cell.scalar_wrapper || cell.scalar_children_list ||
+                 cell.container != AttributeContainerKind::kScalar || !cell.children.empty()) {
+        kind = Cell::kDict;
+      } else if (cell.is_null || is_typed_nat(cell) || (number && std::isnan(*number))) {
+        kind = Cell::kGap;
+      } else {
+        switch (cell.kind) {
+          case AttributeKind::kDate:
+            if (!parse_timestamp_microseconds(cell.value)) return std::nullopt;
+            kind = Cell::kDate;
+            break;
+          case AttributeKind::kString:
+          case AttributeKind::kId: kind = Cell::kText; break;
+          case AttributeKind::kInt:
+            if (!std::holds_alternative<std::int64_t>(cell.typed_value)) return std::nullopt;
+            kind = Cell::kInt;
+            break;
+          case AttributeKind::kFloat:
+            if (!number) return std::nullopt;
+            kind = Cell::kFloat;
+            break;
+          case AttributeKind::kBoolean:
+            if (!std::holds_alternative<bool>(cell.typed_value)) return std::nullopt;
+            kind = Cell::kBool;
+            break;
+          default: return std::nullopt;
+        }
+      }
     }
-    const auto& cell = *row[column];
-    switch (cell.kind) {
-      case AttributeKind::kInt:
-        if (!std::holds_alternative<std::int64_t>(cell.typed_value)) return std::nullopt;
-        has_int = true;
-        break;
-      case AttributeKind::kFloat:
-        if (!std::holds_alternative<double>(cell.typed_value)) return std::nullopt;
-        has_float = true;
-        break;
-      case AttributeKind::kBoolean:
-        if (!std::holds_alternative<bool>(cell.typed_value)) return std::nullopt;
-        has_bool = true;
-        break;
-      case AttributeKind::kDate:
-      case AttributeKind::kString:
-      case AttributeKind::kId:
-        has_other = true;
-        break;
-      default: return std::nullopt;
+    switch (kind) {
+      case Cell::kGap: gap = true; break;
+      case Cell::kNone: none = true; break;
+      case Cell::kDict: dict = true; break;
+      case Cell::kDate: date = true; break;
+      case Cell::kText: text = true; break;
+      case Cell::kInt: integer = true; break;
+      case Cell::kFloat: real = true; break;
+      case Cell::kBool: boolean = true; break;
     }
+    kinds.push_back(kind);
   }
-  const bool numeric = (has_int || has_float) && !has_bool && !has_other;
-  const bool boolean = has_bool && !has_int && !has_float && !has_other;
-  const bool object = !numeric && !(boolean && !any_missing);
+  enum class Dtype { kDatetime, kString, kInt, kFloat, kBool, kObject, kNoneObject, kNaNFloat };
+  const int families = int(dict) + int(date) + int(text) + int(integer || real) + int(boolean);
+  Dtype dtype = Dtype::kObject;
+  if (families == 0) dtype = gap ? Dtype::kNaNFloat : Dtype::kNoneObject;
+  else if (families > 1 || dict) dtype = Dtype::kObject;
+  else if (date) dtype = Dtype::kDatetime;
+  else if (text) dtype = Dtype::kString;
+  else if (integer || real) dtype = real || gap || none ? Dtype::kFloat : Dtype::kInt;
+  else dtype = gap || none ? Dtype::kObject : Dtype::kBool;
   std::vector<PlusCell> cells;
   cells.reserve(table.rows.size());
-  for (const auto& row : table.rows) {
+  for (std::size_t r = 0; r < table.rows.size(); ++r) {
     PlusCell out;
-    if (missing(row)) {
-      out.kind = polars ? PlusCellKind::kNone : PlusCellKind::kNaN;
+    const auto kind = kinds[r];
+    if (kind == Cell::kGap || kind == Cell::kNone) {
+      if (polars) out.kind = PlusCellKind::kNone;
+      else if (dtype == Dtype::kDatetime) out.kind = PlusCellKind::kNaT;
+      else if (kind == Cell::kNone && (dtype == Dtype::kObject || dtype == Dtype::kNoneObject)) out.kind = PlusCellKind::kNone;
+      else out.kind = PlusCellKind::kNaN;
       cells.push_back(std::move(out));
       continue;
     }
-    const auto& cell = *row[column];
-    if (polars && object) {
+    const auto& cell = *table.rows[r][column];
+    if (polars && dtype == Dtype::kObject) {
       // Polars' copy of an object column: str() of each cell.
       out.kind = PlusCellKind::kText;
-      out.text = cell.kind == AttributeKind::kDate ? detail::plus_python_datetime_str(cell.value) : cell.value;
-    } else if (cell.kind == AttributeKind::kInt) {
-      if (numeric && (has_float || any_missing)) {
+      out.text = kind == Cell::kDate ? detail::plus_python_datetime_str(cell.value) : cell.value;
+      cells.push_back(std::move(out));
+      continue;
+    }
+    switch (kind) {
+      case Cell::kDict: out.kind = kDictCell; break;
+      case Cell::kDate:
+        out.micros = *parse_timestamp_microseconds(cell.value);
+        if (dtype == Dtype::kDatetime) {
+          out.kind = polars ? PlusCellKind::kDatetime : PlusCellKind::kTimestamp;
+        } else {
+          out.kind = PlusCellKind::kDatetime;
+          out.text = cell.value;
+        }
+        break;
+      case Cell::kText:
+        out.kind = PlusCellKind::kText;
+        out.text = cell.value;
+        break;
+      case Cell::kInt:
+        if (dtype == Dtype::kFloat) {
+          out.kind = PlusCellKind::kFloat;
+          out.number = static_cast<double>(std::get<std::int64_t>(cell.typed_value));
+        } else {
+          out.kind = PlusCellKind::kInt;
+          out.micros = std::get<std::int64_t>(cell.typed_value);
+        }
+        break;
+      case Cell::kFloat:
         out.kind = PlusCellKind::kFloat;
-        out.number = static_cast<double>(std::get<std::int64_t>(cell.typed_value));
-      } else {
-        out.kind = PlusCellKind::kInt;
-        out.micros = std::get<std::int64_t>(cell.typed_value);
-      }
-    } else if (cell.kind == AttributeKind::kFloat) {
-      out.kind = PlusCellKind::kFloat;
-      out.number = std::get<double>(cell.typed_value);
-    } else if (cell.kind == AttributeKind::kBoolean) {
-      out.kind = PlusCellKind::kBool;
-      out.micros = std::get<bool>(cell.typed_value) ? 1 : 0;
-    } else if (cell.kind == AttributeKind::kDate) {
-      const auto micros = parse_timestamp_microseconds(cell.value);
-      if (!micros) return std::nullopt;
-      out.kind = PlusCellKind::kDatetime;
-      out.micros = *micros;
-    } else {
-      out.kind = PlusCellKind::kText;
-      out.text = cell.value;
+        out.number = std::get<double>(cell.typed_value);
+        break;
+      case Cell::kBool:
+        out.kind = PlusCellKind::kBool;
+        out.micros = std::get<bool>(cell.typed_value) ? 1 : 0;
+        break;
+      default: break;
     }
     cells.push_back(std::move(out));
   }
@@ -3386,11 +3572,289 @@ HeuristicsNet discover_plus_plus_pandas(
   return net;
 }
 
+// pm4py's classic heuristics net sorts each node's accepted successors (DFG
+// order) as Python sorts its activity values (round GA's order, see
+// discover_heuristics_net_xes_frame): rows in the order their source first
+// leads a pair of the cleaned DFG, each row's targets in pair order, an
+// accepted edge adding its source, then its target; the length-two loop
+// edges join later. `less` is Python's < on two activity ids (it raises
+// TypeError on values Python does not order). Round GL: activity values of
+// other types (an XES upload's legacy log, a CSV upload's typed column).
+// Returns the nodes in that order (the Petri conversion visits them so).
+std::vector<std::string> check_successor_sort(const HeuristicsNet& net, const EventLog& log,
+                                              const std::function<bool(std::size_t, std::size_t)>& less) {
+  std::map<std::pair<std::string, std::string>, std::size_t> pair_order;
+  std::vector<std::pair<std::string, std::string>> pairs;
+  for (const auto& trace : log.traces)
+    for (std::size_t e = 1; e < trace.events.size(); ++e)
+      if (pair_order.try_emplace({trace.events[e - 1].activity, trace.events[e].activity}, pair_order.size()).second)
+        pairs.emplace_back(trace.events[e - 1].activity, trace.events[e].activity);
+  std::vector<std::string> rows;
+  for (const auto& pair : pairs)
+    if (net.cleaned_dfg.contains(pair) && std::find(rows.begin(), rows.end(), pair.first) == rows.end())
+      rows.push_back(pair.first);
+  const auto id_of = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(net.activities.begin(), net.activities.end(), name);
+    if (found == net.activities.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - net.activities.begin());
+  };
+  const auto accepted = [&](const std::pair<std::string, std::string>& pair) {
+    const auto source = id_of(pair.first), target = id_of(pair.second);
+    if (!source || !target) return false;
+    return std::any_of(net.edges.begin(), net.edges.end(), [&](const auto& edge) {
+      return edge.source == *source && edge.target == *target && !edge.length_two_loop;
+    });
+  };
+  std::vector<std::string> appearance;
+  for (const auto& row : rows)
+    for (const auto& pair : pairs) {
+      if (pair.first != row || !net.cleaned_dfg.contains(pair) || !accepted(pair)) continue;
+      for (const auto* name : {&pair.first, &pair.second})
+        if (std::find(appearance.begin(), appearance.end(), *name) == appearance.end()) appearance.push_back(*name);
+    }
+  for (const auto& name : appearance) {
+    const auto id = id_of(name);
+    if (!id) continue;
+    std::vector<std::size_t> successors;
+    for (const auto& edge : net.edges)
+      if (edge.source == *id && !edge.length_two_loop) successors.push_back(edge.target);
+    if (successors.size() < 2) continue;
+    const auto rank = [&](std::size_t target) {
+      const auto at = pair_order.find({name, net.activities[target]});
+      return at == pair_order.end() ? pair_order.size() : at->second;
+    };
+    std::stable_sort(successors.begin(), successors.end(),
+                     [&](std::size_t a, std::size_t b) { return rank(a) < rank(b); });
+    detail::python_list_sort(successors, less);
+  }
+  return appearance;
+}
+
+// pm4py's Petri conversion names a node's join place "pre_" + its value: a
+// node whose value is no str raises TypeError at the first such node with an
+// accepted incoming edge, in the dependency pass's order (round GL,
+// observed black-box). Every route that mines such a net on a log shape
+// converts it next, so the miner raises it.
+void check_typed_conversion(const HeuristicsNet& net, const std::vector<std::string>& appearance,
+                            const std::function<std::string(const std::string&)>& python_type) {
+  for (const auto& name : appearance) {
+    const auto type = python_type(name);
+    if (type == "str") continue;
+    const auto found = std::find(net.activities.begin(), net.activities.end(), name);
+    if (found == net.activities.end()) continue;
+    const auto id = static_cast<std::size_t>(found - net.activities.begin());
+    if (std::any_of(net.edges.begin(), net.edges.end(), [&](const auto& edge) { return edge.target == id; }))
+      throw HeuristicPandasError("builtins.TypeError", "can only concatenate str (not \"" + type + "\") to str");
+  }
+}
+
+// pm4py's classic heuristics miner keyed by a custom activity key on an XES
+// upload's log shape, the hybrid legacy log whose event dicts hold each
+// value as the XES importer types it (round GL, observed black-box). In
+// order: a dict value anywhere raises TypeError unhashable (the activity
+// counts); a pair's event without the key raises KeyError (a single-event
+// trace without it is left out); the performance DFG's errors
+// (legacy_classic_waits); the first pair in log order whose earlier value is
+// no str raises TypeError "'T' object is not subscriptable"; the net's
+// nodes, in their first appearance among the retained edges, sort their
+// successors as Python sorts the values ("'<' not supported between
+// instances of ..."). Nodes are named str() of the value, values equal in
+// Python (1, 1.0, True) one node named after the first seen. nullopt when a
+// value is not modelled, or when two nodes would share a name (a str '5'
+// beside an int 5, NaN values, each its own node in pm4py).
+struct LegacyActivityValue {
+  LegacyKind kind = LegacyKind::kAbsent;
+  std::string label;
+  std::string identity;  // equal in Python <=> equal identity
+  long double number = 0.0L;
+  bool nan = false;
+  std::int64_t micros = 0;
+};
+
+std::optional<LegacyActivityValue> legacy_activity_value(const Event& event, const std::string& key) {
+  LegacyActivityValue out;
+  const auto attribute_of = [&]() -> const EventAttribute* {
+    const auto key_of = [](const std::string& source, std::string_view standard) {
+      return source.empty() ? std::string(standard) : source;
+    };
+    const auto first_class = [&](bool present, const std::optional<EventAttribute>& attribute) -> const EventAttribute* {
+      return present && attribute ? &*attribute : nullptr;
+    };
+    if (key == key_of(event.timestamp_source_key, "time:timestamp") && event.has_timestamp())
+      return first_class(true, event.timestamp_attribute);
+    if (key == key_of(event.activity_source_key, "concept:name") && event.has_activity())
+      return first_class(true, event.activity_attribute);
+    if (key == key_of(event.resource_source_key, "org:resource") && event.has_resource())
+      return first_class(true, event.resource_attribute);
+    if (key == key_of(event.lifecycle_source_key, "lifecycle:transition") && event.has_lifecycle())
+      return first_class(true, event.lifecycle_attribute);
+    for (const auto& attribute : event.attributes)
+      if (attribute.key == key) return &attribute;
+    return nullptr;
+  };
+  const auto value = legacy_event_value(event, key, false);
+  out.kind = value.kind;
+  out.micros = value.micros;
+  switch (value.kind) {
+    case LegacyKind::kAbsent:
+    case LegacyKind::kDict: return out;
+    case LegacyKind::kUnmodelled: return std::nullopt;
+    case LegacyKind::kNone:
+      out.label = "None";
+      out.identity = "none";
+      return out;
+    default: break;
+  }
+  const auto* attribute = attribute_of();
+  const std::string* text = nullptr;
+  if (attribute) text = &attribute->value;
+  else if (key == "time:timestamp" || key == event.timestamp_source_key) text = &event.timestamp;
+  else if (key == "concept:name" || key == event.activity_source_key) text = &event.activity;
+  else if (key == "org:resource" || key == event.resource_source_key) text = &event.resource;
+  else text = &event.lifecycle;
+  switch (value.kind) {
+    case LegacyKind::kStr:
+      out.label = *text;
+      out.identity = "s" + *text;
+      return out;
+    case LegacyKind::kDatetime:
+      out.label = detail::plus_python_datetime_str(*text);
+      out.identity = "d" + std::to_string(value.micros);
+      return out;
+    case LegacyKind::kBool: {
+      const bool truth = attribute && std::holds_alternative<bool>(attribute->typed_value)
+                             ? std::get<bool>(attribute->typed_value)
+                             : *text == "true" || *text == "True";
+      out.label = truth ? "True" : "False";
+      out.number = truth ? 1.0L : 0.0L;
+      out.identity = truth ? "n1" : "n0";
+      return out;
+    }
+    case LegacyKind::kInt: {
+      if (!attribute) return std::nullopt;
+      if (const auto* signed_value = std::get_if<std::int64_t>(&attribute->typed_value)) {
+        out.label = std::to_string(*signed_value);
+        out.number = static_cast<long double>(*signed_value);
+      } else if (const auto* unsigned_value = std::get_if<std::uint64_t>(&attribute->typed_value)) {
+        out.label = std::to_string(*unsigned_value);
+        out.number = static_cast<long double>(*unsigned_value);
+      } else {
+        return std::nullopt;
+      }
+      out.identity = "n" + out.label;
+      return out;
+    }
+    case LegacyKind::kFloat: {
+      if (!attribute || !std::holds_alternative<double>(attribute->typed_value)) return std::nullopt;
+      const double real = std::get<double>(attribute->typed_value);
+      out.label = python::float_repr(real);
+      out.number = real;
+      out.nan = std::isnan(real);
+      if (out.nan) {
+        out.identity = "nan";
+      } else if (std::trunc(real) == real && std::fabs(real) < 9.2e18) {
+        out.identity = "n" + std::to_string(static_cast<long long>(real));
+      } else {
+        out.identity = "f" + out.label;
+      }
+      return out;
+    }
+    default: return std::nullopt;
+  }
+}
+
+// Python's a < b on two activity values (TypeError where Python has none).
+bool legacy_activity_less(const LegacyActivityValue& a, const LegacyActivityValue& b) {
+  const auto number = [](LegacyKind kind) {
+    return kind == LegacyKind::kInt || kind == LegacyKind::kFloat || kind == LegacyKind::kBool;
+  };
+  if (a.kind == LegacyKind::kStr && b.kind == LegacyKind::kStr) return a.label < b.label;
+  if (number(a.kind) && number(b.kind)) return !a.nan && !b.nan && a.number < b.number;
+  if (a.kind == LegacyKind::kDatetime && b.kind == LegacyKind::kDatetime) return a.micros < b.micros;
+  throw HeuristicPandasError("builtins.TypeError", std::string("'<' not supported between instances of '") +
+                                                       legacy_type_name(a.kind) + "' and '" +
+                                                       legacy_type_name(b.kind) + "'");
+}
+
+std::optional<HeuristicsNet> legacy_keyed_heuristics(const EventLog& log, const HeuristicMinerOptions& options) {
+  const auto& key = options.activity_attribute;
+  std::vector<std::vector<LegacyActivityValue>> values(log.traces.size());
+  for (std::size_t t = 0; t < log.traces.size(); ++t)
+    for (const auto& event : log.traces[t].events) {
+      auto value = legacy_activity_value(event, key);
+      if (!value) return std::nullopt;
+      values[t].push_back(std::move(*value));
+    }
+  for (const auto& trace : values)
+    for (const auto& value : trace)
+      if (value.kind == LegacyKind::kDict)
+        throw HeuristicPandasError("builtins.TypeError", "unhashable type: 'dict'");
+  for (const auto& trace : values)
+    if (trace.size() > 1)
+      for (const auto& value : trace)
+        if (value.kind == LegacyKind::kAbsent)
+          throw HeuristicPandasError("builtins.KeyError", python_str_repr(key));
+  if (options.decoration == HeuristicNetDecoration::kPerformance) (void)legacy_classic_waits(log, options, true);
+  for (const auto& trace : values)
+    for (std::size_t i = 1; i < trace.size(); ++i)
+      if (trace[i - 1].kind != LegacyKind::kStr)
+        throw HeuristicPandasError("builtins.TypeError", std::string("'") + legacy_type_name(trace[i - 1].kind) +
+                                                             "' object is not subscriptable");
+  // One node per Python-equal value, named after the first seen.
+  std::map<std::string, std::string> label_of;  // identity -> label
+  std::map<std::string, std::string> identity_of_label;
+  std::map<std::string, const LegacyActivityValue*> value_of_label;
+  for (const auto& trace : values)
+    for (const auto& value : trace) {
+      if (value.kind == LegacyKind::kAbsent) continue;
+      if (value.nan) {
+        if (label_of.contains("nan")) return std::nullopt;
+      }
+      const auto [it, inserted] = label_of.emplace(value.identity, value.label);
+      if (!inserted) continue;
+      const auto [named, fresh] = identity_of_label.emplace(value.label, value.identity);
+      if (!fresh && named->second != value.identity) return std::nullopt;
+      value_of_label[value.label] = &value;
+    }
+  EventLog projected = log;
+  projected.traces.clear();
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    if (values[t].size() == 1 && values[t].front().kind == LegacyKind::kAbsent) continue;
+    auto trace = log.traces[t];
+    for (std::size_t e = 0; e < trace.events.size(); ++e) {
+      auto& event = trace.events[e];
+      event.activity = label_of.at(values[t][e].identity);
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key.clear();
+      event.activity_attribute.reset();
+    }
+    projected.traces.push_back(std::move(trace));
+  }
+  auto plain = options;
+  plain.activity_attribute = "concept:name";
+  auto net = discover_heuristics_net(projected, plain);
+  const auto appearance = check_successor_sort(net, projected, [&](std::size_t a, std::size_t b) {
+    return legacy_activity_less(*value_of_label.at(net.activities[a]), *value_of_label.at(net.activities[b]));
+  });
+  check_typed_conversion(net, appearance, [&](const std::string& name) {
+    const auto found = value_of_label.find(name);
+    return found == value_of_label.end() ? std::string("str") : std::string(legacy_type_name(found->second->kind));
+  });
+  net.activity_attribute = options.activity_attribute;
+  net.activity_ids_are_local = true;
+  return net;
+}
+
 HeuristicsNet discover_heuristics_net(
     const EventLog& log,
     const HeuristicMinerOptions& options) {
   if (options.variant == HeuristicMinerVariant::kPlusPlus)
     return discover_plus_plus(log, options);
+  // A custom activity key on an XES upload's log shape reads the legacy
+  // event dicts (round GL).
+  if (log.dataframe_columns && !log.dataframe_columns->csv_text &&
+      !standard_activity_attribute(options.activity_attribute))
+    if (auto net = legacy_keyed_heuristics(log, options)) return std::move(*net);
   // pm4py's classic heuristics miner keyed by a typed column of an upload's
   // frame reads each activity as the cell's Python object: it raises
   // TypeError once a directly-follows pair holds one that is no str, and
@@ -3402,14 +3866,52 @@ HeuristicsNet discover_heuristics_net(
     auto projected = options;
     projected.activity_attribute = "concept:name";
     auto net = discover_heuristics_net(keyed->log, projected);
+    if (keyed->non_text) {
+      // Each label's Python type (one per label: the column's dtype types
+      // its cells alike, a gap NaN or NaT).
+      std::map<std::string, std::string> type_of;
+      for (std::size_t t = 0; t < keyed->types.size(); ++t)
+        for (std::size_t e = 0; e < keyed->types[t].size(); ++e)
+          type_of.try_emplace(keyed->log.traces[t].events[e].activity, keyed->types[t][e]);
+      const auto python_type = [&](const std::string& label) {
+        const auto found = type_of.find(label);
+        return found == type_of.end() || found->second.empty() ? std::string("str") : found->second;
+      };
+      const auto number = [](const std::string& type) { return type == "int" || type == "float" || type == "bool"; };
+      const auto value = [](const std::string& label) -> long double {
+        if (label == "True") return 1.0L;
+        if (label == "False") return 0.0L;
+        return std::strtold(label.c_str(), nullptr);
+      };
+      try {
+        const auto appearance = check_successor_sort(net, keyed->log, [&](std::size_t a, std::size_t b) {
+          const auto& left = net.activities[a];
+          const auto& right = net.activities[b];
+          const auto ta = python_type(left), tb = python_type(right);
+          if (ta == tb && (ta == "str" || ta == "Timestamp")) return left < right;
+          if (number(ta) && number(tb)) {
+            const auto x = value(left), y = value(right);
+            return !std::isnan(x) && !std::isnan(y) && x < y;
+          }
+          const bool dates = (ta == "Timestamp" || ta == "NaTType") && (tb == "Timestamp" || tb == "NaTType");
+          if (dates) return ta == "Timestamp" && tb == "Timestamp" && left < right;
+          throw std::invalid_argument("TypeError: '<' not supported between instances of '" + ta + "' and '" + tb + "'");
+        });
+        check_typed_conversion(net, appearance, python_type);
+      } catch (const HeuristicPandasError&) {
+        throw;
+      } catch (const std::invalid_argument& sorted) {
+        throw std::invalid_argument("Heuristics Miner: " + std::string(sorted.what()));
+      }
+    }
     net.activity_attribute = options.activity_attribute;
     net.activity_ids_are_local = true;
     return net;
   }
   // A CSV log's classic performance view with business hours or a start
   // key reads the frame's cells (round GK).
-  if (classic_cell_clock(options) && log.dataframe_columns && log.dataframe_columns->csv_text &&
-      standard_activity_attribute(options.activity_attribute))
+  if ((classic_cell_clock(options) || classic_custom_clock(options)) && log.dataframe_columns &&
+      log.dataframe_columns->csv_text && standard_activity_attribute(options.activity_attribute))
     if (const auto waits = csv_classic_waits(log, *log.dataframe_columns, options, false)) {
       const auto plain = without_cell_clock(options);
       auto net = discover_classic_dfg(build_classic_input(log, plain, false, &*waits), plain);
@@ -3419,11 +3921,11 @@ HeuristicsNet discover_heuristics_net(
   // An XES upload's log (the hybrid legacy log; its importer attaches the
   // frame's columns, a frame shape's log has none) reads each pair's cells
   // as its event dicts hold them where Minera's own path would fail on a
-  // missing or non-date cell (round GK).
+  // missing or non-date cell (round GK), and with a custom timestamp key,
+  // whose start stays time:timestamp (round GL).
   if (options.decoration == HeuristicNetDecoration::kPerformance && log.dataframe_columns &&
       !log.dataframe_columns->csv_text &&
-      standard_activity_attribute(options.activity_attribute) &&
-      standard_timestamp_attribute(options.timestamp_attribute))
+      standard_activity_attribute(options.activity_attribute))
     if (const auto waits = legacy_classic_waits(log, options)) {
       const auto plain = without_cell_clock(options);
       auto net = discover_classic_dfg(build_classic_input(log, plain, false, &*waits), plain);
@@ -3448,14 +3950,16 @@ HeuristicsNet discover_heuristics_net_csv_frame(
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
   // The classic performance view with business hours or a start key reads
   // the frame's cells (round GK).
-  if (classic_cell_clock(options, true) && (data.kind() == EventDataKind::kEventTable || polars)) {
+  const bool custom_clock = classic_custom_clock(options);
+  if ((classic_cell_clock(options, true) || custom_clock) && (data.kind() == EventDataKind::kEventTable || polars)) {
     const auto log = classic_event_log(data, options);
     const auto selected = [&](const std::string& key, std::string_view standard, auto source) {
       return key.empty() || key == standard || log.traces.empty() || log.traces.front().events.empty() ||
              key == source(log.traces.front().events.front());
     };
     const bool keys = selected(options.activity_attribute, "concept:name", [](const Event& e) { return e.activity_source_key; }) &&
-                      selected(options.timestamp_attribute, "time:timestamp", [](const Event& e) { return e.timestamp_source_key; });
+                      (custom_clock ||
+                       selected(options.timestamp_attribute, "time:timestamp", [](const Event& e) { return e.timestamp_source_key; }));
     if (keys)
       if (const auto waits = csv_classic_waits(log, columns, options, polars)) {
         const auto plain = without_cell_clock(options);
@@ -3521,9 +4025,13 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // empty start key is Minera's own fallback.
   // The classic performance view reads business hours and any start key on
   // the frame's cells too (round GK).
-  const bool cell_clock = performance && classic_cell_clock(options);
+  // Another timestamp column likewise (round GL): pandas and Polars
+  // subtract its cell from the start key's, time:timestamp by default.
+  const bool custom_clock = performance && !standard_timestamp_attribute(options.timestamp_attribute) &&
+                            !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty());
+  const bool cell_clock = performance && (classic_cell_clock(options) || custom_clock);
   const bool own_clock =
-      canonical_timestamp_attribute(options) == "time:timestamp" &&
+      (custom_clock || canonical_timestamp_attribute(options) == "time:timestamp") &&
       (plus ? !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty())
             : cell_clock || (!options.use_business_hours && !options.start_timestamp_attribute));
   if ((!plus && options.variant != HeuristicMinerVariant::kClassic) || ((plus || performance) && !own_clock) ||
@@ -3572,6 +4080,19 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   if (!case_at) throw HeuristicPandasError("builtins.KeyError", repr(options.case_id_attribute));
   const auto activity_at = column_of(activity_key);
   const auto timestamp_at = column_of(timestamp_key);
+  // A column of None cells alone (valueless strings or ids, empty <list>s)
+  // is a column of the frame too, which the present columns leave out: its
+  // index in `source` (round GL).
+  const auto none_column = [&](const std::string& name) -> std::optional<std::size_t> {
+    if (name.starts_with("case:")) return std::nullopt;
+    const auto found = std::find(source->columns.begin(), source->columns.end(), name);
+    if (found == source->columns.end()) return std::nullopt;
+    const auto at = static_cast<std::size_t>(found - source->columns.begin());
+    for (const auto& row : source->rows)
+      if (at < row.size() && row[at] && row[at]->is_null) return at;
+    return std::nullopt;
+  };
+  const auto custom_none_at = custom_clock && !timestamp_at ? none_column(timestamp_key) : std::nullopt;
   const auto value = [](const EventTable::Row& row, std::size_t at) -> const std::string* {
     if (at >= row.size() || !row[at] || row[at]->is_null) return nullptr;
     return &row[at]->value;
@@ -3610,7 +4131,10 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       }
     }
     if (repeated && !activity_at) throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
-    if (repeated && performance && !timestamp_at) throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
+    // Another timestamp column raises at the first pair, after the start
+    // key (classic_cell_waits).
+    if (repeated && performance && !timestamp_at && !custom_clock)
+      throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
     if (!activity_at) return finish(discover_heuristics_net(EventLog{}, projected));
   }
   const auto missing_time = [&](const EventTable::Row& row) {
@@ -3822,21 +4346,36 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // the frame's cells (round GK, classic_cell_waits), before the noise
   // cleaning; a column it does not model keeps the older path.
   std::optional<std::vector<std::vector<double>>> cell_waits;
-  if (cell_clock) {
-    const auto completes = timestamp_at ? detail::plus_frame_cells(table, *timestamp_at, polars) : std::nullopt;
+  // So does the plain performance view when the timestamp column holds
+  // other kinds than dates (round GL).
+  bool odd_clock = false;
+  if (performance && !cell_clock && timestamp_at && !options.use_business_hours && !options.start_timestamp_attribute) {
+    const auto dates = detail::plus_frame_cells(table, *timestamp_at, polars);
+    odd_clock = !dates || std::any_of(dates->begin(), dates->end(), [](const auto& cell) {
+      return cell.kind == detail::PlusCellKind::kText || cell.kind == detail::PlusCellKind::kNaN;
+    });
+  }
+  if (cell_clock || odd_clock) {
+    // Without the timestamp column no case holds a pair (above).
+    const bool complete_missing = custom_clock && !timestamp_at && !custom_none_at;
+    auto completes = custom_none_at ? classic_frame_cells(*source, *custom_none_at, polars)
+                     : !timestamp_at ? std::optional<std::vector<detail::PlusCell>>(
+                                           std::vector<detail::PlusCell>(table.rows.size()))
+                                     : classic_frame_cells(table, *timestamp_at, polars);
     if (!completes) return discover_heuristics_net(data, options);
-    for (const auto& cell : *completes)
-      if (cell.kind == detail::PlusCellKind::kText || cell.kind == detail::PlusCellKind::kNaN)
-        return discover_heuristics_net(data, options);
     const std::string key = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
                                 ? *options.start_timestamp_attribute
-                                : timestamp_key;
+                            : custom_clock ? std::string("time:timestamp")
+                                           : timestamp_key;
     std::optional<std::vector<detail::PlusCell>> starts;
     if (key == timestamp_key) {
       starts = completes;
     } else if (!key.starts_with("case:")) {
       if (const auto at = column_of(key)) {
         starts = classic_frame_cells(table, *at, polars);
+        if (!starts) return discover_heuristics_net(data, options);
+      } else if (const auto none_at = none_column(key)) {
+        starts = classic_frame_cells(*source, *none_at, polars);
         if (!starts) return discover_heuristics_net(data, options);
       }
     }
@@ -3855,12 +4394,15 @@ HeuristicsNet discover_heuristics_net_xes_frame(
                                                                    "Heuristics Miner")
                            : std::vector<BusinessHourSlot>{};
     cell_waits = classic_cell_waits(start_rows, complete_rows, options.use_business_hours, slots,
-                                    starts ? std::nullopt : std::optional<std::string>(repr(key)), polars);
+                                    !starts            ? std::optional<std::string>(repr(key))
+                                    : complete_missing ? std::optional<std::string>(repr(timestamp_key))
+                                                       : std::nullopt,
+                                    polars);
   }
   // Polars' performance decoration subtracts each directly-follows pair's
   // timestamps, case by case, before the noise cleaning: None on either side
   // raises TypeError (round GB, observed black-box).
-  if (performance && polars && !cell_clock)
+  if (performance && polars && !cell_waits)
     for (const auto& trace : log.traces)
       for (std::size_t e = 1; e < trace.events.size(); ++e) {
         const bool later = trace.events[e].timestamp_state == FirstClassAttributeState::kNull;

@@ -619,19 +619,15 @@ std::optional<std::string> csv_frame_cell_label(DataFrameColumnType type, const 
 
 std::string frame_keyed_heuristics_error(const FrameKeyedActivities& keyed) {
   if (!keyed.non_text) return {};
-  // The miner reads the directly-follows pairs in log order and fails at the
-  // first pair holding a cell that is no str: on its first element when
-  // that one is no str, else when it orders the second beside text
-  // (observed black-box). A log without such a pair is discovered.
+  // The miner fails at the first directly-follows pair in log order whose
+  // first element is no str (observed black-box). A cell that is no str
+  // only as a later element is a node; the net's successor sort raises
+  // where it orders one beside text (check_successor_sort, round GL).
   for (std::size_t t = 0; t < keyed.types.size(); ++t) {
     const auto& types = keyed.types[t];
-    for (std::size_t e = 1; e < types.size(); ++e) {
+    for (std::size_t e = 1; e < types.size(); ++e)
       if (!types[e - 1].empty())
         return column_type_error("TypeError: '" + types[e - 1] + "' object is not subscriptable", keyed.column);
-      if (!types[e].empty())
-        return column_type_error("TypeError: '<' not supported between instances of 'str' and '" + types[e] + "'",
-                                 keyed.column);
-    }
   }
   return {};
 }

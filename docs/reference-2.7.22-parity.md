@@ -39263,3 +39263,119 @@ server binary) carries the reference values. The full ctest passed 674 of
 674 (40 minutes, -j2) on the second run (the first failed only
 `review_fr_nanosecond_waits`, see GK1-6). The fixture replay left all
 2,673 responses unchanged; the Python script tests passed 406 of 406.
+
+## Review GL1: the classic heuristics performance view with every XES value kind and another timestamp key, custom typed activity keys (2026-11-23)
+
+Round GL re-reviewed round GK: the classic heuristics variant with the
+performance decoration on XES uploads' log shape (the hybrid legacy log of
+GF1) with start, time and other values of every XES kind, another
+timestamp key (`heuristic_timestamp_attribute`, pm4py's `timestamp_key`)
+and a custom activity key (`heuristic_activity_attribute`, pm4py's
+`activity_key`) of any kind, through `/api/mine` and
+`/api/discover-workflow` (`family=heuristic`, `heuristic_variant=classic`,
+on a session mined with the defaults); the same with another timestamp key
+on XES uploads' frame shapes (read_xes's frame and its Polars copy) and
+CSV uploads' three shapes; the routes reading a classic net mined with
+business hours or a start key (token replay and footprints on CSV
+uploads' three shapes). GK's CI run 45148894611 (51ecfb7) passed every
+job, macOS and Windows included. No device was reachable, so no newer
+reviewer handoff was read from the Mac. Observed black-box on pm4py 2.7.22
+(pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` and
+`PYTHONHASHSEED=0`.
+
+Banks: 1,100 XES uploads from `gen/gengl.py` (glA-glL without glI, seeds
+20000-21099: start, time, `ts2` and `act2` values as dates with offsets,
+text, ids, ints, floats with NaN, booleans, valueless strings, empty and
+filled lists; traces without names, merged case ids); 60 CSV uploads glM
+from `gen/genhcsv3.py` with `ST2=1` (seeds 21200-21259); GK's CSV kcE,
+kcT, kcZ for the routes; 59 hand-made XES and 11 CSV probes.
+
+pm4py's classic performance DFG with another timestamp key (observed
+black-box): each directly-follows pair measures `start(later) -
+complete(earlier)` (with business hours `BusinessHours(complete(earlier),
+start(later))`) with the key's value as the complete and time:timestamp
+as the start unless a start key is given, on the legacy log's values, the
+frame's cells or the Polars copy's. Beyond GK1: two numbers subtract and
+their difference has no `total_seconds` (`AttributeError: 'int' object has
+no attribute 'total_seconds'`, `'float'` when either is a float or NaN);
+pandas' `Timestamp - int` raises its own `TypeError: Addition/subtraction
+of integers and integer-arrays with Timestamp is no longer supported.
+Instead of adding/subtracting `n`, use `n * obj.freq`` (a bool is the
+ordinary TypeError); NaT beside an int (not a bool) is NaT, a zero wait.
+read_xes types a frame column from its present cells: dates (with None)
+datetime64, None and gaps NaT; text (with None) str, None and gaps NaN;
+ints and floats float64 with a gap or None, else int64; booleans bool
+without a gap or None, else object; None alone object (float64 NaN beside
+a gap); any other mix object, each cell its Python type (a date a
+datetime on its own offset, a <list> with children or a scalar with
+children a dict), None None, a gap NaN. Polars' copy holds an object
+column as String (str() of each cell) and every gap and None as None. A
+missing start column raises KeyError before a missing timestamp column.
+
+pm4py's classic miner with a custom activity key on an event log
+(observed black-box): the activities are the events' Python values; a dict
+raises `unhashable type: 'dict'`; a directly-follows pair whose event lacks
+the key raises KeyError (a single-event trace is never read); the noise
+cleaning reads each pair's first element as text (`'int' object is not
+subscriptable`); the AND measure sorts each node's accepted successors, the
+nodes in the order the dependency pass creates them (`'<' not supported
+between instances of 'str' and 'int'`); equal numbers (1, 1.0, True) are
+one activity named by the first met; the net conversion that `/api/mine`
+runs concatenates `"pre_"` with the first typed node that has an incoming
+edge (`can only concatenate str (not "int") to str`).
+
+Fixed:
+
+- **GL1-1. The XES log shape's value kinds.** The legacy path (GK1-5) now
+  reads every kind as the legacy log holds it (lists as dicts or None,
+  valueless strings and ids as None, NaN floats, ids as str) and another
+  timestamp key, where Minera raised "Heuristics Miner: event is missing
+  timestamp attribute" or its own errors; two numbers raise the
+  `total_seconds` AttributeError.
+- **GL1-2. A custom typed activity key on the XES log shape.** The rules
+  above, where Minera mined the values' text (or raised KeyError
+  'concept:name' through its own lookup). On CSV logs the frame-keyed path
+  raised `'<' not supported` at the first pair whose second element is no
+  str; it now raises only for a non-str first element and checks the
+  successor sort and the conversion like pm4py.
+- **GL1-3. The XES frame shapes.** Another timestamp column is measured on
+  the frame's cells as above (a column of None alone too, which Minera's
+  present columns had dropped), where Minera's own path raised "missing
+  timestamp attribute" or measured gaps; the cell model now covers every
+  XES kind (dicts, None, ints beside dates) for start columns too, and a
+  time:timestamp column of other kinds (text, numbers, None) is read on
+  the cells with the default clock, business hours or a start key.
+- **GL1-4. CSV uploads' three shapes.** Another timestamp column (typed as
+  format_dataframe types it, date columns parsed) is measured on the
+  frame's cells, a column the upload lacks raising KeyError after the
+  start key's.
+
+Before and after, per shape (equal or failing alike, of the runs):
+
+| sweep | before | after |
+|---|---|---|
+| XES log shape glA-glE (21,525: 25 option sets, both decorations, `/api/mine` and `/api/discover-workflow`) | 3,978 differing | none differing; the rest stop at the Inductive miner (declared) or in `/api/mine`'s later steps (carried) |
+| XES log shape glF-glL (31,200) | not run | none differing (as above) |
+| XES frames with `ts2`, DataFrame and LazyFrame (glH, glJ, glL 1,800; with glG 2,400) | 1,311, 489 differing | 2,400 |
+| XES frames, GK's option sets on glF, glG, glK, DataFrame and LazyFrame (4,500 before: 15 sets; 5,400 after: 18) | 3,540, 960 differing | 5,400 |
+| CSV glM with another timestamp key, 3 shapes (540 before: 9 sets; 720 after: 12) | 144, 396 differing | 720 |
+| CSV glM, GK's start-key and business-hours sets, log and DataFrame (360) | | 360 |
+| routes on a classic net with business hours or a start key, CSV kcE, kcT, kcZ, 3 shapes (300 per shape and key) | | equal but for 7 unbounded nets whose footprints fail on both sides |
+
+Declared: none new. Carried to round GM: a custom typed activity key on
+XES frame shapes (pandas' Python labels and their errors, Polars' str()
+labels: 381 and 147 of 1,800 runs differ) and `/api/mine`'s steps after a
+net mined with such a key on the log shape (token replay and decorations,
+where pm4py's replay raises KeyError on an event without the key or sorts
+variants). Unchanged: the declared items of GK1 and before.
+
+In the suite: the new `minera_server_review_gl_tests` (47 checks, all of which fail on GK's server binary: another
+timestamp key on XES frames and the log shape with dates, gaps, None,
+text, dicts, ints, a column of None alone and missing columns, with and
+without business hours, a text time:timestamp; custom activity keys on the
+XES log shape: ints, an int beside text successors, a dict, a pair without
+the key, 1 and 1.0; another timestamp key on CSV uploads' three shapes)
+carries the reference values. The full ctest passed 675 of 675 (38
+minutes, -j2) on the first run. The fixture replay left all 2,673
+responses unchanged; the Python script tests passed 406 of 406.
