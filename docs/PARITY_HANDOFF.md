@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GN (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GO (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9545,6 +9545,100 @@ GN's suite: the full ctest 677 of 677 (-j2; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed 2,673
 responses unchanged.
 Harness and probes: `review-harness/round-gn/`.
+
+Round GO re-reviewed GN and aligned Heuristics++, the classic performance
+view and Declare on XES uploads' frame shapes whose time:timestamp and
+start_timestamp columns hold other XES kinds (Review GO1), and the CSV log
+shape's token replay keyed by a column with gaps (GO2). GN's CI run
+45208653724 passed Linux, the Python script tests, the frontend and the
+verifier (macOS cancelled, Windows ctest still running at GO's start). No
+device was reachable, so no newer reviewer handoff was read from the Mac.
+GN's fixes held: `famval.py` on fresh GN-style banks agreed. New banks:
+`gen/gengn.py` with GO seeds (goA-goC, 1,300 XES uploads), `gen/gengo.py`
+(goL, goM: 700 uploads with lifecycle and instance columns beside typed
+timestamps), `gen/genk.py` (goK: 400 CSV uploads whose text, float, date,
+int, bool and mixed columns have gaps); about 30 probes.
+Fixed: GO1-1, pm4py's Heuristics++ on such a frame (observed black-box)
+converts it to an event log that keeps each typed cell: to_interval
+subtracts each complete's cell and its start's (numbers raise
+`'int'|'float' object has no attribute 'total_seconds'`, NaT beside an int
+subtracts to NaT, a Timestamp minus an int raises pandas' own TypeError,
+text, None and dicts `unsupported operand type(s) for -`), the abstraction
+sorts each trace by its start cells (Python's list.sort, `'<'` errors),
+reads the activity and timestamp keys (KeyError after the first trace's
+sort), compares complete <= start for the first following event, then
+subtracts start - previous complete over every trace and reads
+timestamp() of every start, then every complete (NaT `NaTType does not
+support timestamp`, other kinds AttributeError); Minera answered
+"Heuristics Miner PLUSPLUS requires a valid event timestamp" for every
+such frame (shared `plus_subtract_seconds`, both shapes); GO1-2, with
+those cells a lifecycle gap raises lower() only where the transitions are
+read in order, after an earlier interval's subtraction error (Minera
+raised lower() first); GO1-3, the classic performance view keeps its
+frame-cell waits only without a custom start key or business hours;
+GO1-4, Declare's frame check reads the columns as read_xes types them on
+both shapes (`xes_frame_typed_dtypes`), conformance on a Polars frame
+included (Minera refused a dates column whose other cells are valueless
+lists, "should (at least) contain a column of type date"), and the Polars
+sort compares the typed time:timestamp cells. GO2-1, convert_to_event_log
+keeps NaN (one object in a text or object column, a fresh float per cell
+in a float64 column) and NaT in every event, so `/api/mine`'s replay of
+the heuristics net keyed by such a column reads the cells
+(`csv_log_keyed_replay.hpp`): it first sorts the net's transitions by
+name, where a gap's node beside a text name raises `'str' and 'float'`
+when it leads the net's activities, else the reverse (bools and numbers
+order beside NaN), then sorts the variants by (count, tuple) descending
+(NaN or NaT beside text raises), then replays each cell against the node
+of an equal object, dates as UTC Timestamps; the decorations read the
+same log (Minera raised KeyError for a gap, and missed every transition
+of a date column).
+After, per shape: Heuristics++, Heuristics++ performance and the classic
+performance view on goA-goC and goL/goM 2,000 of 2,000 uploads; Declare
+discovery and conformance 2,000 of 2,000 but the declared operand order
+of pandas' rule-column sort (39 uploads at PYTHONHASHSEED=0, 'float'
+first in about a third of the missing-activity uploads, changing with the
+seed); kcT's seven keyed replays equal; goK 2,400 key judgments, every
+error and every replay total equal, 30 nets with several gaps in a
+float64 column differ (open, below). The option sets with business hours
+and custom timestamp or start keys on goA/goL (250 uploads each) differ
+as they did on GN's binary (open, below).
+
+GO's suite: the full ctest 678 of 678 (-j2; the new
+`minera_server_review_go_tests` fails 43 of its 44 checks on GN's server
+binary), Python script tests 406 of 406, and the 16 manifests replayed 2,673
+responses unchanged. Regression on older banks: GL's glA-glL (1,100 XES
+uploads per shape) for the heuristics miners 4,400 of 4,400 and Declare
+2,200 of 2,200 but the declared order; CSV kcE and kcT on three shapes
+every judgment equal.
+Harness and probes: `review-harness/round-go/`.
+
+Next round (GP) should start by re-reviewing round GO:
+
+- GO's CI run (and GN's Windows ctest, still running at GO's handoff;
+  GN's macOS job was cancelled);
+- GO1 on fresh banks: Heuristics++ with business hours on typed-timestamp
+  XES frames, the frequency decoration, `/api/discover-workflow` on the
+  same sessions, token replay and alignments of the nets mined there;
+- the option sets on typed-timestamp XES frames that differ before and
+  after GO (`ct/optval.py`, goA/goL): the temporal profile with business
+  hours (pandas' `Cannot set a DataFrame with multiple columns to the
+  single column @@flow_time`, `str.replace() takes no keyword arguments`
+  where Minera subtracts first) and with a custom timestamp or start key
+  naming a typed column (pandas' KeyError wording, `Invalid comparison
+  between dtype=datetime64[us, UTC] and ndarray`, dicts), Heuristics++
+  with `start_timestamp` as the timestamp key (KeyError wording, typed
+  cells), the classic performance view with a start key (2 to 5 uploads);
+- `/api/discover-graph` footprints on an XES frame with a missing
+  activity: pm4py computes the log's and the cached model's footprints
+  (the NaN label one more activity), Minera answers "activity selector is
+  missing or null" (8 of 200 goA uploads, both shapes);
+- the CSV log shape keyed by a float64 column with several gaps: pm4py
+  names one node per gap (each NaN its own object), Minera one `nan` node;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1, and the
+  anti- and multi-alignments of an upload without traces declared in GJ).
+
+Previous list for round GO (kept for its older items):
 
 Next round (GO) should start by re-reviewing round GN:
 

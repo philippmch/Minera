@@ -105,6 +105,7 @@
 #include "csv_frame_table.hpp"
 #include "../xes_frame_columns.hpp"
 #include "../xes_frame_token_replay.hpp"
+#include "../csv_log_keyed_replay.hpp"
 #include "../token_replay_null_activity.hpp"
 #include "../heuristics_petri_names.hpp"
 #include "../powl_petri_names.hpp"
@@ -2057,6 +2058,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                                        params.overlap_options);
     }
 
+    const auto& heuristic_key = params.heuristic.activity_attribute;
+    const auto heuristic_keyed_log = !heuristic_key.empty() && heuristic_key != "concept:name" && heuristic_key != "activity"
+        ? minera::detail::csv_log_keyed_replay_log(log, heuristic_key, &heuristics, &heuristic_net)
+        : std::nullopt;
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
     const auto model = [&](std::string id, const minera::PetriNet& petri) {
@@ -2081,6 +2086,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       const minera::EventLog* conformance_log =
           is_inductive ? &inductive_log : &log;
       if (is_alpha) conformance_log = &alpha_log;
+      // A CSV upload's log keyed by another column of its frame replays the
+      // cells as convert_to_event_log holds them, gaps included (round GO;
+      // csv_log_keyed_replay_log).
+      if (id == "heuristic" && heuristic_keyed_log && replay_options.activity_attribute == params.heuristic.activity_attribute) {
+        conformance_log = &*heuristic_keyed_log;
+        replay_options.activity_attribute = "concept:name";
+      }
       if (is_powl) {
         projected_powl_log = project_powl_activity(
             log, replay_options.activity_attribute, params.powl.timestamp_key,
@@ -2139,8 +2151,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         inductive_log, inductive_net, "concept:name", "time:timestamp", cancelled);
     // The heuristics and POWL nets replay under pm4py's names (round GF).
     const auto heuristic_decoration = minera::detail::decorate_model(
-        log, heuristic_replay ? heuristic_replay->net : heuristic_net,
-        params.heuristic.activity_attribute, params.heuristic.timestamp_attribute, cancelled,
+        heuristic_keyed_log ? *heuristic_keyed_log : log, heuristic_replay ? heuristic_replay->net : heuristic_net,
+        heuristic_keyed_log ? std::string("concept:name") : params.heuristic.activity_attribute,
+        params.heuristic.timestamp_attribute, cancelled,
         heuristic_replay ? heuristic_replay->place_outgoing : std::nullopt);
     const auto powl_decoration = minera::detail::decorate_model(
         powl_log, powl_replay ? powl_replay->net : powl_net, params.powl.activity_key,

@@ -4275,9 +4275,29 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     return &row[at]->value;
   };
   // Heuristics++ reads every event's activity and timestamp: their columns
-  // are required (round GB).
-  if (plus && !activity_at) throw HeuristicPandasError("builtins.KeyError", repr(activity_key));
-  if (plus && !timestamp_at) throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
+  // are required (round GB). With a start column the abstraction sorts the
+  // first trace by its starts before it reads them (round GO, observed
+  // black-box): that sort's TypeError comes first.
+  if (plus && (!activity_at || !timestamp_at)) {
+    const std::string start_key = options.start_timestamp_attribute.value_or("start_timestamp");
+    const auto start_column = start_key.starts_with("case:") || start_key == timestamp_key ? std::nullopt
+                                                                                            : column_of(start_key);
+    if (start_column) {
+      if (const auto starts = detail::xes_frame_cells(table, *start_column, polars)) {
+        std::vector<std::size_t> first;
+        const auto case_key = [&](std::size_t r) -> std::optional<std::string> {
+          const auto* id = value(table.rows[r], *case_at);
+          return id ? std::optional<std::string>(*id) : std::nullopt;
+        };
+        for (std::size_t r = 0; r < table.rows.size(); ++r)
+          if (case_key(r) == case_key(0)) first.push_back(r);
+        detail::python_list_sort(first, [&](std::size_t a, std::size_t b) {
+          return detail::plus_compare((*starts)[a], (*starts)[b], false);
+        });
+      }
+    }
+    throw HeuristicPandasError("builtins.KeyError", repr(!activity_at ? activity_key : timestamp_key));
+  }
   const auto lifecycle_at = column_of("lifecycle:transition");
   // Heuristics++'s interval input (round GC, observed black-box): with a
   // start_timestamp column every event holds the key, so pm4py's
@@ -4289,9 +4309,28 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   std::optional<std::size_t> start_at;
   if (plus && !interval_start_key.starts_with("case:"))
     start_at = interval_start_key == timestamp_key ? timestamp_at : column_of(interval_start_key);
+  // Round GO: both columns as read_xes types them (xes_frame_typed.hpp), so
+  // timestamp columns of other kinds raise pm4py's own errors in the
+  // abstraction's sort, eventually-follows comparison, performance
+  // subtraction and timestamp() calls (check_plus_interval_cells).
+  const auto time_cells = plus && timestamp_at ? detail::xes_frame_cells(table, *timestamp_at, polars)
+                                               : std::optional<std::vector<detail::PlusCell>>();
   if (start_at) {
-    if (!detail::check_plus_frame_intervals(table, *case_at, *start_at, *timestamp_at, polars, options.use_business_hours))
-      return discover_heuristics_net(data, options);
+    const auto start_cells = detail::xes_frame_cells(table, *start_at, polars);
+    if (!time_cells || !start_cells) return discover_heuristics_net(data, options);
+    // Cases in order of their first row, rows in frame order; the rows
+    // without a case id are one trace.
+    std::map<std::optional<std::string>, std::size_t> trace_index;
+    std::vector<std::vector<std::size_t>> interval_traces;
+    for (std::size_t row = 0; row < table.rows.size(); ++row) {
+      const auto& cells = table.rows[row];
+      const bool named = *case_at < cells.size() && cells[*case_at] && !cells[*case_at]->is_null;
+      const auto key = named ? std::optional<std::string>(cells[*case_at]->value) : std::nullopt;
+      const auto [it, inserted] = trace_index.try_emplace(key, interval_traces.size());
+      if (inserted) interval_traces.emplace_back();
+      interval_traces[it->second].push_back(row);
+    }
+    detail::check_plus_interval_cells(interval_traces, *start_cells, *time_cells, options.use_business_hours);
   }
   std::optional<FrameTypedActivities> typed;
   if (!plus) {
@@ -4358,7 +4397,10 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     // With business hours pandas' NaT raises at its interval (below), so
     // the transitions are read in order there too.
     const bool business_nat = !polars && options.use_business_hours;
-    if (lifecycle_at && !polars && !business_nat &&
+    // Round GO: with the timestamp cells as read_xes types them, a
+    // subtraction of an earlier interval can raise first, so the
+    // transitions are read in order (the loop below).
+    if (lifecycle_at && !polars && !business_nat && !time_cells &&
         std::any_of(table.rows.begin(), table.rows.end(),
                     [&](const auto& row) { return value(row, *lifecycle_at) == nullptr; }))
       throw HeuristicPandasError("builtins.AttributeError", "'float' object has no attribute 'lower'");
@@ -4396,6 +4438,16 @@ HeuristicsNet discover_heuristics_net_xes_frame(
           start = found->second.front();
           found->second.pop_front();
           interval_free[start] = false;
+        }
+        // Round GO: the complete's cell minus the start's, as read_xes types
+        // the timestamp column (plus_subtract_seconds: numbers, text, None
+        // and dicts raise; pandas' NaT subtracts).
+        if (time_cells) {
+          if (detail::plus_subtract_seconds((*time_cells)[r], (*time_cells)[start])) {
+            if (business_nat) throw HeuristicPandasError("builtins.ValueError", "cannot convert float NaN to integer");
+            nat_interval = true;
+          }
+          continue;
         }
         const bool complete_missing = missing_time(row), start_missing = missing_time(table.rows[start]);
         if (complete_missing || start_missing) {
@@ -4543,14 +4595,11 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // cleaning; a column it does not model keeps the older path.
   std::optional<std::vector<std::vector<double>>> cell_waits;
   // So does the plain performance view when the timestamp column holds
-  // other kinds than dates (round GL).
-  bool odd_clock = false;
-  if (performance && !cell_clock && timestamp_at && !options.use_business_hours && !options.start_timestamp_attribute) {
-    const auto dates = detail::plus_frame_cells(table, *timestamp_at, polars);
-    odd_clock = !dates || std::any_of(dates->begin(), dates->end(), [](const auto& cell) {
-      return cell.kind == detail::PlusCellKind::kText || cell.kind == detail::PlusCellKind::kNaN;
-    });
-  }
+  // other kinds than dates (round GL), and since round GO whatever it holds:
+  // a dates column's NaN floats and valueless cells are NaT there (pandas
+  // reads a zero wait, Polars' None raises), as read_xes types the column.
+  const bool odd_clock =
+      performance && !cell_clock && timestamp_at && !options.use_business_hours && !options.start_timestamp_attribute;
   if (cell_clock || odd_clock) {
     // Without the timestamp column no case holds a pair (above).
     const bool complete_missing = custom_clock && !timestamp_at && !custom_none_at;

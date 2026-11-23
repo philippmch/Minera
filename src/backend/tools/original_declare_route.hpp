@@ -208,9 +208,9 @@ void handle_original_declare_workbench(const httplib::Request& request,
           // as an event no rule names (round FW).
           const auto view = source_view();
           const bool xes = source && source->file().format == "xes";
-          if (xes && view.kind() == minera::EventDataKind::kLazyEventTable)
-            minera::check_declare_xes_polars_frame(*view.lazy_table(), *conformance_options);
-          conformances = xes && view.kind() == minera::EventDataKind::kEventTable
+          conformances = xes && view.kind() == minera::EventDataKind::kLazyEventTable
+              ? minera::check_declare_conformance_xes_polars(*view.lazy_table(), model, *conformance_options)
+              : xes && view.kind() == minera::EventDataKind::kEventTable
               ? minera::check_declare_conformance(minera::declare_pandas_conformance_table(*view.table(), *conformance_options), model, *conformance_options)
               : minera::check_declare_conformance(view, model, *conformance_options);
         });
@@ -230,8 +230,9 @@ void handle_original_declare_workbench(const httplib::Request& request,
             invoke("check_declare_conformance(source_lazy, model, options)", [&] {
               // On an XES upload's Polars frame a column without any value
               // is absent for pm4py's frame checks (round FW).
-              if (source->file().format == "xes") minera::check_declare_xes_polars_frame(source_lazy(), *conformance_options);
-              conformances = minera::check_declare_conformance(source_lazy(), model, *conformance_options);
+              conformances = source->file().format == "xes"
+                  ? minera::check_declare_conformance_xes_polars(source_lazy(), model, *conformance_options)
+                  : minera::check_declare_conformance(source_lazy(), model, *conformance_options);
             }); break;
         }
       } else

@@ -67,6 +67,8 @@ inline long double plus_number(const PlusCell& cell) {
 }
 
 inline const char* plus_cell_type(PlusCellKind kind) {
+  // A pandas object column's dict cell (xes_frame_typed.hpp's kPlusDictCell).
+  if (static_cast<int>(kind) == 64) return "dict";
   switch (kind) {
     case PlusCellKind::kTimestamp: return "Timestamp";
     case PlusCellKind::kNaT: return "NaTType";
@@ -192,6 +194,38 @@ inline void check_plus_business_hours(const PlusCell& d1, const PlusCell& d2) {
     throw HeuristicPandasError("builtins.ValueError", "cannot convert float NaN to integer");
 }
 
+// Python's `(later - earlier).total_seconds()` on two cells (round GL's rules
+// of the classic performance view, shared with Heuristics++ since round GO,
+// observed black-box): two numbers subtract and their difference has no
+// total_seconds (an int for ints and booleans, else a float); NaT beside an
+// int (not a bool) is NaT; pandas' Timestamp minus an int raises its own
+// TypeError; any other non-date (text, None, a dict) raises TypeError naming
+// both types, the later first. Returns true when the difference is NaT.
+inline bool plus_subtract_seconds(const PlusCell& later, const PlusCell& earlier) {
+  const auto number = [](PlusCellKind kind) {
+    return kind == PlusCellKind::kInt || kind == PlusCellKind::kBool || kind == PlusCellKind::kFloat ||
+           kind == PlusCellKind::kNaN;
+  };
+  const auto real = [](PlusCellKind kind) { return kind == PlusCellKind::kFloat || kind == PlusCellKind::kNaN; };
+  if (number(later.kind) && number(earlier.kind))
+    throw HeuristicPandasError("builtins.AttributeError",
+                               std::string("'") + (real(later.kind) || real(earlier.kind) ? "float" : "int") +
+                                   "' object has no attribute 'total_seconds'");
+  if ((later.kind == PlusCellKind::kNaT && earlier.kind == PlusCellKind::kInt) ||
+      (later.kind == PlusCellKind::kInt && earlier.kind == PlusCellKind::kNaT))
+    return true;
+  if (later.kind == PlusCellKind::kTimestamp && earlier.kind == PlusCellKind::kInt)
+    throw HeuristicPandasError("builtins.TypeError",
+                               "Addition/subtraction of integers and integer-arrays with Timestamp is no longer "
+                               "supported.  Instead of adding/subtracting `n`, use `n * obj.freq`");
+  const auto subtractable = [](PlusCellKind kind) { return plus_date_like(kind) || kind == PlusCellKind::kNaT; };
+  if (!subtractable(later.kind) || !subtractable(earlier.kind))
+    throw HeuristicPandasError("builtins.TypeError", std::string("unsupported operand type(s) for -: '") +
+                                                         plus_cell_type(later.kind) + "' and '" +
+                                                         plus_cell_type(earlier.kind) + "'");
+  return later.kind == PlusCellKind::kNaT || earlier.kind == PlusCellKind::kNaT;
+}
+
 // The checks on traces of cells (indices into `start` and `complete`, each
 // trace in its events' order): raises pm4py's first error. With business
 // hours the performance DFG and the service times measure each span with
@@ -214,14 +248,8 @@ inline void check_plus_interval_cells(const std::vector<std::vector<std::size_t>
       for (const auto row : trace) check_plus_business_hours(start[row], complete[row]);
     return;
   }
-  const auto subtractable = [](PlusCellKind kind) { return plus_date_like(kind) || kind == PlusCellKind::kNaT; };
   for (const auto& trace : traces)
-    for (std::size_t i = 1; i < trace.size(); ++i) {
-      const auto later = start[trace[i]].kind, earlier = complete[trace[i - 1]].kind;
-      if (!subtractable(later) || !subtractable(earlier))
-        throw HeuristicPandasError("builtins.TypeError", std::string("unsupported operand type(s) for -: '") +
-                                                             plus_cell_type(later) + "' and '" + plus_cell_type(earlier) + "'");
-    }
+    for (std::size_t i = 1; i < trace.size(); ++i) (void)plus_subtract_seconds(start[trace[i]], complete[trace[i - 1]]);
   const auto stamp = [](const PlusCell& cell) {
     if (plus_date_like(cell.kind)) return;
     if (cell.kind == PlusCellKind::kNaT)

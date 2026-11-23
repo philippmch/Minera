@@ -165,6 +165,10 @@ struct DeclareDiagnosticsOptions {
 // every column as a CSV frame does.
 void check_declare_xes_polars_frame(const LazyEventTable& table,
                                     const DeclareConformanceOptions& options = {});
+// Conformance on an XES upload's Polars frame, its frame check on the
+// columns as read_xes types them.
+std::vector<DeclareConformance> check_declare_conformance_xes_polars(
+    const LazyEventTable& table, const DeclareModel& model, const DeclareConformanceOptions& options);
 
 // pm4py's DataFrame Declare discovery and conformance list on an XES
 // upload's frame (its rows in file order) in any input shape: a log with

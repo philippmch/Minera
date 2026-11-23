@@ -7,6 +7,7 @@
 #include "polars_sort.hpp"
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
+#include "xes_frame_typed.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -521,6 +522,34 @@ const EventTable& present_columns(const EventTable& table, std::optional<EventTa
   return detail::xes_frame_present_columns(table, storage);
 }
 
+// Round GO (observed black-box): pm4py's frame check reads each column's
+// dtype as read_xes types it (xes_frame_typed.hpp): a dates column with
+// gaps, NaN floats or valueless cells is still a date column, ints beside a
+// gap float64, a column of NaN alone float64, mixes object; Polars' copy
+// holds an object column (and one of None alone) as String. The table's own
+// inference stays where a column holds kinds outside that model.
+EventTable xes_frame_typed_dtypes(const EventTable& table, bool polars) {
+  EventTable typed = table;
+  std::vector<std::string> dtypes;
+  for (std::size_t column = 0; column < table.columns.size(); ++column) {
+    detail::XesFrameDtype dtype{};
+    if (!detail::xes_frame_cells(table, column, polars, &dtype)) return typed;
+    using D = detail::XesFrameDtype;
+    switch (dtype) {
+      case D::kDatetime: dtypes.emplace_back(polars ? "Datetime(time_unit='us', time_zone='UTC')" : "datetime64[us, UTC]"); break;
+      case D::kString: dtypes.emplace_back(polars ? "String" : "str"); break;
+      case D::kInt: dtypes.emplace_back(polars ? "Int64" : "int64"); break;
+      case D::kFloat:
+      case D::kNaNFloat: dtypes.emplace_back(polars ? "Float64" : "float64"); break;
+      case D::kBool: dtypes.emplace_back(polars ? "Boolean" : "bool"); break;
+      case D::kObject:
+      case D::kNoneObject: dtypes.emplace_back(polars ? "String" : "object"); break;
+    }
+  }
+  typed.dtypes = std::move(dtypes);
+  return typed;
+}
+
 // pm4py's Declare on a Polars frame reads each case after
 // LazyFrame.sort([case, "time:timestamp", row index]): the timestamp column
 // is always "time:timestamp" (left out when the frame has none), a missing
@@ -546,7 +575,7 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
   // frame keeps every header column.
   {
     std::optional<EventTable> storage;
-    check_dataframe_columns(xes_columns ? present_columns(table, storage) : table,
+    check_dataframe_columns(xes_columns ? xes_frame_typed_dtypes(present_columns(table, storage), true) : table,
                             DataFrameColumnOptions{
                                 std::string(activity_key.empty() ? std::string_view("concept:name") : activity_key),
                                 std::string(case_id_key), std::nullopt, std::nullopt, true});
@@ -566,6 +595,12 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
   };
   const bool case_numeric = numeric(dtype(*case_at));
   const bool time_text = time_at && text(dtype(*time_at));
+  // Round GO: an XES upload's time:timestamp column sorts as Polars' copy
+  // types it (a missing value first, text by its bytes, numbers, dates and
+  // booleans by value; xes_polars_cell_compare).
+  const auto typed_time = xes_columns && time_at && table.dtypes.empty()
+                              ? detail::xes_typed_column(table, "time:timestamp", true)
+                              : std::optional<detail::XesTypedColumn>();
   const auto index_at = column_of("@@index");
   const bool index_numeric = index_at && numeric(dtype(*index_at));
   const bool index_integer = index_numeric && dtype(*index_at).find_first_of("fF") != 0;
@@ -620,7 +655,9 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
     } else if (case_numeric ? lhs.case_number != rhs.case_number : *lhs.case_text != *rhs.case_text) {
       return (case_numeric ? lhs.case_number < rhs.case_number : *lhs.case_text < *rhs.case_text) ? -1 : 1;
     }
-    if (time_at) {
+    if (typed_time) {
+      if (const int by = detail::xes_polars_cell_compare(typed_time->cells[a], typed_time->cells[b])) return by;
+    } else if (time_at) {
       if (time_text || !lhs.time || !rhs.time) {
         const auto& x = time_text ? lhs.time_text : lhs.time ? lhs.time_text : std::optional<std::string>();
         const auto& y = time_text ? rhs.time_text : rhs.time ? rhs.time_text : std::optional<std::string>();
@@ -662,7 +699,8 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
 
 EventLog event_data_log(const EventDataView& data,
                         std::string_view activity_key,
-                        std::string_view case_id_key) {
+                        std::string_view case_id_key,
+                        bool xes_columns = false) {
   validate_activity_key(activity_key);
   validate_case_selector_key(case_id_key);
   LogConversionOptions conversion;
@@ -685,7 +723,7 @@ EventLog event_data_log(const EventDataView& data,
           promoted_selector_table(*data.lazy_table(), std::string(activity_key),
                                   std::string(case_id_key))
               .materialize(),
-          case_id_key, activity_key);
+          case_id_key, activity_key, xes_columns);
       return event_data_to_event_log(EventDataView(table), conversion);
     }
   }
@@ -1321,7 +1359,7 @@ void check_pandas_declare_frame(const EventTable& source, std::string_view case_
                                 std::string_view activity_key, bool discovery) {
   std::optional<EventTable> storage;
   const auto& table = present_columns(source, storage);
-  check_dataframe_columns(table, DataFrameColumnOptions{});
+  check_dataframe_columns(table.dtypes.empty() ? xes_frame_typed_dtypes(table, false) : table, DataFrameColumnOptions{});
   const auto column_of = [&](std::string_view name) -> std::optional<std::size_t> {
     const auto found = std::find(table.columns.begin(), table.columns.end(), name);
     if (found == table.columns.end()) return std::nullopt;
@@ -1411,6 +1449,16 @@ std::vector<DeclareConformance> check_declare_conformance_frame_slices(
   std::optional<EventLog> log;
   std::optional<EventTable> table;
   return check_declare_conformance(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, false),
+                                   model, options);
+}
+
+// Round GO: conformance on an XES upload's Polars frame runs pm4py's frame
+// check on the columns as read_xes types them (a dates column whose other
+// cells are valueless lists stays a date column), the same check discovery
+// runs (observed black-box).
+std::vector<DeclareConformance> check_declare_conformance_xes_polars(
+    const LazyEventTable& table, const DeclareModel& model, const DeclareConformanceOptions& options) {
+  return check_declare_conformance(event_data_log(EventDataView(table), options.activity_key, options.case_id_key, true),
                                    model, options);
 }
 
