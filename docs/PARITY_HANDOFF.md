@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GI (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GJ (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9279,6 +9279,57 @@ GI's suite: the full ctest 672 of 672 (36 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gi/`.
+
+Round GJ re-reviewed GI and aligned Heuristics++ with a configured start
+key or business hours with pm4py on CSV uploads' three shapes and on XES
+uploads' frame shapes (Review GJ1). GI's CI run 45102064108 passed every
+job, Windows ctest included. No device was reachable, so no newer reviewer
+handoff was read from the Mac. New banks: `gen/genhcsv3.py` (600 CSV
+Heuristics++ uploads jcA to jcF, seeds 12000-12599: NA-word and
+zero-padded instance columns, a second start column `st2`, spans across
+nights and weekends), GH's hhA and hhB and GE's and GF's heuristics banks
+on the frame shapes with the new option sets (`ct/optval2.py`), 8 CSV and
+2 XES probes. Fixed: GJ1-1, the CSV frame shapes read a configured start
+key like the default one (any event column, the resource, lifecycle and
+timestamp columns too; a `case:` key or one the frame lacks reads the
+lifecycle) and with business hours raise `BusinessHours`'s errors (str:
+`str.replace() takes no keyword arguments`, other non-dates
+`AttributeError ... 'replace'`, NaT `cannot convert float NaN to
+integer`); GJ1-2, the CSV log shape likewise (business-hours errors, a
+role column as the key, NA words in a text start column); GJ1-3, the XES
+frame shapes read any start key and business hours on the frame path
+(pandas' NaT raises at its interval with business hours, so transitions
+are read in order). After: CSV jcA-jcD 3,200 of 3,200 per shape equal or
+failing alike (714 on the log shape and 2,460 per frame shape differed);
+XES hhA-hhB 1,120 of 1,120 per frame shape (826 and 827 differed); GE's
+and GF's banks 1,960 of 1,960 per frame shape; `/api/discover-workflow` on
+jcE and jcF equal; the routes on a CSV frame's Heuristics++ net (GH's 401
+uploads per frame shape) equal but for the declared empty-log fitness and
+55 unbounded nets' footprints failing on both sides. Declared: the anti-
+and multi-alignments of an upload without traces (pm4py's "not an sound
+net" or `min()`/`max()` errors, Minera's empty-log message).
+
+GJ's suite: the full ctest 673 of 673 (29 minutes, -j2, first run; the new
+`minera_server_review_gj_tests` fails 28 of its 49 checks on GI's server
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gj/`.
+
+Next round (GK) should start by re-reviewing round GJ:
+
+- GJ's CI run;
+- GJ1 on fresh banks: the classic heuristics variant with business hours
+  or a start key on CSV and XES frame shapes (the performance
+  decoration's spans), Heuristics++ with business hours over a CSV
+  timestamp column with gaps on the log shape, offset (`+01:00`) start
+  columns with business hours, and a start key naming the activity column
+  (left on Minera's own path: the frame lists no dtype for it);
+- the performance view (`/api/discover-graph` performance DFG and the
+  heuristics performance decoration) on a CSV frame's Heuristics++ net;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GJ (kept for its older items):
 
 Next round (GJ) should start by re-reviewing round GI:
 

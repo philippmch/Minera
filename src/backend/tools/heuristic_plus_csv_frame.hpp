@@ -19,6 +19,12 @@
 //
 // The checks raise pm4py's first error; when none applies the miner keeps
 // its own path, whose results already follow pm4py's on these frames.
+//
+// Round GJ: a configured start key reads the same way (any event column,
+// the resource and timestamp columns too; a `case:` key or one the frame
+// lacks reads the lifecycle), and business hours measure the performance
+// DFG's and the service times' spans with BusinessHours, which raises on a
+// non-date start (replace) or a NaT.
 
 #include "../heuristic_plus_frame_intervals.hpp"
 #include "csv_frame_table.hpp"
@@ -42,8 +48,8 @@ namespace minera::tools {
 
 inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const HeuristicMinerOptions& options) {
   if (options.variant != HeuristicMinerVariant::kPlusPlus) return;
-  // Another clock (business hours, a start key) stays on the older path.
-  if (options.use_business_hours || options.start_timestamp_attribute) return;
+  // An explicitly empty start key is Minera's own fallback (no pm4py call).
+  if (options.start_timestamp_attribute && options.start_timestamp_attribute->empty()) return;
   const auto kind = source.selected_kind();
   if (kind != EventDataKind::kEventTable && kind != EventDataKind::kLazyEventTable) return;
   const bool polars = kind == EventDataKind::kLazyEventTable;
@@ -81,10 +87,25 @@ inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const Heu
     if (inserted) traces.emplace_back();
     traces[it->second].push_back(row);
   }
-  const std::string start_key = "start_timestamp";
-  const auto start_at = start_key == selectors.timestamp_key ? std::nullopt : column_of(start_key);
+  // The start key (round GJ: a configured one too) names a column of
+  // format_dataframe's frame: a CSV column under its header, or the copies
+  // concept:name and time:timestamp of the activity and timestamp columns;
+  // the event log moves the `case:` columns to the trace, so its events
+  // never hold such a key.
+  const std::string start_key = options.start_timestamp_attribute.value_or("start_timestamp");
+  std::optional<std::size_t> start_at;
+  if (!start_key.starts_with("case:")) {
+    if (start_key == "time:timestamp")
+      start_at = timestamp_at;
+    else if (start_key == "concept:name")
+      start_at = column_of(selectors.activity_key);
+    else
+      start_at = column_of(start_key);
+  }
+  // The activity column's dtype is not listed with the frame: not modelled.
+  if (start_at && *start_at != *timestamp_at && table->columns[*start_at] == selectors.activity_key) return;
   if (start_at) {
-    const auto column = csv_frame_column(frame, start_key);
+    const auto column = csv_frame_column(frame, table->columns[*start_at]);
     if (!column) return;
     std::vector<detail::PlusCell> starts, completes;
     starts.reserve(table->rows.size());
@@ -99,7 +120,7 @@ inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const Heu
             start.kind = polars ? detail::PlusCellKind::kNone : detail::PlusCellKind::kNaT;
             break;
           }
-          const auto utc = csv_utc_date_cell(start_key, *cell);
+          const auto utc = csv_utc_date_cell(table->columns[*start_at], *cell);
           const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
           if (!micros) return;
           start.kind = polars ? detail::PlusCellKind::kDatetime : detail::PlusCellKind::kTimestamp;
@@ -162,7 +183,7 @@ inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const Heu
       starts.push_back(std::move(start));
       completes.push_back(std::move(complete));
     }
-    detail::check_plus_interval_cells(traces, starts, completes);
+    detail::check_plus_interval_cells(traces, starts, completes, options.use_business_hours);
     return;
   }
   const std::string lifecycle_key = "lifecycle:transition";

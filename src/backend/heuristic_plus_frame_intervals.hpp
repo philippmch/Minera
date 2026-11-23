@@ -173,17 +173,43 @@ inline bool plus_compare(const PlusCell& a, const PlusCell& b, bool or_equal) {
                                                        plus_cell_type(a.kind) + "' and '" + plus_cell_type(b.kind) + "'");
 }
 
+// pm4py's BusinessHours(d1, d2).get_seconds() (round GJ, observed
+// black-box): replace(tzinfo=None) on d1, then on d2 (str raises TypeError,
+// the other non-dates AttributeError), then a NaT on either side raises
+// ValueError from timedelta(days=NaT.weekday()).
+inline void check_plus_business_hours(const PlusCell& d1, const PlusCell& d2) {
+  for (const auto* cell : {&d1, &d2}) {
+    if (plus_date_like(cell->kind) || cell->kind == PlusCellKind::kNaT) continue;
+    if (cell->kind == PlusCellKind::kText)
+      throw HeuristicPandasError("builtins.TypeError", "str.replace() takes no keyword arguments");
+    throw HeuristicPandasError("builtins.AttributeError",
+                               std::string("'") + plus_cell_type(cell->kind) + "' object has no attribute 'replace'");
+  }
+  if (d1.kind == PlusCellKind::kNaT || d2.kind == PlusCellKind::kNaT)
+    throw HeuristicPandasError("builtins.ValueError", "cannot convert float NaN to integer");
+}
+
 // The checks on traces of cells (indices into `start` and `complete`, each
-// trace in its events' order): raises pm4py's first error.
+// trace in its events' order): raises pm4py's first error. With business
+// hours the performance DFG and the service times measure each span with
+// BusinessHours (round GJ) instead of subtracting and calling timestamp().
 inline void check_plus_interval_cells(const std::vector<std::vector<std::size_t>>& traces,
                                       const std::vector<PlusCell>& start,
-                                      const std::vector<PlusCell>& complete) {
+                                      const std::vector<PlusCell>& complete,
+                                      bool business_hours = false) {
   for (const auto& trace : traces) {
     auto sorted = trace;
     python_list_sort(sorted, [&](std::size_t a, std::size_t b) { return plus_compare(start[a], start[b], false); });
     for (std::size_t i = 0; i < sorted.size(); ++i)
       for (std::size_t j = i + 1; j < sorted.size(); ++j)
         if (plus_compare(complete[sorted[i]], start[sorted[j]], true)) break;
+  }
+  if (business_hours) {
+    for (const auto& trace : traces)
+      for (std::size_t i = 1; i < trace.size(); ++i) check_plus_business_hours(complete[trace[i - 1]], start[trace[i]]);
+    for (const auto& trace : traces)
+      for (const auto row : trace) check_plus_business_hours(start[row], complete[row]);
+    return;
   }
   const auto subtractable = [](PlusCellKind kind) { return plus_date_like(kind) || kind == PlusCellKind::kNaT; };
   for (const auto& trace : traces)
@@ -211,7 +237,7 @@ inline void check_plus_interval_cells(const std::vector<std::vector<std::size_t>
 // starts and completions; returns false when a column is not modelled (the
 // caller keeps its older path), true when every check passes.
 inline bool check_plus_frame_intervals(const EventTable& table, std::size_t case_at, std::size_t start_at,
-                                       std::size_t timestamp_at, bool polars) {
+                                       std::size_t timestamp_at, bool polars, bool business_hours = false) {
   const auto starts = plus_frame_cells(table, start_at, polars);
   auto completes = plus_frame_cells(table, timestamp_at, polars);
   if (!starts || !completes) return false;
@@ -229,7 +255,7 @@ inline bool check_plus_frame_intervals(const EventTable& table, std::size_t case
     if (inserted) traces.emplace_back();
     traces[it->second].push_back(row);
   }
-  check_plus_interval_cells(traces, *starts, *completes);
+  check_plus_interval_cells(traces, *starts, *completes, business_hours);
   return true;
 }
 

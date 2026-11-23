@@ -727,13 +727,36 @@ PlusAbstraction build_plus_abstraction(
   // On a CSV log every event holds every frame column, so a start column
   // keeps the log as it is (to_interval returns it) even where the first
   // event's cell is missing (round GH).
+  // A start key naming the resource or lifecycle column reads that column's
+  // cells (round GJ: the frame's event holds every column).
   const DataFrameColumn* csv_start_column = nullptr;
   if (csv_log && !log.traces.empty() && !log.traces.front().events.empty()) {
     const std::string start_key = options.start_timestamp_attribute.value_or("start_timestamp");
     if (!start_key.empty() && !standard_timestamp_attribute(start_key))
       for (const auto& column : log.dataframe_columns->columns)
-        if (column.key == start_key && column.role == FirstClassAttributeRole::kNone) csv_start_column = &column;
+        if (column.key == start_key &&
+            (column.role == FirstClassAttributeRole::kNone || column.role == FirstClassAttributeRole::kResource ||
+             column.role == FirstClassAttributeRole::kLifecycle))
+          csv_start_column = &column;
   }
+  const auto csv_start_text = [&](const Event& event) -> const std::string* {
+    switch (csv_start_column->role) {
+      case FirstClassAttributeRole::kResource:
+        if (event.resource_source_key == csv_start_column->key)
+          return event.resource_state == FirstClassAttributeState::kPresent && !event.resource.empty() ? &event.resource
+                                                                                                        : nullptr;
+        break;
+      case FirstClassAttributeRole::kLifecycle:
+        if (event.lifecycle_source_key == csv_start_column->key)
+          return event.lifecycle_state == FirstClassAttributeState::kPresent && !event.lifecycle.empty()
+                     ? &event.lifecycle
+                     : nullptr;
+        break;
+      default: break;
+    }
+    const auto* cell = event_attribute_cell(event, csv_start_column->key);
+    return cell && !cell->is_null && !cell->value.empty() ? &cell->value : nullptr;
+  };
   const bool pre_interval_mode =
       csv_start_column != nullptr ||
       (!log.traces.empty() && !log.traces.front().events.empty() &&
@@ -790,20 +813,20 @@ PlusAbstraction build_plus_abstraction(
       auto& rows = traces.emplace_back();
       for (const auto& event : trace.events) {
         detail::PlusCell start, complete;
-        const auto* cell = event_attribute_cell(event, csv_start_column->key);
-        if (!cell || cell->is_null || cell->value.empty()) {
+        const auto* text = csv_start_text(event);
+        if (!text || (type == DataFrameColumnType::kString && is_pandas_csv_na_text(*text))) {
           start.kind = type == DataFrameColumnType::kDate ? detail::PlusCellKind::kNaT : detail::PlusCellKind::kNaN;
         } else if (type == DataFrameColumnType::kString) {
           start.kind = detail::PlusCellKind::kText;
-          start.text = cell->value;
+          start.text = *text;
         } else if (type == DataFrameColumnType::kDate) {
-          const auto utc = csv_utc_date_cell(csv_start_column->key, cell->value);
+          const auto utc = csv_utc_date_cell(csv_start_column->key, *text);
           const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
           if (!micros) modelled = false;
           start.kind = detail::PlusCellKind::kTimestamp;
           start.micros = micros.value_or(0);
         } else {
-          const auto typed = csv_dataframe_cell(*csv_start_column, cell->value);
+          const auto typed = csv_dataframe_cell(*csv_start_column, *text);
           if (const auto* value = std::get_if<std::int64_t>(&typed.typed_value)) {
             start.kind = detail::PlusCellKind::kInt;
             start.micros = *value;
@@ -833,7 +856,7 @@ PlusAbstraction build_plus_abstraction(
         completes.push_back(std::move(complete));
       }
     }
-    if (modelled) detail::check_plus_interval_cells(traces, starts, completes);
+    if (modelled) detail::check_plus_interval_cells(traces, starts, completes, options.use_business_hours);
   }
   for (const auto& trace : log.traces) {
     const auto converted =
@@ -2986,9 +3009,13 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   const bool performance = !plus && options.decoration == HeuristicNetDecoration::kPerformance;
   // Heuristics++ and the classic performance decoration read the frame's own
   // clock (round GB); another clock (business hours, a start key, another
-  // timestamp column) stays on the older path.
-  const bool own_clock = !options.use_business_hours && !options.start_timestamp_attribute &&
-                         canonical_timestamp_attribute(options) == "time:timestamp";
+  // timestamp column) stays on the older path, but Heuristics++ reads any
+  // start key and business hours on the frame too (round GJ). An explicitly
+  // empty start key is Minera's own fallback.
+  const bool own_clock =
+      canonical_timestamp_attribute(options) == "time:timestamp" &&
+      (plus ? !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty())
+            : !options.use_business_hours && !options.start_timestamp_attribute);
   if ((!plus && options.variant != HeuristicMinerVariant::kClassic) || ((plus || performance) && !own_clock) ||
       (!polars && data.kind() != EventDataKind::kEventTable))
     return discover_heuristics_net(data, options);
@@ -3047,10 +3074,15 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // Heuristics++'s interval input (round GC, observed black-box): with a
   // start_timestamp column every event holds the key, so pm4py's
   // to_interval keeps the log as it is (the lifecycle unread) and the
-  // abstraction reads each start as the frame's Python object.
-  const auto start_at = plus ? column_of("start_timestamp") : std::nullopt;
+  // abstraction reads each start as the frame's Python object. A configured
+  // start key likewise (round GJ): the timestamp column itself, or another
+  // event column (the `case:` columns become trace attributes).
+  const std::string interval_start_key = options.start_timestamp_attribute.value_or("start_timestamp");
+  std::optional<std::size_t> start_at;
+  if (plus && !interval_start_key.starts_with("case:"))
+    start_at = interval_start_key == timestamp_key ? timestamp_at : column_of(interval_start_key);
   if (start_at) {
-    if (!detail::check_plus_frame_intervals(table, *case_at, *start_at, *timestamp_at, polars))
+    if (!detail::check_plus_frame_intervals(table, *case_at, *start_at, *timestamp_at, polars, options.use_business_hours))
       return discover_heuristics_net(data, options);
   }
   if (!plus) {
@@ -3098,7 +3130,10 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       if (rows.empty()) case_order.push_back(key);
       rows.push_back(r);
     }
-    if (lifecycle_at && !polars &&
+    // With business hours pandas' NaT raises at its interval (below), so
+    // the transitions are read in order there too.
+    const bool business_nat = !polars && options.use_business_hours;
+    if (lifecycle_at && !polars && !business_nat &&
         std::any_of(table.rows.begin(), table.rows.end(),
                     [&](const auto& row) { return value(row, *lifecycle_at) == nullptr; }))
       throw HeuristicPandasError("builtins.AttributeError", "'float' object has no attribute 'lower'");
@@ -3113,7 +3148,8 @@ HeuristicsNet discover_heuristics_net_xes_frame(
         if (lifecycle_at) {
           const auto* transition = value(row, *lifecycle_at);
           if (!transition)
-            throw HeuristicPandasError("builtins.AttributeError", "'NoneType' object has no attribute 'lower'");
+            throw HeuristicPandasError("builtins.AttributeError", std::string("'") + (polars ? "NoneType" : "float") +
+                                                                      "' object has no attribute 'lower'");
           lifecycle = ascii_lower(*transition);
         }
         const auto* activity = value(row, *activity_at);
@@ -3142,6 +3178,8 @@ HeuristicsNet discover_heuristics_net_xes_frame(
             throw HeuristicPandasError("builtins.TypeError", "unsupported operand type(s) for -: '" +
                                                                  type_of(complete_missing) + "' and '" +
                                                                  type_of(start_missing) + "'");
+          // to_interval's BusinessHours of the interval (round GJ).
+          if (business_nat) throw HeuristicPandasError("builtins.ValueError", "cannot convert float NaN to integer");
           nat_interval = true;
         }
       }

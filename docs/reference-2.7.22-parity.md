@@ -38989,3 +38989,140 @@ fail on GH's server binary) carries the reference values. The full ctest
 passed 672 of 672 (36 minutes, -j2) on the first run. The fixture replay
 left all 2,673 responses unchanged; the Python script tests passed 406 of
 406.
+
+## Review GJ1: Heuristics++ with a configured start key or business hours on CSV uploads and XES uploads' frames (2026-11-23)
+
+Round GJ re-reviewed round GI: Heuristics++ (`heuristic_variant=plusplus`)
+with a configured start key (`heuristic_start_timestamp_attribute`) or
+business hours (`heuristic_business_hours`) on CSV uploads' log shape
+(against `heuristics_miner.apply_heu(variant=PLUSPLUS)` on
+`convert_to_event_log(format_dataframe(read_csv))`, with
+`start_timestamp_key` or `business_hours` among the parameters) and frame
+shapes (`mining_input_shape=dataframe|lazyframe`, the same call on
+`format_dataframe`'s frame and its Polars copy) and on XES uploads' frame
+shapes (read_xes's frame and its Polars copy); text instance columns
+holding pandas' NA words and zero-padded ints; `/api/discover-workflow`
+on the mined session; the routes reading a CSV frame's Heuristics++ net
+(token replay totals and the net's footprints); and the decomposed, anti-
+and multi-alignments of an upload without traces. GI's CI run 45102064108
+(f1ed22c) passed every job (ctest on Linux, macOS and Windows, the Python
+script tests, the parity verifier and the frontend). No device
+was reachable, so no newer reviewer handoff was read from the Mac.
+Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars
+1.44.1, no pyarrow), every sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3
+X86_V4 AVX512_ICL AVX512_SPR"` and `PYTHONHASHSEED=0`.
+
+Banks: 600 CSV Heuristics++ uploads from `gen/genhcsv3.py` (GI's
+generator plus instance columns of pandas' NA words ("NA", "null",
+"None", "N/A", "<NA>", "n/a", "NULL") beside words pandas keeps as text
+("none", "Null", "na", "x") and "1", "2", and zero-padded ints ("01",
+"001", "+1", " 2"), an optional second start column `st2` of dates, text or ints, and
+spans across nights and weekends; jcA to jcD with gaps, seeds 12000-12399;
+jcE and jcF without gaps, 12400-12599); GH's 160 XES Heuristics++
+uploads (hhA, hhB) and GE's and GF's 280 (heL-heN, hfI-hfL) on the frame
+shapes; 8 hand-made CSV and 2 XES probes.
+
+Fixed:
+
+- **GJ1-1. Heuristics++ on a CSV upload's frame shapes with a configured
+  start key or business hours.** GI1-2 modelled pm4py's errors for the
+  default key only and left any configured key and business hours on
+  Minera's own path ("Heuristics Miner PLUSPLUS requires a valid start
+  timestamp", or a net where pm4py raised). pm4py's `to_interval` keeps
+  the log as it is when the first event holds the key, and on a frame's
+  event log every event holds every column: a key naming any event column
+  (a CSV header, `concept:name` or `time:timestamp` for the copies
+  `format_dataframe` adds; the resource and lifecycle columns too) is read
+  as the frame holds it and raises as GI1-2 describes (the timestamp
+  itself as the start reads every interval as an instant), while a key the
+  frame lacks or a `case:` key (a trace attribute in the event log) makes
+  `to_interval` read the lifecycle, as without a start column. With
+  business hours the performance DFG measures each pair (the earlier
+  completion, then the later start) and the service times each event (its
+  start, then its completion) with `BusinessHours`, whose
+  `replace(tzinfo=None)` raises `TypeError: str.replace() takes no keyword
+  arguments` on a str and `AttributeError: '<type>' object has no
+  attribute 'replace'` on another non-date (`float` for NaN, `NoneType`,
+  `int`, `bool`), and whose week arithmetic raises `ValueError: cannot
+  convert float NaN to integer` on a NaT; the eventually-follows pass
+  before it is unchanged (Polars' None raises there first).
+- **GJ1-2. The CSV log shape with business hours or a role column as the
+  start key.** The log shape (GH1-1, GI1-1) raised the service time's
+  `NaTType does not support timestamp` with business hours (pm4py's
+  `BusinessHours` errors above: 157 uploads per option set), ignored a key
+  naming the resource or lifecycle column (it read the lifecycle: 400
+  uploads), and read a text start cell holding a pandas NA word as text.
+- **GJ1-3. Heuristics++ on an XES upload's frame shapes with a configured
+  start key or business hours.** GB1-1 and GC1 modelled the frame for the
+  default key and without business hours only; the other clocks stayed on
+  the EventLog path ("event is missing timestamp attribute", or a net
+  where pm4py raised, and 12 nets with the timestamp as the start key
+  differed). The frame path now reads any key as GJ1-1 does (an event
+  column, the timestamp column itself; a `case:` key or a missing one
+  reads the lifecycle) and with business hours raises `BusinessHours`'s
+  errors; pandas' NaT then raises at its interval in `to_interval`
+  (`ValueError: cannot convert float NaN to integer`), so the transitions
+  are read in order there too.
+
+Before and after, per shape and option set (business hours with and
+without the performance decoration; start keys `start_timestamp`, `st2`,
+`zzz`, `org:resource` and `time:timestamp`; edges with dependency,
+frequency and performance, activities, start and end activities):
+
+| sweep | before | after |
+|---|---|---|
+| CSV jcA-jcD, log (3,200) | 2,486 equal or failing alike, 714 differing | 3,200 |
+| CSV jcA-jcD, DataFrame (3,200) | 740, 2,460 differing | 3,200 |
+| CSV jcA-jcD, LazyFrame (3,200) | 740, 2,460 differing | 3,200 |
+| XES hhA-hhB, DataFrame (1,120) | 294, 826 differing | 1,120 |
+| XES hhA-hhB, LazyFrame (1,120) | 293, 827 differing | 1,120 |
+
+Re-reviewed without a difference:
+
+- text instance columns of pandas' NA words and zero-padded ints: the
+  frame shapes pair them by dtype as GI1-3 does (an object column of
+  text, NaN for the NA words on pandas and None on Polars), and the log
+  shape as GH1 does, on all 600 jc uploads;
+- `/api/discover-workflow` on a session mined with Heuristics++ (the
+  workflow's Heuristics++ model with the session's start key and business
+  hours): jcE and jcF, 200 uploads per option set on each shape, equal or
+  failing alike;
+- the routes reading a CSV frame's Heuristics++ net (`/api/mine`'s token
+  replay totals and `/api/discover-graph`'s footprints with
+  `footprints_model=heuristic`) on GH's hcA, hcB and gcsv banks, 401
+  uploads per frame shape: 176 fail in the mine on both sides; of the
+  other 225 nets the token replay totals are equal on 224 and the upload
+  without traces keeps the declared fitness, the footprints are equal on
+  170 and fail on both sides on 55 unbounded nets (Minera's unboundedness
+  error, pm4py past the sweep's 60-second bound);
+- GE's and GF's XES heuristics banks on both frame shapes with the new
+  option sets (1,960 runs per shape, seven option sets with the
+  baseline), all equal or failing alike;
+- the decomposed alignment of an upload without traces: no alignments
+  (fitness 0) on a net with transitions, as GI1 found.
+
+Declared:
+
+- The anti- and multi-alignments of an upload without traces fail on
+  both sides with other messages: pm4py raises `Exception: Trying to apply
+  anti-alignments on a Petri net that is not an sound net.` (likewise
+  multi-alignments) on a net without transitions, such as the heuristics
+  and Alpha nets of an empty log, and `ValueError: min() arg is an empty
+  sequence` (`max()` for multi-alignments) on any other net; Minera
+  rejects the empty log first ("petri anti-alignment log must not be
+  empty", "petri multi-alignment log must not be empty").
+- Unchanged: the declared items of GI1 and before.
+
+In the suite: the new `minera_server_review_gj_tests` (Heuristics++ on CSV
+uploads on all three shapes: business hours over a start column with a gap
+(with and without the performance decoration), over text starts and over a
+lifecycle gap; text starts; a second start column with a gap and with the
+performance decoration; the resource column, a key the frame lacks, a
+`case:` key and the timestamp column as the start key; business-hours
+performance values over start columns and over lifecycle pairs. On XES
+uploads' frame shapes: business hours over the lifecycle and over a start
+key with a gap, that key alone, a key the frame lacks and the timestamp
+column. 28 of its 49 checks fail on GI's server binary) carries the
+reference values. The full ctest passed 673 of 673 (29 minutes, -j2) on
+the first run. The fixture replay left all 2,673 responses unchanged; the
+Python script tests passed 406 of 406.
