@@ -253,13 +253,105 @@ inline std::optional<std::string> polars_typed_tp_error(const EventTable& table,
          ")].dt.total_seconds()\n";
 }
 
+// Round GP (observed black-box): Polars' temporal profile with business
+// hours on the same copy. The flow time is BusinessHours through
+// map_elements over as_struct(timestamp, start + "_2"), so only the pairs'
+// filter is resolved: a dates column against a String one fails there as
+// without business hours. The filter (index and comparison combined)
+// evaluates whatever the rows: a dates column against a Boolean one raises
+// a SchemaError, a String column against a numeric one a ComputeError.
+// Otherwise each pair whose earlier timestamp is at most the later start
+// (Polars' casts: numbers by value, Booleans as 0/1 beside numbers and as
+// "true"/"false" beside text, dates by their microseconds beside numbers)
+// reaches the UDF, whose replace(tzinfo=None) raises on the first argument
+// that is no datetime; with no such pair the profile is empty (`empty`).
+// nullopt without an error: two dates columns (the dates path), no pair, or
+// a column outside the model (`modelled` false).
+inline std::optional<std::string> polars_typed_tp_business(const EventTable& table, const std::string& case_key,
+                                                           const std::string& timestamp_key,
+                                                           const std::string& start_key, bool own_start,
+                                                           const std::string& side, bool* empty,
+                                                           bool* modelled = nullptr) {
+  enum class P { kD, kS, kI, kF, kB };
+  const auto kind_of = [](XesFrameDtype dtype) {
+    switch (dtype) {
+      case XesFrameDtype::kDatetime: return P::kD;
+      case XesFrameDtype::kInt: return P::kI;
+      case XesFrameDtype::kFloat:
+      case XesFrameDtype::kNaNFloat: return P::kF;
+      case XesFrameDtype::kBool: return P::kB;
+      default: return P::kS;
+    }
+  };
+  const auto times = xes_typed_column(table, timestamp_key, true);
+  const auto starts = own_start ? xes_typed_column(table, start_key, true) : times;
+  const auto cases = xes_typed_column(table, case_key, true);
+  if (modelled) *modelled = times && starts && cases;
+  if (!times || !starts || !cases) return std::nullopt;
+  const auto t = kind_of(times->dtype), s = kind_of(starts->dtype);
+  if (t == P::kD && s == P::kD) return std::nullopt;
+  if ((t == P::kD && s == P::kS) || (t == P::kS && s == P::kD))
+    return polars_typed_tp_error(table, timestamp_key, start_key, own_start, side);
+  const auto ts = "col(" + polars_frame_quoted(timestamp_key) + ")";
+  const auto st = "col(" + polars_frame_quoted(start_key + "_2") + ")";
+  const auto where = "\n\nThis error occurred in the following expression:\n\t[(" + ts + ") <= (" + st +
+                     ")]\nwhile evaluating this larger expression:\n\t[([(col(\"@@index\")) < (col(\"@@index_2\"))]) & "
+                     "([(" + ts + ") <= (" + st + ")])]\n";
+  const auto display = [](P p) -> std::string {
+    return p == P::kD ? "Datetime('\xce\xbcs', 'UTC')" : p == P::kB ? "Boolean" : p == P::kI ? "Int64" : p == P::kF ? "Float64" : "String";
+  };
+  if ((t == P::kD && s == P::kB) || (t == P::kB && s == P::kD))
+    return "could not evaluate '<=' comparison between series '" + timestamp_key + "' of dtype: " + display(t) +
+           " and series '" + start_key + "_2' of dtype: " + display(s) + where;
+  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
+  if ((numeric(t) && s == P::kS) || (t == P::kS && numeric(s)))
+    return std::string("cannot compare string with numeric type (") + ((t == P::kS ? s : t) == P::kI ? "i64" : "f64") +
+           ")" + where;
+  // Polars' `a <= b` on two present cells of the kinds above.
+  const auto number = [](const PlusCell& cell, P p) -> long double {
+    if (p == P::kF) return cell.number;
+    return static_cast<long double>(cell.micros);  // ints, Booleans 0/1, dates' microseconds
+  };
+  const auto less_equal = [&](const PlusCell& a, P pa, const PlusCell& b, P pb) {
+    if (pa == P::kS || pb == P::kS) {
+      const auto text = [](const PlusCell& cell, P p) { return p == P::kB ? std::string(cell.micros ? "true" : "false") : cell.text; };
+      return text(a, pa) <= text(b, pb);
+    }
+    return number(a, pa) <= number(b, pb);
+  };
+  const auto order = xes_polars_sort_order({&*cases, &*starts, &*times});
+  bool reached = false;
+  for (std::size_t a = 0; a < order.size() && !reached; ++a) {
+    const auto& case_a = cases->cells[order[a]];
+    const auto& earlier = times->cells[order[a]];
+    if (xes_cell_null(case_a) || xes_cell_null(earlier)) continue;
+    for (std::size_t b = a + 1; b < order.size() && !reached; ++b) {
+      const auto& case_b = cases->cells[order[b]];
+      const auto& later = starts->cells[order[b]];
+      if (xes_cell_null(case_b) || xes_cell_null(later) || xes_polars_cell_compare(case_a, case_b) != 0) continue;
+      reached = less_equal(earlier, t, later, s);
+    }
+  }
+  if (!reached) {
+    if (empty) *empty = true;
+    return std::nullopt;
+  }
+  const P first = t == P::kD ? s : t;
+  const std::string raised = first == P::kS ? "TypeError: str.replace() takes no keyword arguments"
+                             : std::string("AttributeError: '") + (first == P::kI ? "int" : first == P::kF ? "float" : "bool") +
+                                   "' object has no attribute 'replace'";
+  return raised + "\n\nThis error occurred in the following expression:\n\tas_struct(" +
+         polars_frame_quoted(timestamp_key) + ", " + polars_frame_quoted(start_key + "_2") + ").python_udf()\n";
+}
+
 // Raises the error pm4py's `family` raises on the frame of an XES upload
 // (`data`, a pandas or Polars frame) that lacks the case, activity or
 // timestamp column; does nothing when all three are there.
 inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily family, const std::string& case_key,
                                     const std::string& activity_key, const std::string& timestamp_key,
                                     const std::string& start_key = "start_timestamp",
-                                    bool explicit_start = false, XesPandasTpVerdict* tp_verdict = nullptr) {
+                                    bool explicit_start = false, XesPandasTpVerdict* tp_verdict = nullptr,
+                                    const std::vector<BusinessHourSlot>* business_slots = nullptr) {
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
   if (!polars && data.kind() != EventDataKind::kEventTable) return;
   std::optional<EventTable> materialized;
@@ -318,7 +410,7 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
         return;
       }
       const auto verdict = xes_pandas_tp(*cases, *times, *starts, dtype_name(timestamp_key, *times),
-                                         dtype_name(own_start ? start_key : timestamp_key, *starts));
+                                         dtype_name(own_start ? start_key : timestamp_key, *starts), business_slots);
       if (tp_verdict) *tp_verdict = verdict;
       return;
     }
@@ -463,9 +555,16 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
               ")]\n      ROW INDEX name: @@index, offset: 0\n        SORT BY " + polars_plan_cols(sort_by) +
               "\n          SELECT " + polars_plan_cols(selected) + "\n            " + polars_df_node(table.columns) + "\n";
     bool modelled = false;
-    if (const auto typed =
-            polars_typed_tp_error(table, timestamp_key, start_key, start_key != timestamp_key, side, &modelled))
+    if (business_slots && family == XesFrameFamily::kTemporalProfile) {
+      bool empty = false;
+      if (const auto typed = polars_typed_tp_business(table, case_key, timestamp_key, start_key,
+                                                      start_key != timestamp_key, side, &empty, &modelled))
+        throw std::invalid_argument(*typed);
+      if (empty && tp_verdict) tp_verdict->kind = XesPandasTpVerdict::Kind::kEmpty;
+    } else if (const auto typed =
+                   polars_typed_tp_error(table, timestamp_key, start_key, start_key != timestamp_key, side, &modelled)) {
       throw std::invalid_argument(*typed);
+    }
     if (!modelled && start_column && frame_key_numeric(start_column->dtype)) {
       const auto dtype = start_column->dtype;
       const std::string cast = dtype == FrameKeyDtype::kInt64 ? ".cast(Int64)" : dtype == FrameKeyDtype::kFloat64 ? ".cast(Float64)" : "";
@@ -489,9 +588,16 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
   }
   // Round GN: without a start column the timestamp's alias is subtracted
   // from it (the evaluation errors need no plan).
-  if (polars && !start_held && family == XesFrameFamily::kTemporalProfile && has(case_key) && has(timestamp_key))
-    if (const auto typed = polars_typed_tp_error(table, timestamp_key, start_key, false, {}))
+  if (polars && !start_held && family == XesFrameFamily::kTemporalProfile && has(case_key) && has(timestamp_key)) {
+    if (business_slots) {
+      bool empty = false, modelled = false;
+      if (const auto typed = polars_typed_tp_business(table, case_key, timestamp_key, start_key, false, {}, &empty, &modelled))
+        throw std::invalid_argument(*typed);
+      if (empty && tp_verdict) tp_verdict->kind = XesPandasTpVerdict::Kind::kEmpty;
+    } else if (const auto typed = polars_typed_tp_error(table, timestamp_key, start_key, false, {})) {
       throw std::invalid_argument(*typed);
+    }
+  }
   if (has(case_key) && has(activity_key) && has(timestamp_key)) return;
   if (start_held && !polars) return;
   if (!polars) {
@@ -500,15 +606,19 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
   }
   if (!has(timestamp_key))
     throw std::invalid_argument(polars_df_missing_column_error(timestamp_key, table.columns, {"with_columns"}, "with_columns"));
+  // The timestamp as its own start key (start_timestamp) is selected once,
+  // in frame order, without the alias (round GP, observed black-box).
+  const bool own_start_key = start_key == timestamp_key;
   std::vector<std::string> selected;
   for (const auto& column : table.columns)
-    if (column != start_key && (column == case_key || column == activity_key || column == timestamp_key))
+    if ((own_start_key || column != start_key) &&
+        (column == case_key || column == activity_key || column == timestamp_key))
       selected.push_back(column);
-  selected.push_back(start_key);
+  if (!own_start_key) selected.push_back(start_key);
   if (family == XesFrameFamily::kTemporalProfile) {
     if (!has(case_key))
       throw std::invalid_argument(polars_select_plan_missing_column(case_key, table.columns, selected, timestamp_key,
-                                                                    start_key, {}, "sort", {"sort"}));
+                                                                    start_key, {}, "sort", {"sort"}, !own_start_key));
     const auto labels = "[" + frame_python_str_repr(activity_key) + ", " + frame_python_str_repr(activity_key + "_2") + "]";
     throw std::invalid_argument("KeyError: " + frame_python_str_repr(labels + " not in index"));
   }

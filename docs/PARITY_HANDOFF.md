@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GO (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GP (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9611,6 +9611,91 @@ uploads per shape) for the heuristics miners 4,400 of 4,400 and Declare
 2,200 of 2,200 but the declared order; CSV kcE and kcT on three shapes
 every judgment equal.
 Harness and probes: `review-harness/round-go/`.
+
+Round GP re-reviewed GO and aligned the temporal profile on XES uploads'
+frame shapes with typed timestamp and start columns under business hours or
+custom keys (Review GP1), Heuristics++ with start_timestamp as the
+timestamp key and the classic performance view's KeyError order (GP2), and
+`/api/discover-graph` footprints on XES frame sessions (GP3). GO's CI run
+45232314482 passed Linux, macOS, the frontend, the Python script tests and
+the verifier (Windows ctest still running at GP's handoff). No device
+was reachable, so no newer reviewer handoff was read from the Mac. GO's
+fixes held: Heuristics++, Heuristics++ performance, business hours and a
+start key on fresh GO-style banks (gpA 600, gpL 500 uploads per shape,
+`gen/gengn.py` and `gen/gengo.py` with GP seeds) equal pm4py's.
+Fixed: GP1-1, pandas' temporal profile with business hours applies the
+business seconds per pair row (observed black-box): an empty pair frame
+raises `ValueError: Cannot set a DataFrame with multiple columns to the
+single column @@flow_time` (pairs whose row lacks an activity count; the
+groupby drops them later), and BusinessHours strips tzinfo from the
+earlier cell, then the later one (text `str.replace() takes no keyword
+arguments`, other kinds AttributeError; a datetime64[UTC] column reads the
+UTC wall, an object column's datetime its own wall); Minera subtracted
+first (`xes_business_cells`, `xes_pandas_tp`). GP1-2, Polars filters the
+pairs by index and complete <= start before its UDF: Datetime beside String
+raises the resolution error, beside Boolean a SchemaError, a number beside
+String a ComputeError, whatever the rows; otherwise the UDF raises for the
+first non-datetime argument (`polars_typed_tp_business`). GP1-3, with a
+custom key pm4py's default start key is start_timestamp, not the route's
+timestamp target; a start key equal to the timestamp key reads that column
+once (pandas and the Polars plan, the missing-case alias included). GP2-1,
+Heuristics++ with start_timestamp as the timestamp key reads the same column
+as its start, so to_interval keeps the log and the abstraction keeps frame
+order (Minera sorted the start and end activities, or raised "interval input
+is missing the configured start timestamp"). GP2-2, the classic performance
+view reads the later event's start before the earlier one's timestamp: a
+start key naming no column raises its own KeyError first. GP3-1, pm4py's
+footprints of an XES frame session convert the frame to an EventLog in which
+a missing activity is NaN (pandas, one shared object) or None (Polars), one
+more activity in the log's and the traces' footprints, the precision and the
+fitness (Minera answered "activity selector is missing or null"); GP3-2, the
+conversion groups the rows by case id in order of first appearance, so the
+XES traces without a case id are one trace (Minera kept them apart, so the
+log footprints, precision and fitness differed wherever two or more
+traces lacked one); a frame without the activity column raises pm4py's
+`KeyError: 'concept:name'`.
+Open: the CSV log shape keyed by a float64 column with several gaps (pm4py's
+heuristics net has one node per NaN object, each its own transition; Minera
+names one `nan` node: activities are text keys throughout the miner).
+Declared: the order of pandas' missing-key list in the temporal profile's
+selection with a custom activity key (a set iteration, changes with the hash
+seed: 4 gpAs uploads at PYTHONHASHSEED=0).
+After, per shape: the option sets with business hours and custom keys
+(`ct/optval.py`, 12 sets) on gpA and gpL 7,200 of 7,200 and 6,000 of
+6,000 judgments (GO's binary differed in 3,246 of gpAs/gpLs' judgments
+over both shapes, `out/o1_*`); the footprints route
+(`ct/fpmiss.py`) on gpA 414 of 414 uploads with a heuristics net (11 with
+a missing activity) and on gpLs 180 of 180 (6) equal in the log's and the
+model's footprints, the log_model violations, precision and fitness; 20
+and 4 unbounded nets fail on both sides (pm4py does not finish). Families
+on GO's goA50 (`ct/famval.py`) agree but the declared operand order of
+Polars' Inductive/POWL sort TypeError (3 uploads, as on GO's binary).
+
+GP's suite: the full ctest 679 of 679 (-j2; the new
+`minera_server_review_gp_tests` fails all 68 of its checks on GO's server
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gp/`.
+
+Next round (GQ) should start by re-reviewing round GP:
+
+- GP's CI run (and GO's Windows ctest, still running at GP's handoff);
+- GP1 on fresh banks: the temporal profile's conformance with business hours
+  (pandas raises the same ValueError on an empty pair frame; Minera's
+  conformance path is unchanged), business hours with a custom timestamp
+  key naming a typed column, the Polars frame with business hours and gaps
+  in both columns;
+- GP3 on the other routes reading an XES frame session as a log:
+  `/api/mine`'s footprints family on frame sessions with traces without a
+  case id or a missing activity, the footprints conformance variants
+  (trace_extensive, log_extensive) and a custom footprints activity or case
+  key on such sessions, `/api/discover-graph` transition systems there;
+- the open float64 key with several gaps (above);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1, and the
+  anti- and multi-alignments of an upload without traces declared in GJ).
+
+Previous list for round GP (kept for its older items):
 
 Next round (GP) should start by re-reviewing round GO:
 

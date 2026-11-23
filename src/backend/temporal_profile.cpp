@@ -841,7 +841,7 @@ TemporalProfile discover_temporal_profile(
 
 namespace {
 TemporalProfile discover_temporal_profile_table(const EventTable& table, const TemporalProfileOptions& options,
-                                                bool whole_seconds);
+                                                bool whole_seconds, const std::string& polars_start_name = {});
 }  // namespace
 
 TemporalProfile discover_temporal_profile_dataframe(
@@ -858,7 +858,8 @@ namespace {
 // discovery and conformance alike (round FW, observed black-box). The pair
 // named is the first in the pair frame's order (later row's position, then
 // the earlier's) with one Polars thread; with several it can differ.
-void check_polars_business_pairs(const EventTable& table, const TemporalProfileOptions& options) {
+void check_polars_business_pairs(const EventTable& table, const TemporalProfileOptions& options,
+                                 const std::string& start_name = {}) {
   if (!options.use_business_hours) return;
   const auto slots = normalized_slots(options);
   const auto columns = temporal_table_columns(table, options);
@@ -914,12 +915,14 @@ void check_polars_business_pairs(const EventTable& table, const TemporalProfileO
   // pm4py then reads its default start key, start_timestamp.
   const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
   const auto timestamp = source_timestamp_key(options);
+  // An explicit start key naming the timestamp keeps its name (round GP).
   throw std::invalid_argument(detail::polars_business_schema_error(
-      timestamp, start.empty() || start == timestamp ? std::string("start_timestamp") : start, std::get<2>(*first)));
+      timestamp, !start_name.empty() ? start_name : start.empty() || start == timestamp ? std::string("start_timestamp") : start,
+      std::get<2>(*first)));
 }
 
 TemporalProfile discover_temporal_profile_table(const EventTable& table, const TemporalProfileOptions& options,
-                                                bool whole_seconds) {
+                                                bool whole_seconds, const std::string& polars_start_name) {
   PairRanks ranks, orders;
   const auto log = temporal_table_to_log(table, options, nullptr, &ranks, &orders);
   // pm4py's DataFrame discovery (without business hours): Timedelta
@@ -931,7 +934,7 @@ TemporalProfile discover_temporal_profile_table(const EventTable& table, const T
   // Round FL: with business hours the same pairs, each measured with
   // BusinessHours on the frame's UTC Timestamps at their microsecond.
   validate_slots(options);
-  if (whole_seconds) check_polars_business_pairs(table, options);
+  if (whole_seconds) check_polars_business_pairs(table, options, polars_start_name);
   const auto slots = options.use_business_hours ? normalized_slots(options)
                                                 : std::vector<BusinessHourSlot>{};
   {
@@ -959,8 +962,32 @@ TemporalProfile discover_temporal_profile_table(const EventTable& table, const T
       }
       ordered.push_back({&log.traces[t].case_id, &rows[t]});
     }
-    if (exact) return frame_arithmetic_profile(ordered, {}, options.use_business_hours ? &slots : nullptr,
-                                               whole_seconds);
+    if (exact) {
+      auto profile = frame_arithmetic_profile(ordered, {}, options.use_business_hours ? &slots : nullptr, whole_seconds);
+      // Round GP (observed black-box): pandas assigns DataFrame.apply's
+      // result over an empty pair frame, a DataFrame, to @@flow_time and
+      // fails. A pair whose row lacks the activity counts (groupby drops it
+      // only afterwards): the pairs are found again with each missing
+      // activity filled in.
+      if (options.use_business_hours && !whole_seconds && profile.entries.empty()) {
+        auto filled = table;
+        for (auto& row : filled.rows) {
+          if (columns.activity >= row.size()) row.resize(columns.activity + 1);
+          auto& cell = row[columns.activity];
+          if (!cell || cell->is_null || cell->value.empty())
+            cell = EventAttribute{filled.columns[columns.activity], "\x1f", AttributeKind::kString};
+        }
+        auto plain = options;
+        plain.use_business_hours = false;
+        bool paired = true;
+        try {
+          paired = !discover_temporal_profile_table(filled, plain, false).entries.empty();
+        } catch (const std::exception&) {
+        }
+        if (!paired) throw std::invalid_argument(detail::kPandasBusinessEmptyFlow);
+      }
+      return profile;
+    }
   }
   return discover_temporal_profile_ranked(log, normalized_table_options(options), {},
                                           ranks.empty() ? nullptr : &ranks, false);
@@ -1074,7 +1101,8 @@ TemporalProfile discover_temporal_profile(
 }
 
 TemporalProfile discover_temporal_profile_xes_frame(
-    const EventDataView& data, const TemporalProfileOptions& options, bool explicit_start_key) {
+    const EventDataView& data, const TemporalProfileOptions& requested, bool explicit_start_key) {
+  auto options = requested;
   if (data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable) {
     // A start key other than the timestamp is read as given (round GB); the
     // routes pass the timestamp when none is given. The timestamp given as
@@ -1088,13 +1116,74 @@ TemporalProfile discover_temporal_profile_xes_frame(
       implicit.target_timestamp_attribute = "start_timestamp";
       return discover_temporal_profile_xes_frame(data, implicit, true);
     }
-    const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
+    // Round GP (observed black-box): without a start key pm4py's own start
+    // key, start_timestamp, names the timestamp column itself or no column
+    // (the timestamp is then its own start), whatever start the route fills
+    // in.
+    if (!explicit_start_key) {
+      options.target_timestamp_attribute = timestamp;
+      options.target_start_timestamp_attribute.clear();
+    }
+    const auto start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
     const bool explicit_start =
         !start.empty() && (start != timestamp || (explicit_start_key && data.kind() == EventDataKind::kLazyEventTable));
+    // pandas reads a start key naming the timestamp as the timestamp column
+    // (round GP), not the frame's start_timestamp column.
+    const std::string start_column = explicit_start ? start
+        : data.kind() == EventDataKind::kEventTable && explicit_start_key ? timestamp : std::string("start_timestamp");
     detail::XesPandasTpVerdict verdict;
+    // Round GP: with business hours pandas measures the kept pairs with
+    // BusinessHours row by row (xes_pandas_tp's kPairs).
+    std::vector<BusinessHourSlot> business_slots;
+    if (options.use_business_hours) business_slots = normalized_slots(options);
     detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
-                                    options.activity_attribute, timestamp,
-                                    explicit_start ? start : std::string("start_timestamp"), explicit_start, &verdict);
+                                    options.activity_attribute, timestamp, start_column, explicit_start, &verdict,
+                                    options.use_business_hours ? &business_slots : nullptr);
+    if (verdict.kind == detail::XesPandasTpVerdict::Kind::kPairs) {
+      const auto* table = data.table();
+      const auto column = std::find(table->columns.begin(), table->columns.end(), options.activity_attribute);
+      const auto at = static_cast<std::size_t>(column - table->columns.begin());
+      const auto activity = [&](std::size_t row) -> const std::string* {
+        if (column == table->columns.end()) return nullptr;
+        const auto& cells = table->rows[row];
+        if (at >= cells.size() || !cells[at] || cells[at]->is_null) return nullptr;
+        return &cells[at]->value;
+      };
+      // groupby([activity, activity_2]) drops a pair with a missing
+      // activity; the mean compensated, the deviation Welford's, in the pair
+      // frame's order.
+      struct Sums {
+        std::uint64_t count = 0;
+        double sum = 0.0, compensation = 0.0, mean = 0.0, squares = 0.0;
+      };
+      std::map<std::pair<std::string, std::string>, Sums> sums;
+      for (const auto& [i, j, value] : verdict.pairs) {
+        const auto* source = activity(i);
+        const auto* target = activity(j);
+        if (!source || !target) continue;
+        auto& entry = sums[{*source, *target}];
+        ++entry.count;
+        const double y = value - entry.compensation;
+        const double t = entry.sum + y;
+        entry.compensation = t - entry.sum - y;
+        entry.sum = t;
+        const double previous = entry.mean;
+        entry.mean += (value - previous) / static_cast<double>(entry.count);
+        entry.squares += (value - entry.mean) * (value - previous);
+      }
+      TemporalProfile profile;
+      for (const auto& [key, entry] : sums) {
+        TemporalProfileEntry out;
+        out.source = key.first;
+        out.target = key.second;
+        out.count = entry.count;
+        out.mean_seconds = entry.sum / static_cast<double>(entry.count);
+        out.standard_deviation_seconds =
+            entry.count > 1 ? std::sqrt(entry.squares / static_cast<double>(entry.count - 1)) : 0.0;
+        profile.entries.push_back(std::move(out));
+      }
+      return profile;
+    }
     // Round GN: typed columns that leave no pair, or one pair measured (a
     // datetime64 start less one object-column date, a TimedeltaArray).
     if (verdict.kind == detail::XesPandasTpVerdict::Kind::kEmpty) return TemporalProfile{};
@@ -1133,12 +1222,20 @@ TemporalProfile discover_temporal_profile_xes_frame(
     }
     // Round GN: a dates column's NaN floats, empty lists and valueless
     // values read as NaT (a null in Polars' copy).
-    const std::vector<std::string> keys{timestamp, explicit_start ? start : std::string("start_timestamp")};
+    const std::vector<std::string> keys{timestamp, start_column};
     if (data.kind() == EventDataKind::kEventTable) {
       if (const auto gaps = detail::xes_frame_date_gaps_missing(*data.table(), keys))
         return discover_temporal_profile(EventDataView(*gaps), options);
-    } else if (auto gaps = detail::xes_frame_date_gaps_missing(data.lazy_table()->materialize(), keys)) {
-      return discover_temporal_profile_table(polars_partial_order_table(std::move(*gaps), options), options, true);
+    } else {
+      // Polars with an explicit start key naming the timestamp: the UDF's
+      // struct names its "_2" copy after it (round GP).
+      const std::string start_name = explicit_start && start == timestamp ? timestamp : std::string();
+      if (auto gaps = detail::xes_frame_date_gaps_missing(data.lazy_table()->materialize(), keys))
+        return discover_temporal_profile_table(polars_partial_order_table(std::move(*gaps), options), options, true,
+                                               start_name);
+      if (!start_name.empty())
+        return discover_temporal_profile_table(polars_partial_order_table(data.lazy_table()->materialize(), options),
+                                               options, true, start_name);
     }
   }
   return discover_temporal_profile(data, options);

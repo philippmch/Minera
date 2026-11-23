@@ -1243,7 +1243,8 @@ minera::FootprintsAnalysis analyze_footprints_models(
     const minera::PetriNet* heuristic_model, const minera::PetriNet* powl_net_model,
     const minera::FootprintsOptions& options,
     const minera::ActiveEventSource* active_source = nullptr,
-    const minera::EventTable* upload_frame = nullptr) {
+    const minera::EventTable* upload_frame = nullptr,
+    const std::string* missing_activity_label = nullptr) {
   const auto need = [](const auto* model, const char* message) -> const auto& {
     if (!model) throw std::invalid_argument(message);
     return *model;
@@ -1252,9 +1253,61 @@ minera::FootprintsAnalysis analyze_footprints_models(
   analysis.model = options.model;
   analysis.strict = options.strict;
   const auto discovery_options = footprints_discovery_options(options);
-  const auto& selected_log = options.model == "alpha"
+  const auto& checked_log = options.model == "alpha"
       ? need(alpha_log_model, "the cached Alpha prepared log is unavailable")
       : active_source ? active_source->checked_log() : log;
+  // XES frame sessions (round GP): pm4py converts read_xes's frame to an
+  // EventLog, grouping the rows by case id in order of first appearance (the
+  // rows without one are one trace), in which a missing activity stays NaN
+  // (pandas, one shared object in the object column) or None (Polars): one
+  // more activity in the log's and the traces' footprints, observed
+  // black-box.
+  std::optional<minera::EventLog> labelled_log;
+  if (missing_activity_label && options.model != "alpha") {
+    const auto missing = [](const minera::Event& event) {
+      return !event.has_activity() || event.activity_state == minera::FirstClassAttributeState::kNull ||
+             (event.activity_attribute && event.activity_attribute->is_null);
+    };
+    const auto case_key = [](const minera::Trace& trace) -> std::optional<std::string> {
+      if (!trace.has_case_id() || trace.case_id_state == minera::FirstClassAttributeState::kNull) return std::nullopt;
+      return trace.case_id;
+    };
+    const bool label = options.activity_attribute == "concept:name" || options.activity_attribute.empty();
+    const bool group = options.case_id_attribute == "case:concept:name" || options.case_id_attribute.empty();
+    bool any_missing = false, any_present = false, regroup = false;
+    std::set<std::optional<std::string>> seen;
+    for (const auto& trace : checked_log.traces) {
+      if (group && !seen.insert(case_key(trace)).second) regroup = true;
+      if (label)
+        for (const auto& event : trace.events) (missing(event) ? any_missing : any_present) = true;
+    }
+    // A frame without the activity column raises pm4py's KeyError.
+    if (any_missing && !any_present) throw std::invalid_argument("KeyError: 'concept:name'");
+    if (any_missing || regroup) {
+      labelled_log = checked_log;
+      if (regroup) {
+        std::vector<minera::Trace> grouped;
+        std::map<std::optional<std::string>, std::size_t> group_of;
+        for (auto& trace : labelled_log->traces) {
+          const auto [it, inserted] = group_of.try_emplace(case_key(trace), grouped.size());
+          if (inserted) grouped.push_back(std::move(trace));
+          else
+            for (auto& event : trace.events) grouped[it->second].events.push_back(std::move(event));
+        }
+        labelled_log->traces = std::move(grouped);
+      }
+      if (any_missing)
+        for (auto& trace : labelled_log->traces)
+          for (auto& event : trace.events)
+            if (missing(event)) {
+              event.activity = *missing_activity_label;
+              event.activity_state = minera::FirstClassAttributeState::kPresent;
+              event.activity_attribute =
+                  minera::EventAttribute{"concept:name", *missing_activity_label, minera::AttributeKind::kString};
+            }
+    }
+  }
+  const auto& selected_log = labelled_log ? *labelled_log : checked_log;
   analysis.activity_attribute = discovery_options.activity_attribute;
   analysis.case_id_attribute = discovery_options.case_id_attribute;
   analysis.trace_case_ids = minera::resolve_footprints_case_ids(
@@ -4938,11 +4991,23 @@ void handle_graph_discovery(const httplib::Request& request,
     std::string model_footprint, model_origin;
     if (family == "footprints") {
       register_activity_selector_values(graph, *input, params.footprints.activity_attribute);
+      std::optional<std::string> missing_label;
+      if (xes_frame_session(*session)) {
+        missing_label = session->active_source->selected_kind() == minera::EventDataKind::kLazyEventTable ? "None" : "nan";
+        bool any = false, present = false;
+        for (const auto& trace : session->active_source->checked_log().traces)
+          for (const auto& event : trace.events)
+            (!event.has_activity() || event.activity_state == minera::FirstClassAttributeState::kNull ||
+                     (event.activity_attribute && event.activity_attribute->is_null)
+                 ? any
+                 : present) = true;
+        if (any && present && params.footprints.model != "alpha") graph.ensure_activity(*missing_label);
+      }
       footprints = analyze_footprints_models(require_prepared_log(*session), graph,
         session->alpha_log_ready ? &session_alpha_log(*session) : nullptr,
         session->tree_ready ? &session->tree : nullptr, session->powl ? &*session->powl : nullptr,
         session_net("inductive"), session_net("alpha"), session_net("heuristic"), session_net("powl"),
-        params.footprints, session->active_source.get());
+        params.footprints, session->active_source.get(), nullptr, missing_label ? &*missing_label : nullptr);
       model_footprint = minera::footprint_json(footprints->model_footprint, graph);
       model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
     } else {

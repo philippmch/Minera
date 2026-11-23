@@ -4207,10 +4207,13 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   const bool custom_clock = performance && !standard_timestamp_attribute(options.timestamp_attribute) &&
                             !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty());
   const bool cell_clock = performance && (classic_cell_clock(options) || custom_clock);
+  // Heuristics++ reads another timestamp column's cells as well (round GP,
+  // observed black-box: start_timestamp as the timestamp key is its own
+  // start, so to_interval keeps the log and the abstraction reads it).
   const bool own_clock =
-      (custom_clock || canonical_timestamp_attribute(options) == "time:timestamp") &&
-      (plus ? !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty())
-            : cell_clock || (!options.use_business_hours && !options.start_timestamp_attribute));
+      plus ? !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty())
+           : (custom_clock || canonical_timestamp_attribute(options) == "time:timestamp") &&
+                 (cell_clock || (!options.use_business_hours && !options.start_timestamp_attribute));
   if ((!plus && options.variant != HeuristicMinerVariant::kClassic) || ((plus || performance) && !own_clock) ||
       (!polars && data.kind() != EventDataKind::kEventTable))
     return discover_heuristics_net(data, options);
@@ -4363,8 +4366,16 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     }
     // Another timestamp column raises at the first pair, after the start
     // key (classic_cell_waits).
-    if (repeated && performance && !timestamp_at && !custom_clock)
+    // The pair reads the later event's start before the earlier one's
+    // timestamp: a start key naming no event column raises first (round
+    // GP, observed black-box).
+    if (repeated && performance && !timestamp_at && !custom_clock) {
+      const auto& start_key = options.start_timestamp_attribute;
+      if (start_key && !start_key->empty() && *start_key != timestamp_key &&
+          (start_key->starts_with("case:") || (!column_of(*start_key) && !none_column(*start_key))))
+        throw HeuristicPandasError("builtins.KeyError", repr(*start_key));
       throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
+    }
     if (!activity_at && !typed) return finish(discover_heuristics_net(EventLog{}, projected));
   }
   const auto missing_time = [&](const EventTable::Row& row) {
@@ -4526,6 +4537,15 @@ HeuristicsNet discover_heuristics_net_xes_frame(
           attribute.key = table.columns[column];
           event.attributes.push_back(std::move(attribute));
         }
+      // A start key naming the timestamp column (start_timestamp as the
+      // timestamp key) reads that same cell: pm4py sees a start column, so
+      // the intervals keep frame order (round GP, observed black-box).
+      if (start_at && timestamp_at && *start_at == *timestamp_at && value(row, *timestamp_at) &&
+          !standard_timestamp_attribute(interval_start_key)) {
+        auto attribute = *row[*timestamp_at];
+        attribute.key = interval_start_key;
+        event.attributes.push_back(std::move(attribute));
+      }
     }
     log.traces[it->second].events.push_back(std::move(event));
   }

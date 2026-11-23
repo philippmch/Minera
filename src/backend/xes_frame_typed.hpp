@@ -22,6 +22,7 @@
 // the pairs the comparison kept and reads .dt of the difference. How each
 // step behaves depends on the two columns' dtypes (xes_pandas_tp).
 
+#include "business_hours.hpp"
 #include "heuristic_plus_frame_intervals.hpp"
 #include "minera/event_log.hpp"
 #include "minera/timestamp.hpp"
@@ -460,20 +461,54 @@ inline bool xes_texts_read_as_dates(const std::vector<const std::string*>& texts
 // (xes_pandas_tp): the dates path the profile's own discovery measures
 // (both columns datetime64), no pair at all, or one pair measured.
 struct XesPandasTpVerdict {
-  enum class Kind { kDates, kEmpty, kSingle };
+  enum class Kind { kDates, kEmpty, kSingle, kPairs };
   Kind kind = Kind::kDates;
   std::size_t earlier = 0, later = 0;  // rows of the single pair
   std::int64_t micros = 0;            // its later start minus earlier timestamp
+  // kPairs (business hours, round GP): each kept pair (earlier row, later
+  // row) with its BusinessHours seconds, in the pair frame's order.
+  std::vector<std::tuple<std::size_t, std::size_t, double>> pairs;
 };
+
+// pandas' message when pm4py assigns DataFrame.apply's result over an empty
+// pair frame to @@flow_time (business hours, round GP).
+inline const char* const kPandasBusinessEmptyFlow =
+    "ValueError: Cannot set a DataFrame with multiple columns to the single column @@flow_time";
+
+// BusinessHours(a, b) in a DataFrame.apply row (round GP, observed
+// black-box): each argument's replace(tzinfo=None), the first argument
+// first (a str: "str.replace() takes no keyword arguments", any other
+// non-date AttributeError), then the business seconds between the two wall
+// clocks (a datetime64 column's Timestamp in UTC, an object column's
+// datetime at its own offset).
+inline double xes_business_cells(const PlusCell& a, const PlusCell& b, const std::vector<BusinessHourSlot>& slots) {
+  const auto wall = [](const PlusCell& cell) -> std::int64_t {
+    if (cell.kind == PlusCellKind::kTimestamp) return cell.micros;
+    if (cell.kind == PlusCellKind::kDatetime) {
+      if (!cell.text.empty())
+        if (const auto local = local_wall_timestamp_microseconds(cell.text)) return *local;
+      return cell.micros;
+    }
+    if (cell.kind == PlusCellKind::kText) throw std::invalid_argument("TypeError: str.replace() takes no keyword arguments");
+    throw std::invalid_argument(std::string("AttributeError: '") + xes_cell_type(cell) + "' object has no attribute 'replace'");
+  };
+  const auto start = wall(a);
+  const auto end = wall(b);
+  return business_elapsed_seconds_microseconds(start, end, slots);
+}
 
 // pm4py's temporal profile on read_xes's frame up to the flow times (see the
 // header comment): raises the error pandas raises, or returns the verdict.
 // `start` is the start column (the timestamp column when the frame lacks
 // one); `timestamp_dtype` names the timestamp column's dtype in pandas'
 // messages.
+// With `slots` (business hours) the kept pairs are measured with
+// BusinessHours row by row instead of subtracted (kPairs; no pair kept
+// raises kPandasBusinessEmptyFlow).
 inline XesPandasTpVerdict xes_pandas_tp(const XesTypedColumn& cases, const XesTypedColumn& timestamps,
                                         const XesTypedColumn& start, const std::string& timestamp_dtype,
-                                        const std::string& start_dtype) {
+                                        const std::string& start_dtype,
+                                        const std::vector<BusinessHourSlot>* slots = nullptr) {
   using D = XesFrameDtype;
   const auto order = xes_pandas_sort_order({&cases, &start, &timestamps});
   // Pairs (earlier, later) of a case in sorted order, earlier row first.
@@ -599,6 +634,13 @@ inline XesPandasTpVerdict xes_pandas_tp(const XesTypedColumn& cases, const XesTy
   std::vector<std::pair<std::size_t, std::size_t>> kept;
   for (std::size_t p = 0; p < pairs.size(); ++p)
     if (keep[p]) kept.push_back(pairs[p]);
+  if (slots) {
+    if (kept.empty()) throw std::invalid_argument(kPandasBusinessEmptyFlow);
+    XesPandasTpVerdict verdict;
+    verdict.kind = XesPandasTpVerdict::Kind::kPairs;
+    for (const auto& [i, j] : kept) verdict.pairs.emplace_back(i, j, xes_business_cells(L[i], R[j], *slots));
+    return verdict;
+  }
   const auto no_accessor = [] {
     return std::invalid_argument("AttributeError: Can only use .dt accessor with datetimelike values");
   };

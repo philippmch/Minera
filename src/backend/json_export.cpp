@@ -628,11 +628,11 @@ void validate_footprints_extensive(
 void validate_footprints_analysis(const FootprintsAnalysis& analysis,
                                   const EventLog& log,
                                   const DirectlyFollowsGraph& graph) {
-  if (analysis.trace_case_ids.size() != 0 &&
-      analysis.trace_case_ids.size() != log.traces.size()) {
-    throw std::invalid_argument(
-        "footprints diagnostic case ids must contain one value per trace");
-  }
+  // The analysis' own traces: an XES frame session's footprints group the
+  // frame's rows by case id as pm4py's EventLog conversion does (round GP),
+  // so their case ids, when given, count the traces.
+  const std::size_t trace_count =
+      analysis.trace_case_ids.empty() ? log.traces.size() : analysis.trace_case_ids.size();
   if (analysis.activity_attribute.empty() ||
       analysis.case_id_attribute.empty()) {
     throw std::invalid_argument(
@@ -648,7 +648,7 @@ void validate_footprints_analysis(const FootprintsAnalysis& analysis,
     validate_footprint(*analysis.polars_lazyframes, graph);
   }
   if (analysis.trace_by_trace) {
-    if (analysis.trace_by_trace->size() != log.traces.size()) {
+    if (analysis.trace_by_trace->size() != trace_count) {
       throw std::invalid_argument(
           "trace-by-trace footprints must contain one result per trace");
     }
@@ -677,7 +677,7 @@ void validate_footprints_analysis(const FootprintsAnalysis& analysis,
     validate_footprints_extensive(*analysis.log_extensive, graph);
   }
   if (analysis.trace_extensive) {
-    if (analysis.trace_extensive->size() != log.traces.size()) {
+    if (analysis.trace_extensive->size() != trace_count) {
       throw std::invalid_argument(
           "trace-extensive footprints must contain one result per trace");
     }
@@ -864,7 +864,7 @@ void write_footprints_analysis(std::ostream& out,
                                const EventLog& log,
                                const DirectlyFollowsGraph& graph) {
   const auto diagnostic_case_id = [&](std::size_t index) -> const std::string& {
-    if (analysis.trace_case_ids.size() == log.traces.size())
+    if (index < analysis.trace_case_ids.size())
       return analysis.trace_case_ids[index];
     return log.traces[index].case_id;
   };
