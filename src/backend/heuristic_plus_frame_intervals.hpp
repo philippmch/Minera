@@ -41,6 +41,9 @@ struct PlusCell {
   std::int64_t micros = 0;
   std::string text;
   double number = 0.0;
+  // A date's nanoseconds past `micros` (0-999): pandas keeps them, the
+  // classic waits subtract them (round GK).
+  std::int32_t nanos = 0;
 };
 
 // Python's `a < b` on two ints given as decimal text (an optional '-', no

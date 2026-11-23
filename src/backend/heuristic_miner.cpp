@@ -579,6 +579,487 @@ const std::string* csv_transition_text(const Event& event) {
   return cell && !cell->is_null && !cell->value.empty() ? &cell->value : nullptr;
 }
 
+std::string python_str_repr(const std::string& text) {
+  const bool double_quote = text.find('\'') != std::string::npos && text.find('"') == std::string::npos;
+  const char quote = double_quote ? '"' : '\'';
+  std::string out(1, quote);
+  for (const char ch : text) {
+    if (ch == '\\' || ch == quote) out += '\\';
+    out += ch;
+  }
+  return out + quote;
+}
+
+// How the events of a CSV upload's log (pm4py's convert_to_event_log of
+// format_dataframe's frame, or that frame and its Polars copy) hold `key`
+// (rounds GH-GK, observed black-box): every event holds every event column
+// of the frame, typed by the column (a date column Timestamp or NaT, on
+// Polars datetime.datetime or None; a str column str, a pandas NA word or a
+// gap NaN (None); a float64 column float or NaN (None); an int64, bool or
+// object column int or bool; Polars' copy of an object column str). The
+// copies concept:name and time:timestamp, the activity and timestamp
+// columns under their headers, a case column under a header without the
+// `case:` prefix, the resource and lifecycle columns are event columns too;
+// a `case:` key is a trace attribute. Returns nullopt when no event holds
+// the key; the reader gives nullopt for a cell it does not model.
+using CsvCellReader = std::function<std::optional<detail::PlusCell>(const Trace&, const Event&)>;
+
+std::optional<detail::PlusCell> csv_typed_cell(const DataFrameColumn& column, const std::string* text, bool polars) {
+  using detail::PlusCell;
+  using detail::PlusCellKind;
+  PlusCell cell;
+  const auto type = column.type;
+  if (!text || text->empty() || (type == DataFrameColumnType::kString && is_pandas_csv_na_text(*text))) {
+    cell.kind = polars ? PlusCellKind::kNone
+                       : type == DataFrameColumnType::kDate ? PlusCellKind::kNaT : PlusCellKind::kNaN;
+    return cell;
+  }
+  switch (type) {
+    case DataFrameColumnType::kString:
+      cell.kind = PlusCellKind::kText;
+      cell.text = *text;
+      return cell;
+    case DataFrameColumnType::kDate: {
+      const auto utc = csv_utc_date_cell(column.key, *text);
+      const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
+      if (!micros) return std::nullopt;
+      cell.kind = polars ? PlusCellKind::kDatetime : PlusCellKind::kTimestamp;
+      cell.micros = *micros;
+      if (const auto exact = parse_timestamp_exact(utc->value)) cell.nanos = static_cast<std::int32_t>(exact->nanoseconds % 1000);
+      return cell;
+    }
+    default: break;
+  }
+  const auto typed = csv_dataframe_cell(column, *text);
+  if (type == DataFrameColumnType::kObject && polars) {
+    cell.kind = PlusCellKind::kText;
+    cell.text = typed.value;
+    return cell;
+  }
+  if (const auto* value = std::get_if<std::int64_t>(&typed.typed_value)) {
+    cell.kind = PlusCellKind::kInt;
+    cell.micros = *value;
+  } else if (std::holds_alternative<std::uint64_t>(typed.typed_value) ||
+             (type == DataFrameColumnType::kObject && typed.kind == AttributeKind::kInt)) {
+    cell.kind = PlusCellKind::kInt;
+    cell.text = typed.value;
+  } else if (const auto* flag = std::get_if<bool>(&typed.typed_value)) {
+    cell.kind = PlusCellKind::kBool;
+    cell.micros = *flag ? 1 : 0;
+  } else if (const auto* number = std::get_if<double>(&typed.typed_value)) {
+    cell.kind = std::isnan(*number) ? (polars ? PlusCellKind::kNone : PlusCellKind::kNaN) : PlusCellKind::kFloat;
+    cell.number = *number;
+  } else {
+    return std::nullopt;
+  }
+  return cell;
+}
+
+std::optional<detail::PlusCell> csv_timestamp_cell(const Event& event, bool polars) {
+  detail::PlusCell cell;
+  if (!event.has_timestamp() || event.timestamp_state == FirstClassAttributeState::kNull) {
+    cell.kind = polars ? detail::PlusCellKind::kNone : detail::PlusCellKind::kNaT;
+    return cell;
+  }
+  const auto utc = csv_utc_date_cell("time:timestamp", event.timestamp);
+  const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
+  if (!micros) return std::nullopt;
+  cell.kind = polars ? detail::PlusCellKind::kDatetime : detail::PlusCellKind::kTimestamp;
+  cell.micros = *micros;
+  if (const auto exact = parse_timestamp_exact(utc->value)) cell.nanos = static_cast<std::int32_t>(exact->nanoseconds % 1000);
+  return cell;
+}
+
+std::optional<CsvCellReader> csv_log_cell_reader(const DataFrameColumns& frame, const std::string& key, bool polars,
+                                                 std::string_view activity_header) {
+  if (key.empty() || key.starts_with("case:")) return std::nullopt;
+  if (key == "time:timestamp")
+    return CsvCellReader([polars](const Trace&, const Event& event) { return csv_timestamp_cell(event, polars); });
+  if (key == "concept:name")
+    return CsvCellReader([](const Trace&, const Event& event) -> std::optional<detail::PlusCell> {
+      detail::PlusCell cell;
+      cell.kind = detail::PlusCellKind::kText;
+      cell.text = event.activity;
+      return cell;
+    });
+  const DataFrameColumn* column = nullptr;
+  for (const auto& candidate : frame.columns)
+    if (candidate.key == key) column = &candidate;
+  if (!column) {
+    // The activity column under its own header holds read_csv's dtype.
+    if (key != activity_header) return std::nullopt;
+    auto activity = std::make_shared<DataFrameColumn>();
+    activity->key = key;
+    activity->type = frame.activity_type;
+    return CsvCellReader([activity, key, polars](const Trace&, const Event& event) -> std::optional<detail::PlusCell> {
+      if (event.activity_source_key != key) return std::nullopt;
+      return csv_typed_cell(*activity, &event.activity, polars);
+    });
+  }
+  if (column->role == FirstClassAttributeRole::kTimestamp)
+    return CsvCellReader([polars](const Trace&, const Event& event) { return csv_timestamp_cell(event, polars); });
+  return CsvCellReader([column, polars](const Trace& trace, const Event& event) -> std::optional<detail::PlusCell> {
+    const std::string* text = nullptr;
+    bool read = false;
+    switch (column->role) {
+      case FirstClassAttributeRole::kResource:
+        if (event.resource_source_key == column->key) {
+          read = true;
+          if (event.resource_state == FirstClassAttributeState::kPresent) text = &event.resource;
+        }
+        break;
+      case FirstClassAttributeRole::kLifecycle:
+        if (event.lifecycle_source_key == column->key) {
+          read = true;
+          if (event.lifecycle_state == FirstClassAttributeState::kPresent) text = &event.lifecycle;
+        }
+        break;
+      case FirstClassAttributeRole::kCaseId:
+        if (trace.case_id_source_key == column->key) {
+          read = true;
+          if (trace.case_id_state == FirstClassAttributeState::kPresent) text = &trace.case_id;
+        }
+        break;
+      default: break;
+    }
+    if (!read) {
+      const auto* cell = event_attribute_cell(event, column->key);
+      if (cell && !cell->is_null && !is_typed_nat(*cell)) text = &cell->value;
+    }
+    return csv_typed_cell(*column, text, polars);
+  });
+}
+
+// pm4py's classic performance DFG with business hours or a configured start
+// key (round GK, observed black-box on pandas, on Polars and on the event
+// log of either): trace by trace, each directly-follows pair (earlier,
+// later) in the trace's order measures BusinessHours(complete(earlier),
+// start(later)) with business hours (check_plus_business_hours' errors),
+// else start(later) - complete(earlier): a non-date on either side raises
+// TypeError (the later start's type first), a NaT on either side gives NaT,
+// read as a zero wait, and a negative wait is 0. A start key no event holds
+// raises KeyError at the first pair (`missing_key`, its repr). Returns each
+// pair's wait in seconds, waits[t][i] for the pair ending at event i: on
+// pandas Timedelta.total_seconds() of the exact difference floored to the
+// microsecond (frame_elapsed_seconds, 1.118 s is 1.1179999999999999), on
+// Polars' Python datetimes (`python_seconds`) the microseconds / 1e6 of the
+// instants truncated to the microsecond (observed black-box, round GK).
+std::vector<std::vector<double>> classic_cell_waits(const std::vector<std::vector<detail::PlusCell>>& start,
+                                                    const std::vector<std::vector<detail::PlusCell>>& complete,
+                                                    bool business_hours, const std::vector<BusinessHourSlot>& slots,
+                                                    const std::optional<std::string>& missing_key,
+                                                    bool python_seconds) {
+  using detail::PlusCellKind;
+  const auto subtractable = [](PlusCellKind kind) { return detail::plus_date_like(kind) || kind == PlusCellKind::kNaT; };
+  std::vector<std::vector<double>> waits(complete.size());
+  for (std::size_t t = 0; t < complete.size(); ++t) {
+    waits[t].assign(complete[t].size(), 0.0);
+    for (std::size_t i = 1; i < complete[t].size(); ++i) {
+      if (missing_key) throw HeuristicPandasError("builtins.KeyError", *missing_key);
+      const auto& later = start[t][i];
+      const auto& earlier = complete[t][i - 1];
+      double wait = 0.0;
+      if (business_hours) {
+        detail::check_plus_business_hours(earlier, later);
+        wait = detail::business_elapsed_seconds_microseconds(earlier.micros, later.micros, slots);
+      } else {
+        if (!subtractable(later.kind) || !subtractable(earlier.kind))
+          throw HeuristicPandasError("builtins.TypeError", std::string("unsupported operand type(s) for -: '") +
+                                                               detail::plus_cell_type(later.kind) + "' and '" +
+                                                               detail::plus_cell_type(earlier.kind) + "'");
+        if (later.kind != PlusCellKind::kNaT && earlier.kind != PlusCellKind::kNaT) {
+          if (python_seconds) {
+            wait = detail::epoch_seconds_from_microseconds(later.micros - earlier.micros);
+          } else {
+            const auto nanos = (later.micros - earlier.micros) * 1000 + (later.nanos - earlier.nanos);
+            wait = frame_elapsed_seconds(nanos >= 0 ? nanos / 1000 : -((-nanos + 999) / 1000));
+          }
+        }
+      }
+      waits[t][i] = std::max(0.0, wait);
+    }
+  }
+  return waits;
+}
+
+// The waits of a CSV log (or a CSV frame's log, `frame` its columns) with
+// business hours or a configured start key; nullopt when a cell is not
+// modelled (Minera's own path then).
+std::optional<std::vector<std::vector<double>>> csv_classic_waits(const EventLog& log, const DataFrameColumns& frame,
+                                                                  const HeuristicMinerOptions& options, bool polars) {
+  const std::string key = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
+                              ? *options.start_timestamp_attribute
+                              : "time:timestamp";
+  const auto reader = csv_log_cell_reader(
+      frame, key, polars,
+      log.traces.empty() || log.traces.front().events.empty() ? std::string_view{}
+                                                              : std::string_view(log.traces.front().events.front().activity_source_key));
+  std::vector<std::vector<detail::PlusCell>> starts, completes;
+  for (const auto& trace : log.traces) {
+    auto& start_row = starts.emplace_back();
+    auto& complete_row = completes.emplace_back();
+    for (const auto& event : trace.events) {
+      const auto complete = csv_timestamp_cell(event, polars);
+      if (!complete) return std::nullopt;
+      complete_row.push_back(*complete);
+      if (reader) {
+        auto start = (*reader)(trace, event);
+        if (!start) return std::nullopt;
+        start_row.push_back(std::move(*start));
+      } else {
+        start_row.emplace_back();
+      }
+    }
+  }
+  const auto slots = options.use_business_hours
+                         ? detail::normalize_business_hour_slots(options.business_hour_slots,
+                                                                 options.business_hour_slots_explicit,
+                                                                 "Heuristics Miner")
+                         : std::vector<BusinessHourSlot>{};
+  return classic_cell_waits(starts, completes, options.use_business_hours, slots,
+                            reader ? std::nullopt : std::optional<std::string>(python_str_repr(key)), polars);
+}
+
+// pm4py's classic performance DFG on an XES upload's log shape, the hybrid
+// legacy log whose events hold only the keys they carry (round GK,
+// observed black-box): each directly-follows pair reads start(later) and
+// then complete(earlier) (complete first with business hours), a key the
+// event lacks raising KeyError, then measures them as classic_cell_waits
+// does (a non-date raises TypeError, or check_plus_business_hours' errors).
+// Taken only where Minera's own path would fail on a missing or non-date
+// cell; nullopt otherwise, when a cell is not modelled (a null, a NaT, a
+// container, an unparsable date, a custom timestamp key) or when an event
+// of a pair lacks its activity (the frequency DFG raises first).
+std::optional<std::vector<std::vector<double>>> legacy_classic_waits(const EventLog& log,
+                                                                     const HeuristicMinerOptions& options) {
+  using detail::PlusCell;
+  using detail::PlusCellKind;
+  const std::string start_key = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
+                                    ? *options.start_timestamp_attribute
+                                    : "time:timestamp";
+  const bool business_hours = options.use_business_hours;
+  bool modelled = true, failing = false;
+  const auto date_cell = [&](const std::string& text) {
+    PlusCell cell;
+    const auto micros = business_hours ? detail::local_wall_timestamp_microseconds(text)
+                                       : parse_timestamp_microseconds(text);
+    if (!micros) modelled = false;
+    cell.kind = PlusCellKind::kDatetime;
+    cell.micros = micros.value_or(0);
+    return cell;
+  };
+  const auto typed = [&](const EventAttribute& attribute) {
+    PlusCell cell;
+    if (attribute.is_null || attribute.container != AttributeContainerKind::kScalar) {
+      modelled = false;
+      return cell;
+    }
+    switch (attribute.kind) {
+      case AttributeKind::kDate:
+        if (is_typed_nat(attribute)) modelled = false;
+        return date_cell(attribute.value);
+      case AttributeKind::kString:
+      case AttributeKind::kId: cell.kind = PlusCellKind::kText; break;
+      case AttributeKind::kInt: cell.kind = PlusCellKind::kInt; break;
+      case AttributeKind::kFloat: cell.kind = PlusCellKind::kFloat; break;
+      case AttributeKind::kBoolean: cell.kind = PlusCellKind::kBool; break;
+      default: modelled = false; return cell;
+    }
+    cell.text = attribute.value;
+    failing = true;
+    return cell;
+  };
+  // A first-class field as the event dict holds it: nullopt when absent.
+  const auto field = [&](bool present, FirstClassAttributeState state, const std::optional<EventAttribute>& attribute,
+                         const std::string& text) -> std::optional<PlusCell> {
+    if (!present) {
+      failing = true;
+      return std::nullopt;
+    }
+    if (state == FirstClassAttributeState::kNull) modelled = false;
+    if (attribute) return typed(*attribute);
+    PlusCell cell;
+    cell.kind = PlusCellKind::kText;
+    cell.text = text;
+    failing = true;
+    return cell;
+  };
+  const auto timestamp_cell = [&](const Event& event) -> std::optional<PlusCell> {
+    if (!event.timestamp_source_key.empty() && event.timestamp_source_key != "time:timestamp") modelled = false;
+    if (!event.has_timestamp()) {
+      failing = true;
+      return std::nullopt;
+    }
+    if (event.timestamp_state == FirstClassAttributeState::kNull) modelled = false;
+    if (event.timestamp_attribute) return typed(*event.timestamp_attribute);
+    return date_cell(event.timestamp);
+  };
+  const auto key_of = [](const std::string& source, std::string_view standard) {
+    return source.empty() ? std::string(standard) : source;
+  };
+  const auto start_cell = [&](const Event& event) -> std::optional<PlusCell> {
+    if (start_key == "time:timestamp") return timestamp_cell(event);
+    if (const auto* attribute = selected_start_attribute(event, start_key)) return typed(*attribute);
+    if (event.has_activity() && start_key == key_of(event.activity_source_key, "concept:name"))
+      return field(true, event.activity_state, event.activity_attribute, event.activity);
+    if (event.has_resource() && start_key == key_of(event.resource_source_key, "org:resource"))
+      return field(true, event.resource_state, event.resource_attribute, event.resource);
+    if (event.has_lifecycle() && start_key == key_of(event.lifecycle_source_key, "lifecycle:transition"))
+      return field(true, event.lifecycle_state, event.lifecycle_attribute, event.lifecycle);
+    failing = true;
+    return std::nullopt;
+  };
+  std::vector<std::vector<std::optional<PlusCell>>> starts, completes;
+  for (const auto& trace : log.traces) {
+    auto& start_row = starts.emplace_back();
+    auto& complete_row = completes.emplace_back();
+    for (const auto& event : trace.events) {
+      if (trace.events.size() > 1 && !event.has_activity()) return std::nullopt;
+      complete_row.push_back(timestamp_cell(event));
+      start_row.push_back(start_cell(event));
+    }
+  }
+  if (!modelled || !failing) return std::nullopt;
+  const auto slots = business_hours ? detail::normalize_business_hour_slots(options.business_hour_slots,
+                                                                            options.business_hour_slots_explicit,
+                                                                            "Heuristics Miner")
+                                    : std::vector<BusinessHourSlot>{};
+  const auto missing = [](const std::string& key) {
+    return HeuristicPandasError("builtins.KeyError", python_str_repr(key));
+  };
+  std::vector<std::vector<double>> waits(completes.size());
+  for (std::size_t t = 0; t < completes.size(); ++t) {
+    waits[t].assign(completes[t].size(), 0.0);
+    for (std::size_t i = 1; i < completes[t].size(); ++i) {
+      const auto& later = starts[t][i];
+      const auto& earlier = completes[t][i - 1];
+      double wait = 0.0;
+      if (business_hours) {
+        if (!earlier) throw missing("time:timestamp");
+        if (!later) throw missing(start_key);
+        detail::check_plus_business_hours(*earlier, *later);
+        wait = detail::business_elapsed_seconds_microseconds(earlier->micros, later->micros, slots);
+      } else {
+        if (!later) throw missing(start_key);
+        if (!earlier) throw missing("time:timestamp");
+        if (!detail::plus_date_like(later->kind) || !detail::plus_date_like(earlier->kind))
+          throw HeuristicPandasError("builtins.TypeError", std::string("unsupported operand type(s) for -: '") +
+                                                               detail::plus_cell_type(later->kind) + "' and '" +
+                                                               detail::plus_cell_type(earlier->kind) + "'");
+        wait = detail::epoch_seconds_from_microseconds(later->micros - earlier->micros);
+      }
+      waits[t][i] = std::max(0.0, wait);
+    }
+  }
+  return waits;
+}
+
+// An XES frame column's cells as Python reads them for the classic
+// performance view (round GK): plus_frame_cells for dates and text; numbers
+// and booleans as pandas types the column (ints without a gap int64, with a
+// gap or beside floats float64; booleans without a gap bool; any other mix
+// object, each cell its own type, a gap NaN) and as Polars' copy holds it
+// (Int64, Float64, Boolean; an object column String; a gap None). nullopt
+// for other kinds.
+std::optional<std::vector<detail::PlusCell>> classic_frame_cells(const EventTable& table, std::size_t column,
+                                                                 bool polars) {
+  using detail::PlusCell;
+  using detail::PlusCellKind;
+  if (auto cells = detail::plus_frame_cells(table, column, polars)) return cells;
+  const auto missing = [&](const EventTable::Row& row) {
+    if (column >= row.size() || !row[column] || row[column]->is_null) return true;
+    const auto* number = std::get_if<double>(&row[column]->typed_value);
+    return number && std::isnan(*number) && row[column]->kind == AttributeKind::kFloat;
+  };
+  bool any_missing = false, has_int = false, has_float = false, has_bool = false, has_other = false;
+  for (const auto& row : table.rows) {
+    if (missing(row)) {
+      any_missing = true;
+      continue;
+    }
+    const auto& cell = *row[column];
+    switch (cell.kind) {
+      case AttributeKind::kInt:
+        if (!std::holds_alternative<std::int64_t>(cell.typed_value)) return std::nullopt;
+        has_int = true;
+        break;
+      case AttributeKind::kFloat:
+        if (!std::holds_alternative<double>(cell.typed_value)) return std::nullopt;
+        has_float = true;
+        break;
+      case AttributeKind::kBoolean:
+        if (!std::holds_alternative<bool>(cell.typed_value)) return std::nullopt;
+        has_bool = true;
+        break;
+      case AttributeKind::kDate:
+      case AttributeKind::kString:
+      case AttributeKind::kId:
+        has_other = true;
+        break;
+      default: return std::nullopt;
+    }
+  }
+  const bool numeric = (has_int || has_float) && !has_bool && !has_other;
+  const bool boolean = has_bool && !has_int && !has_float && !has_other;
+  const bool object = !numeric && !(boolean && !any_missing);
+  std::vector<PlusCell> cells;
+  cells.reserve(table.rows.size());
+  for (const auto& row : table.rows) {
+    PlusCell out;
+    if (missing(row)) {
+      out.kind = polars ? PlusCellKind::kNone : PlusCellKind::kNaN;
+      cells.push_back(std::move(out));
+      continue;
+    }
+    const auto& cell = *row[column];
+    if (polars && object) {
+      // Polars' copy of an object column: str() of each cell.
+      out.kind = PlusCellKind::kText;
+      out.text = cell.kind == AttributeKind::kDate ? detail::plus_python_datetime_str(cell.value) : cell.value;
+    } else if (cell.kind == AttributeKind::kInt) {
+      if (numeric && (has_float || any_missing)) {
+        out.kind = PlusCellKind::kFloat;
+        out.number = static_cast<double>(std::get<std::int64_t>(cell.typed_value));
+      } else {
+        out.kind = PlusCellKind::kInt;
+        out.micros = std::get<std::int64_t>(cell.typed_value);
+      }
+    } else if (cell.kind == AttributeKind::kFloat) {
+      out.kind = PlusCellKind::kFloat;
+      out.number = std::get<double>(cell.typed_value);
+    } else if (cell.kind == AttributeKind::kBoolean) {
+      out.kind = PlusCellKind::kBool;
+      out.micros = std::get<bool>(cell.typed_value) ? 1 : 0;
+    } else if (cell.kind == AttributeKind::kDate) {
+      const auto micros = parse_timestamp_microseconds(cell.value);
+      if (!micros) return std::nullopt;
+      out.kind = PlusCellKind::kDatetime;
+      out.micros = *micros;
+    } else {
+      out.kind = PlusCellKind::kText;
+      out.text = cell.value;
+    }
+    cells.push_back(std::move(out));
+  }
+  return cells;
+}
+
+// `selected_keys`: a CSV frame, whose session selects its own case,
+// activity and timestamp columns (the frame's copies are those columns).
+bool classic_cell_clock(const HeuristicMinerOptions& options, bool selected_keys = false) {
+  return options.variant == HeuristicMinerVariant::kClassic &&
+         options.decoration == HeuristicNetDecoration::kPerformance &&
+         (selected_keys || canonical_timestamp_attribute(options) == "time:timestamp") &&
+         (options.use_business_hours ||
+          (options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()));
+}
+
+HeuristicMinerOptions without_cell_clock(HeuristicMinerOptions options) {
+  options.use_business_hours = false;
+  options.start_timestamp_attribute.reset();
+  return options;
+}
+
 IntervalTrace to_intervals(const Trace& trace,
                            const HeuristicMinerOptions& options,
                            bool pre_interval_mode, bool utc_clock,
@@ -729,36 +1210,21 @@ PlusAbstraction build_plus_abstraction(
   // event's cell is missing (round GH).
   // A start key naming the resource or lifecycle column reads that column's
   // cells (round GJ: the frame's event holds every column).
-  const DataFrameColumn* csv_start_column = nullptr;
+  // A start key naming the activity column (its copy concept:name a str
+  // column, the column under its header read_csv's dtype) or the case column
+  // under a header without `case:` reads those cells too (round GK).
+  std::optional<CsvCellReader> csv_start_reader;
   if (csv_log && !log.traces.empty() && !log.traces.front().events.empty()) {
     const std::string start_key = options.start_timestamp_attribute.value_or("start_timestamp");
-    if (!start_key.empty() && !standard_timestamp_attribute(start_key))
-      for (const auto& column : log.dataframe_columns->columns)
-        if (column.key == start_key &&
-            (column.role == FirstClassAttributeRole::kNone || column.role == FirstClassAttributeRole::kResource ||
-             column.role == FirstClassAttributeRole::kLifecycle))
-          csv_start_column = &column;
+    bool timestamp_column = standard_timestamp_attribute(start_key);
+    for (const auto& column : log.dataframe_columns->columns)
+      if (column.key == start_key && column.role == FirstClassAttributeRole::kTimestamp) timestamp_column = true;
+    if (!start_key.empty() && !timestamp_column)
+      csv_start_reader = csv_log_cell_reader(*log.dataframe_columns, start_key, false,
+                                             log.traces.front().events.front().activity_source_key);
   }
-  const auto csv_start_text = [&](const Event& event) -> const std::string* {
-    switch (csv_start_column->role) {
-      case FirstClassAttributeRole::kResource:
-        if (event.resource_source_key == csv_start_column->key)
-          return event.resource_state == FirstClassAttributeState::kPresent && !event.resource.empty() ? &event.resource
-                                                                                                        : nullptr;
-        break;
-      case FirstClassAttributeRole::kLifecycle:
-        if (event.lifecycle_source_key == csv_start_column->key)
-          return event.lifecycle_state == FirstClassAttributeState::kPresent && !event.lifecycle.empty()
-                     ? &event.lifecycle
-                     : nullptr;
-        break;
-      default: break;
-    }
-    const auto* cell = event_attribute_cell(event, csv_start_column->key);
-    return cell && !cell->is_null && !cell->value.empty() ? &cell->value : nullptr;
-  };
   const bool pre_interval_mode =
-      csv_start_column != nullptr ||
+      csv_start_reader.has_value() ||
       (!log.traces.empty() && !log.traces.front().events.empty() &&
        selected_start_timestamp(log.traces.front().events.front(), options,
                                 true) != nullptr);
@@ -801,58 +1267,26 @@ PlusAbstraction build_plus_abstraction(
   // NaN, a float64 column float or NaN, an int64 or bool column int or
   // bool) and raises as on an XES upload's frame
   // (heuristic_plus_frame_intervals.hpp).
-  if (csv_start_column) {
-    const auto type = csv_start_column->type;
-    bool modelled = type == DataFrameColumnType::kDate || type == DataFrameColumnType::kString ||
-                    type == DataFrameColumnType::kFloat64 || type == DataFrameColumnType::kInt64 ||
-                    type == DataFrameColumnType::kBool || type == DataFrameColumnType::kObject;
+  if (csv_start_reader) {
+    bool modelled = true;
     std::vector<detail::PlusCell> starts, completes;
     std::vector<std::vector<std::size_t>> traces;
     for (const auto& trace : log.traces) {
       if (!modelled) break;
       auto& rows = traces.emplace_back();
       for (const auto& event : trace.events) {
-        detail::PlusCell start, complete;
-        const auto* text = csv_start_text(event);
-        if (!text || (type == DataFrameColumnType::kString && is_pandas_csv_na_text(*text))) {
-          start.kind = type == DataFrameColumnType::kDate ? detail::PlusCellKind::kNaT : detail::PlusCellKind::kNaN;
-        } else if (type == DataFrameColumnType::kString) {
-          start.kind = detail::PlusCellKind::kText;
-          start.text = *text;
-        } else if (type == DataFrameColumnType::kDate) {
-          const auto utc = csv_utc_date_cell(csv_start_column->key, *text);
-          const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
-          if (!micros) modelled = false;
-          start.kind = detail::PlusCellKind::kTimestamp;
-          start.micros = micros.value_or(0);
-        } else {
-          const auto typed = csv_dataframe_cell(*csv_start_column, *text);
-          if (const auto* value = std::get_if<std::int64_t>(&typed.typed_value)) {
-            start.kind = detail::PlusCellKind::kInt;
-            start.micros = *value;
-          } else if (std::holds_alternative<std::uint64_t>(typed.typed_value) ||
-                     (type == DataFrameColumnType::kObject && typed.kind == AttributeKind::kInt)) {
-            // A uint64 column's int beyond int64, or an object column's
-            // Python int of any size (round GI).
-            start.kind = detail::PlusCellKind::kInt;
-            start.text = typed.value;
-          } else if (const auto* flag = std::get_if<bool>(&typed.typed_value)) {
-            start.kind = detail::PlusCellKind::kBool;
-            start.micros = *flag ? 1 : 0;
-          } else if (const auto* number = std::get_if<double>(&typed.typed_value)) {
-            start.kind = std::isnan(*number) ? detail::PlusCellKind::kNaN : detail::PlusCellKind::kFloat;
-            start.number = *number;
-          } else {
-            modelled = false;
-          }
-        }
+        auto start = (*csv_start_reader)(trace, event);
         const auto utc = event.has_timestamp() ? csv_utc_date_cell("time:timestamp", event.timestamp) : std::nullopt;
         const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
-        if (!micros) modelled = false;
+        if (!start || !micros) {
+          modelled = false;
+          break;
+        }
+        detail::PlusCell complete;
         complete.kind = detail::PlusCellKind::kTimestamp;
-        complete.micros = micros.value_or(0);
+        complete.micros = *micros;
         rows.push_back(starts.size());
-        starts.push_back(std::move(start));
+        starts.push_back(std::move(*start));
         completes.push_back(std::move(complete));
       }
     }
@@ -1450,12 +1884,21 @@ std::vector<HeuristicBundle> plus_bundles(
 // `frame_clock` (round GB): an XES upload's frame, whose missing
 // timestamps are NaT: a wait that reads one is NaT, and pm4py keeps
 // max(0, NaN), a zero wait (observed black-box on the pandas frame).
+// `waits` (round GK): each directly-follows pair's wait, as
+// classic_cell_waits measured it on the frame's cells, in place of the
+// event texts' clock.
 HeuristicClassicDfgInput build_classic_input(
     const EventLog& log, const HeuristicMinerOptions& options,
-    bool frame_clock = false) {
+    bool frame_clock = false, const std::vector<std::vector<double>>* waits = nullptr,
+    bool pandas_frame = false) {
   HeuristicClassicDfgInput input;
   const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
-  const bool frame_seconds = log.dataframe_columns != nullptr;  // round FR
+  // pandas (a CSV upload's log, a frame shape's pandas frame) measures a wait
+  // as Timedelta.total_seconds() of the exact difference (round FR); an XES
+  // upload's legacy log and Polars' copies hold Python datetimes, whose
+  // timedelta.total_seconds() is the microseconds / 1e6 (round GK, observed
+  // black-box: 1.118 s is 1.1179999999999999 on pandas, 1.118 there).
+  const bool frame_seconds = utc_clock || pandas_frame;
   const auto business_slots =
       options.use_business_hours
           ? detail::normalize_business_hour_slots(
@@ -1469,7 +1912,10 @@ HeuristicClassicDfgInput build_classic_input(
   std::map<std::string, std::uint64_t> ends;
   if (options.decoration == HeuristicNetDecoration::kPerformance)
     input.performance_dfg.emplace();
+  std::size_t trace_index = 0;
   for (const auto& trace : log.traces) {
+    const auto* trace_waits = waits ? &(*waits)[trace_index] : nullptr;
+    ++trace_index;
     if (!trace.events.empty()) {
       ++starts[selected_activity(trace.events.front(), options)];
       ++ends[selected_activity(trace.events.back(), options)];
@@ -1486,6 +1932,10 @@ HeuristicClassicDfgInput build_classic_input(
                           selected_activity(trace.events[i], options)};
       if (!options.keep_once_per_case || seen_direct.insert(pair).second)
         ++input.dfg[pair];
+      if (options.decoration == HeuristicNetDecoration::kPerformance && trace_waits) {
+        (*input.performance_dfg)[pair].push_back((*trace_waits)[i]);
+        continue;
+      }
       if (options.decoration == HeuristicNetDecoration::kPerformance) {
         if (frame_clock && (!trace.events[i - 1].has_timestamp() ||
                             trace.events[i - 1].timestamp_state == FirstClassAttributeState::kNull ||
@@ -1520,7 +1970,7 @@ HeuristicClassicDfgInput build_classic_input(
         // floored instants, in frame_elapsed_seconds on an upload's frame
         // (round FR, observed black-box).
         const auto elapsed_microseconds =
-            utc_clock ? floored_elapsed_microseconds(
+            frame_seconds ? floored_elapsed_microseconds(
                             start_text, selected_timestamp(trace.events[i - 1], options),
                             start_microseconds - complete_microseconds)
                       : start_microseconds - complete_microseconds;
@@ -2956,6 +3406,30 @@ HeuristicsNet discover_heuristics_net(
     net.activity_ids_are_local = true;
     return net;
   }
+  // A CSV log's classic performance view with business hours or a start
+  // key reads the frame's cells (round GK).
+  if (classic_cell_clock(options) && log.dataframe_columns && log.dataframe_columns->csv_text &&
+      standard_activity_attribute(options.activity_attribute))
+    if (const auto waits = csv_classic_waits(log, *log.dataframe_columns, options, false)) {
+      const auto plain = without_cell_clock(options);
+      auto net = discover_classic_dfg(build_classic_input(log, plain, false, &*waits), plain);
+      net.activity_ids_are_local = false;
+      return net;
+    }
+  // An XES upload's log (the hybrid legacy log; its importer attaches the
+  // frame's columns, a frame shape's log has none) reads each pair's cells
+  // as its event dicts hold them where Minera's own path would fail on a
+  // missing or non-date cell (round GK).
+  if (options.decoration == HeuristicNetDecoration::kPerformance && log.dataframe_columns &&
+      !log.dataframe_columns->csv_text &&
+      standard_activity_attribute(options.activity_attribute) &&
+      standard_timestamp_attribute(options.timestamp_attribute))
+    if (const auto waits = legacy_classic_waits(log, options)) {
+      const auto plain = without_cell_clock(options);
+      auto net = discover_classic_dfg(build_classic_input(log, plain, false, &*waits), plain);
+      net.activity_ids_are_local = false;
+      return net;
+    }
   auto net = discover_classic_dfg(build_classic_input(log, options), options);
   net.activity_ids_are_local =
       !standard_activity_attribute(options.activity_attribute);
@@ -2972,6 +3446,35 @@ HeuristicsNet discover_heuristics_net_csv_frame(
     const EventDataView& data, const HeuristicMinerOptions& options,
     const DataFrameColumns& columns) {
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  // The classic performance view with business hours or a start key reads
+  // the frame's cells (round GK).
+  if (classic_cell_clock(options, true) && (data.kind() == EventDataKind::kEventTable || polars)) {
+    const auto log = classic_event_log(data, options);
+    const auto selected = [&](const std::string& key, std::string_view standard, auto source) {
+      return key.empty() || key == standard || log.traces.empty() || log.traces.front().events.empty() ||
+             key == source(log.traces.front().events.front());
+    };
+    const bool keys = selected(options.activity_attribute, "concept:name", [](const Event& e) { return e.activity_source_key; }) &&
+                      selected(options.timestamp_attribute, "time:timestamp", [](const Event& e) { return e.timestamp_source_key; });
+    if (keys)
+      if (const auto waits = csv_classic_waits(log, columns, options, polars)) {
+        const auto plain = without_cell_clock(options);
+        auto net = discover_classic_dfg(build_classic_input(log, plain, false, &*waits), plain);
+        net.activity_ids_are_local = !standard_activity_attribute(plain.activity_attribute);
+        return net;
+      }
+  }
+  // pandas' frame measures the classic waits with Timedelta.total_seconds()
+  // of the exact difference (round GK).
+  if (options.variant == HeuristicMinerVariant::kClassic &&
+      options.decoration == HeuristicNetDecoration::kPerformance && data.kind() == EventDataKind::kEventTable) {
+    const auto log = classic_event_log(data, options);
+    if (!frame_keyed_activities(log, options.activity_attribute)) {
+      auto net = discover_classic_dfg(build_classic_input(log, options, false, nullptr, true), options);
+      net.activity_ids_are_local = !standard_activity_attribute(options.activity_attribute);
+      return net;
+    }
+  }
   if (options.variant != HeuristicMinerVariant::kPlusPlus || (data.kind() != EventDataKind::kEventTable && !polars))
     return discover_heuristics_net(data, options);
   // The table holds each cell as its text; the frame holds it typed by the
@@ -2979,6 +3482,10 @@ HeuristicsNet discover_heuristics_net_csv_frame(
   // every gap as the one null, so a float column's 1 and 1.0 pair and a
   // missing instance pairs with a missing one (kPythonFrame).
   auto log = classic_event_log(data, options);
+  // The frame holds UTC Timestamps (an offset converted), so BusinessHours
+  // reads the UTC clock, as on the upload's log (round GK).
+  if (options.use_business_hours && !log.dataframe_columns)
+    log.dataframe_columns = std::make_shared<const DataFrameColumns>(columns);
   const DataFrameColumn* instance_column = nullptr;
   for (const auto& column : columns.columns)
     if (column.key == options.lifecycle_instance_attribute && column.role == FirstClassAttributeRole::kNone)
@@ -3012,10 +3519,13 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // timestamp column) stays on the older path, but Heuristics++ reads any
   // start key and business hours on the frame too (round GJ). An explicitly
   // empty start key is Minera's own fallback.
+  // The classic performance view reads business hours and any start key on
+  // the frame's cells too (round GK).
+  const bool cell_clock = performance && classic_cell_clock(options);
   const bool own_clock =
       canonical_timestamp_attribute(options) == "time:timestamp" &&
       (plus ? !(options.start_timestamp_attribute && options.start_timestamp_attribute->empty())
-            : !options.use_business_hours && !options.start_timestamp_attribute);
+            : cell_clock || (!options.use_business_hours && !options.start_timestamp_attribute));
   if ((!plus && options.variant != HeuristicMinerVariant::kClassic) || ((plus || performance) && !own_clock) ||
       (!polars && data.kind() != EventDataKind::kEventTable))
     return discover_heuristics_net(data, options);
@@ -3198,6 +3708,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   const std::string null_type = polars ? "NoneType" : "float";
   const bool timed = plus || performance;
   EventLog log;
+  std::vector<std::vector<std::size_t>> trace_rows;
   std::map<std::optional<std::string>, std::size_t> trace_of;
   for (std::size_t r = 0; r < table.rows.size(); ++r) {
     const auto& row = table.rows[r];
@@ -3207,6 +3718,8 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     const auto* case_id = value(row, *case_at);
     const auto key = case_id ? std::optional<std::string>(*case_id) : std::nullopt;
     const auto [it, inserted] = trace_of.try_emplace(key, log.traces.size());
+    if (inserted) trace_rows.emplace_back();
+    trace_rows[it->second].push_back(r);
     if (inserted) {
       Trace trace;
       trace.case_id = key.value_or("");
@@ -3305,10 +3818,49 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       net.null_activity = static_cast<std::size_t>(null_at - net.activities.begin());
     return net;
   }
+  // With business hours or a start key the decoration measures each pair on
+  // the frame's cells (round GK, classic_cell_waits), before the noise
+  // cleaning; a column it does not model keeps the older path.
+  std::optional<std::vector<std::vector<double>>> cell_waits;
+  if (cell_clock) {
+    const auto completes = timestamp_at ? detail::plus_frame_cells(table, *timestamp_at, polars) : std::nullopt;
+    if (!completes) return discover_heuristics_net(data, options);
+    for (const auto& cell : *completes)
+      if (cell.kind == detail::PlusCellKind::kText || cell.kind == detail::PlusCellKind::kNaN)
+        return discover_heuristics_net(data, options);
+    const std::string key = options.start_timestamp_attribute && !options.start_timestamp_attribute->empty()
+                                ? *options.start_timestamp_attribute
+                                : timestamp_key;
+    std::optional<std::vector<detail::PlusCell>> starts;
+    if (key == timestamp_key) {
+      starts = completes;
+    } else if (!key.starts_with("case:")) {
+      if (const auto at = column_of(key)) {
+        starts = classic_frame_cells(table, *at, polars);
+        if (!starts) return discover_heuristics_net(data, options);
+      }
+    }
+    std::vector<std::vector<detail::PlusCell>> start_rows, complete_rows;
+    for (const auto& rows : trace_rows) {
+      auto& start_row = start_rows.emplace_back();
+      auto& complete_row = complete_rows.emplace_back();
+      for (const auto r : rows) {
+        complete_row.push_back((*completes)[r]);
+        start_row.push_back(starts ? (*starts)[r] : detail::PlusCell{});
+      }
+    }
+    const auto slots = options.use_business_hours
+                           ? detail::normalize_business_hour_slots(options.business_hour_slots,
+                                                                   options.business_hour_slots_explicit,
+                                                                   "Heuristics Miner")
+                           : std::vector<BusinessHourSlot>{};
+    cell_waits = classic_cell_waits(start_rows, complete_rows, options.use_business_hours, slots,
+                                    starts ? std::nullopt : std::optional<std::string>(repr(key)), polars);
+  }
   // Polars' performance decoration subtracts each directly-follows pair's
   // timestamps, case by case, before the noise cleaning: None on either side
   // raises TypeError (round GB, observed black-box).
-  if (performance && polars)
+  if (performance && polars && !cell_clock)
     for (const auto& trace : log.traces)
       for (std::size_t e = 1; e < trace.events.size(); ++e) {
         const bool later = trace.events[e].timestamp_state == FirstClassAttributeState::kNull;
@@ -3327,8 +3879,14 @@ HeuristicsNet discover_heuristics_net_xes_frame(
           throw HeuristicPandasError("builtins.TypeError", "'" + null_type + "' object is not subscriptable");
   auto net = finish([&] {
     if (!performance) return discover_heuristics_net(log, projected);
+    if (cell_waits) {
+      const auto plain = without_cell_clock(projected);
+      auto decorated = discover_classic_dfg(build_classic_input(log, plain, true, &*cell_waits), plain);
+      decorated.activity_ids_are_local = !standard_activity_attribute(plain.activity_attribute);
+      return decorated;
+    }
     // A pair with a NaT reads as a zero wait.
-    auto decorated = discover_classic_dfg(build_classic_input(log, projected, true), projected);
+    auto decorated = discover_classic_dfg(build_classic_input(log, projected, true, nullptr, !polars), projected);
     decorated.activity_ids_are_local = !standard_activity_attribute(projected.activity_attribute);
     return decorated;
   }());

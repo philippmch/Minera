@@ -39126,3 +39126,140 @@ column. 28 of its 49 checks fail on GI's server binary) carries the
 reference values. The full ctest passed 673 of 673 (29 minutes, -j2) on
 the first run. The fixture replay left all 2,673 responses unchanged; the
 Python script tests passed 406 of 406.
+
+## Review GK1: the classic heuristics performance view with business hours or a start key on CSV and XES uploads (2026-11-23)
+
+Round GK re-reviewed round GJ: the classic heuristics variant with the
+performance decoration (`heuristic_decoration=performance`) and business
+hours (`heuristic_business_hours`) or a configured start key
+(`heuristic_start_timestamp_attribute`) on CSV uploads' log shape (against
+`heuristics_miner.apply_heu` on `convert_to_event_log(format_dataframe(read_csv))`
+with `business_hours` or `start_timestamp_key` among the parameters) and
+frame shapes (`mining_input_shape=dataframe|lazyframe`: the same call on
+`format_dataframe`'s frame and its Polars copy), on XES uploads' frame
+shapes (read_xes's frame and its Polars copy) and log shape (the hybrid
+legacy log of GF1); start keys naming the activity, case, instance,
+lifecycle and resource columns, under renamed headers too; Heuristics++
+with the activity column as the start key, and with business hours over
+timestamp gaps and offset (`+01:00`) start columns. GJ's CI run
+45120506995 (188d93e) passed the Linux ctest, the Python script tests, the
+parity verifier and the frontend; macOS failed only
+`minera_cancellation_hooks_tests` (a timing test GJ did not touch) and
+Windows' ctest was still running at handoff. No device was reachable, so
+no newer reviewer handoff was read from the Mac. Observed black-box on
+pm4py 2.7.22 (pandas 3.0.5, numpy 2.4.6, polars 1.44.1, no pyarrow), every
+sweep with `NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL
+AVX512_SPR"` and `PYTHONHASHSEED=0`.
+
+Banks: 900 CSV uploads from `gen/genhcsv3.py` (GJ's generator plus
+offset start columns, `STK=tz`, and timestamp gaps, `TGAP`): kcA to kcD
+with gaps, seeds 13000-13399; kcE (13400-13499) and kcF (13500-13599)
+without gaps; kcT with timestamp gaps (13600-13699); kcZ and kcY with
+offset start columns, with and without gaps (13700-13899); GC's and GH's
+610 XES uploads (gcB-gcX, hhA, hhB) on the frame and log shapes; 6
+hand-made CSV and 11 XES probes.
+
+pm4py's classic performance DFG (observed black-box): trace by trace,
+each directly-follows pair (earlier, later) measures
+`BusinessHours(complete(earlier), start(later))` with business hours,
+else `start(later) - complete(earlier)`, on the Python objects the frame,
+its Polars copy or the event log holds, before the noise cleaning (a
+missing label then raises `'float' object is not subscriptable`). Without
+business hours a non-date on either side raises `TypeError: unsupported
+operand type(s) for -: '<start type>' and '<complete type>'`, a NaT gives
+NaT (read as a zero wait) and a negative wait is 0; with business hours
+`replace(tzinfo=None)` raises `TypeError: str.replace() takes no keyword
+arguments` on a str and `AttributeError: '<type>' object has no attribute
+'replace'` on another non-date, and a NaT `ValueError: cannot convert
+float NaN to integer`. A start key no event holds, or a `case:` key (a
+trace attribute in the event log), raises KeyError at the first pair; a
+log without pairs raises nothing. CSV frames hold UTC Timestamps, so an
+offset start is read in UTC there.
+
+Fixed:
+
+- **GK1-1. The CSV log shape.** Minera raised its own "Heuristics Miner
+  PLUSPLUS requires a valid start timestamp" or "Heuristics Miner CLASSIC
+  is missing the configured start timestamp attribute", or measured where
+  pm4py raised, and read offset starts in local time. The decoration now
+  measures each pair on the frame's cells as above (the resource,
+  lifecycle and case-id columns and the activity column as keys too).
+- **GK1-2. The CSV frame shapes.** Likewise on `format_dataframe`'s frame
+  and its Polars copy (Polars' None raises `TypeError: unsupported operand
+  type(s) for -: 'NoneType' and ...`), also when the upload names its
+  case, activity and timestamp columns otherwise.
+- **GK1-3. The XES frame shapes.** Likewise on read_xes's frame (pandas'
+  dtypes: ints without a gap int64, with a gap float64, booleans bool, a
+  mix object) and its Polars copy, in place of the per-event timestamp
+  checks.
+- **GK1-4. Heuristics++ with the activity column as the start key.**
+  pm4py's `to_interval` reads the activity column like any text column and
+  its sort raises `'<=' not supported between instances of 'Timestamp' and
+  'str'` (Polars `'datetime.datetime' and 'str'`); Minera left the column
+  on its own path. On CSV frames business hours now read the UTC clock.
+- **GK1-5. The XES log shape.** The hybrid legacy log's events hold only
+  the keys they carry: each pair reads start(later) and then
+  complete(earlier) (complete first with business hours), so a key an
+  event lacks raises KeyError (`'time:timestamp'`, the start key) and a
+  non-date start or time (text, int, float, bool) raises the TypeError or
+  `BusinessHours` error above. Minera raised "Heuristics Miner PLUSPLUS
+  requires a valid event timestamp" or "missing the configured start
+  timestamp attribute". The legacy path is taken only where Minera's own
+  path would fail on a missing or non-date cell; a null, a NaT, a
+  container or a custom timestamp key stays on Minera's own path.
+- **GK1-6. The waits' seconds.** pm4py measures a classic wait on pandas
+  (a CSV upload's log, the pandas frames of CSV and XES uploads) as
+  `Timedelta.total_seconds()` of the exact difference floored to the
+  microsecond (1.118 s is 1.1179999999999999; a start at 14.5 s less a
+  completion at 0.0000005 s is 14.499999), and on Python datetimes (an XES
+  upload's legacy log, the Polars copies, whose instants are truncated to
+  the microsecond first: 14.5 there) as `timedelta.total_seconds()`, the
+  microseconds / 1e6 (1.118). Minera used the pandas form on the XES log
+  shape and the Python form on the pandas frames, for the default clock
+  too; the sweeps round to six digits, so only an exact comparison shows
+  it (`probes/exact.py`). The first cut of GK1-1 also dropped a CSV start's
+  nanoseconds, which FR's `review_fr_nanosecond_waits` caught.
+
+Before and after, per shape (equal or failing alike, of the runs):
+
+| sweep | before | after |
+|---|---|---|
+| CSV kcA-kcD classic, log (3,200: 8 option sets) | 1,333, 1,867 differing | 3,200 |
+| CSV kcA-kcD classic, DataFrame (3,200) | 1,329, 1,871 differing | 3,200 |
+| CSV kcA-kcD classic, LazyFrame (3,200) | 1,329, 1,871 differing | 3,200 |
+| CSV kcE, kcT, kcY, kcZ classic, log (4,400 before, 4,800 after: 11 and 12 option sets) | 1,968, 2,432 differing | 4,800 |
+| the same, DataFrame and LazyFrame | 1,848, 2,552 differing | 4,800 |
+| CSV kcT, kcY, kcZ Heuristics++, log (3,000 before, 1,800 after) | 2,100, 900 differing | 1,800 |
+| the same, DataFrame and LazyFrame | 1,992, 1,008 differing | 1,800 |
+| XES classic, DataFrame and LazyFrame (6,100: 10 option sets) | 2,714, 3,386 differing | 6,100 |
+| XES classic performance, log (8,540: 14 option sets) | 5,440, 3,100 differing | 8,232; the other 308 stop at the Inductive miner (declared) |
+| exact doubles: kcE, kcT and hhA, 3 shapes, default clock, `st` and business hours (2,520) | 2,512, 8 differing | 2,520 (and 99 of 99 nanosecond and 1.118 s probes) |
+
+Re-reviewed without a difference: the CSV banks with the default clock,
+with business hours over the default start and with the timestamp column
+as the start key (equal before and after on all three shapes); the
+frequency decoration with business hours or a start key on XES frames
+(it reads neither); Heuristics++ with business hours over timestamp gaps
+(kcT) and offset start columns (kcY, kcZ) on all three CSV shapes.
+
+Declared: none new. The mine of an XES upload whose single-event trace
+lacks an activity stops at the Inductive miner with KeyError
+'concept:name' (pm4py's variants and inductive miner raise it too), so the
+heuristics step is not reached there (22 uploads per option set, 308 of the XES log-shape runs,
+as before). Unchanged: the declared items of GJ1 and before.
+
+In the suite: the new `minera_server_review_gk_tests` (the classic
+performance view on CSV uploads on all three shapes: a start column with a
+gap, text and int starts, business hours over them, offset starts, a
+lifecycle column, the resource and case columns and a key the frame lacks
+as the start key; Heuristics++ with the activity column as the start key
+and business hours over offset starts on CSV frames; on XES uploads' frame
+shapes: a boolean start column, a start column with a gap, business hours
+over a missing time, the timestamp as the start key, a missing label; on
+the XES log shape: missing times and start keys, boolean, int and text
+cells, with and without business hours; a wait's seconds on all six
+shapes and a CSV start's nanoseconds; 57 of its 70 checks fail on GJ's
+server binary) carries the reference values. The full ctest passed 674 of
+674 (40 minutes, -j2) on the second run (the first failed only
+`review_fr_nanosecond_waits`, see GK1-6). The fixture replay left all
+2,673 responses unchanged; the Python script tests passed 406 of 406.

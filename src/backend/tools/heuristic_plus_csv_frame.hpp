@@ -102,10 +102,16 @@ inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const Heu
     else
       start_at = column_of(start_key);
   }
-  // The activity column's dtype is not listed with the frame: not modelled.
-  if (start_at && *start_at != *timestamp_at && table->columns[*start_at] == selectors.activity_key) return;
+  // The activity column (round GK): its copy concept:name is a str column,
+  // the column under its header keeps read_csv's dtype.
+  std::optional<DataFrameColumn> activity_column;
+  if (start_at && *start_at != *timestamp_at && table->columns[*start_at] == selectors.activity_key) {
+    activity_column.emplace();
+    activity_column->key = table->columns[*start_at];
+    activity_column->type = start_key == "concept:name" ? DataFrameColumnType::kString : frame.activity_type;
+  }
   if (start_at) {
-    const auto column = csv_frame_column(frame, table->columns[*start_at]);
+    const auto column = activity_column ? activity_column : csv_frame_column(frame, table->columns[*start_at]);
     if (!column) return;
     std::vector<detail::PlusCell> starts, completes;
     starts.reserve(table->rows.size());

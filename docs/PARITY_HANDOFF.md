@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GJ (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GK (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9314,6 +9314,86 @@ GJ's suite: the full ctest 673 of 673 (29 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gj/`.
+
+Round GK re-reviewed GJ and aligned the classic heuristics performance
+view with business hours or a configured start key with pm4py on CSV
+uploads' three shapes and on XES uploads' frame and log shapes, and
+Heuristics++ with the activity column as the start key (Review GK1).
+GJ's CI run 45120506995 passed the Linux ctest, the Python script tests,
+the parity verifier and the frontend; macOS failed only
+`minera_cancellation_hooks_tests` ("Subprocess aborted", a timing test GJ
+did not touch; it passed here in both full runs and 3 of 3 alone), and
+Windows' ctest was still
+running at handoff. No device was reachable, so no newer reviewer handoff
+was read from the Mac. New banks: `gen/genhcsv3.py` (GJ's generator plus
+offset `+01:00` start columns, `STK=tz`, and timestamp gaps, `TGAP`): 900
+CSV uploads kcA-kcF and kcT, kcY, kcZ, seeds 13000-13899; GC's and GH's
+610 XES uploads (gcB-gcX, hhA, hhB) on the frame and log shapes; 6 CSV
+and 11 XES probes. Fixed: GK1-1, the classic performance DFG with business
+hours or a start key on a CSV upload's log shape measures each
+directly-follows pair on the frame's cells (start(later) - complete(earlier),
+`BusinessHours(complete, start)`): a non-date raises TypeError (the later
+start's type first), a NaT reads as a zero wait (with business hours
+`cannot convert float NaN to integer`), a `case:` key or one the frame
+lacks raises KeyError at the first pair, offset starts read in UTC,
+before the noise cleaning; GK1-2, the CSV frame shapes likewise (Polars'
+None raises, renamed headers included); GK1-3, the XES frame shapes
+likewise on read_xes's frame and its Polars copy; GK1-4, Heuristics++ with
+the activity column as the start key compares the column's text with the
+timestamps (`'<=' not supported between instances of 'Timestamp' and
+'str'`, Polars `'datetime.datetime'`), and on CSV frames business hours
+read the UTC clock; GK1-5, the classic performance view on an XES upload's
+log shape (the hybrid legacy log, whose events hold only the keys they
+carry) reads start(later) and then complete(earlier) (complete first with
+business hours): a key an event lacks raises KeyError, a non-date
+TypeError or `BusinessHours`' errors, where Minera raised its own "valid
+event timestamp" and "missing the configured start timestamp attribute"
+errors; GK1-6, a wait's seconds follow the backend: pandas'
+`Timedelta.total_seconds()` of the exact difference floored to the
+microsecond on a CSV log and the pandas frames (1.118 s is
+1.1179999999999999), Python's `timedelta.total_seconds()` on an XES
+upload's legacy log and the Polars copies (1.118; Minera had them the other
+way round there, hidden by the sweeps' six-digit rounding). After: CSV
+kcA-kcD 3,200 of 3,200 per shape equal or failing
+alike (1,867 on the log shape and 1,871 per frame shape differed); kcE,
+kcT, kcY, kcZ with start keys naming the activity, case, instance and
+lifecycle columns and renamed headers 4,800 of 4,800 per shape (2,432 and
+2,552 of 4,400 differed); Heuristics++ on kcT, kcY, kcZ 1,800 of 1,800 per
+shape (900 and 1,008 of 3,000 differed); XES frames 6,100 of 6,100 per
+shape (3,386 differed); XES log shape 8,232 of 8,540 (14 option sets; 3,100 differed), the other
+308 the 22 uploads per option set whose mine stops earlier (below); exact
+doubles on kcE, kcT and hhA 2,520 of 2,520 (8 differed). Declared: none new;
+the mine of an XES upload whose single-event trace lacks an activity
+still stops at the Inductive miner with KeyError 'concept:name' (pm4py's
+variants raise it too), before the heuristics step.
+
+GK's suite: the full ctest 674 of 674 (40 minutes, -j2) on the second
+run; the first failed only FR's `review_fr_nanosecond_waits` (the first
+cut of GK1-1 dropped a CSV start's nanoseconds, now kept). The new
+`minera_server_review_gk_tests` (70 checks, 57 of them fail on GJ's
+server binary) passes, Python script tests 406 of 406, and the 16
+manifests replayed 2,673 responses unchanged.
+Harness and probes: `review-harness/round-gk/`.
+
+Next round (GL) should start by re-reviewing round GK:
+
+- GK's CI run (and GJ's Windows ctest job if it was still running; check
+  whether macOS' `minera_cancellation_hooks_tests` abort recurs);
+- GK1 on fresh banks: the classic performance view on XES uploads' log
+  shape with other attribute types (lists and containers, ids, NaN
+  floats, nulls, NaT; left on Minera's own path), dates with offsets under
+  business hours, a custom timestamp or activity key, and the frequency
+  decoration on the same logs; through `/api/discover-workflow` (a
+  heuristics-only route, where an event without an activity in a
+  single-event trace does not stop the mine) as well as `/api/mine`;
+- the routes reading a classic heuristics net mined with business hours
+  or a start key (token replay, the heuristics Petri conversion, the
+  performance view) on CSV and XES frames;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1, and the
+  anti- and multi-alignments of an upload without traces declared in GJ).
+
+Previous list for round GK (kept for its older items):
 
 Next round (GK) should start by re-reviewing round GJ:
 
