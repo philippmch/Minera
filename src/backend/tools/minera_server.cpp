@@ -5014,8 +5014,11 @@ void handle_graph_discovery(const httplib::Request& request,
       transitions = xes_frame_session(*session)
           ? minera::discover_transition_system_xes_frame(session_selected_view(*session), params.transition_system)
           : minera::discover_transition_system(session_selected_view(*session), params.transition_system);
-      for (const auto& state : transitions->states()) for (const auto& activity : state.payload) if (activity) graph.ensure_activity(*activity);
-      for (const auto& transition : transitions->transitions()) if (transition.label) graph.ensure_activity(*transition.label);
+      for (const auto& state : transitions->states())
+        for (const auto& activity : state.payload)
+          if (const auto shown = minera::transition_activity_shown(activity)) graph.ensure_activity(*shown);
+      for (const auto& transition : transitions->transitions())
+        if (const auto shown = minera::transition_activity_shown(transition.label)) graph.ensure_activity(*shown);
     }
     std::string result = "null", result_error;
     if (input) try { const minera::OmitAnalysisTraces omit_traces(!analysis_include_traces(request)); result = minera::analysis_json(session->dataset, *input, graph,

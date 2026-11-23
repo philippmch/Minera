@@ -586,6 +586,24 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
   return out;
 }
 
+void distinct_float_gap_labels(FrameKeyedActivities& keyed) {
+  if (keyed.column != DataFrameColumnType::kFloat64 || !keyed.any_missing) return;
+  std::string label = "nan";
+  bool first = true;
+  for (std::size_t t = 0; t < keyed.log.traces.size(); ++t)
+    for (std::size_t e = 0; e < keyed.log.traces[t].events.size(); ++e) {
+      if (!keyed.missing[t][e]) continue;
+      if (!first) label += '\x1f';
+      first = false;
+      keyed.log.traces[t].events[e].activity = label;
+    }
+}
+
+std::string_view printed_activity_label(std::string_view label) {
+  const auto end = label.find_last_not_of('\x1f');
+  return end == std::string_view::npos ? label : label.substr(0, end + 1);
+}
+
 std::string frame_activity_column_error(const FrameKeyedActivities& keyed) {
   if (keyed.column != DataFrameColumnType::kString && keyed.column != DataFrameColumnType::kObject)
     return "the activity column should be of type string.";

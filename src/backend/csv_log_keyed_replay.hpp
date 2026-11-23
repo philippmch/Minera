@@ -47,6 +47,7 @@ inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, con
   if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
   auto keyed = frame_keyed_activities(log, key);
   if (!keyed) return std::nullopt;
+  distinct_float_gap_labels(*keyed);
   const auto frame = dataframe_frame_event_log(log);
   if (frame.traces.size() != log.traces.size()) return std::nullopt;
   const auto column = frame_column_type(frame, key);

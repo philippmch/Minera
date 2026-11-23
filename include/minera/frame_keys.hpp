@@ -122,6 +122,17 @@ struct FrameKeyedActivities {
 // The TypeError pm4py's Inductive miner raises on such activities (any cell
 // that is no str), and the one its POWL discovery raises (only text beside
 // another type: sorted() of the labels); empty when none.
+// A CSV upload's log shape keyed by a float64 column: convert_to_event_log
+// holds each gap as a fresh float NaN, never equal to another, so pm4py's
+// heuristics miner names one node per gap (round GQ). The second gap on is
+// named "nan" with as many trailing \x1f as gaps before it (shown as
+// printed, printed_activity_label).
+void distinct_float_gap_labels(FrameKeyedActivities& keyed);
+
+// An activity name as printed: the trailing \x1f that tell apart values
+// printed alike (rounds GM, GQ) dropped.
+[[nodiscard]] std::string_view printed_activity_label(std::string_view label);
+
 [[nodiscard]] std::string frame_keyed_inductive_error(const FrameKeyedActivities& keyed);
 [[nodiscard]] std::string frame_keyed_powl_error(const FrameKeyedActivities& keyed);
 

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GP (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GQ (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9676,6 +9676,108 @@ GP's suite: the full ctest 679 of 679 (-j2; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gp/`.
+
+Round GQ re-reviewed GP and aligned the temporal profile's conformance on
+XES uploads' frame shapes (Review GQ1), `/api/mine`'s footprints family on
+XES frame sessions (GQ2), a CSV upload's log shape keyed by a float64
+column with several gaps (GQ3, open since GO) and `/api/discover-graph`
+transition systems keyed by a typed column of an XES frame (GQ4). GP's CI
+run 45249798603 passed every job (Linux, Windows and macOS ctest, the
+frontend, the Python script tests and the verifier). No device was
+reachable, so no newer reviewer handoff was read from the Mac. GP's fixes
+held on fresh banks (gqA 600, gqL 500 uploads per shape with GQ seeds):
+GP's option sets with business hours and custom keys (`ct/optval.py`, 12
+sets) agree in 12,000 of 12,000 judgments on gqAs and gqLs (the first 250
+of gqA and gqL) over both shapes, and `/api/discover-graph` footprints
+(`ct/fpmiss.py`) in 4,068 of 4,068 (24 unbounded nets fail on both sides).
+Fixed: GQ1-1, `/api/analyze-behavior` temporal_conformance on a frame
+session read the XES traces; pm4py reads the frame as its discovery does
+(round GP): pandas raises `KeyError: 'case:concept:name'` for a missing case
+column before anything else, Polars a select failure; the typed timestamp
+and start columns, the business seconds per pair row (an empty pair frame
+raises the same ValueError as discovery) and the custom keys follow GP's
+rules; a Polars plan error past the join names the join's plan (RESOLVING
+'select', the context stack select, join left, join, filter, select), and
+a missing activity column fails the plan at its final select. The route's
+default zeta is 1.0 (pm4py's wrapper), and a deviation needs distance >
+zeta (a zero deviation the sys.maxsize sentinel). GQ2-1, `/api/mine`'s
+footprints family on a frame session required every cached model (the
+process tree and POWL of the default variants), so a session whose Inductive
+or POWL discovery failed answered "requested footprint bundle requires
+successfully discovered source models"; it now reads only the models its
+selection needs, as `/api/discover-graph` does (round GD), with the frame's
+missing label (NaN on pandas, None on Polars) and its case grouping (GP3).
+GQ3-1, convert_to_event_log holds each gap of a float64 column as its own
+NaN object, so pm4py's heuristics miner names one node per gap (each its own
+transition: the token replay's variants, generalization and simplicity
+count them); Minera named one `nan` node (`distinct_float_gap_labels`, the
+names told apart by trailing \x1f and shown as printed). GQ4-1, a transition
+system keyed by a typed column of an XES frame reads each cell's Python
+object: str() names it (a Timestamp `2021-03-05 08:06:00+00:00`), Python's
+== matches transition labels (int 1 and float 1.0 alike, a NaN or NaT
+never), a state's list or set matches a NaN by its object (each cell of a
+float64 column its own) and NaT always, and pandas' set and multiset views
+hash a dict cell (`TypeError: unhashable type: 'dict'`); Minera read the
+XES text (`frame_typed_activities` now in its own header).
+Declared: the set view's state names are Python sets, printed in hash-slot
+order, so two equal sets built in a different insertion order can stay two
+states in pm4py (11 of 2,000 set-view judgments over both banks and
+shapes; str hashes vary with the seed, None's with its address); Polars' temporal
+conformance lists its cases in unique() order (nondeterministic).
+Open: a transition system keyed by a column holding values Python finds
+equal but prints apart (0 and False, 1 and 1.0): pm4py names each state and
+transition after the object that created it, in its case order, while
+Minera names each value after its first row (1 of 250 gqLs uploads per
+key). Also fixed on the way: Polars' transition system with the case key
+equal to the activity key raises DuplicateError at the group_by (Minera
+answered).
+After, per shape: temporal conformance (`ct/tpcval.py`, 12 option sets) on
+gqAs and gqLs 12,000 of 12,000 judgments (GP's binary differed in 4,647 of
+gqAs' 6,000, `out/t4_*`) and the hand-made frames without a case column,
+an activity or a timestamp 72 of 72; the footprints family
+(`ct/fpmine.py`) 5,424 of 5,424 judgments over 339 uploads per shape with a
+heuristics net (GP's binary failed 275 of them over both shapes with the
+bundle error, `out/f0_*`), 24 unbounded nets failing on both sides; the
+CSV log keyed by K1-K6 (`ct/csvk.py`, gqK 400 uploads) 3,318 of 3,318 nets, replay totals and
+generalization/simplicity/precision (GP's binary differed in 42 nets);
+transition systems (`ct/tsgraph.py`, 10 option sets, 5 of them typed keys)
+9,487 of 10,000 judgments equal on gqAs and gqLs; 500 more (Polars with the
+case key equal to the activity key) agree after the DuplicateError fix
+(rechecked on 40 uploads), 11 set views are declared and 2 open.
+GQ's suite: the full ctest 680 of 680 (-j2; the new
+`minera_server_review_gq_tests` fails all 80 of its checks on GP's server
+binary; the Polars DuplicateError fix came after it, then the transition
+system, server and review tests passed again), Python script tests 406 of
+406, and the 16 manifests replayed 2,673 responses unchanged (a first
+replay caught the footprints family's bundle error changing on a table
+session: the selection rule now applies to XES frame sessions only).
+Harness and probes: `review-harness/round-gq/`.
+
+Next round (GR) should start by re-reviewing round GQ:
+
+- GQ's CI run;
+- GQ1 on fresh banks: temporal conformance with business hours and custom
+  keys on CSV uploads' frame shapes, and the Polars plan errors with gaps in
+  both columns;
+- custom footprints keys on XES frame sessions (found in GQ, not fixed):
+  a case key naming an event column of the frame (concept:name) groups the
+  frame's rows by that column in pm4py's converted EventLog, one trace per
+  value, while Minera keeps the XES traces (`ct/fpmine.py` FPKEY=case_act:
+  228 of 1,336 judgments equal per shape on gqAs); an activity key the
+  frame lacks raises pm4py's `KeyError: 'org:resource'` (Minera "activity
+  selector is missing or null", FPKEY=act_res, 174 uploads per shape); a
+  typed activity key with gaps (start_timestamp) raises pm4py's KeyError
+  of the key (FPKEY=act_st; the probe's harness needs a guard for
+  responses without an analysis);
+- GQ4 on the other views of a typed key (multiset counts with NaN, backward
+  windows) and on CSV uploads' frame shapes; the float64 gap rule (GQ3) on
+  the other miners of a CSV log shape (DFG, Alpha, variants), where pm4py's
+  EventLog holds the same distinct NaN objects;
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1, and the
+  anti- and multi-alignments of an upload without traces declared in GJ).
+
+Previous list for round GQ (kept for its older items):
 
 Next round (GQ) should start by re-reviewing round GP:
 

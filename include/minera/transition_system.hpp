@@ -304,4 +304,10 @@ class TransitionSystemSelectorRegistry {
 [[nodiscard]] TransitionActivity transition_system_event_activity(
     const Event& event, std::string_view activity_key);
 
+// An activity as shown (rounds FY, GQ): a typed activity column of an XES
+// frame names each Python-equal value once, values printed alike told
+// apart by trailing \x1f; a pandas NaN (\x1e) or None (\x1c) shows as
+// null, a NaT (\x1d) as printed.
+[[nodiscard]] TransitionActivity transition_activity_shown(const TransitionActivity& activity);
+
 }  // namespace minera

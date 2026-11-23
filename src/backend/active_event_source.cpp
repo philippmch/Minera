@@ -624,7 +624,10 @@ std::string transition_view_json(TransitionView view) {
 }
 
 std::string transition_payload_json(const TransitionPayload& values) {
-  return array_json(values, [](const auto& value) { return value ? quote(*value) : "null"; });
+  return array_json(values, [](const auto& raw) {
+    const auto value = transition_activity_shown(raw);
+    return value ? quote(*value) : "null";
+  });
 }
 
 std::string occurrence_json(const TransitionOccurrence& value) {
@@ -872,7 +875,8 @@ std::string serialize_active_source_transition_json(const TransitionSystem& resu
         {"incoming", integers_json(state.incoming)}, {"outgoing", integers_json(state.outgoing)}});
   })}, {"transitions", array_json(result.transitions(), [](const auto& transition) {
     return object_json({{"source", std::to_string(transition.source)}, {"target", std::to_string(transition.target)},
-        {"label", transition.label ? quote(*transition.label) : "null"}, {"count", std::to_string(transition.count)},
+        {"label", transition_activity_shown(transition.label) ? quote(*transition_activity_shown(transition.label)) : "null"},
+        {"count", std::to_string(transition.count)},
         {"occurrences", array_json(transition.occurrences, occurrence_json)}});
   })}});
 }

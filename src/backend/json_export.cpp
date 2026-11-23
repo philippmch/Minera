@@ -74,6 +74,11 @@ void write_json_string(std::ostream& out, std::string_view value) {
   out << '"';
 }
 
+// An activity name of a net or replay as printed (printed_activity_label).
+void write_activity_label(std::ostream& out, std::string_view value) {
+  write_json_string(out, printed_activity_label(value));
+}
+
 std::string_view operator_name(ProcessTreeOperator op) {
   switch (op) {
     case ProcessTreeOperator::kActivity: return "activity";
@@ -1275,7 +1280,7 @@ void write_heuristics_net(std::ostream& out,
       << (net.activity_ids_are_local ? "true" : "false")
       << ", \"activities\": [";
   for (std::size_t i = 0; i < export_activities.size(); ++i) {
-    write_json_string(out, export_activities[i]);
+    write_activity_label(out, export_activities[i]);
     if (i + 1 < export_activities.size()) out << ", ";
   }
   out << "], \"edges\": [";
@@ -1348,7 +1353,7 @@ void write_heuristics_net(std::ostream& out,
     out << ", \"sojourn_times\": {";
     std::size_t index = 0;
     for (const auto& [activity, seconds] : *net.sojourn_times) {
-      write_json_string(out, activity);
+      write_activity_label(out, activity);
       out << ": " << seconds
           << (++index < net.sojourn_times->size() ? ", " : "");
     }
@@ -1461,9 +1466,9 @@ void write_heuristics_net(std::ostream& out,
       std::size_t index = 0;
       for (const auto& [pair, count] : net.window_two_dfg) {
         out << "{\"key\": [";
-        write_json_string(out, pair.first);
+        write_activity_label(out, pair.first);
         out << ", ";
-        write_json_string(out, pair.second);
+        write_activity_label(out, pair.second);
         out << "], \"value\": " << count << '}'
             << (++index < net.window_two_dfg.size() ? ", " : "");
       }
@@ -1478,11 +1483,11 @@ void write_heuristics_net(std::ostream& out,
       for (const auto& [triple, count] : net.frequency_triples) {
         const auto& [first, middle, last] = triple;
         out << "{\"key\": [";
-        write_json_string(out, first);
+        write_activity_label(out, first);
         out << ", ";
-        write_json_string(out, middle);
+        write_activity_label(out, middle);
         out << ", ";
-        write_json_string(out, last);
+        write_activity_label(out, last);
         out << "], \"value\": " << count << '}'
             << (++index < net.frequency_triples.size() ? ", " : "");
       }
@@ -1499,9 +1504,9 @@ void write_heuristics_net(std::ostream& out,
       std::size_t index = 0;
       for (const auto& [pair, count] : net.window_two_dfg) {
         out << "{\"key\": [";
-        write_json_string(out, pair.first);
+        write_activity_label(out, pair.first);
         out << ", ";
-        write_json_string(out, pair.second);
+        write_activity_label(out, pair.second);
         out << "], \"value\": " << count << '}'
             << (++index < net.window_two_dfg.size() ? ", " : "");
       }
@@ -1516,11 +1521,11 @@ void write_heuristics_net(std::ostream& out,
       for (const auto& [triple, count] : net.frequency_triples) {
         const auto& [first, middle, last] = triple;
         out << "{\"key\": [";
-        write_json_string(out, first);
+        write_activity_label(out, first);
         out << ", ";
-        write_json_string(out, middle);
+        write_activity_label(out, middle);
         out << ", ";
-        write_json_string(out, last);
+        write_activity_label(out, last);
         out << "], \"value\": " << count << '}'
             << (++index < net.frequency_triples.size() ? ", " : "");
       }
@@ -1534,9 +1539,9 @@ void write_heuristics_net(std::ostream& out,
       std::size_t index = 0;
       for (const auto& [pair, mean] : *net.plusplus_computed_performance_dfg) {
         out << "{\"key\": [";
-        write_json_string(out, pair.first);
+        write_activity_label(out, pair.first);
         out << ", ";
-        write_json_string(out, pair.second);
+        write_activity_label(out, pair.second);
         out << "], \"value\": ";
         write_heuristic_public_double(out, mean);
         out << '}' << (++index < net.plusplus_computed_performance_dfg->size()
@@ -1552,11 +1557,11 @@ void write_heuristics_net(std::ostream& out,
       matrix[pair.first].emplace(pair.second, mean);
     std::size_t source_index = 0;
     for (const auto& [source, targets] : matrix) {
-      write_json_string(out, source);
+      write_activity_label(out, source);
       out << ": {";
       std::size_t target_index = 0;
       for (const auto& [target, mean] : targets) {
-        write_json_string(out, target);
+        write_activity_label(out, target);
         out << ": ";
         write_heuristic_public_double(out, mean);
         if (++target_index < targets.size()) out << ", ";
@@ -1596,7 +1601,7 @@ void write_heuristics_net(std::ostream& out,
             if constexpr (std::is_same_v<Value, std::vector<std::string>>) {
               out << '[';
               for (std::size_t i = 0; i < selected.size(); ++i) {
-                write_json_string(out, selected[i]);
+                write_activity_label(out, selected[i]);
                 if (i + 1 < selected.size()) out << ", ";
               }
               out << ']';
@@ -1604,7 +1609,7 @@ void write_heuristics_net(std::ostream& out,
               out << '{';
               std::size_t i = 0;
               for (const auto& [name, count] : selected) {
-                write_json_string(out, name);
+                write_activity_label(out, name);
                 out << ": " << count;
                 if (++i < selected.size()) out << ", ";
               }
@@ -1616,13 +1621,13 @@ void write_heuristics_net(std::ostream& out,
     };
     out << ", \"metadata\": {\"activities\": [";
     for (std::size_t i = 0; i < net.metadata->activities.size(); ++i) {
-      write_json_string(out, net.metadata->activities[i]);
+      write_activity_label(out, net.metadata->activities[i]);
       if (i + 1 < net.metadata->activities.size()) out << ", ";
     }
     out << "], \"activities_occurrences\": {";
     std::size_t occurrence_index = 0;
     for (const auto& [name, count] : net.metadata->activities_occurrences) {
-      write_json_string(out, name);
+      write_activity_label(out, name);
       out << ": " << count.to_string();
       if (++occurrence_index < net.metadata->activities_occurrences.size())
         out << ", ";
@@ -1920,7 +1925,7 @@ void write_conformance(std::ostream& out,
     }
     out << "], \"activity_names\": [";
     for (std::size_t j = 0; j < variants[i].activities.size(); ++j) {
-      write_json_string(out, variants[i].activities[j]);
+      write_activity_label(out, variants[i].activities[j]);
       out << (j + 1 < variants[i].activities.size() ? ", " : "");
     }
     out << ']';
@@ -3428,7 +3433,8 @@ ResolvedTransitionSystem resolve_transition_system(
   (void)transition_view_name(system.options().view);
   (void)transition_direction_name(system.options().direction);
   ResolvedTransitionSystem resolved;
-  const auto resolve_activity = [&](const TransitionActivity& activity) -> std::optional<std::size_t> {
+  const auto resolve_activity = [&](const TransitionActivity& raw) -> std::optional<std::size_t> {
+    const auto activity = transition_activity_shown(raw);
     if (!activity) return std::nullopt;
     const auto id = graph.activity_id(*activity);
     if (!id) throw std::invalid_argument("transition system activity is not registered: " + *activity);

@@ -315,13 +315,44 @@ void handle_active_source_mining(const httplib::Request& request,
     return "{\"representation\":\"analysis_presentation\"}";
   });
   std::optional<minera::FootprintsAnalysis> footprints;
+  // The XES frame session's label of a missing activity (round GP, below).
+  std::optional<std::string> footprints_missing_label;
   run("footprints", "selected_native_variants", [&](bool& native_returned) {
-    if (!session->alpha_log_ready || !session->tree_ready || !session->powl ||
-        !net("inductive") || !net("alpha") || !net("heuristic") || !net("powl"))
-      throw std::invalid_argument("requested footprint bundle requires successfully discovered source models");
-    footprints = analyze_footprints(require_prepared_log(*session), require_graph(*session), session_alpha_log(*session),
-        session->tree, *session->powl, *net("inductive"), *net("alpha"), *net("heuristic"), *net("powl"), params.footprints,
-        session->active_source.get());
+    if (!xes_frame) {
+      if (!session->alpha_log_ready || !session->tree_ready || !session->powl ||
+          !net("inductive") || !net("alpha") || !net("heuristic") || !net("powl"))
+        throw std::invalid_argument("requested footprint bundle requires successfully discovered source models");
+      footprints = analyze_footprints(require_prepared_log(*session), require_graph(*session), session_alpha_log(*session),
+          session->tree, *session->powl, *net("inductive"), *net("alpha"), *net("heuristic"), *net("powl"), params.footprints,
+          session->active_source.get());
+      native_returned = true;
+      return "{\"representation\":\"analysis_presentation\"}";
+    }
+    // On an XES frame session the bundle reads only the models its
+    // selection names, as /api/discover-graph does (round GQ; round GD
+    // there): a default variant whose model the session lacks is left out.
+    auto options = params.footprints;
+    if (!active_source_supplied(request, "footprints_discovery_variants")) {
+      if (!session->tree_ready) options.discovery_variants.erase("process_tree");
+      if (!session->powl) options.discovery_variants.erase("powl");
+    }
+    const auto& model = options.model;
+    const bool reach = options.discovery_variants.contains("petri_reach_graph");
+    const bool ready =
+        (!options.discovery_variants.contains("process_tree") || session->tree_ready) &&
+        (!options.discovery_variants.contains("powl") || session->powl) &&
+        (model != "process_tree" || (session->tree_ready && (!reach || net("inductive")))) &&
+        (model != "inductive" || net("inductive")) && (model != "powl" || (session->powl && (!reach || net("powl")))) &&
+        (model != "alpha" || (net("alpha") && session->alpha_log_ready)) && (model != "heuristic" || net("heuristic"));
+    if (!ready) throw std::invalid_argument("requested footprint bundle requires successfully discovered source models");
+    // pm4py converts an XES session's frame to an EventLog (round GP): a
+    // missing activity is one more activity (NaN, Polars None), the traces
+    // without a case id one trace.
+    footprints_missing_label = session->active_source->selected_kind() == minera::EventDataKind::kLazyEventTable ? "None" : "nan";
+    footprints = analyze_footprints_models(require_prepared_log(*session), require_graph(*session),
+        session->alpha_log_ready ? &session_alpha_log(*session) : nullptr, session->tree_ready ? &session->tree : nullptr,
+        session->powl ? &*session->powl : nullptr, net("inductive"), net("alpha"), net("heuristic"), net("powl"), options,
+        session->active_source.get(), nullptr, footprints_missing_label ? &*footprints_missing_label : nullptr);
     native_returned = true;
     return "{\"representation\":\"analysis_presentation\"}";
   });
@@ -333,8 +364,22 @@ void handle_active_source_mining(const httplib::Request& request,
       if (session->tree_ready) for (const auto& label : session->tree.activities()) graph.ensure_activity(label);
       if (heuristics) for (const auto& label : heuristics->activities) graph.ensure_activity(label);
       if (session->powl) register_powl_labels(graph, *session->powl);
+      // The footprints' label of a missing activity (round GQ, as
+      // /api/discover-graph registers it).
+      if (footprints && footprints_missing_label && params.footprints.model != "alpha") {
+        bool missing = false, labelled = false;
+        for (const auto& trace : session->active_source->checked_log().traces)
+          for (const auto& event : trace.events)
+            (!event.has_activity() || event.activity_state == minera::FirstClassAttributeState::kNull ||
+                     (event.activity_attribute && event.activity_attribute->is_null)
+                 ? missing
+                 : labelled) = true;
+        if (missing && labelled) graph.ensure_activity(*footprints_missing_label);
+      }
       if (temporal) for (const auto& entry : temporal->entries) {graph.ensure_activity(entry.source); graph.ensure_activity(entry.target);}
-      if (transition) for (const auto& item : transition->transitions()) if (item.label) graph.ensure_activity(*item.label);
+      if (transition)
+        for (const auto& item : transition->transitions())
+          if (const auto shown = minera::transition_activity_shown(item.label)) graph.ensure_activity(*shown);
       if (distances) for (const auto& item : *distances) {if (!item.activity_is_null) graph.ensure_activity(item.activity); for (const auto& witness : item.witnesses) graph.ensure_activity(witness);}
       if (correlations) minera::register_correlation_activities(graph, *correlations);
       if (session->declare_ready) for (const auto& [name, rules] : session->declare.rules) { (void)name; for (const auto& rule : rules) {graph.ensure_activity(rule.first); if (rule.binary) graph.ensure_activity(rule.second);} }

@@ -15,6 +15,7 @@
 
 #include "polars_missing_column.hpp"
 #include "python_scalar.hpp"
+#include "frame_typed_activities.hpp"
 #include "xes_frame_columns.hpp"
 
 namespace minera {
@@ -458,7 +459,7 @@ template <typename Builder>
 TransitionSystem build_transition_system(
     const std::vector<TraceSequence>& sequences,
     const TransitionSystemOptions& options, Builder&& occurrence_builder,
-    bool distinct_missing_labels = false) {
+    bool distinct_missing_labels = false, bool typed_labels = false) {
   if (options.direction != TransitionDirection::kForward &&
       options.direction != TransitionDirection::kBackward) {
     throw std::invalid_argument("transition-system direction is invalid");
@@ -511,7 +512,11 @@ TransitionSystem build_transition_system(
       // (not even itself), so each step it labels is a transition of its own.
       std::size_t edge_index = result_transitions.size();
       bool inserted = true;
-      if (!distinct_missing_labels || activities[index]) {
+      // A typed column's NaN and NaT equal no label either (round GQ).
+      const auto& label = activities[index];
+      const bool never_equal = typed_labels ? label && !label->empty() && (label->front() == '\x1e' || label->front() == '\x1d')
+                                            : distinct_missing_labels && !label;
+      if (!never_equal) {
         const auto found = edges.emplace(key, result_transitions.size());
         edge_index = found.first->second;
         inserted = found.second;
@@ -605,7 +610,7 @@ TransitionSystem build_flat_system(
 // labels is a transition of its own, while a state's name compares its list
 // by identity and so matches.
 std::vector<TraceSequence> xes_frame_sequences(const EventTable& source, bool polars,
-                                               const TransitionSystemOptions& options) {
+                                               const TransitionSystemOptions& options, bool* typed_labels) {
   const auto activity_key = effective_activity_key(options);
   const auto case_id_key = effective_case_id_key(options);
   std::optional<EventTable> storage;
@@ -621,6 +626,21 @@ std::vector<TraceSequence> xes_frame_sequences(const EventTable& source, bool po
     for (const auto& key : {case_id_key, activity_key})
       if (!column_of(key))
         throw std::invalid_argument(detail::polars_df_missing_column_error(key, table.columns, {"select", "group_by"}));
+    // select(case, activity) of one column twice: the group_by's
+    // resolution raises DuplicateError (round GQ, observed black-box).
+    if (case_id_key == activity_key) {
+      std::string frame = "DF [";
+      for (std::size_t i = 0; i < table.columns.size() && i < 4; ++i)
+        frame += (i ? ", " : "") + detail::polars_frame_quoted(table.columns[i]);
+      if (table.columns.size() > 4) frame += ", ...";
+      frame += "]; PROJECT */" + std::to_string(table.columns.size()) + " COLUMNS";
+      throw std::invalid_argument(
+          "projections contained duplicate output name '" + case_id_key +
+          "'. It's possible that multiple expressions are returning the same default column name. If this is the "
+          "case, try renaming the columns with `.alias(\"new_name\")` to avoid duplicate column names.\n\n"
+          "Resolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'group_by' <---\n" + frame +
+          "\n\nThis error occurred with the following context stack:\n\t[1] 'select'\n\t[2] 'group_by'\n");
+    }
   } else {
     if (!case_at) throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(case_id_key));
     if (!activity_at)
@@ -649,14 +669,37 @@ std::vector<TraceSequence> xes_frame_sequences(const EventTable& source, bool po
     }
     for (auto& group : python::groupby(keys)) groups.push_back(std::move(group.rows));
   }
+  // A column of other kinds than text reads each cell's Python object (round
+  // GQ, observed black-box): str() names it, Python's == matches labels
+  // (int 1 and float 1.0 alike, a NaN or NaT never), a state's list or set
+  // matches a NaN by the object (each cell of a float64 column its own) and
+  // NaT always; pandas' set and multiset views hash a dict cell, which
+  // raises. Polars' copy holds a gap as None.
+  const auto typed = frame_typed_activities(table, *activity_at, polars);
+  if (typed) *typed_labels = true;
   std::vector<TraceSequence> sequences;
   sequences.reserve(groups.size());
   for (const auto& rows : groups) {
     TraceSequence sequence;
     sequence.occurrence_trace_index = sequences.size();
     for (const auto row : rows) {
-      const auto* activity = cell(table.rows[row], *activity_at);
-      sequence.activities.push_back(activity ? TransitionActivity(activity->value) : std::nullopt);
+      if (typed) {
+        const auto& value = typed->cells[row];
+        const auto& name = typed->names[row];
+        if (!polars && value.type == "dict" && options.view != TransitionView::kSequence)
+          throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+        if (value.type == "NoneType")
+          sequence.activities.push_back(polars ? TransitionActivity{} : TransitionActivity("\x1c" + name));
+        else if (value.nan && !polars)
+          sequence.activities.push_back("\x1e" + name);
+        else if (value.type == "NaTType" && !polars)
+          sequence.activities.push_back("\x1d" + name);
+        else
+          sequence.activities.push_back(name);
+      } else {
+        const auto* activity = cell(table.rows[row], *activity_at);
+        sequence.activities.push_back(activity ? TransitionActivity(activity->value) : std::nullopt);
+      }
       sequence.event_indices.push_back(row);
     }
     sequences.push_back(std::move(sequence));
@@ -673,8 +716,9 @@ TransitionSystem discover_transition_system_xes_frame(const EventDataView& data,
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
   if (polars && !data.lazy_table()->valid())
     throw std::invalid_argument("transition system lazy table is invalid");
-  const auto sequences = polars ? xes_frame_sequences(data.lazy_table()->materialize(), true, options)
-                                : xes_frame_sequences(*data.table(), false, options);
+  bool typed_labels = false;
+  const auto sequences = polars ? xes_frame_sequences(data.lazy_table()->materialize(), true, options, &typed_labels)
+                                : xes_frame_sequences(*data.table(), false, options, &typed_labels);
   return build_transition_system(
       sequences, options,
       [](const TraceSequence& sequence, std::size_t event_index) {
@@ -683,7 +727,16 @@ TransitionSystem discover_transition_system_xes_frame(const EventDataView& data,
                                       : event_index;
         return TransitionOccurrence{sequence.occurrence_trace_index, source_index};
       },
-      /*distinct_missing_labels=*/!polars);
+      /*distinct_missing_labels=*/!polars, typed_labels);
+}
+
+TransitionActivity transition_activity_shown(const TransitionActivity& activity) {
+  if (!activity || activity->empty()) return activity;
+  std::string_view shown(*activity);
+  if (shown.front() == '\x1e' || shown.front() == '\x1c') return std::nullopt;
+  if (shown.front() == '\x1d') shown.remove_prefix(1);
+  const auto end = shown.find_last_not_of('\x1f');
+  return std::string(end == std::string_view::npos ? shown : shown.substr(0, end + 1));
 }
 
 TransitionActivity transition_system_event_activity(

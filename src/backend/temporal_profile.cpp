@@ -1241,25 +1241,6 @@ TemporalProfile discover_temporal_profile_xes_frame(
   return discover_temporal_profile(data, options);
 }
 
-TemporalConformanceResult conform_temporal_profile_xes_frame(
-    const EventDataView& data, const TemporalProfile& profile, const TemporalProfileOptions& options,
-    bool explicit_start_key) {
-  const bool frame = data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable;
-  const auto timestamp = source_timestamp_key(options);
-  if (!frame || explicit_start_key || timestamp == "start_timestamp" ||
-      !detail::xes_frame_has_column(data, "start_timestamp"))
-    return conform_temporal_profile(data, profile, options);
-  auto implicit = options;
-  implicit.target_timestamp_attribute = "start_timestamp";
-  // The start column's errors, once the frame holds the columns the
-  // conformance reads first.
-  if (detail::xes_frame_has_column(data, options.case_id_attribute) &&
-      detail::xes_frame_has_column(data, options.activity_attribute) && detail::xes_frame_has_column(data, timestamp))
-    detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
-                                    options.activity_attribute, timestamp, "start_timestamp", true);
-  return conform_temporal_profile(data, profile, implicit);
-}
-
 TemporalProfile discover_temporal_profile(
     const EventDataView& data, const TemporalProfileOptions& options) {
   switch (data.kind()) {
@@ -1446,7 +1427,8 @@ namespace {
 // black-box; the EventLog conformance lists every case without deviations).
 TemporalConformanceResult conform_table(const EventTable& table, const TemporalProfile& profile,
                                         const TemporalProfileOptions& options, bool lazy, bool whole_seconds = false,
-                                        std::optional<std::size_t> pair_rows = std::nullopt) {
+                                        std::optional<std::size_t> pair_rows = std::nullopt,
+                                        const std::string& polars_start_name = {}) {
   std::vector<std::size_t> case_first_rows;
   PairRanks ranks, orders;
   auto log = temporal_table_to_log(table, options, &case_first_rows, &ranks, &orders);
@@ -1458,7 +1440,7 @@ TemporalConformanceResult conform_table(const EventTable& table, const TemporalP
   }
   if (lazy && whole_seconds) {
     validate_slots(options);
-    check_polars_business_pairs(table, options);
+    check_polars_business_pairs(table, options, polars_start_name);
   }
   // pm4py's DataFrame conformance lists the cases in the order of their
   // first rows (an XES upload's frame in file order), not by case id, and
@@ -1568,7 +1550,8 @@ std::optional<std::size_t> polars_pair_rows(const EventTable& table, const Tempo
 // FV, observed black-box). The cases are listed by first row, as the
 // DataFrame conformance lists them.
 TemporalConformanceResult conform_lazy_table(EventTable table, const TemporalProfile& profile,
-                                             const TemporalProfileOptions& options) {
+                                             const TemporalProfileOptions& options,
+                                             const std::string& polars_start_name = {}) {
   const auto columns = temporal_table_columns(table, options);
   std::optional<std::size_t> missing_at;
   {
@@ -1584,7 +1567,8 @@ TemporalConformanceResult conform_lazy_table(EventTable table, const TemporalPro
   }
   auto paired = polars_partial_order_table(std::move(table), options);
   auto result = conform_table(paired, profile, options, true, true,
-                              options.frame_index_rows ? std::nullopt : polars_pair_rows(paired, options));
+                              options.frame_index_rows ? std::nullopt : polars_pair_rows(paired, options),
+                              polars_start_name);
   if (missing_at) result.insert(result.begin() + static_cast<std::ptrdiff_t>(std::min(*missing_at, result.size())),
                                 std::vector<TemporalDeviation>{});
   return result;
@@ -1614,6 +1598,249 @@ TemporalConformanceResult conform_temporal_profile(
       return conform_lazy_table(data.lazy_table()->materialize(), profile, options);
   }
   throw std::invalid_argument("temporal profile: unsupported event-data input");
+}
+
+namespace {
+
+// Polars' conformance pairs the rows as the discovery does, inside the select
+// of its result (round GQ, observed black-box): a plan error after the join
+// fails at that select, the context stack one level deeper.
+std::string polars_conformance_plan_error(std::string message) {
+  const std::string stack_marker = "context stack:\n";
+  const std::string head = "---> FAILED HERE RESOLVING '";
+  const auto stack_at = message.find(stack_marker);
+  const auto head_at = message.find(head);
+  if (message.find("INNER JOIN:") == std::string::npos || stack_at == std::string::npos ||
+      head_at == std::string::npos || head_at > stack_at)
+    return message;
+  const auto head_end = message.find(" <---", head_at);
+  if (head_end == std::string::npos) return message;
+  message.replace(head_at, head_end - head_at, head + "select'");
+  const auto entries_at = message.find(stack_marker) + stack_marker.size();
+  std::size_t count = 0;
+  for (auto at = entries_at; at < message.size() && message.compare(at, 2, "\t[") == 0;) {
+    ++count;
+    const auto line_end = message.find('\n', at);
+    if (line_end == std::string::npos) {
+      message += '\n';
+      at = message.size();
+    } else {
+      at = line_end + 1;
+    }
+  }
+  for (const char* name : {"select", "join left", "join", "filter", "select"})
+    message += "\t[" + std::to_string(++count) + "] '" + name + "'\n";
+  return message;
+}
+
+// Polars' conformance without the activity column (round GQ, observed
+// black-box): the pairs are measured, then the select of the activity
+// columns fails over the joined frame's columns.
+std::string polars_conformance_missing_activity(const EventTable& table, const std::string& case_key,
+                                                const std::string& activity_key, const std::string& timestamp,
+                                                const std::string& start, bool start_held, bool business) {
+  const auto has = [&](const std::string& name) {
+    return std::find(table.columns.begin(), table.columns.end(), name) != table.columns.end();
+  };
+  const bool own_start = start == timestamp;
+  std::vector<std::string> selected;
+  for (const auto& column : table.columns)
+    if (column == case_key || column == timestamp || (start_held && !own_start && column == start))
+      selected.push_back(column);
+  const bool aliased = !own_start && !start_held;
+  if (aliased) selected.push_back(start);
+  (void)has;
+  std::vector<std::string> valid{"@@index"};
+  valid.insert(valid.end(), selected.begin(), selected.end());
+  valid.push_back("@@index_2");
+  for (const auto& column : selected)
+    if (column != case_key) valid.push_back(column + "_2");
+  valid.push_back("@@flow_time");
+  const auto col = [](const std::string& name) { return "col(" + detail::polars_frame_quoted(name) + ")"; };
+  std::string message = "unable to find column " + detail::polars_frame_quoted(activity_key) + "; valid columns: [";
+  for (std::size_t i = 0; i < valid.size(); ++i) message += (i ? ", " : "") + detail::polars_frame_quoted(valid[i]);
+  message += "]";
+  if (const auto hint = detail::polars_column_hint(activity_key, valid))
+    message += "\n\nDid you mean " + detail::polars_frame_quoted(*hint) + "?";
+  const auto later = start + "_2";
+  message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING 'select' <---\n WITH_COLUMNS:\n [";
+  message += business ? col(timestamp) + ".as_struct([" + col(later) + "]).python_udf()"
+                      : "((" + col(later) + " - " + col(timestamp) + ")).dt.total_seconds()";
+  message += ".alias(\"@@flow_time\")] \n  FILTER " + col(timestamp) + " <= " + col(later) +
+             "\n  FROM\n    FILTER col(\"@@index\") < col(\"@@index_2\")\n    FROM\n      INNER JOIN:\n";
+  std::string sort = "[" + col(case_key) + ", " + col(start) + ", " + col(timestamp) + "]";
+  std::string select = "[";
+  for (std::size_t i = 0; i < selected.size(); ++i) select += (i ? ", " : "") + col(selected[i]);
+  select += "]";
+  for (const char* side : {"LEFT", "RIGHT"}) {
+    message += "      " + std::string(side) + " PLAN ON: [" + col(case_key) +
+               "]\n        ROW INDEX name: @@index, offset: 0\n          SORT BY " + sort + "\n            SELECT " +
+               select + "\n";
+    std::string pad = "              ";
+    if (aliased) {
+      message += "               WITH_COLUMNS:\n               [" + col(timestamp) + ".alias(" +
+                 detail::polars_frame_quoted(start) + ")] \n";
+      pad = "                ";
+    }
+    message += pad + detail::polars_df_node(table.columns) + "\n";
+  }
+  message += "      END INNER JOIN\n\nThis error occurred with the following context stack:\n";
+  int at = 0;
+  for (const char* name : {"select", "join left", "join", "filter", "select"})
+    message += "\t[" + std::to_string(++at) + "] '" + name + "'\n";
+  return message;
+}
+
+}  // namespace
+
+// pm4py's temporal profile conformance on an XES upload's frame shape (round
+// GQ, observed black-box on pm4py 2.7.22): the start key resolves as the
+// discovery's (discover_temporal_profile_xes_frame), the case column is read
+// before anything else (pandas KeyError, Polars' select), then the pairs are
+// built, compared and measured as the discovery builds them, with its errors
+// (Polars' plan errors at the result's select); the pairs whose activities
+// the profile holds deviate as in conform_log, listed per case in the order
+// of the cases' first rows.
+TemporalConformanceResult conform_temporal_profile_xes_frame(
+    const EventDataView& data, const TemporalProfile& profile, const TemporalProfileOptions& requested,
+    bool explicit_start_key) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (!polars && data.kind() != EventDataKind::kEventTable) return conform_temporal_profile(data, profile, requested);
+  auto options = requested;
+  const auto timestamp = source_timestamp_key(options);
+  if (!explicit_start_key && timestamp != "start_timestamp" && detail::xes_frame_has_column(data, "start_timestamp")) {
+    auto implicit = options;
+    implicit.target_timestamp_attribute = "start_timestamp";
+    return conform_temporal_profile_xes_frame(data, profile, implicit, true);
+  }
+  if (!explicit_start_key) {
+    options.target_timestamp_attribute = timestamp;
+    options.target_start_timestamp_attribute.clear();
+  }
+  const auto start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
+  const bool explicit_start =
+      !start.empty() && (start != timestamp || (explicit_start_key && polars));
+  const std::string start_column = explicit_start ? start
+      : !polars && explicit_start_key ? timestamp : std::string("start_timestamp");
+  std::optional<EventTable> materialized;
+  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  std::optional<EventTable> storage;
+  const auto& present = detail::xes_frame_present_columns(*source, storage, polars);
+  const auto has = [&](const std::string& name) {
+    return std::find(present.columns.begin(), present.columns.end(), name) != present.columns.end();
+  };
+  if (!has(options.case_id_attribute)) {
+    if (!polars) throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(options.case_id_attribute));
+    throw std::invalid_argument(
+        detail::polars_df_missing_column_error(options.case_id_attribute, present.columns, {"select"}, "select"));
+  }
+  detail::XesPandasTpVerdict verdict;
+  std::vector<BusinessHourSlot> business_slots;
+  if (options.use_business_hours) business_slots = normalized_slots(options);
+  try {
+    detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
+                                    options.activity_attribute, timestamp, start_column, explicit_start, &verdict,
+                                    options.use_business_hours ? &business_slots : nullptr);
+  } catch (const std::invalid_argument& error) {
+    if (!polars) throw;
+    const std::string message = error.what();
+    // The discovery's KeyError on the missing activity pair: the
+    // conformance measures the pairs first.
+    if (!has(options.activity_attribute) && has(timestamp) && message.starts_with("KeyError: "))
+      throw std::invalid_argument(polars_conformance_missing_activity(
+          present, options.case_id_attribute, options.activity_attribute, timestamp,
+          explicit_start ? start : start_column == timestamp ? timestamp : std::string("start_timestamp"),
+          explicit_start && has(start), options.use_business_hours));
+    throw std::invalid_argument(polars_conformance_plan_error(message));
+  }
+  if (verdict.kind == detail::XesPandasTpVerdict::Kind::kPairs ||
+      verdict.kind == detail::XesPandasTpVerdict::Kind::kSingle ||
+      verdict.kind == detail::XesPandasTpVerdict::Kind::kEmpty) {
+    const auto& table = present;
+    const auto cases = detail::xes_typed_column(table, options.case_id_attribute, polars);
+    const auto column = std::find(table.columns.begin(), table.columns.end(), options.activity_attribute);
+    const auto at = static_cast<std::size_t>(column - table.columns.begin());
+    const auto activity = [&](std::size_t row) -> const std::string* {
+      if (column == table.columns.end()) return nullptr;
+      const auto& cells = table.rows[row];
+      if (at >= cells.size() || !cells[at] || cells[at]->is_null) return nullptr;
+      return &cells[at]->value;
+    };
+    // The cases by first row (the rows without a case one more case).
+    const auto case_key = [&](std::size_t row) -> std::string {
+      if (!cases) return {};
+      const auto& cell = cases->cells[row];
+      if (detail::xes_cell_null(cell)) return std::string("\x1fnull");
+      return cell.kind == detail::PlusCellKind::kText ? "s" + cell.text : "o" + std::to_string(row);
+    };
+    std::map<std::string, std::size_t> case_of;
+    std::vector<std::string> case_ids;
+    std::vector<std::size_t> row_case(table.rows.size(), 0);
+    for (std::size_t row = 0; row < table.rows.size(); ++row) {
+      const auto key = case_key(row);
+      const auto [it, inserted] = case_of.emplace(key, case_ids.size());
+      if (inserted) case_ids.push_back(cases && cases->cells[row].kind == detail::PlusCellKind::kText ? cases->cells[row].text
+                                                                                              : std::string());
+      row_case[row] = it->second;
+    }
+    TemporalConformanceResult result(case_ids.size());
+    const auto lookup = build_profile_lookup(profile);
+    const auto deviate = [&](std::size_t earlier, std::size_t later, double duration) {
+      const auto* source_activity = activity(earlier);
+      const auto* target_activity = activity(later);
+      if (!source_activity || !target_activity) return;
+      const auto found = lookup.find({*source_activity, *target_activity});
+      if (found == lookup.end()) return;
+      const auto* entry = found->second;
+      const double difference = std::abs(duration - entry->mean_seconds);
+      double distance = 0.0;
+      bool sentinel = false;
+      if (entry->standard_deviation_seconds == 0.0) {
+        if (difference == 0.0) return;
+        distance = static_cast<double>(std::numeric_limits<std::int64_t>::max());
+        sentinel = true;
+      } else {
+        distance = difference / entry->standard_deviation_seconds;
+      }
+      if (!(distance > options.zeta)) return;
+      const auto c = row_case[earlier];
+      result[c].push_back({case_ids[c], *source_activity, *target_activity, duration, distance, sentinel});
+    };
+    if (verdict.kind == detail::XesPandasTpVerdict::Kind::kPairs) {
+      for (const auto& [i, j, value] : verdict.pairs) deviate(i, j, value);
+    } else if (verdict.kind == detail::XesPandasTpVerdict::Kind::kSingle) {
+      const auto micros = verdict.micros;
+      auto days = micros / 86400000000LL;
+      auto rest = micros % 86400000000LL;
+      if (rest < 0) {
+        rest += 86400000000LL;
+        --days;
+      }
+      deviate(verdict.earlier, verdict.later,
+              86400.0 * static_cast<double>(days) + static_cast<double>(rest / 1000000) +
+                  1e-6 * static_cast<double>(rest % 1000000));
+    }
+    return result;
+  }
+  const std::vector<std::string> keys{timestamp, start_column};
+  if (!polars) {
+    const auto gaps = detail::xes_frame_date_gaps_missing(*data.table(), keys);
+    const EventDataView view = gaps ? EventDataView(*gaps) : data;
+    // With business hours an empty pair frame fails as the discovery's
+    // does (round GP there).
+    if (options.use_business_hours) {
+      try {
+        (void)discover_temporal_profile(view, options);
+      } catch (const std::invalid_argument& error) {
+        if (std::string_view(error.what()) == detail::kPandasBusinessEmptyFlow) throw;
+      }
+    }
+    return conform_temporal_profile(view, profile, options);
+  }
+  const std::string start_name = explicit_start && start == timestamp ? timestamp : std::string();
+  if (auto gaps = detail::xes_frame_date_gaps_missing(*source, keys))
+    return conform_lazy_table(std::move(*gaps), profile, options, start_name);
+  return conform_lazy_table(*source, profile, options, start_name);
 }
 
 std::vector<TemporalDeviation> check_temporal_profile_conformance(
