@@ -29,6 +29,7 @@
 #include "polars_sort.hpp"
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
+#include "xes_frame_typed.hpp"
 
 namespace minera {
 namespace inductive_detail {
@@ -2312,6 +2313,13 @@ void check_xes_frame_projection(const EventDataView& data, const InductiveMinerO
   const auto missing = [](const EventTable::Row& row, std::size_t at) {
     return at >= row.size() || !row[at] || row[at]->is_null;
   };
+  // Round GN: sort_values([case, timestamp]) over the columns as read_xes
+  // types them raises first (xes_frame_typed.hpp).
+  if (!polars) {
+    const auto cases = detail::xes_typed_column(table, options.case_id_key);
+    const auto times = detail::xes_typed_column(table, options.timestamp_key);
+    if (cases && times) (void)detail::xes_pandas_sort_order({&*cases, &*times});
+  }
   if (!polars) {
     std::vector<python::Scalar> named;
     std::size_t unnamed = 0;
@@ -2350,7 +2358,24 @@ EventLog event_data_to_log(const EventDataView& data,
   // of a case leave their frame order the way the parallel pdqsort moves
   // them (round FU, XES uploads with tied timestamps, observed black-box).
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
-  if (polars) {
+  // Round GN: on an XES upload's frame the sort reads the case and timestamp
+  // columns as Polars copies them (xes_frame_typed.hpp); nothing is parsed.
+  bool polars_typed = false;
+  if (polars && xes_frame) {
+    const auto whole = data.lazy_table()->materialize();
+    std::optional<EventTable> storage;
+    const auto& table = detail::xes_frame_present_columns(whole, storage, true);
+    const auto cases = detail::xes_typed_column(table, options.case_id_key, true);
+    const auto times = detail::xes_typed_column(table, options.timestamp_key, true);
+    if (cases && times && times->cells.size() == records.size()) {
+      std::vector<IndexedRecord> sorted;
+      sorted.reserve(records.size());
+      for (const auto i : detail::xes_polars_sort_order({&*cases, &*times})) sorted.push_back(std::move(records[i]));
+      records = std::move(sorted);
+      polars_typed = true;
+    }
+  }
+  if (polars && !polars_typed) {
     struct Key {
       std::optional<std::string> case_id;
       std::optional<ParsedExactTimestamp> time;
@@ -2380,6 +2405,16 @@ EventLog event_data_to_log(const EventDataView& data,
     for (const auto i : order) sorted.push_back(std::move(records[i]));
     records = std::move(sorted);
   }
+  // Round GN: on pandas the rows of a case follow the timestamp column's
+  // Categorical codes (any value kind, a gap last); nothing is parsed.
+  std::optional<std::vector<std::size_t>> time_codes;
+  if (xes_frame && !polars) {
+    std::optional<EventTable> storage;
+    const auto& table = detail::xes_frame_present_columns(*data.table(), storage, false);
+    if (const auto times = detail::xes_typed_column(table, options.timestamp_key);
+        times && times->cells.size() == records.size())
+      time_codes = detail::xes_pandas_codes(*times);
+  }
   EventLog log;
   std::unordered_map<std::string, std::size_t> traces;
   // On the frame of an XES upload a row without a case id is a case of its
@@ -2401,7 +2436,10 @@ EventLog event_data_to_log(const EventDataView& data,
     }
     const std::string activity = required_record_value(
         indexed.record, options.activity_key, "activity", indexed.input_order);
-    if (!xes_frame || present(indexed.record, options.timestamp_key)) {
+    if (time_codes || polars_typed) {
+      // Only the codes order the case: the value is kept as it reads.
+      if (const auto* field = present(indexed.record, options.timestamp_key)) timestamp = field->value;
+    } else if (!xes_frame || present(indexed.record, options.timestamp_key)) {
       timestamp = required_record_value(
           indexed.record, options.timestamp_key, "timestamp", indexed.input_order);
       if (!parse_timestamp(timestamp)) {
@@ -2433,7 +2471,12 @@ EventLog event_data_to_log(const EventDataView& data,
     event.input_order = indexed.input_order;
     trace.events.push_back(std::move(event));
   }
-  if (!polars && xes_frame) {
+  if (time_codes) {
+    for (auto& trace : log.traces)
+      std::stable_sort(trace.events.begin(), trace.events.end(), [&](const Event& a, const Event& b) {
+        return (*time_codes)[a.input_order] < (*time_codes)[b.input_order];
+      });
+  } else if (!polars && xes_frame) {
     // sort_values: by timestamp within the case, NaT last, ties in row order.
     for (auto& trace : log.traces)
       std::stable_sort(trace.events.begin(), trace.events.end(), [](const Event& a, const Event& b) {

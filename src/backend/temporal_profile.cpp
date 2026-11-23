@@ -1091,9 +1091,55 @@ TemporalProfile discover_temporal_profile_xes_frame(
     const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
     const bool explicit_start =
         !start.empty() && (start != timestamp || (explicit_start_key && data.kind() == EventDataKind::kLazyEventTable));
+    detail::XesPandasTpVerdict verdict;
     detail::check_xes_frame_columns(data, detail::XesFrameFamily::kTemporalProfile, options.case_id_attribute,
                                     options.activity_attribute, timestamp,
-                                    explicit_start ? start : std::string("start_timestamp"), explicit_start);
+                                    explicit_start ? start : std::string("start_timestamp"), explicit_start, &verdict);
+    // Round GN: typed columns that leave no pair, or one pair measured (a
+    // datetime64 start less one object-column date, a TimedeltaArray).
+    if (verdict.kind == detail::XesPandasTpVerdict::Kind::kEmpty) return TemporalProfile{};
+    if (verdict.kind == detail::XesPandasTpVerdict::Kind::kSingle) {
+      const auto* table = data.table();
+      const auto column = std::find(table->columns.begin(), table->columns.end(), options.activity_attribute);
+      TemporalProfile profile;
+      if (column == table->columns.end()) return profile;
+      const auto at = static_cast<std::size_t>(column - table->columns.begin());
+      const auto activity = [&](std::size_t row) -> const std::string* {
+        const auto& cells = table->rows[row];
+        if (at >= cells.size() || !cells[at] || cells[at]->is_null) return nullptr;
+        return &cells[at]->value;
+      };
+      const auto* source = activity(verdict.earlier);
+      const auto* target = activity(verdict.later);
+      if (!source || !target) return profile;
+      // get_total_seconds: 86400 * days + seconds + 1e-6 * microseconds.
+      const auto micros = verdict.micros;
+      auto days = micros / 86400000000LL;
+      auto rest = micros % 86400000000LL;
+      if (rest < 0) {
+        rest += 86400000000LL;
+        --days;
+      }
+      const double seconds = 86400.0 * static_cast<double>(days) + static_cast<double>(rest / 1000000) +
+                             1e-6 * static_cast<double>(rest % 1000000);
+      TemporalProfileEntry entry;
+      entry.source = *source;
+      entry.target = *target;
+      entry.count = 1;
+      entry.mean_seconds = seconds;
+      entry.standard_deviation_seconds = 0.0;
+      profile.entries.push_back(std::move(entry));
+      return profile;
+    }
+    // Round GN: a dates column's NaN floats, empty lists and valueless
+    // values read as NaT (a null in Polars' copy).
+    const std::vector<std::string> keys{timestamp, explicit_start ? start : std::string("start_timestamp")};
+    if (data.kind() == EventDataKind::kEventTable) {
+      if (const auto gaps = detail::xes_frame_date_gaps_missing(*data.table(), keys))
+        return discover_temporal_profile(EventDataView(*gaps), options);
+    } else if (auto gaps = detail::xes_frame_date_gaps_missing(data.lazy_table()->materialize(), keys)) {
+      return discover_temporal_profile_table(polars_partial_order_table(std::move(*gaps), options), options, true);
+    }
   }
   return discover_temporal_profile(data, options);
 }

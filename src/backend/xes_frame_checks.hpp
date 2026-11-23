@@ -30,6 +30,7 @@
 #include "pandas_to_datetime.hpp"
 #include "polars_missing_column.hpp"
 #include "xes_frame_columns.hpp"
+#include "xes_frame_typed.hpp"
 
 namespace minera::detail {
 
@@ -157,13 +158,108 @@ inline void check_xes_frame_replay_columns(const EventDataView& data, const std:
     if (!has(*key)) throw std::invalid_argument(polars_df_missing_column_error(*key, table.columns, {"select", "group_by"}));
 }
 
+// Round GN (observed black-box): Polars' temporal profile on the copy of
+// read_xes's frame, its timestamp (T) and start (S) columns typed as read_xes
+// types them (a datetime64 column a Datetime, text, object and None-only
+// columns String, numbers Int64 or Float64, booleans Boolean). Whatever the
+// rows, a dates column against a String one fails resolving the pairs'
+// filter, a dates column against a numeric or Boolean one and a String
+// column against a numeric one fail resolving the flow time's subtraction,
+// and the rest but two dates columns fail evaluating it (String or Boolean
+// subtraction, a number where .dt wants a Duration). `side` is the join's
+// two input plans. nullopt: two dates columns, or a column outside the model.
+inline std::optional<std::string> polars_typed_tp_error(const EventTable& table, const std::string& timestamp_key,
+                                                        const std::string& start_key, bool own_start,
+                                                        const std::string& side, bool* modelled = nullptr) {
+  enum class P { kD, kS, kI, kF, kB };
+  const auto dtype = [&](const std::string& name) -> std::optional<P> {
+    const auto column = xes_typed_column(table, name);
+    if (!column) return std::nullopt;
+    switch (column->dtype) {
+      case XesFrameDtype::kDatetime: return P::kD;
+      case XesFrameDtype::kInt: return P::kI;
+      case XesFrameDtype::kFloat:
+      case XesFrameDtype::kNaNFloat: return P::kF;
+      case XesFrameDtype::kBool: return P::kB;
+      default: return P::kS;
+    }
+  };
+  const auto t = dtype(timestamp_key);
+  const auto s = own_start ? dtype(start_key) : t;
+  if (modelled) *modelled = t && s;
+  if (!t || !s || (*t == P::kD && *s == P::kD)) return std::nullopt;
+  const auto name = [](P p) -> std::string {
+    switch (p) {
+      case P::kD: return "datetime[\xce\xbcs, UTC]";
+      case P::kS: return "str";
+      case P::kI: return "i64";
+      case P::kF: return "f64";
+      case P::kB: return "bool";
+    }
+    return "str";
+  };
+  const auto cast = [](P p) -> std::string {
+    return p == P::kI ? ".cast(Int64)" : p == P::kF ? ".cast(Float64)" : p == P::kS ? ".cast(String)" : "";
+  };
+  const auto ts = "col(" + polars_frame_quoted(timestamp_key) + ")";
+  const auto st = "col(" + polars_frame_quoted(start_key + "_2") + ")";
+  const auto join = "FROM\n  FILTER col(\"@@index\") < col(\"@@index_2\")\n  FROM\n    INNER JOIN:\n" + side + "    END INNER JOIN\n";
+  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
+  if ((*t == P::kD && *s == P::kS) || (*t == P::kS && *s == P::kD))
+    return "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } "
+           "or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING "
+           "'with_columns' <---\nFILTER " + ts + " <= " + st + "\n" + join +
+           "\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n";
+  if (*t == P::kD || *s == P::kD) {
+    // The comparison casts the timestamp's side to the other's dtype.
+    const auto filter = *t == P::kD ? ts + (*s == P::kB ? "" : cast(*s)) + " <= " + st
+                                    : ts + " <= " + st + (*t == P::kB ? "" : cast(*t));
+    return "- not allowed on " + name(*s) + " and " + name(*t) + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE "
+           "RESOLVING 'with_columns' <---\nFILTER " + filter + "\n" + join +
+           "\nThis error occurred with the following context stack:\n\t[1] 'with_columns'\n";
+  }
+  if ((numeric(*t) && *s == P::kS) || (*t == P::kS && numeric(*s))) {
+    std::string nested;
+    std::size_t from = 0;
+    const auto inner = "FILTER " + ts + " <= " + st + "\n" + join;
+    while (from < inner.size()) {
+      const auto end = inner.find('\n', from);
+      nested += "  " + inner.substr(from, end - from) + "\n";
+      from = end + 1;
+    }
+    return "arithmetic on dtypes " + name(*s) + " and " + name(*t) + " is not allowed (lhs: column '" + start_key +
+           "_2', rhs: column '" + timestamp_key + "'); try an explicit cast first\n\nResolved plan until failure:\n\n"
+           "\t---> FAILED HERE RESOLVING 'with_columns' failed <---\n WITH_COLUMNS:\n [((" + st + " - " + ts +
+           ")).dt.total_seconds().alias(\"@@flow_time\")] \n" + nested +
+           "\nThis error occurred with the following context stack:\n\t[1] 'with_columns' failed\n";
+  }
+  if (*t == P::kB && *s == P::kB)
+    return "`subtract` operation not supported for dtype `bool`\n\nThis error occurred in the following expression:\n\t[(" +
+           st + ") - (" + ts + ")]\nwhile evaluating this larger expression:\n\t[(" + st + ") - (" + ts +
+           ")].dt.total_seconds()\n";
+  if (*t == P::kS || *s == P::kS) {
+    const auto lhs = st + (*s == P::kS ? "" : cast(P::kS));
+    const auto rhs = ts + (*t == P::kS ? "" : cast(P::kS));
+    return "sub operation not supported for dtypes `str` and `str`\n\nThis error occurred in the following "
+           "expression:\n\t[(" + lhs + ") - (" + rhs + ")]\nwhile evaluating this larger expression:\n\t[(" + lhs +
+           ") - (" + rhs + ")].dt.total_seconds()\n";
+  }
+  // Numbers and booleans: the supertype, the narrower side cast to it.
+  const auto super = *t == P::kF || *s == P::kF ? P::kF : P::kI;
+  const auto lhs = st + (*s == super ? "" : cast(super));
+  const auto rhs = ts + (*t == super ? "" : cast(super));
+  return "invalid series dtype: expected `Duration`, got `" + name(super) + "` for series with name `" + start_key +
+         "_2`\n\nThis error occurred in the following expression:\n\t[(" + lhs + ") - (" + rhs +
+         ")].dt.total_seconds()\n";
+}
+
 // Raises the error pm4py's `family` raises on the frame of an XES upload
 // (`data`, a pandas or Polars frame) that lacks the case, activity or
 // timestamp column; does nothing when all three are there.
 inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily family, const std::string& case_key,
                                     const std::string& activity_key, const std::string& timestamp_key,
                                     const std::string& start_key = "start_timestamp",
-                                    bool explicit_start = false) {
+                                    bool explicit_start = false, XesPandasTpVerdict* tp_verdict = nullptr) {
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
   if (!polars && data.kind() != EventDataKind::kEventTable) return;
   std::optional<EventTable> materialized;
@@ -193,6 +289,40 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
       if (table.columns[i] == name) return table.dtypes[i];
     return {};
   };
+  // Round GN: pandas sorts by case, start and timestamp, each column typed
+  // as read_xes types it (xes_frame_typed.hpp); the temporal profile then
+  // compares and subtracts the pairs' timestamps and starts. A start the
+  // frame lacks is a copy of the timestamp column.
+  if (!polars && has(case_key) && has(activity_key) && has(timestamp_key) && (!explicit_start || start_held ||
+                                                                              family == XesFrameFamily::kTemporalProfile)) {
+    const bool own_start = explicit_start ? start_held : has(start_key);
+    const auto cases = xes_typed_column(table, case_key);
+    const auto times = xes_typed_column(table, timestamp_key);
+    const auto starts = own_start ? xes_typed_column(table, start_key) : times;
+    if (cases && times && starts) {
+      const auto dtype_name = [&](const std::string& name, const XesTypedColumn& column) {
+        const auto given = dtype_of(name);
+        if (!given.empty()) return std::string(given);
+        switch (column.dtype) {
+          case XesFrameDtype::kDatetime: return std::string("datetime64[us, UTC]");
+          case XesFrameDtype::kString: return std::string("str");
+          case XesFrameDtype::kInt: return std::string("int64");
+          case XesFrameDtype::kFloat:
+          case XesFrameDtype::kNaNFloat: return std::string("float64");
+          case XesFrameDtype::kBool: return std::string("bool");
+          default: return std::string("object");
+        }
+      };
+      if (family == XesFrameFamily::kAlpha) {
+        (void)xes_pandas_sort_order({&*cases, &*starts, &*times});
+        return;
+      }
+      const auto verdict = xes_pandas_tp(*cases, *times, *starts, dtype_name(timestamp_key, *times),
+                                         dtype_name(own_start ? start_key : timestamp_key, *starts));
+      if (tp_verdict) *tp_verdict = verdict;
+      return;
+    }
+  }
   const bool text_start = start_held && start_key != timestamp_key && xes_frame_text_column(table, start_key) &&
                           has(timestamp_key) && !xes_frame_text_column(table, timestamp_key);
   // Round GC (observed black-box): the temporal profile's start column of
@@ -332,7 +462,11 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
       side += "    " + std::string(name) + " PLAN ON: [col(" + polars_frame_quoted(case_key) +
               ")]\n      ROW INDEX name: @@index, offset: 0\n        SORT BY " + polars_plan_cols(sort_by) +
               "\n          SELECT " + polars_plan_cols(selected) + "\n            " + polars_df_node(table.columns) + "\n";
-    if (start_column && frame_key_numeric(start_column->dtype)) {
+    bool modelled = false;
+    if (const auto typed =
+            polars_typed_tp_error(table, timestamp_key, start_key, start_key != timestamp_key, side, &modelled))
+      throw std::invalid_argument(*typed);
+    if (!modelled && start_column && frame_key_numeric(start_column->dtype)) {
       const auto dtype = start_column->dtype;
       const std::string cast = dtype == FrameKeyDtype::kInt64 ? ".cast(Int64)" : dtype == FrameKeyDtype::kFloat64 ? ".cast(Float64)" : "";
       throw std::invalid_argument(
@@ -343,7 +477,7 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
           "    INNER JOIN:\n" + side + "    END INNER JOIN\n\nThis error occurred with the following context stack:\n"
           "\t[1] 'with_columns'\n");
     }
-    if (text_start || (start_column && frame_key_polars_string(start_column->dtype))) {
+    if (!modelled && (text_start || (start_column && frame_key_polars_string(start_column->dtype)))) {
       throw std::invalid_argument(
           "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } "
           "or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING "
@@ -353,6 +487,11 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
           "\t[1] 'filter' failed\n\t[2] 'with_columns'\n");
     }
   }
+  // Round GN: without a start column the timestamp's alias is subtracted
+  // from it (the evaluation errors need no plan).
+  if (polars && !start_held && family == XesFrameFamily::kTemporalProfile && has(case_key) && has(timestamp_key))
+    if (const auto typed = polars_typed_tp_error(table, timestamp_key, start_key, false, {}))
+      throw std::invalid_argument(*typed);
   if (has(case_key) && has(activity_key) && has(timestamp_key)) return;
   if (start_held && !polars) return;
   if (!polars) {

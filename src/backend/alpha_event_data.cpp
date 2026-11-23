@@ -13,6 +13,7 @@
 #include "minera/timestamp.hpp"
 #include "alpha_python_nan.hpp"
 #include "frame_key_column.hpp"
+#include "xes_frame_typed.hpp"
 #include "polars_sort.hpp"
 #include "xes_frame_checks.hpp"
 
@@ -276,6 +277,20 @@ PetriNet discover_classic_table(const EventTable& table,
     if (!parsed) throw std::invalid_argument("Alpha: invalid selected timestamp");
     return *parsed;
   };
+  // Round GN: pandas' sort of an XES upload's frame reads each key column
+  // as read_xes types it (xes_frame_typed.hpp), whatever its values, and
+  // raises the sort's own errors; no timestamp is parsed.
+  std::optional<std::vector<std::size_t>> typed_order;
+  // Polars sorts its copy of the frame (String, Int64, Float64, Boolean or
+  // Datetime columns) with its unstable sort, a missing value first.
+  if (xes_frame && reads_time && options.sort_caseid_required && (!polars || has_completion)) {
+    const auto cases = detail::xes_typed_column(table, options.case_id_attribute, polars);
+    const auto times = detail::xes_typed_column(table, options.timestamp_attribute, polars);
+    const auto starts = has_start ? detail::xes_typed_column(table, start, polars) : times;
+    if (cases && times && starts && cases->cells.size() == stream.events.size())
+      typed_order = polars ? detail::xes_polars_sort_order({&*cases, &*starts, &*times})
+                           : detail::xes_pandas_sort_order({&*cases, &*starts, &*times});
+  }
   std::map<std::string, std::pair<std::string, std::string>> endpoints;
   struct FrameEnds {
     std::optional<std::string> first, last;
@@ -292,7 +307,9 @@ PetriNet discover_classic_table(const EventTable& table,
                     ":" + *row.case_id;
     row.activity = value(select_field(record, activity,
         FirstClassAttributeRole::kActivity, false, true));
-    if (reads_time && explicit_frame_start) {
+    if (typed_order) {
+      // The typed order decides; nothing to read.
+    } else if (reads_time && explicit_frame_start) {
       const auto* completion = has_completion ? select_field(record, options.timestamp_attribute,
           FirstClassAttributeRole::kTimestamp, false, true) : nullptr;
       if (text_completion) row.completion_text = value(completion);
@@ -335,7 +352,7 @@ PetriNet discover_classic_table(const EventTable& table,
     }
     rows.push_back(std::move(row));
   }
-  if (ranked_start && reads_time && start_cells.size() == rows.size()) {
+  if (!typed_order && ranked_start && reads_time && start_cells.size() == rows.size()) {
     const auto column = detail::frame_key_column(std::move(start_cells));
     const auto ranks = polars ? detail::frame_key_polars_ranks(column) : detail::frame_key_pandas_ranks(column);
     for (std::size_t index = 0; index < rows.size(); ++index) rows[index].start_rank = ranks[index];
@@ -377,7 +394,12 @@ PetriNet discover_classic_table(const EventTable& table,
     if (const int by = compare_instant(left.start, right.start)) return by;
     return compare_instant(left.completion, right.completion);
   };
-  if (options.sort_caseid_required) {
+  if (typed_order) {
+    std::vector<Row> sorted_rows;
+    sorted_rows.reserve(rows.size());
+    for (const auto index : *typed_order) sorted_rows.push_back(std::move(rows[index]));
+    rows = std::move(sorted_rows);
+  } else if (options.sort_caseid_required) {
     std::vector<std::size_t> order(rows.size());
     for (std::size_t index = 0; index < order.size(); ++index) order[index] = index;
     if (polars && reads_time) {

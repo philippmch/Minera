@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GM (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GN (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9482,6 +9482,91 @@ GM's suite: the full ctest 676 of 676 (43 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gm/`.
+
+Round GN re-reviewed GM and aligned /api/mine's Alpha, temporal profile,
+Inductive and POWL families on XES uploads' frame shapes whose
+time:timestamp and start_timestamp columns hold other XES kinds with pm4py
+(Review GN1), and a CSV upload's frames keyed by a column pm4py's event log
+lacks (GN2). GM's CI run 45188920161 passed Linux, the Python script tests,
+the frontend and the verifier (macOS and Windows still ran at handoff). No
+device was reachable, so no newer reviewer handoff was read from the Mac.
+New banks: `gen/gengn.py` (2,600 XES uploads gnA-gnC, seeds 30000-32599:
+timestamp and start columns of dates, offset dates, date text, text, ints,
+floats, NaN, booleans, None, lists and gaps), GL's `gengl.py` with `AC2`
+and `TS2` (500 uploads gnD-gnE, seeds 33000-33499); about 200 probes.
+Fixed: GN1-1, read_xes types each column (a new `xes_frame_typed.hpp`:
+dates datetime64, text str, ints int64 or float64 beside a gap, booleans
+bool or object beside a gap, mixes object; an empty `<list/>` or a
+valueless value is None, NaT in a dates column, and a dates column's NaN
+floats are NaT); pandas sorts the frame by case, start and timestamp with
+each column's Categorical codes (the last key coded first: a dict is
+unhashable, numbers beside dates are "'values' is not ordered", a gap
+sorts last), so Alpha and Inductive read that order instead of parsing
+dates ("Alpha: invalid selected timestamp", "timestamp field ... missing or
+null" before); GN1-2, pandas' temporal profile compares each pair's
+timestamp with the later row's start and subtracts them with pandas' own
+errors for every dtype pair (`Invalid comparison between dtype=... and
+ndarray|StringArray`, elementwise `'<=' not supported between instances
+of 'Timestamp' and 'T'` or the reflected `'>='`, `cannot subtract
+DatetimeArray from ndarray[object]`, numpy's boolean subtract, Python's
+`unsupported operand type(s) for -`, then `Can only use .dt accessor with
+datetimelike values`), no pair left an empty profile and one measured pair
+a profile of one entry; GN1-3, Polars' copy holds an object column as
+str() of each cell (True/False, Python's float repr, a list's dict repr)
+and sorts unstably with a missing value first (Alpha, Inductive), and its
+temporal profile fails on the two columns' dtypes alone, rows or none: a
+Datetime against a String column at the pairs' filter ("cannot compare
+'date/datetime/time' to a string value"), against a numeric or Boolean one
+and a String against a numeric one resolving the flow time ("- not allowed
+on S and T", "arithmetic on dtypes ... try an explicit cast first" with
+its nested plan), the rest evaluating it (String or Boolean subtraction,
+"expected `Duration`, got `i64|f64`" with the narrower side cast); GN1-4,
+the temporal profile's date path reads a dates column's NaN floats, empty
+lists and valueless values as NaT on both shapes; GN2, pm4py's classic
+heuristics miner on a CSV upload's frames reads the frame's event log,
+whose events lack the case columns: keyed by such a column (or one the
+frame lacks) a log of single-event traces (rows without a timestamp
+dropped) leaves a net without activities (Minera refused the key; with a
+pair, Minera keeps naming the key where pm4py raises KeyError). After:
+/api/mine's seven families on XES frames (gl banks glA-glL and gnA-gnC,
+3,700 uploads per shape) differ only where declared: pandas 4 Inductive
+and POWL operand orders (float/str), Polars 225 (NoneType/str, which vary
+inside one process: 25 against 6 on glA with one seed), where GM's binary
+differed for Alpha 527/233, the temporal profile 548/196 and Inductive
+122/154 (pandas/Polars); GM's typed custom keys with business hours, a
+start key and `ts2` as the timestamp key on fresh banks (gnD-gnE, both
+decorations and the conversion record) 4,000 of 4,000 judgments per shape;
+CSV uploads with seven typed keys (kcE, kcT) 2,000 of 2,000 per frame
+shape (the four uploads with missing timestamps included) and 1,993 of
+2,000 on the log shape (the seven replays carried below).
+
+GN's suite: the full ctest 677 of 677 (-j2; the new
+`minera_server_review_gn_tests` fails 59 of its 74 checks on GM's server
+binary), Python script tests 406 of 406, and the 16 manifests replayed 2,673
+responses unchanged.
+Harness and probes: `review-harness/round-gn/`.
+
+Next round (GO) should start by re-reviewing round GN:
+
+- GN's CI run (and GM's Windows job: GM's Linux, macOS, script, frontend and
+  verifier jobs passed, Windows ctest was still running at handoff);
+- GN1 on fresh banks: the other families on typed-timestamp XES frames
+  (heuristics, log skeleton and transition system matched; Declare,
+  Heuristics++, the performance view, token replay and alignments of the
+  mined nets, `/api/discover-workflow`, conformance routes), a custom
+  timestamp or start key naming a typed column, and business hours on the
+  temporal profile of such frames;
+- the CSV log shape with a custom activity key whose column has gaps:
+  convert_to_event_log keeps NaN and NaT in the event dicts (Minera drops
+  them), so pm4py names a 'nan' node and its token replay sorts the
+  variants with a NaN beside text (`'<' not supported between instances
+  of 'float' and 'str'`), and a NaT key or the timestamp column as the key
+  replays without KeyError (kcT j13663, j13675, j13690, j13695);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1, and the
+  anti- and multi-alignments of an upload without traces declared in GJ).
+
+Previous list for round GN (kept for its older items):
 
 Next round (GN) should start by re-reviewing round GM:
 

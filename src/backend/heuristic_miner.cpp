@@ -14,6 +14,7 @@
 #include "python_scalar.hpp"
 #include "root_cause_unicode.hpp"
 #include "xes_frame_columns.hpp"
+#include "xes_frame_typed.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -732,7 +733,7 @@ std::optional<CsvCellReader> csv_log_cell_reader(const DataFrameColumns& frame, 
 
 // A pandas object column's dict cell (an XES <list> with children, or a
 // scalar with children): the classic waits name it 'dict' (round GL).
-constexpr auto kDictCell = static_cast<detail::PlusCellKind>(64);
+constexpr auto kDictCell = detail::kPlusDictCell;
 
 const char* classic_cell_type(detail::PlusCellKind kind) {
   return kind == kDictCell ? "dict" : detail::plus_cell_type(kind);
@@ -1087,151 +1088,12 @@ std::optional<std::vector<std::vector<double>>> legacy_classic_waits(const Event
   return waits;
 }
 
-// An XES frame column's cells as Python reads them for the classic
-// performance view (round GK; every XES kind since round GL, observed
-// black-box): pandas types the column from its present cells, a gap being
-// an event without the key (or a NaN float, or a typed NaT) and None a
-// valueless string or id or a <list> without children:
-//   - dates (and None): datetime64, each date a Timestamp, a gap or None NaT;
-//   - text (and None): str, a gap or None NaN;
-//   - ints and floats: int64 without a gap or None, else float64 (NaN);
-//   - booleans: bool without a gap or None, else object;
-//   - None alone: object (None), float64 (NaN) beside a gap;
-//   - any other mix object: each cell its own type (a date a Python
-//     datetime, a <list> with children or a scalar with children a dict),
-//     None None, a gap NaN.
-// Polars' copy holds Datetime, String, Int64, Float64 and Boolean columns
-// as such and an object column as String (str() of each cell), a gap and
-// None as None. nullopt for other kinds.
-// How pandas types the column (round GM: `dtype`, when given).
-enum class ClassicFrameDtype { kDatetime, kString, kInt, kFloat, kBool, kObject, kNoneObject, kNaNFloat };
+// An XES frame column's cells as Python reads them (xes_frame_typed.hpp).
+using ClassicFrameDtype = detail::XesFrameDtype;
 
 std::optional<std::vector<detail::PlusCell>> classic_frame_cells(const EventTable& table, std::size_t column,
                                                                  bool polars, ClassicFrameDtype* dtype_out = nullptr) {
-  using detail::PlusCell;
-  using detail::PlusCellKind;
-  enum class Cell { kGap, kNone, kDict, kDate, kText, kInt, kFloat, kBool };
-  std::vector<Cell> kinds;
-  kinds.reserve(table.rows.size());
-  bool gap = false, none = false, dict = false, date = false, text = false, integer = false, real = false,
-       boolean = false;
-  for (const auto& row : table.rows) {
-    Cell kind = Cell::kGap;
-    if (column < row.size() && row[column] && row[column]->xes_public_shape != XesPublicShape::kAbsent) {
-      const auto& cell = *row[column];
-      const auto* number = std::get_if<double>(&cell.typed_value);
-      if (cell.xes_public_shape == XesPublicShape::kNone || (cell.is_null && cell.container == AttributeContainerKind::kScalar &&
-                                                             !cell.scalar_wrapper && cell.children.empty())) {
-        kind = Cell::kNone;
-      } else if (cell.xes_public_shape == XesPublicShape::kWrapper || cell.scalar_wrapper || cell.scalar_children_list ||
-                 cell.container != AttributeContainerKind::kScalar || !cell.children.empty()) {
-        kind = Cell::kDict;
-      } else if (cell.is_null || is_typed_nat(cell) || (number && std::isnan(*number))) {
-        kind = Cell::kGap;
-      } else {
-        switch (cell.kind) {
-          case AttributeKind::kDate:
-            if (!parse_timestamp_microseconds(cell.value)) return std::nullopt;
-            kind = Cell::kDate;
-            break;
-          case AttributeKind::kString:
-          case AttributeKind::kId: kind = Cell::kText; break;
-          case AttributeKind::kInt:
-            if (!std::holds_alternative<std::int64_t>(cell.typed_value)) return std::nullopt;
-            kind = Cell::kInt;
-            break;
-          case AttributeKind::kFloat:
-            if (!number) return std::nullopt;
-            kind = Cell::kFloat;
-            break;
-          case AttributeKind::kBoolean:
-            if (!std::holds_alternative<bool>(cell.typed_value)) return std::nullopt;
-            kind = Cell::kBool;
-            break;
-          default: return std::nullopt;
-        }
-      }
-    }
-    switch (kind) {
-      case Cell::kGap: gap = true; break;
-      case Cell::kNone: none = true; break;
-      case Cell::kDict: dict = true; break;
-      case Cell::kDate: date = true; break;
-      case Cell::kText: text = true; break;
-      case Cell::kInt: integer = true; break;
-      case Cell::kFloat: real = true; break;
-      case Cell::kBool: boolean = true; break;
-    }
-    kinds.push_back(kind);
-  }
-  using Dtype = ClassicFrameDtype;
-  const int families = int(dict) + int(date) + int(text) + int(integer || real) + int(boolean);
-  Dtype dtype = Dtype::kObject;
-  if (families == 0) dtype = gap ? Dtype::kNaNFloat : Dtype::kNoneObject;
-  else if (families > 1 || dict) dtype = Dtype::kObject;
-  else if (date) dtype = Dtype::kDatetime;
-  else if (text) dtype = Dtype::kString;
-  else if (integer || real) dtype = real || gap || none ? Dtype::kFloat : Dtype::kInt;
-  else dtype = gap || none ? Dtype::kObject : Dtype::kBool;
-  if (dtype_out) *dtype_out = dtype;
-  std::vector<PlusCell> cells;
-  cells.reserve(table.rows.size());
-  for (std::size_t r = 0; r < table.rows.size(); ++r) {
-    PlusCell out;
-    const auto kind = kinds[r];
-    if (kind == Cell::kGap || kind == Cell::kNone) {
-      if (polars) out.kind = PlusCellKind::kNone;
-      else if (dtype == Dtype::kDatetime) out.kind = PlusCellKind::kNaT;
-      else if (kind == Cell::kNone && (dtype == Dtype::kObject || dtype == Dtype::kNoneObject)) out.kind = PlusCellKind::kNone;
-      else out.kind = PlusCellKind::kNaN;
-      cells.push_back(std::move(out));
-      continue;
-    }
-    const auto& cell = *table.rows[r][column];
-    if (polars && dtype == Dtype::kObject) {
-      // Polars' copy of an object column: str() of each cell.
-      out.kind = PlusCellKind::kText;
-      out.text = kind == Cell::kDate ? detail::plus_python_datetime_str(cell.value) : cell.value;
-      cells.push_back(std::move(out));
-      continue;
-    }
-    switch (kind) {
-      case Cell::kDict: out.kind = kDictCell; break;
-      case Cell::kDate:
-        out.micros = *parse_timestamp_microseconds(cell.value);
-        if (dtype == Dtype::kDatetime) {
-          out.kind = polars ? PlusCellKind::kDatetime : PlusCellKind::kTimestamp;
-        } else {
-          out.kind = PlusCellKind::kDatetime;
-          out.text = cell.value;
-        }
-        break;
-      case Cell::kText:
-        out.kind = PlusCellKind::kText;
-        out.text = cell.value;
-        break;
-      case Cell::kInt:
-        if (dtype == Dtype::kFloat) {
-          out.kind = PlusCellKind::kFloat;
-          out.number = static_cast<double>(std::get<std::int64_t>(cell.typed_value));
-        } else {
-          out.kind = PlusCellKind::kInt;
-          out.micros = std::get<std::int64_t>(cell.typed_value);
-        }
-        break;
-      case Cell::kFloat:
-        out.kind = PlusCellKind::kFloat;
-        out.number = std::get<double>(cell.typed_value);
-        break;
-      case Cell::kBool:
-        out.kind = PlusCellKind::kBool;
-        out.micros = std::get<bool>(cell.typed_value) ? 1 : 0;
-        break;
-      default: break;
-    }
-    cells.push_back(std::move(out));
-  }
-  return cells;
+  return detail::xes_frame_cells(table, column, polars, dtype_out);
 }
 
 // `selected_keys`: a CSV frame, whose session selects its own case,
@@ -3956,6 +3818,27 @@ HeuristicsNet discover_heuristics_net_csv_frame(
     const DataFrameColumns& columns) {
   if (auto typed = csv_frame_typed_heuristics(data, options, columns)) return std::move(*typed);
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  // Round GN (observed black-box): the classic miner reads pm4py's event log
+  // of the frame, whose events lack the case columns (moved to the traces)
+  // and any column the frame lacks. Keyed by such a column, a directly-follows
+  // pair fails (Minera names the key); a log of single-event traces (the
+  // rows without a timestamp dropped) leaves a net without activities.
+  if (options.variant == HeuristicMinerVariant::kClassic && !standard_activity_attribute(options.activity_attribute) &&
+      (data.kind() == EventDataKind::kEventTable || polars)) {
+    const auto& key = options.activity_attribute;
+    const bool held = key.rfind("case:", 0) != 0 &&
+                      std::any_of(columns.columns.begin(), columns.columns.end(),
+                                  [&](const DataFrameColumn& column) { return column.key == key; });
+    if (!held) {
+      const auto log = classic_event_log(data, options);
+      if (std::all_of(log.traces.begin(), log.traces.end(), [](const Trace& trace) { return trace.events.size() < 2; })) {
+        auto net = discover_classic_dfg(build_classic_input(EventLog{}, options), options);
+        net.activity_attribute = key;
+        net.activity_ids_are_local = true;
+        return net;
+      }
+    }
+  }
   // The classic performance view with business hours or a start key reads
   // the frame's cells (round GK).
   const bool custom_clock = classic_custom_clock(options);
@@ -4020,67 +3903,7 @@ HeuristicsNet discover_heuristics_net_csv_frame(
                                    : csv_instance_mode(columns, options.lifecycle_instance_attribute));
 }
 
-// Python's repr of an XES value as read_xes's frame holds it (round GM): a
-// <list> with children {'value': None, 'children': [('k', v), ...]}, a
-// scalar with children {'value': v, 'children': {'k': v, ...}} (or pairs),
-// a valueless string or id None; text, ints, floats and booleans as Python
-// prints them. nullopt for other kinds (dates among the children).
-std::optional<std::string> xes_frame_value_repr(const EventAttribute& value) {
-  if (value.xes_public_shape == XesPublicShape::kNone) return std::string("None");
-  const bool xes_list = value.xes_public_shape == XesPublicShape::kWrapper;
-  const bool wrapped = xes_list || (value.container == AttributeContainerKind::kScalar &&
-                                    (value.scalar_wrapper || value.scalar_children_list || !value.children.empty()));
-  const auto scalar = [](const EventAttribute& cell) -> std::optional<std::string> {
-    if (cell.is_null) return std::string("None");
-    switch (cell.kind) {
-      case AttributeKind::kString:
-      case AttributeKind::kId: return python_str_repr(cell.value);
-      case AttributeKind::kInt:
-        if (const auto* number = std::get_if<std::int64_t>(&cell.typed_value)) return std::to_string(*number);
-        return std::nullopt;
-      case AttributeKind::kFloat:
-        if (const auto* number = std::get_if<double>(&cell.typed_value)) return python::float_repr(*number);
-        return std::nullopt;
-      case AttributeKind::kBoolean:
-        if (const auto* truth = std::get_if<bool>(&cell.typed_value)) return std::string(*truth ? "True" : "False");
-        return std::nullopt;
-      default: return std::nullopt;
-    }
-  };
-  if (!wrapped) {
-    if (value.container != AttributeContainerKind::kScalar) return std::nullopt;
-    return scalar(value);
-  }
-  std::string head = "None";
-  if (!xes_list) {
-    const auto own = scalar(value);
-    if (!own) return std::nullopt;
-    head = *own;
-  }
-  std::vector<std::pair<std::string, std::string>> children;
-  const bool pairs = xes_list ? value.container == AttributeContainerKind::kList : value.scalar_children_list;
-  for (const auto& child : value.children) {
-    if (child.xes_public_shape == XesPublicShape::kAbsent) continue;
-    const auto item = xes_frame_value_repr(child);
-    if (!item) return std::nullopt;
-    if (!pairs) {
-      // Later duplicate keys replace earlier values, as in a dictionary.
-      const auto existing = std::find_if(children.begin(), children.end(),
-                                         [&](const auto& entry) { return entry.first == child.key; });
-      if (existing != children.end()) {
-        existing->second = *item;
-        continue;
-      }
-    }
-    children.emplace_back(child.key, *item);
-  }
-  std::string body;
-  for (const auto& [key, item] : children) {
-    if (!body.empty()) body += ", ";
-    body += pairs ? "(" + python_str_repr(key) + ", " + item + ")" : python_str_repr(key) + ": " + item;
-  }
-  return "{'value': " + head + ", 'children': " + (pairs ? "[" + body + "]" : "{" + body + "}") + "}";
-}
+using detail::xes_frame_value_repr;
 
 // An activity column of an XES upload's frame as pm4py's classic heuristics
 // miner reads it (round GM, observed black-box): each cell the Python
