@@ -739,6 +739,34 @@ ReplayFitnessResult evaluate_replay_fitness(
       out.alignment_result.variant = alignment_options.variant;
       out.alignment_result.activity_attribute =
           alignment_options.activity_attribute;
+      // The reference's alignments check easy soundness before reading the
+      // log, so an empty log on a net whose final marking is unreachable
+      // fails as a non-empty one does (round GH, observed black-box: a
+      // heuristics net without transitions).
+      bool sound = true, exhausted = false;
+      if (petri_net_has_weighted_arcs(net)) {
+        PetriTraceAlignmentOptions check;
+        check.initial_marking = alignment_options.initial_marking;
+        check.final_marking = alignment_options.final_marking;
+        check.cancelled = alignment_options.cancelled;
+        try {
+          sound = reference_easy_sound(net, check);
+        } catch (const std::invalid_argument&) {
+          sound = false;
+          exhausted = true;
+        }
+      } else {
+        EventLog probe;
+        probe.traces.push_back(Trace{});
+        const auto soundness = check_alignment(probe, net, alignment_options);
+        sound = soundness.computed;
+        exhausted = soundness.exhausted;
+      }
+      if (!sound) {
+        out.computed = false;
+        out.exhausted = exhausted;
+        out.error = exhausted ? "alignment search exhausted" : "final marking is unreachable";
+      }
     }
     return out;
   }

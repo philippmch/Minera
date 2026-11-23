@@ -567,10 +567,23 @@ const EventAttribute* event_attribute_cell(const Event& event, std::string_view 
   return nullptr;
 }
 
+// The text of a CSV event's lifecycle:transition cell, or nullptr when the
+// cell is missing or the frame has no such column.
+const std::string* csv_transition_text(const Event& event) {
+  if (event.lifecycle_source_key == "lifecycle:transition")
+    return event.lifecycle_state == FirstClassAttributeState::kPresent && !event.lifecycle.empty()
+               ? &event.lifecycle
+               : nullptr;
+  const auto* cell = event_attribute_cell(event, "lifecycle:transition");
+  return cell && !cell->is_null && !cell->value.empty() ? &cell->value : nullptr;
+}
+
 IntervalTrace to_intervals(const Trace& trace,
                            const HeuristicMinerOptions& options,
                            bool pre_interval_mode, bool utc_clock,
-                           InstanceKeyMode instance_mode = InstanceKeyMode::kPythonLog) {
+                           InstanceKeyMode instance_mode = InstanceKeyMode::kPythonLog,
+                           const DataFrameColumn* csv_instance_column = nullptr,
+                           bool csv_log = false) {
   using LifecycleKey = std::pair<std::string, std::string>;
   struct PendingStart {
     std::string timestamp_text;
@@ -624,10 +637,21 @@ IntervalTrace to_intervals(const Trace& trace,
     // ignored after required field presence has been checked.  An explicitly
     // present empty transition is also ignored; an omitted transition remains
     // the atomic/completion form below.
-    const bool lifecycle_present = event.has_lifecycle();
-    const std::string lifecycle = ascii_lower(event.lifecycle);
-    const auto instance = lifecycle_instance_key(
-        event_attribute_cell(event, options.lifecycle_instance_attribute), instance_mode, position);
+    // A CSV log's transition is its frame's lifecycle:transition cell (a
+    // lifecycle column under another header is an ordinary column there).
+    const auto* csv_transition = csv_log ? csv_transition_text(event) : nullptr;
+    const bool lifecycle_present = csv_log ? csv_transition != nullptr : event.has_lifecycle();
+    const std::string lifecycle =
+        ascii_lower(csv_log ? (csv_transition ? *csv_transition : std::string()) : event.lifecycle);
+    // A CSV log's instance is the frame's cell, typed by its column: "1" and
+    // "1.0" of a float64 column are both 1.0 (round GH).
+    const EventAttribute* instance_cell = event_attribute_cell(event, options.lifecycle_instance_attribute);
+    std::optional<EventAttribute> typed_instance;
+    if (csv_instance_column && instance_cell && !instance_cell->is_null) {
+      typed_instance = csv_dataframe_cell(*csv_instance_column, instance_cell->value);
+      instance_cell = &*typed_instance;
+    }
+    const auto instance = lifecycle_instance_key(instance_cell, instance_mode, position);
     const LifecycleKey key{activity, instance};
     if ((lifecycle_present && lifecycle.empty()) ||
         (!lifecycle.empty() && lifecycle != "start" &&
@@ -698,19 +722,119 @@ PlusAbstraction build_plus_abstraction(
                 options.business_hour_slots,
                 options.business_hour_slots_explicit, "Heuristics Miner")
           : std::vector<BusinessHourSlot>{};
+  const bool csv_log = !instance_mode && log.dataframe_columns && log.dataframe_columns->csv_text;
+  // On a CSV log every event holds every frame column, so a start column
+  // keeps the log as it is (to_interval returns it) even where the first
+  // event's cell is missing (round GH).
+  const DataFrameColumn* csv_start_column = nullptr;
+  if (csv_log && !log.traces.empty() && !log.traces.front().events.empty()) {
+    const std::string start_key = options.start_timestamp_attribute.value_or("start_timestamp");
+    if (!start_key.empty() && !standard_timestamp_attribute(start_key))
+      for (const auto& column : log.dataframe_columns->columns)
+        if (column.key == start_key && column.role == FirstClassAttributeRole::kNone) csv_start_column = &column;
+  }
   const bool pre_interval_mode =
-      !log.traces.empty() && !log.traces.front().events.empty() &&
-      selected_start_timestamp(log.traces.front().events.front(), options,
-                               true) != nullptr;
+      csv_start_column != nullptr ||
+      (!log.traces.empty() && !log.traces.front().events.empty() &&
+       selected_start_timestamp(log.traces.front().events.front(), options,
+                                true) != nullptr);
   const bool utc_clock = log.dataframe_columns && log.dataframe_columns->csv_text;  // round FL
   const bool frame_seconds = log.dataframe_columns != nullptr;  // round FR
+  // A CSV log is pm4py's convert_to_event_log of its frame (round GH,
+  // observed black-box): every event holds every column, typed by the
+  // column, a missing cell as NaN. to_interval lower-cases each event's
+  // transition, so a lifecycle column with a missing cell (NaN) or of
+  // another dtype raises AttributeError at the first such event, before
+  // any interval is formed; the instance is the typed cell.
+  const DataFrameColumn* csv_instance_column = nullptr;
+  if (csv_log) {
+    for (const auto& column : log.dataframe_columns->columns) {
+      if (column.key == options.lifecycle_instance_attribute && column.role == FirstClassAttributeRole::kNone)
+        csv_instance_column = &column;
+      if (column.key != "lifecycle:transition" || pre_interval_mode) continue;
+      for (const auto& trace : log.traces)
+        for (const auto& event : trace.events) {
+          std::string type;
+          if (const auto* text = csv_transition_text(event); !text) {
+            type = "float";
+          } else {
+            switch (csv_dataframe_cell(column, *text).kind) {
+              case AttributeKind::kInt: type = "int"; break;
+              case AttributeKind::kFloat: type = "float"; break;
+              case AttributeKind::kBoolean: type = "bool"; break;
+              case AttributeKind::kDate: type = "Timestamp"; break;
+              default: break;
+            }
+          }
+          if (!type.empty())
+            throw HeuristicPandasError("builtins.AttributeError",
+                                       "'" + type + "' object has no attribute 'lower'");
+        }
+    }
+  }
+  // A CSV start column: the abstraction reads each event's start as the
+  // frame's object (a date column Timestamp or NaT, a str column str or
+  // NaN, a float64 column float or NaN, an int64 or bool column int or
+  // bool) and raises as on an XES upload's frame
+  // (heuristic_plus_frame_intervals.hpp).
+  if (csv_start_column) {
+    const auto type = csv_start_column->type;
+    bool modelled = type == DataFrameColumnType::kDate || type == DataFrameColumnType::kString ||
+                    type == DataFrameColumnType::kFloat64 || type == DataFrameColumnType::kInt64 ||
+                    type == DataFrameColumnType::kBool;
+    std::vector<detail::PlusCell> starts, completes;
+    std::vector<std::vector<std::size_t>> traces;
+    for (const auto& trace : log.traces) {
+      if (!modelled) break;
+      auto& rows = traces.emplace_back();
+      for (const auto& event : trace.events) {
+        detail::PlusCell start, complete;
+        const auto* cell = event_attribute_cell(event, csv_start_column->key);
+        if (!cell || cell->is_null || cell->value.empty()) {
+          start.kind = type == DataFrameColumnType::kDate ? detail::PlusCellKind::kNaT : detail::PlusCellKind::kNaN;
+        } else if (type == DataFrameColumnType::kString) {
+          start.kind = detail::PlusCellKind::kText;
+          start.text = cell->value;
+        } else if (type == DataFrameColumnType::kDate) {
+          const auto utc = csv_utc_date_cell(csv_start_column->key, cell->value);
+          const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
+          if (!micros) modelled = false;
+          start.kind = detail::PlusCellKind::kTimestamp;
+          start.micros = micros.value_or(0);
+        } else {
+          const auto typed = csv_dataframe_cell(*csv_start_column, cell->value);
+          if (const auto* value = std::get_if<std::int64_t>(&typed.typed_value)) {
+            start.kind = detail::PlusCellKind::kInt;
+            start.micros = *value;
+          } else if (const auto* flag = std::get_if<bool>(&typed.typed_value)) {
+            start.kind = detail::PlusCellKind::kBool;
+            start.micros = *flag ? 1 : 0;
+          } else if (const auto* number = std::get_if<double>(&typed.typed_value)) {
+            start.kind = std::isnan(*number) ? detail::PlusCellKind::kNaN : detail::PlusCellKind::kFloat;
+            start.number = *number;
+          } else {
+            modelled = false;
+          }
+        }
+        const auto utc = event.has_timestamp() ? csv_utc_date_cell("time:timestamp", event.timestamp) : std::nullopt;
+        const auto micros = utc ? parse_timestamp_microseconds(utc->value) : std::nullopt;
+        if (!micros) modelled = false;
+        complete.kind = detail::PlusCellKind::kTimestamp;
+        complete.micros = micros.value_or(0);
+        rows.push_back(starts.size());
+        starts.push_back(std::move(start));
+        completes.push_back(std::move(complete));
+      }
+    }
+    if (modelled) detail::check_plus_interval_cells(traces, starts, completes);
+  }
   for (const auto& trace : log.traces) {
     const auto converted =
         to_intervals(trace, options, pre_interval_mode, utc_clock,
-                     instance_mode.value_or(log.dataframe_columns && log.dataframe_columns->csv_text
-                                                ? csv_instance_mode(*log.dataframe_columns,
-                                                                    options.lifecycle_instance_attribute)
-                                                : InstanceKeyMode::kPythonLog));
+                     instance_mode.value_or(csv_log ? csv_instance_mode(*log.dataframe_columns,
+                                                                        options.lifecycle_instance_attribute)
+                                                    : InstanceKeyMode::kPythonLog),
+                     csv_instance_column, csv_log);
     const auto& intervals = converted.sorted;
     if (intervals.empty()) continue;
     // In pre-interval mode discovery preserves trace order for start/end/attribute

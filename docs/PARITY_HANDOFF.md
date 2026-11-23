@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GG (2026-11-05 to 2026-11-22, cloud container)
+## Review-fix loop, rounds T–GH (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9199,6 +9199,69 @@ GG's suite: the full ctest 670 of 670 (29 minutes, -j2, first run; the new
 binary), Python script tests 406 of 406, and the 16 manifests replayed
 2,673 responses unchanged.
 Harness and probes: `review-harness/round-gg/`.
+
+Round GH re-reviewed GG on fresh banks and aligned Heuristics++ on CSV
+uploads' log shape and the alignments of an upload without traces with
+pm4py (Review GH1). GG's CI run 45082708237 passed on Linux, macOS and
+the Python, verifier and frontend jobs (Windows ctest still running at
+GH's end). No device was reachable, so no newer reviewer handoff was
+read from the Mac. New banks: `gen/gengh.py` (GG's generator plus shuffled
+event order, first-event time gaps and swapped times; ghA to ghD, seeds
+9400-9639; hhA and hhB Heuristics++ uploads, 9700-9859), `gen/genhcsv.py`
+(960 CSV Heuristics++ uploads hcA to hcH with typed instance, lifecycle and
+start columns and gaps), 201 CSV copies of the gh uploads and 44 CSV
+probes. Fixed: GH1-1, Heuristics++ reads a CSV upload's log shape as
+`convert_to_event_log` of its frame holds it: instances by the column's
+dtype ("1" and "1.0" of a float64 column pair), a missing or non-str
+`lifecycle:transition` raises pm4py's AttributeError, a lifecycle column
+under another header is ignored, and any start-timestamp column keeps the
+log as it is, then raises pm4py's NaT ValueError or Timestamp TypeError
+(str, int, float, bool or all-missing columns); GH1-2, `/api/evaluate`'s
+alignment fitness and `/api/align` of an upload without traces fail on a
+net that is not easy sound (a heuristics net without transitions), since
+pm4py checks easy soundness before reading the log. After: Heuristics++ on
+CSV uploads 1,004 of 1,004 equal or failing alike (13 matrices and 339
+errors differed before), the option sets likewise; the alignment fitness 711 of 711 equal or
+failing on both sides; the stochastic map 163 POWL and 161 heuristics
+sessions equal on the new banks (Monte Carlo 100 and 128, playout 163 and
+129, CSV copies 192 and 193); Heuristics++ on the new XES banks' frame
+shapes 160 of 160 per shape and option set; `/api/align` costs equal on
+every variant (moves and search counters are tie choices the contract
+does not bind). Declared: the element usage of gfR/f8532 against f8533,
+ghA/f9426 against f9427 and ghB/f9461 against f9462 and the stochastic
+map of gcsv/f9631 vary with pm4py's hash seed (GG's note that f8532 was
+seed-stable was wrong); the log shape's whole-mine message when a later
+event lacks the start timestamp (pm4py `KeyError: 'start_timestamp'`),
+as for a missing time. The Alpha model's log-shape totals on the GG and
+GH banks equal pm4py's (327 replay totals, 269 footprints) but for the
+declared empty-log fitness (60) and footprints failing on both sides
+(118, unbounded nets).
+
+GH's suite: the full ctest 671 of 671 (27 minutes, -j2, first run; the new
+`minera_server_review_gh_tests` fails 11 of its 15 checks on GG's
+binary), Python script tests 406 of 406, and the 16 manifests replayed
+2,673 responses unchanged.
+Harness and probes: `review-harness/round-gh/`.
+
+Next round (GI) should start by re-reviewing round GH:
+
+- GH's CI run (and GG's Windows ctest job if it was still running);
+- GH1 on fresh banks: Heuristics++ on CSV uploads with other columns
+  (date and mixed instance columns, a lifecycle column of dates, unsigned
+  ints beyond int64 in a start column, a renamed timestamp column beside
+  `start_timestamp`) and on CSV uploads' frame shapes
+  (`mining_input_shape=dataframe|lazyframe`), with `ct/hppcsv.py` and
+  `ct/hppcsv2.py`;
+- the other alignment consumers of an upload without traces (the
+  decomposed alignments, the mine analysis' conformance summary, the
+  `minera_export` CLI) and of imported nets, against pm4py's easy-soundness
+  check;
+- the Alpha model's footprints on bounded nets and the Inductive model's
+  footprints on the log shape (`cmroutes4.py` with `MODEL=inductive`);
+- the carried items below (the SQLite leftovers, the new Polars dtypes,
+  DW1, the declared items, the CU list, the open choices, EV1-1).
+
+Previous list for round GH (kept for its older items):
 
 Next round (GH) should start by re-reviewing round GG:
 

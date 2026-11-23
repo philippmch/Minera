@@ -30,12 +30,15 @@
 
 namespace minera::detail {
 
-enum class PlusCellKind { kTimestamp, kNaT, kDatetime, kText, kNaN, kNone };
+// kInt and kBool: a CSV start column of ints or bools (the value in micros);
+// kFloat: a float64 CSV start column's number (in `number`).
+enum class PlusCellKind { kTimestamp, kNaT, kDatetime, kText, kNaN, kNone, kInt, kBool, kFloat };
 
 struct PlusCell {
   PlusCellKind kind = PlusCellKind::kNone;
   std::int64_t micros = 0;
   std::string text;
+  double number = 0.0;
 };
 
 inline const char* plus_cell_type(PlusCellKind kind) {
@@ -46,6 +49,9 @@ inline const char* plus_cell_type(PlusCellKind kind) {
     case PlusCellKind::kText: return "str";
     case PlusCellKind::kNaN: return "float";
     case PlusCellKind::kNone: return "NoneType";
+    case PlusCellKind::kInt: return "int";
+    case PlusCellKind::kBool: return "bool";
+    case PlusCellKind::kFloat: return "float";
   }
   return "object";
 }
@@ -124,35 +130,23 @@ inline bool plus_compare(const PlusCell& a, const PlusCell& b, bool or_equal) {
     return false;
   if (a.kind == PlusCellKind::kText && b.kind == PlusCellKind::kText) return or_equal ? a.text <= b.text : a.text < b.text;
   if (a.kind == PlusCellKind::kNaN && b.kind == PlusCellKind::kNaN) return false;
+  const auto floating = [](PlusCellKind kind) { return kind == PlusCellKind::kNaN || kind == PlusCellKind::kFloat; };
+  if (floating(a.kind) && floating(b.kind)) {
+    if (a.kind == PlusCellKind::kNaN || b.kind == PlusCellKind::kNaN) return false;
+    return or_equal ? a.number <= b.number : a.number < b.number;
+  }
+  const auto integral = [](PlusCellKind kind) { return kind == PlusCellKind::kInt || kind == PlusCellKind::kBool; };
+  if (integral(a.kind) && integral(b.kind)) return or_equal ? a.micros <= b.micros : a.micros < b.micros;
   throw HeuristicPandasError("builtins.TypeError", std::string("'") + (or_equal ? "<=" : "<") +
                                                        "' not supported between instances of '" +
                                                        plus_cell_type(a.kind) + "' and '" + plus_cell_type(b.kind) + "'");
 }
 
-// Raises the error pm4py's Heuristics++ abstraction raises on the frame's
-// starts and completions; returns false when a column is not modelled (the
-// caller keeps its older path), true when every check passes.
-inline bool check_plus_frame_intervals(const EventTable& table, std::size_t case_at, std::size_t start_at,
-                                       std::size_t timestamp_at, bool polars) {
-  const auto starts = plus_frame_cells(table, start_at, polars);
-  auto completes = plus_frame_cells(table, timestamp_at, polars);
-  if (!starts || !completes) return false;
-  for (const auto& cell : *completes)
-    if (cell.kind == PlusCellKind::kText || cell.kind == PlusCellKind::kNaN) return false;
-  // Cases in order of their first row, rows in frame order; the rows
-  // without a case id are one trace.
-  std::map<std::optional<std::string>, std::size_t> trace_of;
-  std::vector<std::vector<std::size_t>> traces;
-  for (std::size_t row = 0; row < table.rows.size(); ++row) {
-    const auto& cells = table.rows[row];
-    const bool named = case_at < cells.size() && cells[case_at] && !cells[case_at]->is_null;
-    const auto key = named ? std::optional<std::string>(cells[case_at]->value) : std::nullopt;
-    const auto [it, inserted] = trace_of.try_emplace(key, traces.size());
-    if (inserted) traces.emplace_back();
-    traces[it->second].push_back(row);
-  }
-  const auto& start = *starts;
-  const auto& complete = *completes;
+// The checks on traces of cells (indices into `start` and `complete`, each
+// trace in its events' order): raises pm4py's first error.
+inline void check_plus_interval_cells(const std::vector<std::vector<std::size_t>>& traces,
+                                      const std::vector<PlusCell>& start,
+                                      const std::vector<PlusCell>& complete) {
   for (const auto& trace : traces) {
     auto sorted = trace;
     python_list_sort(sorted, [&](std::size_t a, std::size_t b) { return plus_compare(start[a], start[b], false); });
@@ -180,6 +174,31 @@ inline bool check_plus_frame_intervals(const EventTable& table, std::size_t case
       stamp(start[row]);
       stamp(complete[row]);
     }
+}
+
+// Raises the error pm4py's Heuristics++ abstraction raises on the frame's
+// starts and completions; returns false when a column is not modelled (the
+// caller keeps its older path), true when every check passes.
+inline bool check_plus_frame_intervals(const EventTable& table, std::size_t case_at, std::size_t start_at,
+                                       std::size_t timestamp_at, bool polars) {
+  const auto starts = plus_frame_cells(table, start_at, polars);
+  auto completes = plus_frame_cells(table, timestamp_at, polars);
+  if (!starts || !completes) return false;
+  for (const auto& cell : *completes)
+    if (cell.kind == PlusCellKind::kText || cell.kind == PlusCellKind::kNaN) return false;
+  // Cases in order of their first row, rows in frame order; the rows
+  // without a case id are one trace.
+  std::map<std::optional<std::string>, std::size_t> trace_of;
+  std::vector<std::vector<std::size_t>> traces;
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    const auto& cells = table.rows[row];
+    const bool named = case_at < cells.size() && cells[case_at] && !cells[case_at]->is_null;
+    const auto key = named ? std::optional<std::string>(cells[case_at]->value) : std::nullopt;
+    const auto [it, inserted] = trace_of.try_emplace(key, traces.size());
+    if (inserted) traces.emplace_back();
+    traces[it->second].push_back(row);
+  }
+  check_plus_interval_cells(traces, *starts, *completes);
   return true;
 }
 

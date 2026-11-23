@@ -38698,3 +38698,149 @@ and Polars; 14 of its checks fail on GF's binary) carries the reference
 values. The full ctest passed 670 of 670 (29 minutes, -j2) on the first
 run. The fixture replay left all 2,673 responses unchanged; the Python
 script tests passed 406 of 406.
+
+## Review GH1: Heuristics++ on CSV uploads' log shape, alignments of an empty log on a net that is not easy sound (2026-11-23)
+
+Round GH re-reviewed round GG on fresh banks: the stochastic map, the
+Monte Carlo route and the stochastic playout fitted from cached POWL and
+heuristics nets, the stochastic map of CSV uploads, Heuristics++
+(`heuristic_variant=plusplus`) on CSV uploads' default (log) shape
+against `heuristics_miner.apply_heu(variant=PLUSPLUS)` on
+`convert_to_event_log(format_dataframe(read_csv))` and on new XES banks'
+log and frame shapes, `/api/compare-petri`'s element usage, the
+alignment routes (`/api/align`, `/api/evaluate`'s alignment-based fitness
+and Align-ETConformance precision) on the session's cached POWL,
+heuristics and Inductive nets against pm4py's alignments on its own nets,
+and the Alpha model's token replay and footprints on the log shape. GG's
+CI run 45082708237 (507ceb7) passed on Linux, macOS and the Python,
+verifier and frontend jobs; its Windows ctest job was still running at
+GH's end. Observed black-box on pm4py 2.7.22 (pandas 3.0.5, numpy
+2.4.6, polars 1.44.1, no pyarrow), every sweep with
+`NPY_DISABLE_CPU_FEATURES="X86_V3 X86_V4 AVX512_ICL AVX512_SPR"` and
+`PYTHONHASHSEED=0`, hash-seed stability checked over `PYTHONHASHSEED`
+0-15.
+
+Banks: new banks from `gen/gengh.py` (round GG's generator plus shuffled
+event order, time gaps on a trace's first event and swapped times) on
+seeds 9400-9639 (ghA to ghD, 240 uploads) and 9700-9859 (hhA and hhB, 160
+Heuristics++ uploads); 960 CSV Heuristics++ uploads from
+`gen/genhcsv.py` (hcA to hcH, seeds 9700-10679: int, float, str and mixed
+instance columns with gaps, lifecycle gaps, time gaps, shuffled rows, and
+start-timestamp columns of date, text, int or mixed cells with gaps); 201
+CSV copies of the gh uploads (gcsv) for the stochastic map; 44 hand-made
+CSV probes.
+
+Fixed:
+
+- **GH1-1. Heuristics++ reads a CSV upload's log shape as pm4py's
+  converted frame holds it.** The log shape of a CSV upload is
+  `convert_to_event_log` of its formatted frame: every event carries every
+  column, typed by the column's dtype, a missing cell as NaN. Minera read
+  the CSV text instead, in four places:
+  - the lifecycle pairing keys a start by its activity and the
+    instance's frame value: "1" and "1.0" of a float64 column are one
+    instance (Minera compared the text and kept them apart), "01" and "1"
+    of a str column stay two;
+  - `to_interval` lower-cases each event's `lifecycle:transition`: a
+    missing cell raises `AttributeError: 'float' object has no attribute
+    'lower'`, and an int, float, bool or date column raises with its type's
+    name (Minera read a gap as a complete);
+  - a lifecycle column mapped from another header (`lifecycle`) is an
+    ordinary column to pm4py, which reads only `lifecycle:transition`, so
+    every event is a complete (Minera paired the column's starts);
+  - a start-timestamp column (the configured key, by default
+    `start_timestamp`) is on the first event even where its cell is
+    missing, so `to_interval` keeps the log as it is and the abstraction
+    raises pm4py's first error, as on an XES upload's frame (GC1): a
+    missing start `ValueError: NaTType does not support timestamp`, a str,
+    int, bool or float64 column (numbers or all missing) `TypeError: '<='
+    not supported between instances of 'Timestamp' and 'str'` (`'int'`,
+    `'bool'`, `'float'`). Minera decided pre-interval mode from the first
+    event's value and reported its own start-timestamp messages.
+- **GH1-2. Alignments of an upload without traces on a net that is not
+  easy sound.** pm4py's log alignments check easy soundness before reading
+  the log, so on an XES upload without traces, whose heuristics net has no
+  transitions and an unreachable final marking, `alignments.apply` and
+  `fitness_alignments` raise "trying to apply alignments on a Petri net
+  that is not a easy sound net!!". `/api/evaluate`'s alignment-based
+  fitness returned 0 and `/api/align` an empty computed result; both now
+  report the uncomputed result they give a non-empty log on that net
+  (`computed: false`, "final marking is unreachable" and "alignment not
+  computed: final marking unreachable or invalid alignment options"). The
+  Align-ETConformance precision already failed there; the POWL net of the
+  same upload is sound, and pm4py's fitness 0 stays.
+
+Before and after, on the 960 bank uploads and 44 probes: Heuristics++ on
+CSV uploads' log shape gave 652 equal dependency matrices, 13 different
+ones, 227 results where pm4py raises and 112 other messages before; 665
+equal and 339 failing on both sides with pm4py's message after. The option
+sets (`hpp`, `hpp_perf`, `hpp_min`: edges with dependency, frequency and
+performance, activities, start and end activities) differed on 8, 11 and
+7 uploads beside the same 339 errors before, 0 after (1,004 of 1,004 per
+option set).
+The alignment-based fitness of the heuristics net on the gh and gg banks
+324 equal and 60 failing in pm4py only before, 324 equal and 63 failing on
+both sides after (387 of 387 POWL equal throughout); `/api/align` on the
+120 heuristics sessions of ghA and ghB 18 failing in pm4py only before,
+18 failing on both sides after.
+
+Re-reviewed without a difference:
+
+- the stochastic map on ghA to ghD: POWL 163 and heuristics 161 sessions
+  equal (weights, distribution types and parameters; pm4py's service-time
+  model per transition equal on the same sessions), the rest fail on both
+  sides (`FitDataError` on negative samples) or in the mine; Monte Carlo
+  fitted from the log 100 POWL and 128 heuristics runs equal; the
+  stochastic playout 163 POWL and 129 heuristics runs equal (32 more
+  heuristics lines were the harness posting an empty weights string for a
+  net without transitions);
+- the stochastic map of the 201 CSV copies: POWL 192 and heuristics 193
+  equal, eight untimed CSVs fail in pm4py only (the declared AE2-7
+  extension), one POWL map varies with the hash seed (below);
+- Heuristics++ on hhA and hhB: both frame shapes 34 equal and 126 failing
+  on both sides with pm4py's message, per option set; the log shape 78
+  equal and 82 failing on both sides with Minera's whole-mine message (58
+  a missing time, declared in GF1; 24 a later event without the start
+  timestamp, declared below);
+- `/api/compare-petri`'s element usage of consecutive uploads: heuristics
+  205 pairs equal, POWL 203 equal and 2 varying with the hash seed;
+- `/api/align` on the cached POWL, heuristics and Inductive nets: the
+  cost of every variant equals pm4py's (its cost in units of 10000, the
+  silent-move epsilon dropped), and with it fitness; the chosen moves and
+  the search counters differ where several optimal alignments exist,
+  which the alignment contract does not bind (pm4py's own choice changes
+  between runs on ghA/f9414); Align-ETConformance precision equal on
+  every session where both compute it;
+- the Alpha model's token replay totals on the log shape equal pm4py's
+  but for the declared empty-log fitness; its footprints on nets whose
+  reachability graph is unbounded fail on both sides (Minera's
+  unboundedness error, pm4py past the sweep's 20-second bound): on the gg
+  and gh banks 327 replay totals equal, 60 empty logs (the declared
+  fitness), 269 footprints equal and 118 failing on both sides, and 33
+  uploads failing in the mine (an event without a label, declared).
+
+Declared:
+
+- pm4py's POWL discovery orders a partial order's children by string
+  hashes, so the element usage of gfR/f8532 against f8533 (open since GF;
+  seeds 3, 9, 12, 13 and 15 of 0-15 give Minera's counts, GG's note of a
+  seed-stable answer was wrong), of ghA/f9426 against f9427 and ghB/f9461
+  against f9462, and the stochastic map of gcsv/f9631 (seeds 2, 3 and 5 of
+  0-7 give Minera's) change with the hash seed; Minera gives one of its
+  answers.
+- The log shape's whole-mine message for Heuristics++ on an XES upload
+  whose first event has the start timestamp and a later one lacks it
+  ("Heuristics Miner PLUSPLUS interval input is missing the configured
+  start timestamp", pm4py `KeyError: 'start_timestamp'`), as for a missing
+  time (GF1). The frame shapes give pm4py's message.
+- Unchanged: the declared items of GG1 and before.
+
+In the suite: the new `minera_server_review_gh_tests` (Heuristics++ on
+CSV uploads: float64, int64 and str instance pairs, a lifecycle gap, an
+int lifecycle column, a lifecycle column under another header, start
+columns with a missing first cell, text, ints or no values; the
+alignment-based fitness and `/api/align` of an upload without traces on
+its heuristics and POWL nets; 11 of its 15 checks fail on GG's binary)
+carries the reference values. The full ctest passed 671 of 671 (27
+minutes, -j2) on the first run. The fixture replay left all 2,673
+responses unchanged; the Python script tests passed 406 of 406.

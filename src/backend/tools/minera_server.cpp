@@ -7707,10 +7707,25 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
           session->powl_timestamp_key, session->powl_case_id_key);
       alignment_log = &*projected_powl_log;
     }
-    const auto alignment =
+    auto alignment =
         miner == "imported"
             ? minera::tools::imported_model_alignment(*alignment_log, selected, options)
             : minera::check_alignment(*alignment_log, selected, options);
+    // The reference's log alignments check easy soundness before reading
+    // the log, so a session without traces fails on a net whose final
+    // marking is unreachable as a non-empty log does (round GH, observed
+    // black-box: a heuristics net without transitions). A supplied model's
+    // reference path checks it already.
+    if (miner != "imported" && alignment.computed && alignment.trace_count == 0) {
+      minera::EventLog probe;
+      probe.traces.push_back(minera::Trace{});
+      const auto soundness = minera::check_alignment(probe, selected, options);
+      if (!soundness.computed) {
+        alignment.computed = false;
+        alignment.exhausted = soundness.exhausted;
+        alignment.time_limit_reached = soundness.time_limit_reached;
+      }
+    }
     auto graph = session->graph;
     register_activity_selector_values(graph, *alignment_log,
                                       options.activity_attribute);

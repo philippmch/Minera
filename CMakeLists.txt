@@ -2605,6 +2605,17 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_stochastic_fits_gg_tests minera_server)
     add_test(NAME minera_server_stochastic_fits_gg_tests
              COMMAND minera_server_stochastic_fits_gg_tests $<TARGET_FILE:minera_server>)
+    # Review GH: Heuristics++ on a CSV upload's log shape (typed instances,
+    # lifecycle and start columns as pm4py's converted frame holds them);
+    # alignments of an empty log on a net that is not easy sound.
+    add_executable(minera_server_review_gh_tests
+      src/backend/tests/test_server_review_gh.cpp)
+    target_include_directories(minera_server_review_gh_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_gh_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_gh_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_gh_tests minera_server)
+    add_test(NAME minera_server_review_gh_tests
+             COMMAND minera_server_review_gh_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)
