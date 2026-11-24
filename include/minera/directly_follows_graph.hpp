@@ -56,6 +56,15 @@ class DirectlyFollowsGraph {
     return intern_activity(activity);
   }
 
+  // The same graph with its edges recounted from `cases`, each one case's
+  // activities in the order its directly-follows pairs take (pm4py's frame
+  // DFG over a start column, frame_dfg.hpp), the edges in order of first
+  // appearance. Activities, their counts, start and end activities, rework
+  // and variants stay as they are; an activity the registry lacks pairs
+  // with nothing.
+  [[nodiscard]] DirectlyFollowsGraph with_edges_from(
+      const std::vector<std::vector<std::string_view>>& cases) const;
+
   [[nodiscard]] std::uint64_t activity_count(std::string_view activity) const;
   [[nodiscard]] std::uint64_t start_activity_count(
       std::string_view activity) const;

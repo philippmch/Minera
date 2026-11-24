@@ -3192,7 +3192,12 @@ void write_performance(std::ostream& out, const PerformanceMetrics& performance)
     write_duration_stats(out, edges[i].stats);
     out << '}' << (i + 1 < edges.size() ? ", " : "");
   }
-  out << "], \"activities\": [";
+  out << ']';
+  if (!performance.edges_error.empty()) {
+    out << ", \"edges_error\": ";
+    write_json_string(out, performance.edges_error);
+  }
+  out << ", \"activities\": [";
   // Service times from lifecycle start/complete pairs; sparse, so a log of
   // atomic events emits an empty list.
   const auto& service = performance.activity_service;
@@ -3651,7 +3656,9 @@ void validate_dfg_count(std::uint64_t count, std::string_view field) {
 void validate_dfg_performance_statistics(
     const DfgPerformanceStatistics& statistics) {
   validate_dfg_count(statistics.summary.count, "performance summary count");
-  const auto finite = [](double value) { return std::isfinite(value); };
+  // Round GU: on an upload's frame an edge whose durations are all NaN (a
+  // NaT start) has NaN aggregates and NaN raw values, written as null.
+  const auto finite = [](double value) { return std::isnan(value) || std::isfinite(value); };
   const auto& summary = statistics.summary;
   if (!finite(summary.mean) || !finite(summary.median) ||
       !finite(summary.minimum) || !finite(summary.maximum) ||
@@ -3810,21 +3817,31 @@ void write_dfg_frequency(std::ostream& out, const DfgFrequency& dfg,
   out << ']';
 }
 
+// A DFG performance number; NaN (the frame path's NaT gaps) as null.
+struct DfgNumber {
+  double value;
+};
+
+std::ostream& operator<<(std::ostream& out, DfgNumber number) {
+  if (std::isnan(number.value)) return out << "null";
+  return out << number.value;
+}
+
 void write_dfg_performance_summary(
     std::ostream& out, const DfgPerformanceSummary& summary) {
-  out << "{\"count\": " << summary.count << ", \"mean\": " << summary.mean
-      << ", \"median\": " << summary.median
-      << ", \"min\": " << summary.minimum
-      << ", \"max\": " << summary.maximum
-      << ", \"stdev\": " << summary.standard_deviation
-      << ", \"sum\": " << summary.sum << '}';
+  out << "{\"count\": " << summary.count << ", \"mean\": " << DfgNumber{summary.mean}
+      << ", \"median\": " << DfgNumber{summary.median}
+      << ", \"min\": " << DfgNumber{summary.minimum}
+      << ", \"max\": " << DfgNumber{summary.maximum}
+      << ", \"stdev\": " << DfgNumber{summary.standard_deviation}
+      << ", \"sum\": " << DfgNumber{summary.sum} << '}';
 }
 
 void write_double_vector(std::ostream& out,
                          const std::vector<double>& values) {
   out << '[';
   for (std::size_t i = 0; i < values.size(); ++i) {
-    out << values[i] << (i + 1 < values.size() ? ", " : "");
+    out << DfgNumber{values[i]} << (i + 1 < values.size() ? ", " : "");
   }
   out << ']';
 }
@@ -3835,7 +3852,7 @@ void write_dfg_performance_value(std::ostream& out,
       [&](const auto& selected) {
         using Value = std::decay_t<decltype(selected)>;
         if constexpr (std::is_same_v<Value, double>) {
-          out << selected;
+          out << DfgNumber{selected};
         } else if constexpr (std::is_same_v<Value, std::vector<double>>) {
           write_double_vector(out, selected);
         } else {

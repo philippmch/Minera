@@ -295,12 +295,23 @@ void handle_active_source_mining(const httplib::Request& request,
     return "{\"representation\":\"analysis_presentation\"}";
   });
   std::optional<minera::PerformanceMetrics> performance;
+  // The pandas frame's order; Polars' sort (nulls first, clamped durations)
+  // is not modelled here.
+  std::optional<minera::FrameDfgStartOrder> frame_dfg_order;
   std::optional<minera::ResourceNetwork> resources;
   std::optional<std::vector<minera::DurationStats>> durations;
   std::optional<std::vector<minera::EventuallyFollowsEdge>> eventually;
   run("log_statistics_preparation", "log", [&](bool& native_returned) {
     const auto& log = require_prepared_log(*session); const auto& graph = require_graph(*session);
-    performance = minera::compute_performance_metrics(log, graph, dataframe_performance_source(session->active_source.get()));
+    // pm4py's frame DFG reads an upload's start_timestamp column (round GU).
+    if (dataframe_performance_source(session->active_source.get()) &&
+        session->active_source->selected_kind() != minera::EventDataKind::kLazyEventTable)
+      frame_dfg_order = minera::frame_dfg_start_order(log);
+    if (frame_dfg_order)
+      performance = minera::compute_performance_metrics(log, minera::frame_dfg_graph(graph, log, *frame_dfg_order),
+                                                        true, &*frame_dfg_order);
+    else
+      performance = minera::compute_performance_metrics(log, graph, dataframe_performance_source(session->active_source.get()));
     resources = minera::discover_resource_network(log);
     durations = minera::compute_variant_durations(log, graph);
     eventually = minera::discover_eventually_follows(log, graph, params.eventually_follows);
@@ -471,7 +482,8 @@ void handle_active_source_mining(const httplib::Request& request,
       const auto constraint_order = skeleton_order();
       const minera::AnalysisConstraintCaseOrder constraint_list_order(
           constraint_order ? &*constraint_order : nullptr);
-      analysis = minera::analysis_json(dataset, session_log(*session), graph,
+      analysis = minera::analysis_json(dataset, session_log(*session),
+          frame_dfg_order ? minera::frame_dfg_graph(graph, require_prepared_log(*session), *frame_dfg_order) : graph,
           session->tree_ready ? &session->tree : nullptr, net("alpha"), heuristics ? &*heuristics : nullptr,
           &conformance, performance ? &*performance : nullptr, resources ? &*resources : nullptr,
           durations ? &*durations : nullptr, eventually ? &*eventually : nullptr,

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "minera/directly_follows_graph.hpp"
@@ -56,6 +57,9 @@ struct PerformanceMetrics {
   // until the next case arrives; empty when fewer than two cases are timed.
   DurationStats case_arrival;
   std::uint64_t timed_traces = 0;  // traces with at least two parseable instants
+  // pm4py's error for the edge timings when an upload's start_timestamp
+  // column holds no dates (frame_dfg.hpp); the edges then carry no timings.
+  std::string edges_error;
 };
 
 // Reduces a list of durations (seconds) to summary statistics — the shared
@@ -77,6 +81,21 @@ struct PerformanceMetrics {
     const EventLog& log,
     const DirectlyFollowsGraph& graph,
     bool dataframe_arithmetic = false);
+
+struct FrameDfgStartOrder;
+
+// The same with the edge timings of pm4py's frame DFG over an upload's
+// start_timestamp column (frame_dfg.hpp) when `frame_order` is given: the
+// pairs in that order, each the later event's start minus the earlier one's
+// timestamp, signed, a NaT start NaN (skipped; an edge of only NaN durations
+// has total 0 and NaN statistics, written as null). `graph` is then the
+// graph frame_dfg_graph recounted. A start column of no dates leaves the
+// edges untimed with the order's subtraction error in edges_error.
+[[nodiscard]] PerformanceMetrics compute_performance_metrics(
+    const EventLog& log,
+    const DirectlyFollowsGraph& graph,
+    bool dataframe_arithmetic,
+    const FrameDfgStartOrder* frame_order);
 
 // Case throughput time (first-to-last event) summarized per trace variant. The
 // returned vector is aligned to `graph.variants()` order, so entry i describes

@@ -118,6 +118,7 @@
 #include "minera/declare_playout.hpp"
 #include "minera/decision_table.hpp"
 #include "minera/directly_follows_graph.hpp"
+#include "minera/frame_dfg.hpp"
 #include "minera/dfg_conversion.hpp"
 #include "minera/dfg_dataframe.hpp"
 #include "minera/dfg_dataframe_json.hpp"
@@ -2625,8 +2626,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                            heuristic_net, powl_net, params.footprints, nullptr,
                            footprint_frame ? &*footprint_frame : nullptr);
     checkpoint("Performance and resources");
+    // pm4py's frame DFG reads an upload's start_timestamp column (round GU):
+    // the process map's edges and their timings take its order.
+    const auto frame_dfg_order = dataframe_performance_source(active_source.get())
+                                     ? minera::frame_dfg_start_order(log)
+                                     : std::nullopt;
     const auto performance = minera::compute_performance_metrics(
-        log, graph, dataframe_performance_source(active_source.get()));
+        log, frame_dfg_order ? minera::frame_dfg_graph(graph, log, *frame_dfg_order) : graph,
+        dataframe_performance_source(active_source.get()), frame_dfg_order ? &*frame_dfg_order : nullptr);
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
@@ -2848,7 +2855,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const minera::AnalysisConstraintCaseOrder constraint_list_order(
         constraint_order ? &*constraint_order : nullptr);
     std::string body = minera::analysis_json(
-        dataset, log, graph, &tree, &net, &heuristics, &conformance,
+        dataset, log, frame_dfg_order ? minera::frame_dfg_graph(graph, log, *frame_dfg_order) : graph,
+        &tree, &net, &heuristics, &conformance,
         &performance, &resources, &variant_durations, &eventually,
         /*decisions=*/nullptr, &petri_decoration,
         spectrum ? &*spectrum : nullptr,
@@ -5255,10 +5263,14 @@ void handle_dfg_discovery(const httplib::Request& request,
     const auto variants = analyze_dfg_variants(require_prepared_log(*session), params.dfg_statistical_variants, params.dfg_causal_variants, dfg_statistics_for_source(params.dfg_statistics, session->active_source.get()));
     for (const auto& activity : minera::dfg_variant_activities(variants)) graph.ensure_activity(activity);
     std::optional<minera::OmitAnalysisTraces> omit_traces(std::in_place, !analysis_include_traces(request));
+    const auto frame_dfg_order = dataframe_performance_source(session->active_source.get())
+                                     ? minera::frame_dfg_start_order(require_prepared_log(*session))
+                                     : std::nullopt;
     const auto result = minera::analysis_json(
       /* dataset */ session->dataset,
       /* event_log */ require_prepared_log(*session),
-      /* graph */ graph,
+      /* graph */ frame_dfg_order ? minera::frame_dfg_graph(graph, require_prepared_log(*session), *frame_dfg_order)
+                                  : graph,
       /* tree */ nullptr,
       /* net */ nullptr,
       /* heuristics */ nullptr,
@@ -7352,8 +7364,19 @@ void handle_cycle_time(const httplib::Request& request,
     const bool dataframe = !session->active_source ||
                            session->active_source->file().format == "csv" ||
                            session->active_source->file().format == "xes";
+    // Round GU (observed black-box): format_dataframe names a CSV upload's
+    // start_timestamp column as the frame's start key, which
+    // pm4py.get_cycle_time reads; read_xes names none.
+    const auto csv_start_column = [&] {
+      if (!session->active_source || session->active_source->file().format != "csv") return false;
+      const auto& log = require_prepared_log(*session);
+      if (!log.dataframe_columns) return false;
+      for (const auto& column : log.dataframe_columns->columns)
+        if (column.key == "start_timestamp") return true;
+      return false;
+    };
     if (dataframe && !present("cycle_time_start_timestamp_key"))
-      options.start_timestamp_key = options.timestamp_key;
+      options.start_timestamp_key = csv_start_column() ? std::string("start_timestamp") : options.timestamp_key;
     response.set_content(
         minera::cycle_time_json(
             minera::discover_cycle_time(require_prepared_log(*session), options)),

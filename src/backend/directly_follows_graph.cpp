@@ -108,6 +108,21 @@ std::uint64_t DirectlyFollowsGraph::edge_count(
   return edges_[it->second].count;
 }
 
+DirectlyFollowsGraph DirectlyFollowsGraph::with_edges_from(
+    const std::vector<std::vector<std::string_view>>& cases) const {
+  DirectlyFollowsGraph result = *this;
+  result.edges_.clear();
+  result.edge_ids_.clear();
+  for (const auto& activities : cases) {
+    for (std::size_t i = 1; i < activities.size(); ++i) {
+      const auto source = activity_id(activities[i - 1]);
+      const auto target = activity_id(activities[i]);
+      if (source && target) result.add_edge(*source, *target);
+    }
+  }
+  return result;
+}
+
 std::size_t DirectlyFollowsGraph::intern_activity(
     const std::string& activity) {
   auto [it, inserted] = activity_ids_.emplace(activity, activities_.size());

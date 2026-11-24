@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string_view>
 
+#include "minera/frame_dfg.hpp"
 #include "minera/frame_keys.hpp"
 #include "minera/timestamp.hpp"
 
@@ -601,8 +602,63 @@ DfgCleanAnalysis frame_keyed_clean_dfg(const FrameKeyedActivities& keyed,
   return result;
 }
 
+// pm4py's frame performance DFG on an upload's frame with a
+// start_timestamp column (round GU, frame_dfg.hpp), for the DataFrame path
+// without an explicit start key: `log` holds the frame, `labels` the
+// activities (the same traces and events, keyed by another column). With
+// business hours a duration is the business time from the earlier event's
+// timestamp to the later one's start on the UTC clock, clamped at 0, and a
+// NaT start fails the conversion to int. The aggregates skip NaN; the raw
+// values keep it.
+std::optional<DfgPerformance> frame_start_performance_dfg(const EventLog& log, const EventLog& labels,
+                                                          const DfgStatisticalOptions& options) {
+  if (!options.dataframe_arithmetic || !options.start_timestamp_attribute.empty()) return std::nullopt;
+  if (!options.timestamp_attribute.empty() && options.timestamp_attribute != "time:timestamp") return std::nullopt;
+  const auto order = frame_dfg_start_order(log);
+  if (!order) return std::nullopt;
+  if (!order->subtraction_error.empty())
+    throw std::invalid_argument(options.use_business_hours ? order->business_hours_error : order->subtraction_error);
+  const auto slots = options.use_business_hours
+                         ? detail::normalize_business_hour_slots(options.business_hour_slots,
+                                                                 options.business_hour_slots_explicit,
+                                                                 "DFG discovery")
+                         : std::vector<BusinessHourSlot>{};
+  const auto micro = [](const ParsedExactTimestamp& instant) {
+    return instant.seconds * 1000000LL + static_cast<std::int64_t>(instant.nanoseconds / 1000U);
+  };
+  std::map<DfgActivityPair, std::vector<double>> observations;
+  for (const auto& pair : frame_dfg_pairs(log, *order)) {
+    double elapsed = pair.seconds;
+    if (options.use_business_hours) {
+      if (!pair.previous_timestamp || !pair.current_start)
+        throw std::invalid_argument("ValueError: cannot convert float NaN to integer");
+      elapsed = std::max(0.0, detail::business_elapsed_microseconds(micro(*pair.previous_timestamp),
+                                                                    micro(*pair.current_start), slots));
+    }
+    const auto& events = labels.traces[pair.trace].events;
+    observations[{activity_value(events[pair.previous], options), activity_value(events[pair.current], options)}]
+        .push_back(elapsed);
+  }
+  DfgPerformance result;
+  for (auto& [pair, values] : observations) {
+    std::vector<double> present;
+    for (const double value : values)
+      if (!std::isnan(value)) present.push_back(value);
+    auto summary = summarize(present, true);
+    summary.count = present.size();
+    if (present.empty())
+      summary.mean = summary.median = summary.minimum = summary.maximum = summary.standard_deviation =
+          std::numeric_limits<double>::quiet_NaN();
+    result.emplace(pair, DfgPerformanceStatistics{summary, values,
+                                                  selected_performance_value(summary, values,
+                                                                             options.performance_aggregation)});
+  }
+  return result;
+}
+
 DfgStatisticalAnalysis frame_keyed_dfg_statistics(const FrameKeyedActivities& keyed,
-                                                  const DfgStatisticalOptions& options) {
+                                                  const DfgStatisticalOptions& options,
+                                                  const EventLog* frame_log) {
   const auto projected = dfg_concept_name(options);
   DfgStatisticalAnalysis result;
   result.variant = options.variant;
@@ -614,6 +670,11 @@ DfgStatisticalAnalysis frame_keyed_dfg_statistics(const FrameKeyedActivities& ke
       if (options.dataframe_arithmetic)
         if (const auto error = frame_activity_column_error(keyed); !error.empty())
           throw std::invalid_argument(error);
+      if (frame_log)
+        if (auto frame = frame_start_performance_dfg(*frame_log, keyed.log, projected)) {
+          result.performance_dfg = std::move(*frame);
+          return result;
+        }
       result.performance_dfg = discover_performance_dfg(keyed.log, projected);
       return result;
     case DfgStatisticalVariant::kClean:
@@ -659,7 +720,7 @@ DfgStatisticalAnalysis discover_dfg_statistics(
                                    options.variant == DfgStatisticalVariant::kCaseAttributes;
     if (event_log_counter && log.dataframe_columns && log.dataframe_columns->csv_text)
       distinct_float_gap_labels(*keyed);
-    return frame_keyed_dfg_statistics(*keyed, options);
+    return frame_keyed_dfg_statistics(*keyed, options, &log);
   }
   DfgStatisticalAnalysis result;
   result.variant = options.variant;
@@ -668,7 +729,10 @@ DfgStatisticalAnalysis discover_dfg_statistics(
   } else if (options.variant == DfgStatisticalVariant::kFrequencyTriples) {
     result.frequency_triples = discover_frequency_triples(log, options);
   } else if (options.variant == DfgStatisticalVariant::kPerformance) {
-    result.performance_dfg = discover_performance_dfg(log, options);
+    if (auto frame = frame_start_performance_dfg(log, log, options))
+      result.performance_dfg = std::move(*frame);
+    else
+      result.performance_dfg = discover_performance_dfg(log, options);
   } else if (options.variant == DfgStatisticalVariant::kCaseAttributes) {
     result.case_attributes = discover_case_attribute_dfg(log, options);
   } else if (options.variant == DfgStatisticalVariant::kClean) {

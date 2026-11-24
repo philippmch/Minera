@@ -229,7 +229,16 @@ PassedTimeResult frame_passed_time(const EventLog& log, const PassedTimeOptions&
   const auto activity_key = frame_times::activity_column(options.activity_key);
   const auto timestamp_key = frame_times::timestamp_column(options.timestamp_key);
   const bool start_given = !options.start_timestamp_key.empty();
-  const auto start_key = start_given ? frame_times::timestamp_column(options.start_timestamp_key) : timestamp_key;
+  // Round GU (observed black-box): without a start key the pandas variant
+  // reads the frame's start_timestamp column when it holds one, as pm4py's
+  // frame DFG does (frame_dfg.hpp): the rows sorted by it, each pair's time
+  // the next row's start, not raised, less the row's timestamp (a NaT start
+  // NaN; with business hours a ValueError); a start column of no dates fails
+  // the subtraction (with business hours the .dt accessor), pairs or not.
+  const bool implicit_start = !start_given && frame.has("start_timestamp") && timestamp_key != "start_timestamp";
+  const auto start_key = start_given      ? frame_times::timestamp_column(options.start_timestamp_key)
+                         : implicit_start ? std::string("start_timestamp")
+                                          : timestamp_key;
   const bool raised_start = start_given && start_key != timestamp_key;
   if (!start_given) {
     if (!frame.has(timestamp_key)) fail("KeyError: '" + timestamp_key + "'");
@@ -298,7 +307,7 @@ PassedTimeResult frame_passed_time(const EventLog& log, const PassedTimeOptions&
     const auto& previous = rows[pairs[i].previous];
     const auto& next = rows[pairs[i].next];
     if (!raised_start) {
-      starts[i] = next.timestamp;
+      starts[i] = implicit_start ? next.start : next.timestamp;
       continue;
     }
     const auto a = held(next.start, start_type, true);
@@ -313,6 +322,11 @@ PassedTimeResult frame_passed_time(const EventLog& log, const PassedTimeOptions&
     else if (!next.start) starts[i] = previous.timestamp;
     else if (!previous.timestamp) starts[i] = next.start;
     else starts[i] = python::compare(*next.start, *previous.timestamp) >= 0 ? next.start : previous.timestamp;
+  }
+  if (implicit_start && timestamp_type == DataFrameColumnType::kDate && start_type != DataFrameColumnType::kDate) {
+    if (business) fail("AttributeError: Can only use .dt accessor with datetimelike values");
+    const bool numbers = start_type == DataFrameColumnType::kInt64 || start_type == DataFrameColumnType::kFloat64;
+    fail(std::string("TypeError: cannot subtract DatetimeArray from ndarray[") + (numbers ? "float64" : "object") + "]");
   }
   if (raised_start && pairs.empty()) {
     // Without a successive pair (observed): business hours fail on a date or
@@ -346,7 +360,7 @@ PassedTimeResult frame_passed_time(const EventLog& log, const PassedTimeOptions&
         ends.push_back(starts[i]);
         begins.push_back(rows[pairs[i].previous].timestamp);
       }
-      auto shifted_type = raised_start ? start_type : timestamp_type;
+      auto shifted_type = raised_start || implicit_start ? start_type : timestamp_type;
       if (shifted_type == DataFrameColumnType::kInt64) shifted_type = DataFrameColumnType::kFloat64;
       if (shifted_type == DataFrameColumnType::kBool) shifted_type = DataFrameColumnType::kObject;
       const auto difference = frame_times::column_subtraction(shifted_type, ends, timestamp_type, begins);
@@ -403,7 +417,7 @@ PassedTimeResult frame_passed_time(const EventLog& log, const PassedTimeOptions&
       ends.push_back(&starts[i]);
     }
     convertible(timestamp_type, false, begins);
-    convertible(raised_start ? start_type : timestamp_type, true, ends);
+    convertible(raised_start || implicit_start ? start_type : timestamp_type, true, ends);
     const auto instant = [](const std::optional<Scalar>& cell) -> std::optional<ParsedExactTimestamp> {
       if (!cell) return std::nullopt;
       if (cell->kind == Scalar::Kind::kDate) return cell->date;

@@ -993,7 +993,18 @@ DfgPerformanceSummary summarize_values(const std::vector<double>& values,
   if (values.empty()) return result;
   if (!polars) {
     // pandas groupby: Kahan sum, sum / count mean, Welford deviation (NaN
-    // for one observation).
+    // for one observation). The aggregates skip a NaN flow (an unclamped NaT
+    // start); an edge of only NaN flows sums to 0 and is NaN otherwise
+    // (round GU, observed black-box).
+    std::vector<double> present;
+    for (const double value : values)
+      if (!std::isnan(value)) present.push_back(value);
+    if (present.size() != values.size()) {
+      const double nan = std::numeric_limits<double>::quiet_NaN();
+      if (present.empty()) return {0, nan, nan, nan, nan, nan, 0.0};
+      auto summary = summarize_values(present, false);
+      return summary;
+    }
     const auto aggregates = detail::aggregate_performance(values, true);
     result.sum = aggregates.sum;
     result.mean = aggregates.mean;
@@ -1246,6 +1257,14 @@ DfgTableResult discover_table_dfg(const EventTable& table,
           performance_values[pair].push_back(0.0);
         else if (polars)
           (void)performance_values[pair];
+        else if (!clamp_start) {
+          // Unclamped (the frame's own start_timestamp column, which pm4py
+          // takes as is) the flow is NaN, and the edge stays; business
+          // hours fail converting it (round GU, observed black-box).
+          if (options.business_hours)
+            throw std::invalid_argument("ValueError: cannot convert float NaN to integer");
+          performance_values[pair].push_back(std::numeric_limits<double>::quiet_NaN());
+        }
         continue;
       }
       performance_values[pair].push_back(

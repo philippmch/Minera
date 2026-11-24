@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GT (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–GU (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9984,6 +9984,85 @@ GT's suite: the full ctest 683 of 683 (with the new
 server binary), Python script tests 406 of 406, and the 16 manifests
 replayed 2,673 responses unchanged (the frontend is untouched).
 Harness and probes: `review-harness/round-gt/`.
+
+Round GU re-reviewed GT and took GT5. GT's CI run 45324381722 passed on
+Linux, macOS, the frontend, the Python scripts and the parity verifier
+(its Windows job was still building at GU's handoff). Fresh bank:
+`gen/genstx.py` guX, 200 uploads, XES and CSV alternating, whose
+start_timestamp column holds dates (gaps, swaps, ties, XES offsets),
+ints, floats, text, booleans, date text, mixed cells or nothing, seeds
+71000-71199; with GT's gtP. GU1, pm4py's frame DFG reads an upload's
+start_timestamp column (`frame_dfg.cpp`, `frame_dfg_start_order`): each
+case's rows sorted by the column's own pandas ranks, then the timestamp,
+ties in frame order and a gap last, give the directly-follows pairs of
+the process map (`/api/mine` edges) and of the DFG performance variant
+(`/api/mine`, `/api/discover-dfg`); a pair's duration is the later row's
+start minus the earlier row's timestamp, signed, a NaT start NaN, which
+the aggregates skip (an edge of only NaN durations sums to 0 and is NaN
+otherwise, now written as null rather than refused by the variant's
+finite check); start and end counts keep the timestamp order; business
+hours clamp at 0 and fail on a NaT start (`ValueError: cannot convert
+float NaN to integer`). GU1-2, a start column of no dates no longer
+fails the mine: the edges keep the column's order and carry no timings,
+and `performance.edges_error` holds pm4py's `TypeError: cannot subtract
+DatetimeArray from ndarray[float64]` (numbers, all empty) or
+`ndarray[object]` (text, booleans, mixed); the performance variant fails
+with it, with business hours at the `.dt` accessor. A column pandas cannot
+sort (an XES column of mixed Python objects) fails the mine with
+discover_dfg's `TypeError: 'values' is not ordered, ...` (declared: the
+process map is the mine's core result). After (`ct/pmap2.py`): gtP 200 of
+200 uploads with equal edges, start and end counts, performance edges and
+variant (GT's binary 47, 200, 16 and 16); guX 194 mines with equal edges
+and start and end counts and 6 equal mine errors, 101 equal performance
+edges and 93 equal `edges_error`, 101 equal variants and 99 equal errors.
+GU2, passed time without a start key (the pandas variant) pairs each row
+with the next row's start, unclamped, signed, NaN pairs counted in the
+frequency (`passed_time.cpp`), and cycle time on a CSV upload's frame
+takes the start_timestamp column format_dataframe names in its attrs
+(read_xes names none; `handle_cycle_time`): `ct/ptc.py` on gtP 0 diffs
+in 100 cycle times and 822 passed-time judgments, and in 420 more with
+business hours (GT's binary on the first 50 uploads: 42 of 50 cycle
+times and 339 of 420 judgments wrong, 355 of 420 with business hours); on
+guX the only diffs are uploads whose mine fails
+(the routes then answer from the previous session). GU3,
+`/api/dfg-dataframe` with pandas' default start (the frame's own
+start_timestamp column, unclamped) kept no edge for a NaN flow; it now
+keeps it with NaN aggregates as above, and business hours fail converting
+it (`dfg_dataframe.cpp`): `ct/dfgdf.py` on gtP 600 of 600 (GT's binary 38
+performance and 38 both-measure results wrong of 200 each), with business
+hours 150 of 150 on 50 uploads. Declared: native table sources' EventLog
+names no start key in its properties, so its performance DFG keeps
+time:timestamp (an EventLog converted from a format_dataframe frame
+carries it and clamps at 0); heuristics (apply_heu), the EFG default,
+footprints, Inductive, the transition system, log skeleton, Declare,
+POWL, variants, service time and overlap do not read the column.
+Carried (GU3-2): `/api/dfg-dataframe` on a start column of no dates
+answers `DFG table discovery: invalid start timestamp`, where pandas sorts
+by the column for the frequency and raises the TypeError above for the
+performance (an XES text column of date strings is object there, dates
+in Minera); 40 of the test generator's specs.
+GU's suite: the full ctest 684 of 684 (with the new
+`minera_server_review_gu_tests`: 200 checks, 175 of which fail on GT's
+server binary), Python script tests 406 of 406, the 16 manifests replayed
+2,673 responses unchanged, and the frontend type check passes (types.ts
+gains `performance.edges_error`).
+Harness and probes: `review-harness/round-gu/`.
+
+Next round (GV) should start by re-reviewing round GU:
+
+- GU's CI run (and GT's Windows job, still building at GU's handoff);
+- GU3-2, `/api/dfg-dataframe` on a start column of no dates (frequency in
+  the column's pandas order, the subtraction TypeError for performance,
+  XES date text as object);
+- the frame DFG start order on the other routes that build a DFG from an
+  upload: the stochastic map and playout performance DFGs, the Polars
+  lazy shape's process map (Polars sorts a null start first and clamps),
+  the CSV upload's log shape (an EventLog whose properties name the start
+  key: clamped at 0, in timestamp order) where a route mines it;
+- GT1 on fresh banks and the GT2-GT4 residuals (not taken in GU, below);
+- the carried items below.
+
+Previous list for round GU (kept for its older items):
 
 Next round (GU) should start by re-reviewing round GT:
 

@@ -6166,6 +6166,11 @@ export interface Performance {
   /** Edge timings, in the same order as MineraExport.edges. */
   edges: EdgePerformance[];
   /**
+   * The reference's error for the edge timings when an upload's
+   * start_timestamp column holds no dates; the edges then carry no timings.
+   */
+  edges_error?: string;
+  /**
    * Activity service times from lifecycle start/complete pairs; sparse (only
    * paired activities appear) and absent in exports from older versions.
    */

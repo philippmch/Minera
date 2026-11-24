@@ -94,6 +94,13 @@ struct DataFrameColumns {
 [[nodiscard]] std::optional<EventAttribute> csv_utc_date_cell(const std::string& key,
                                                               const std::string& text);
 
+// The cell `event` holds in `column` of its log's `frame`, as the frame
+// holds it (a CSV cell typed by the column, a CSV date column's UTC date,
+// an XES float64 column's ints as floats); nullopt for a missing cell.
+[[nodiscard]] std::optional<EventAttribute> dataframe_event_cell(const DataFrameColumns& frame,
+                                                                 const DataFrameColumn& column,
+                                                                 const Event& event);
+
 // The log as pm4py's convert_to_event_log of its frame gives it: each event
 // of `log` holds every listed column as an attribute, typed by the column
 // (ints of a float column as floats, bools as bools), a missing cell as NaN,

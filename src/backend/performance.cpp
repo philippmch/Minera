@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <stdexcept>
 #include <deque>
 #include <limits>
 #include <map>
@@ -11,6 +13,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "minera/frame_dfg.hpp"
 #include "minera/timestamp.hpp"
 #include "performance_arithmetic.hpp"
 
@@ -77,12 +80,35 @@ DurationStats summarize_gaps(const std::vector<double>& durations,
   return stats;
 }
 
+// A frame DFG edge's durations: NaN (a NaT start) skipped, as pandas'
+// aggregations skip it; only NaN leaves the sum 0 and the rest NaN.
+DurationStats summarize_frame_gaps(const std::vector<double>& durations) {
+  std::vector<double> present;
+  present.reserve(durations.size());
+  for (const double value : durations)
+    if (!std::isnan(value)) present.push_back(value);
+  if (present.empty()) {
+    DurationStats stats;
+    stats.mean = stats.median = stats.min = stats.max = std::numeric_limits<double>::quiet_NaN();
+    return stats;
+  }
+  return summarize_gaps(present, true);
+}
+
 }  // namespace
 
 PerformanceMetrics compute_performance_metrics(
     const EventLog& log,
     const DirectlyFollowsGraph& graph,
     bool dataframe_arithmetic) {
+  return compute_performance_metrics(log, graph, dataframe_arithmetic, nullptr);
+}
+
+PerformanceMetrics compute_performance_metrics(
+    const EventLog& log,
+    const DirectlyFollowsGraph& graph,
+    bool dataframe_arithmetic,
+    const FrameDfgStartOrder* frame_order) {
   std::unordered_map<std::uint64_t, std::vector<double>> edge_durations;
   std::map<std::size_t, std::vector<double>> service_durations;
   std::vector<double> case_durations;
@@ -118,7 +144,7 @@ PerformanceMetrics compute_performance_metrics(
         }
         last = *instant;
 
-        if (previous) {
+        if (previous && !frame_order) {
           // Like the reference performance DFG, a backwards step (the trace is
           // not sorted by time) counts as a zero-second gap, max(0, delta).
           const double duration =
@@ -154,7 +180,18 @@ PerformanceMetrics compute_performance_metrics(
     }
   }
 
+  // A start column of no dates fails pm4py's subtraction: no edge timings.
+  if (frame_order && frame_order->subtraction_error.empty()) {
+    for (const auto& pair : frame_dfg_pairs(log, *frame_order)) {
+      const auto& events = log.traces[pair.trace].events;
+      const auto source = graph.activity_id(events[pair.previous].activity);
+      const auto target = graph.activity_id(events[pair.current].activity);
+      if (source && target) edge_durations[edge_key(*source, *target)].push_back(pair.seconds);
+    }
+  }
+
   PerformanceMetrics metrics;
+  if (frame_order) metrics.edges_error = frame_order->subtraction_error;
   metrics.timed_traces = case_durations.size();
   metrics.case_duration = summarize_gaps(case_durations, dataframe_arithmetic);
 
@@ -183,7 +220,8 @@ PerformanceMetrics compute_performance_metrics(
     performance.target = edge.target;
     const auto it = edge_durations.find(edge_key(edge.source, edge.target));
     if (it != edge_durations.end()) {
-      performance.stats = summarize_gaps(it->second, dataframe_arithmetic);
+      performance.stats = frame_order ? summarize_frame_gaps(it->second)
+                                      : summarize_gaps(it->second, dataframe_arithmetic);
     }
     metrics.edges.push_back(std::move(performance));
   }

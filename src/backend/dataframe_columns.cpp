@@ -315,6 +315,18 @@ DataFrameColumns xes_dataframe_columns(const EventLog& log) {
   return result;
 }
 
+std::optional<EventAttribute> dataframe_event_cell(const DataFrameColumns& frame,
+                                                  const DataFrameColumn& column,
+                                                  const Event& event) {
+  if (frame.csv_text) {
+    std::vector<char> listed(event.attributes.size(), 0);
+    return csv_value(event, column, listed);
+  }
+  auto cell = xes_value(event, column.key);
+  if (!cell) return std::nullopt;
+  return xes_column_cell(column, std::move(*cell));
+}
+
 EventLog dataframe_frame_event_log(const EventLog& log) {
   if (!log.dataframe_columns) return log;
   EventLog result = log;
