@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GR (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GS (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9821,6 +9821,101 @@ vitest files 298 of 298, and the 16 manifests replayed 2,673 responses with
 the 2 CSV frame captures above changed as intended (rewritten on a fresh
 server over the whole manifest).
 Harness and probes: `review-harness/round-gr/`.
+
+Round GS re-reviewed GR and aligned the temporal profile and its
+conformance on CSV uploads' frame shapes (Review GS1 Polars, GS2 pandas,
+the rest of GR4) and re-ran GR1's custom footprints keys on a fresh bank
+(GS3, no change). GR's CI run 45293923182 passed the Linux ctest, the
+frontend, the Python script tests and the verifier; its macOS build and
+Windows ctest were still running at GS's handoff. No device was reachable,
+so no newer reviewer handoff was read from the Mac.
+Fixed: GS1-1, Polars resolves the pair frame's plan over a CSV frame's own
+dtypes (`csv_frame_temporal_start`, the plan text over the frame's names:
+format_dataframe's copies case:concept:name, concept:name and
+time:timestamp, its "@@index", no row index): a start column of ints,
+floats, Booleans or text beside the dates fails with the plan errors of an
+XES upload's frame (`detail::polars_tp_dtype_error`, now shared as
+`polars_typed_tp_error`, `polars_tp_business_dtype_error` and
+`polars_tp_udf_error`), a frame without its timestamp column fails at the
+with_columns, and with business hours only the filter resolves, the first
+pair that passes it then failing in the UDF's SchemaError (no pair: an
+empty profile, and a conformance listing its cases without deviations);
+Minera answered the profile or another error. GS1-2, the Polars
+conformance of a CSV frame lists each case's deviations in pair order:
+the pair count read the configured start key on the converted log, which
+holds the start as `__minera_temporal_target`, so every CSV frame's pair
+frame looked empty and the deviations followed the profile's order. GS1-3,
+the business hours SchemaError on a CSV frame names the timestamp copy
+time:timestamp and orders the pairs by the frame's "@@index"
+(`discover_temporal_profile_named_start`, `conform_temporal_profile_named_start`).
+GS2-1, pandas with business hours and the timestamp as its own start (a
+custom timestamp key and no start column) measures the pairs row by row:
+a value that is no datetime raises in BusinessHours (`AttributeError:
+'float' object has no attribute 'replace'`, `TypeError: str.replace() takes
+no keyword arguments`), no pair leaves the empty frame's `ValueError:
+Cannot set a DataFrame with multiple columns to the single column
+@@flow_time`, which the conformance raises before it reads the profile.
+GS2-2, without business hours a text column as its own start subtracts
+only once a pair passes the filter (`TypeError: unsupported operand
+type(s) for -: 'str' and 'str'`, else the .dt `AttributeError`), and a
+Boolean column fails numpy's subtraction at any length (`TypeError: numpy
+boolean subtract, ...`). GS2-3, a Boolean column with a gap is read_csv's
+object column of Python bools: as the start beside the dates each present
+pair (NaN skipped) raises `TypeError: '<=' not supported between instances
+of 'Timestamp' and 'bool'`, no such pair `TypeError: cannot subtract
+DatetimeArray from ndarray[object]` (business hours: the empty frame's
+ValueError); as its own start the .dt `AttributeError`; Polars' copy holds
+it as text ("True"/"False").
+After, single-threaded Polars (POLARS_MAX_THREADS=1; with several threads
+pm4py's UDF can name another failing pair, 3 of 1,200 conformance
+judgments): the CSV frames' temporal profile (`ct/tpdcsv.py`, kcT 100
+uploads, 9 option sets) on Polars 900 of 900 judgments (GR's binary 445 of
+600 over its 6 sets, `out/d0_la`) and on pandas 900 of 900; the conformance
+(`ct/tpccsv.py`, 12 sets) on Polars 1,200 of 1,200 (GR's 504) and on pandas 1,200 of 1,200 (GR's 1,126); `tc/mkgs.py`
+over kcT and 12 synthetic uploads (Boolean, float, int, text and object
+start columns, `syn/`, `syn2/`) 4,256 of 4,256 discovery and conformance
+cases on the final binary. XES frames after the refactor: the conformance
+(`ct/tpcval.py`, 12 sets) on grA60 1,440 of 1,440 over both shapes and the
+discovery option sets (`ct/optval.py`, 10 `tp_*` sets) 1,199 of 1,200, the
+one a pandas `KeyError` listing the missing columns of an unknown activity
+key in an order that follows the hash seed (PYTHONHASHSEED 0 and 1
+`['time:timestamp', 'org:resource']`, 2 and 3 Minera's order; declared).
+GS3: the footprints family with 8 other custom keys (`fpk2.sh`: activity
+key lifecycle:transition, concept:instance, a Boolean column, a dict
+column, org:resource; case key lifecycle:transition, concept:instance, the
+Boolean column) on a fresh bank of 200 XES uploads (`gen/gengs.py`, seeds
+67000-67199) 18,397 of 18,397 compared judgments over both shapes (112 fail
+on both sides: reference timeouts, unbounded nets).
+Measured and carried: Declare and Inductive on a CSV log keyed by a column
+with gaps (`ct/csvfam.py` FAMS=declare,inductive; pm4py's Inductive recurses
+past Python's limit or raises a TypeError on distinct NaN objects across
+traces, and its Declare sorts rules keyed by tuples beside scalars into a
+TypeError; Minera refuses the null activities), the 2 grAs footprints
+uploads with time:timestamp as the activity key (mixed-type timestamps).
+GS's suite: the full ctest 682 of 682 (with the new
+`minera_server_review_gs_tests`: 260 checks, 236 of which fail on GR's
+server binary), Python script tests 406 of 406, and the 16 manifests
+replayed 2,673 responses unchanged (the frontend is untouched).
+Harness and probes: `review-harness/round-gs/`.
+
+Next round (GT) should start by re-reviewing round GS:
+
+- GS's CI run (and GR's macOS and Windows jobs, still running at GS's
+  handoff);
+- GS1/GS2 on fresh CSV banks: start columns of other kinds (object ints
+  above int64, mixed bools and numbers, dates with gaps beside text),
+  business hours with gaps in both columns, the conformance with a custom
+  zeta and a Boolean start column; the `/api/analyze-behavior` temporal
+  conformance of a CSV log shape (variant log) with the same columns;
+- the carried Declare and Inductive families on CSV logs keyed by a
+  column with gaps (above), and the DFG and variants families there;
+- the 2 grAs footprints uploads with time:timestamp as the activity key
+  (two traces' NaN start activities stay two objects in pm4py's sets,
+  Minera one `nan`; 0 and False named after the first object);
+- the open transition-system item from GQ (0 and False named by the
+  creating object) and the carried items below.
+
+Previous list for round GS (kept for its older items):
 
 Next round (GS) should start by re-reviewing round GR:
 

@@ -841,7 +841,8 @@ TemporalProfile discover_temporal_profile(
 
 namespace {
 TemporalProfile discover_temporal_profile_table(const EventTable& table, const TemporalProfileOptions& options,
-                                                bool whole_seconds, const std::string& polars_start_name = {});
+                                                bool whole_seconds, const std::string& polars_start_name = {},
+                                                const std::string& polars_timestamp_name = {});
 }  // namespace
 
 TemporalProfile discover_temporal_profile_dataframe(
@@ -859,7 +860,7 @@ namespace {
 // named is the first in the pair frame's order (later row's position, then
 // the earlier's) with one Polars thread; with several it can differ.
 void check_polars_business_pairs(const EventTable& table, const TemporalProfileOptions& options,
-                                 const std::string& start_name = {}) {
+                                 const std::string& start_name = {}, const std::string& timestamp_name = {}) {
   if (!options.use_business_hours) return;
   const auto slots = normalized_slots(options);
   const auto columns = temporal_table_columns(table, options);
@@ -870,7 +871,9 @@ void check_polars_business_pairs(const EventTable& table, const TemporalProfileO
   };
   const auto index_at = column_of("@@index");
   const auto position_at = column_of(kPolarsPosition);
-  if (!index_at || !position_at) return;
+  // A CSV upload's frame (frame_index_rows) keeps format_dataframe's
+  // "@@index", its row order, which the position follows (round GS).
+  if ((!index_at && !options.frame_index_rows) || !position_at) return;
   struct PairRow {
     std::int64_t index = 0, position = 0;
     std::optional<std::int64_t> completion, start;  // microseconds
@@ -892,8 +895,8 @@ void check_polars_business_pairs(const EventTable& table, const TemporalProfileO
   std::map<std::string, std::vector<PairRow>> cases;
   for (const auto& row : table.rows) {
     const auto* case_id = table_value(row, columns.case_id);
-    const auto index = integer(table_value(row, *index_at));
     const auto position = integer(table_value(row, *position_at));
+    const auto index = index_at ? integer(table_value(row, *index_at)) : position;
     if (!case_id || !index || !position) continue;
     cases[*case_id].push_back({*index, *position, micros(row, columns.source_timestamp), micros(row, columns.target_timestamp)});
   }
@@ -916,13 +919,16 @@ void check_polars_business_pairs(const EventTable& table, const TemporalProfileO
   const auto& start = configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
   const auto timestamp = source_timestamp_key(options);
   // An explicit start key naming the timestamp keeps its name (round GP).
+  // A CSV upload's frame names its timestamp copy time:timestamp (round GS).
   throw std::invalid_argument(detail::polars_business_schema_error(
-      timestamp, !start_name.empty() ? start_name : start.empty() || start == timestamp ? std::string("start_timestamp") : start,
+      timestamp_name.empty() ? timestamp : timestamp_name,
+      !start_name.empty() ? start_name : start.empty() || start == timestamp ? std::string("start_timestamp") : start,
       std::get<2>(*first)));
 }
 
 TemporalProfile discover_temporal_profile_table(const EventTable& table, const TemporalProfileOptions& options,
-                                                bool whole_seconds, const std::string& polars_start_name) {
+                                                bool whole_seconds, const std::string& polars_start_name,
+                                                const std::string& polars_timestamp_name) {
   PairRanks ranks, orders;
   const auto log = temporal_table_to_log(table, options, nullptr, &ranks, &orders);
   // pm4py's DataFrame discovery (without business hours): Timedelta
@@ -934,7 +940,7 @@ TemporalProfile discover_temporal_profile_table(const EventTable& table, const T
   // Round FL: with business hours the same pairs, each measured with
   // BusinessHours on the frame's UTC Timestamps at their microsecond.
   validate_slots(options);
-  if (whole_seconds) check_polars_business_pairs(table, options, polars_start_name);
+  if (whole_seconds) check_polars_business_pairs(table, options, polars_start_name, polars_timestamp_name);
   const auto slots = options.use_business_hours ? normalized_slots(options)
                                                 : std::vector<BusinessHourSlot>{};
   {
@@ -1428,7 +1434,8 @@ namespace {
 TemporalConformanceResult conform_table(const EventTable& table, const TemporalProfile& profile,
                                         const TemporalProfileOptions& options, bool lazy, bool whole_seconds = false,
                                         std::optional<std::size_t> pair_rows = std::nullopt,
-                                        const std::string& polars_start_name = {}) {
+                                        const std::string& polars_start_name = {},
+                                        const std::string& polars_timestamp_name = {}) {
   std::vector<std::size_t> case_first_rows;
   PairRanks ranks, orders;
   auto log = temporal_table_to_log(table, options, &case_first_rows, &ranks, &orders);
@@ -1440,7 +1447,7 @@ TemporalConformanceResult conform_table(const EventTable& table, const TemporalP
   }
   if (lazy && whole_seconds) {
     validate_slots(options);
-    check_polars_business_pairs(table, options, polars_start_name);
+    check_polars_business_pairs(table, options, polars_start_name, polars_timestamp_name);
   }
   // pm4py's DataFrame conformance lists the cases in the order of their
   // first rows (an XES upload's frame in file order), not by case id, and
@@ -1468,10 +1475,12 @@ TemporalConformanceResult conform_table(const EventTable& table, const TemporalP
   // Without an "@@index" column (a CSV upload's frame order), the pair frame
   // of a Polars frame counts the pairs of the log's ranked rows.
   if (whole_seconds && !pair_rows && !ranks.empty()) {
-    const auto& source_attribute = configured_attribute(options.source_timestamp_attribute,
-                                                        options.source_completion_timestamp_attribute);
-    const auto& target_attribute = configured_attribute(options.target_timestamp_attribute,
-                                                        options.target_start_timestamp_attribute);
+    // temporal_table_to_log keeps each row's completion as the event's
+    // timestamp and its start as "__minera_temporal_target" (round GS: the
+    // configured keys found no start column there, so every CSV frame's
+    // pair frame read as empty and the deviations went profile first).
+    const std::string source_attribute;
+    const std::string target_attribute = "__minera_temporal_target";
     const auto instant = [](const Event& event, const std::string& attribute) {
       const auto* value = selected_event_value(event, attribute, "timestamp");
       return value ? parse_timestamp_exact(*value) : std::nullopt;
@@ -1551,7 +1560,8 @@ std::optional<std::size_t> polars_pair_rows(const EventTable& table, const Tempo
 // DataFrame conformance lists them.
 TemporalConformanceResult conform_lazy_table(EventTable table, const TemporalProfile& profile,
                                              const TemporalProfileOptions& options,
-                                             const std::string& polars_start_name = {}) {
+                                             const std::string& polars_start_name = {},
+                                             const std::string& polars_timestamp_name = {}) {
   const auto columns = temporal_table_columns(table, options);
   std::optional<std::size_t> missing_at;
   {
@@ -1568,7 +1578,7 @@ TemporalConformanceResult conform_lazy_table(EventTable table, const TemporalPro
   auto paired = polars_partial_order_table(std::move(table), options);
   auto result = conform_table(paired, profile, options, true, true,
                               options.frame_index_rows ? std::nullopt : polars_pair_rows(paired, options),
-                              polars_start_name);
+                              polars_start_name, polars_timestamp_name);
   if (missing_at) result.insert(result.begin() + static_cast<std::ptrdiff_t>(std::min(*missing_at, result.size())),
                                 std::vector<TemporalDeviation>{});
   return result;
@@ -1601,37 +1611,6 @@ TemporalConformanceResult conform_temporal_profile(
 }
 
 namespace {
-
-// Polars' conformance pairs the rows as the discovery does, inside the select
-// of its result (round GQ, observed black-box): a plan error after the join
-// fails at that select, the context stack one level deeper.
-std::string polars_conformance_plan_error(std::string message) {
-  const std::string stack_marker = "context stack:\n";
-  const std::string head = "---> FAILED HERE RESOLVING '";
-  const auto stack_at = message.find(stack_marker);
-  const auto head_at = message.find(head);
-  if (message.find("INNER JOIN:") == std::string::npos || stack_at == std::string::npos ||
-      head_at == std::string::npos || head_at > stack_at)
-    return message;
-  const auto head_end = message.find(" <---", head_at);
-  if (head_end == std::string::npos) return message;
-  message.replace(head_at, head_end - head_at, head + "select'");
-  const auto entries_at = message.find(stack_marker) + stack_marker.size();
-  std::size_t count = 0;
-  for (auto at = entries_at; at < message.size() && message.compare(at, 2, "\t[") == 0;) {
-    ++count;
-    const auto line_end = message.find('\n', at);
-    if (line_end == std::string::npos) {
-      message += '\n';
-      at = message.size();
-    } else {
-      at = line_end + 1;
-    }
-  }
-  for (const char* name : {"select", "join left", "join", "filter", "select"})
-    message += "\t[" + std::to_string(++count) + "] '" + name + "'\n";
-  return message;
-}
 
 // Polars' conformance without the activity column (round GQ, observed
 // black-box): the pairs are measured, then the select of the activity
@@ -1751,7 +1730,7 @@ TemporalConformanceResult conform_temporal_profile_xes_frame(
           present, options.case_id_attribute, options.activity_attribute, timestamp,
           explicit_start ? start : start_column == timestamp ? timestamp : std::string("start_timestamp"),
           explicit_start && has(start), options.use_business_hours));
-    throw std::invalid_argument(polars_conformance_plan_error(message));
+    throw std::invalid_argument(detail::polars_conformance_plan_error(message));
   }
   if (verdict.kind == detail::XesPandasTpVerdict::Kind::kPairs ||
       verdict.kind == detail::XesPandasTpVerdict::Kind::kSingle ||
@@ -1841,6 +1820,27 @@ TemporalConformanceResult conform_temporal_profile_xes_frame(
   if (auto gaps = detail::xes_frame_date_gaps_missing(*source, keys))
     return conform_lazy_table(std::move(*gaps), profile, options, start_name);
   return conform_lazy_table(*source, profile, options, start_name);
+}
+
+TemporalProfile discover_temporal_profile_named_start(const EventDataView& data,
+                                                     const TemporalProfileOptions& options,
+                                                     const std::string& polars_start_name,
+                                                     const std::string& polars_timestamp_name) {
+  if (data.kind() != EventDataKind::kLazyEventTable || (polars_start_name.empty() && polars_timestamp_name.empty()))
+    return discover_temporal_profile(data, options);
+  return discover_temporal_profile_table(polars_partial_order_table(data.lazy_table()->materialize(), options), options,
+                                         true, polars_start_name, polars_timestamp_name);
+}
+
+TemporalConformanceResult conform_temporal_profile_named_start(const EventDataView& data,
+                                                               const TemporalProfile& profile,
+                                                               const TemporalProfileOptions& options,
+                                                               const std::string& polars_start_name,
+                                                               const std::string& polars_timestamp_name) {
+  if (data.kind() != EventDataKind::kLazyEventTable || (polars_start_name.empty() && polars_timestamp_name.empty()))
+    return conform_temporal_profile(data, profile, options);
+  return conform_lazy_table(data.lazy_table()->materialize(), profile, options, polars_start_name,
+                            polars_timestamp_name);
 }
 
 std::vector<TemporalDeviation> check_temporal_profile_conformance(

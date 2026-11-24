@@ -162,6 +162,21 @@ using TemporalConformanceResult = std::vector<std::vector<TemporalDeviation>>;
     const EventDataView& data, const TemporalProfile& profile, const TemporalProfileOptions& options = {},
     bool explicit_start_key = false);
 
+// The temporal profile and its conformance on a Polars frame whose pair frame
+// names the start's "_2" copy `polars_start_name` (an explicit start key
+// naming the timestamp keeps its name; round GS on a CSV upload's frame, as
+// on an XES upload's since GP) and its timestamp `polars_timestamp_name` (a
+// CSV upload's time:timestamp copy where the routes read its header); both
+// empty, or another kind of data: as discover_temporal_profile and
+// conform_temporal_profile.
+[[nodiscard]] TemporalProfile discover_temporal_profile_named_start(const EventDataView& data,
+                                                                    const TemporalProfileOptions& options,
+                                                                    const std::string& polars_start_name,
+                                                                    const std::string& polars_timestamp_name = {});
+[[nodiscard]] TemporalConformanceResult conform_temporal_profile_named_start(
+    const EventDataView& data, const TemporalProfile& profile, const TemporalProfileOptions& options,
+    const std::string& polars_start_name, const std::string& polars_timestamp_name = {});
+
 // Detailed conformance preserves one result bucket per input case, including
 // empty buckets. The legacy check function below remains a flattened view.
 [[nodiscard]] TemporalConformanceResult conform_temporal_profile_log(

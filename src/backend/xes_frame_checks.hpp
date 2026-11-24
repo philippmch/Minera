@@ -158,6 +158,14 @@ inline void check_xes_frame_replay_columns(const EventDataView& data, const std:
     if (!has(*key)) throw std::invalid_argument(polars_df_missing_column_error(*key, table.columns, {"select", "group_by"}));
 }
 
+// The dtypes of the model below: a dates column, String, Int64, Float64 and
+// Boolean (a CSV upload's object columns read as String in Polars' copy).
+enum class PolarsTpDtype { kD, kS, kI, kF, kB };
+
+inline std::string polars_tp_datetime_name(bool nanoseconds) {
+  return nanoseconds ? "datetime[ns, UTC]" : "datetime[\xce\xbcs, UTC]";
+}
+
 // Round GN (observed black-box): Polars' temporal profile on the copy of
 // read_xes's frame, its timestamp (T) and start (S) columns typed as read_xes
 // types them (a datetime64 column a Datetime, text, object and None-only
@@ -168,10 +176,84 @@ inline void check_xes_frame_replay_columns(const EventDataView& data, const std:
 // and the rest but two dates columns fail evaluating it (String or Boolean
 // subtraction, a number where .dt wants a Duration). `side` is the join's
 // two input plans. nullopt: two dates columns, or a column outside the model.
+// The same errors from the two columns' dtypes (`t` the timestamp's, `s` the
+// start's; the start "_2" copy is `start_key` + "_2"); `nanoseconds` names a
+// dates column of nanoseconds (a CSV upload's, round GS).
+inline std::optional<std::string> polars_tp_dtype_error(PolarsTpDtype t, PolarsTpDtype s,
+                                                        const std::string& timestamp_key,
+                                                        const std::string& start_key, const std::string& side,
+                                                        bool nanoseconds = false) {
+  using P = PolarsTpDtype;
+  if (t == P::kD && s == P::kD) return std::nullopt;
+  const auto name = [nanoseconds](P p) -> std::string {
+    switch (p) {
+      case P::kD: return polars_tp_datetime_name(nanoseconds);
+      case P::kS: return "str";
+      case P::kI: return "i64";
+      case P::kF: return "f64";
+      case P::kB: return "bool";
+    }
+    return "str";
+  };
+  const auto cast = [](P p) -> std::string {
+    return p == P::kI ? ".cast(Int64)" : p == P::kF ? ".cast(Float64)" : p == P::kS ? ".cast(String)" : "";
+  };
+  const auto ts = "col(" + polars_frame_quoted(timestamp_key) + ")";
+  const auto st = "col(" + polars_frame_quoted(start_key + "_2") + ")";
+  const auto join = "FROM\n  FILTER col(\"@@index\") < col(\"@@index_2\")\n  FROM\n    INNER JOIN:\n" + side + "    END INNER JOIN\n";
+  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
+  if ((t == P::kD && s == P::kS) || (t == P::kS && s == P::kD))
+    return "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } "
+           "or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING "
+           "'with_columns' <---\nFILTER " + ts + " <= " + st + "\n" + join +
+           "\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n";
+  if (t == P::kD || s == P::kD) {
+    // The comparison casts the timestamp's side to the other's dtype.
+    const auto filter = t == P::kD ? ts + (s == P::kB ? "" : cast(s)) + " <= " + st
+                                    : ts + " <= " + st + (t == P::kB ? "" : cast(t));
+    return "- not allowed on " + name(s) + " and " + name(t) + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE "
+           "RESOLVING 'with_columns' <---\nFILTER " + filter + "\n" + join +
+           "\nThis error occurred with the following context stack:\n\t[1] 'with_columns'\n";
+  }
+  if ((numeric(t) && s == P::kS) || (t == P::kS && numeric(s))) {
+    std::string nested;
+    std::size_t from = 0;
+    const auto inner = "FILTER " + ts + " <= " + st + "\n" + join;
+    while (from < inner.size()) {
+      const auto end = inner.find('\n', from);
+      nested += "  " + inner.substr(from, end - from) + "\n";
+      from = end + 1;
+    }
+    return "arithmetic on dtypes " + name(s) + " and " + name(t) + " is not allowed (lhs: column '" + start_key +
+           "_2', rhs: column '" + timestamp_key + "'); try an explicit cast first\n\nResolved plan until failure:\n\n"
+           "\t---> FAILED HERE RESOLVING 'with_columns' failed <---\n WITH_COLUMNS:\n [((" + st + " - " + ts +
+           ")).dt.total_seconds().alias(\"@@flow_time\")] \n" + nested +
+           "\nThis error occurred with the following context stack:\n\t[1] 'with_columns' failed\n";
+  }
+  if (t == P::kB && s == P::kB)
+    return "`subtract` operation not supported for dtype `bool`\n\nThis error occurred in the following expression:\n\t[(" +
+           st + ") - (" + ts + ")]\nwhile evaluating this larger expression:\n\t[(" + st + ") - (" + ts +
+           ")].dt.total_seconds()\n";
+  if (t == P::kS || s == P::kS) {
+    const auto lhs = st + (s == P::kS ? "" : cast(P::kS));
+    const auto rhs = ts + (t == P::kS ? "" : cast(P::kS));
+    return "sub operation not supported for dtypes `str` and `str`\n\nThis error occurred in the following "
+           "expression:\n\t[(" + lhs + ") - (" + rhs + ")]\nwhile evaluating this larger expression:\n\t[(" + lhs +
+           ") - (" + rhs + ")].dt.total_seconds()\n";
+  }
+  // Numbers and booleans: the supertype, the narrower side cast to it.
+  const auto super = t == P::kF || s == P::kF ? P::kF : P::kI;
+  const auto lhs = st + (s == super ? "" : cast(super));
+  const auto rhs = ts + (t == super ? "" : cast(super));
+  return "invalid series dtype: expected `Duration`, got `" + name(super) + "` for series with name `" + start_key +
+         "_2`\n\nThis error occurred in the following expression:\n\t[(" + lhs + ") - (" + rhs +
+         ")].dt.total_seconds()\n";
+}
+
 inline std::optional<std::string> polars_typed_tp_error(const EventTable& table, const std::string& timestamp_key,
                                                         const std::string& start_key, bool own_start,
                                                         const std::string& side, bool* modelled = nullptr) {
-  enum class P { kD, kS, kI, kF, kB };
+  using P = PolarsTpDtype;
   const auto dtype = [&](const std::string& name) -> std::optional<P> {
     const auto column = xes_typed_column(table, name);
     if (!column) return std::nullopt;
@@ -187,70 +269,8 @@ inline std::optional<std::string> polars_typed_tp_error(const EventTable& table,
   const auto t = dtype(timestamp_key);
   const auto s = own_start ? dtype(start_key) : t;
   if (modelled) *modelled = t && s;
-  if (!t || !s || (*t == P::kD && *s == P::kD)) return std::nullopt;
-  const auto name = [](P p) -> std::string {
-    switch (p) {
-      case P::kD: return "datetime[\xce\xbcs, UTC]";
-      case P::kS: return "str";
-      case P::kI: return "i64";
-      case P::kF: return "f64";
-      case P::kB: return "bool";
-    }
-    return "str";
-  };
-  const auto cast = [](P p) -> std::string {
-    return p == P::kI ? ".cast(Int64)" : p == P::kF ? ".cast(Float64)" : p == P::kS ? ".cast(String)" : "";
-  };
-  const auto ts = "col(" + polars_frame_quoted(timestamp_key) + ")";
-  const auto st = "col(" + polars_frame_quoted(start_key + "_2") + ")";
-  const auto join = "FROM\n  FILTER col(\"@@index\") < col(\"@@index_2\")\n  FROM\n    INNER JOIN:\n" + side + "    END INNER JOIN\n";
-  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
-  if ((*t == P::kD && *s == P::kS) || (*t == P::kS && *s == P::kD))
-    return "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } "
-           "or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING "
-           "'with_columns' <---\nFILTER " + ts + " <= " + st + "\n" + join +
-           "\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n";
-  if (*t == P::kD || *s == P::kD) {
-    // The comparison casts the timestamp's side to the other's dtype.
-    const auto filter = *t == P::kD ? ts + (*s == P::kB ? "" : cast(*s)) + " <= " + st
-                                    : ts + " <= " + st + (*t == P::kB ? "" : cast(*t));
-    return "- not allowed on " + name(*s) + " and " + name(*t) + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE "
-           "RESOLVING 'with_columns' <---\nFILTER " + filter + "\n" + join +
-           "\nThis error occurred with the following context stack:\n\t[1] 'with_columns'\n";
-  }
-  if ((numeric(*t) && *s == P::kS) || (*t == P::kS && numeric(*s))) {
-    std::string nested;
-    std::size_t from = 0;
-    const auto inner = "FILTER " + ts + " <= " + st + "\n" + join;
-    while (from < inner.size()) {
-      const auto end = inner.find('\n', from);
-      nested += "  " + inner.substr(from, end - from) + "\n";
-      from = end + 1;
-    }
-    return "arithmetic on dtypes " + name(*s) + " and " + name(*t) + " is not allowed (lhs: column '" + start_key +
-           "_2', rhs: column '" + timestamp_key + "'); try an explicit cast first\n\nResolved plan until failure:\n\n"
-           "\t---> FAILED HERE RESOLVING 'with_columns' failed <---\n WITH_COLUMNS:\n [((" + st + " - " + ts +
-           ")).dt.total_seconds().alias(\"@@flow_time\")] \n" + nested +
-           "\nThis error occurred with the following context stack:\n\t[1] 'with_columns' failed\n";
-  }
-  if (*t == P::kB && *s == P::kB)
-    return "`subtract` operation not supported for dtype `bool`\n\nThis error occurred in the following expression:\n\t[(" +
-           st + ") - (" + ts + ")]\nwhile evaluating this larger expression:\n\t[(" + st + ") - (" + ts +
-           ")].dt.total_seconds()\n";
-  if (*t == P::kS || *s == P::kS) {
-    const auto lhs = st + (*s == P::kS ? "" : cast(P::kS));
-    const auto rhs = ts + (*t == P::kS ? "" : cast(P::kS));
-    return "sub operation not supported for dtypes `str` and `str`\n\nThis error occurred in the following "
-           "expression:\n\t[(" + lhs + ") - (" + rhs + ")]\nwhile evaluating this larger expression:\n\t[(" + lhs +
-           ") - (" + rhs + ")].dt.total_seconds()\n";
-  }
-  // Numbers and booleans: the supertype, the narrower side cast to it.
-  const auto super = *t == P::kF || *s == P::kF ? P::kF : P::kI;
-  const auto lhs = st + (*s == super ? "" : cast(super));
-  const auto rhs = ts + (*t == super ? "" : cast(super));
-  return "invalid series dtype: expected `Duration`, got `" + name(super) + "` for series with name `" + start_key +
-         "_2`\n\nThis error occurred in the following expression:\n\t[(" + lhs + ") - (" + rhs +
-         ")].dt.total_seconds()\n";
+  if (!t || !s) return std::nullopt;
+  return polars_tp_dtype_error(*t, *s, timestamp_key, start_key, side);
 }
 
 // Round GP (observed black-box): Polars' temporal profile with business
@@ -267,12 +287,54 @@ inline std::optional<std::string> polars_typed_tp_error(const EventTable& table,
 // that is no datetime; with no such pair the profile is empty (`empty`).
 // nullopt without an error: two dates columns (the dates path), no pair, or
 // a column outside the model (`modelled` false).
+// The errors of the dtypes alone (`t` the timestamp's, `s` the start's):
+// nullopt when the pairs decide (or two dates columns).
+inline std::optional<std::string> polars_tp_business_dtype_error(PolarsTpDtype t, PolarsTpDtype s,
+                                                                 const std::string& timestamp_key,
+                                                                 const std::string& start_key,
+                                                                 const std::string& side, bool nanoseconds = false) {
+  using P = PolarsTpDtype;
+  if (t == P::kD && s == P::kD) return std::nullopt;
+  if ((t == P::kD && s == P::kS) || (t == P::kS && s == P::kD))
+    return polars_tp_dtype_error(t, s, timestamp_key, start_key, side, nanoseconds);
+  const auto ts = "col(" + polars_frame_quoted(timestamp_key) + ")";
+  const auto st = "col(" + polars_frame_quoted(start_key + "_2") + ")";
+  const auto where = "\n\nThis error occurred in the following expression:\n\t[(" + ts + ") <= (" + st +
+                     ")]\nwhile evaluating this larger expression:\n\t[([(col(\"@@index\")) < (col(\"@@index_2\"))]) & "
+                     "([(" + ts + ") <= (" + st + ")])]\n";
+  const auto display = [nanoseconds](P p) -> std::string {
+    return p == P::kD ? (nanoseconds ? "Datetime('ns', 'UTC')" : "Datetime('\xce\xbcs', 'UTC')")
+           : p == P::kB ? "Boolean" : p == P::kI ? "Int64" : p == P::kF ? "Float64" : "String";
+  };
+  if ((t == P::kD && s == P::kB) || (t == P::kB && s == P::kD))
+    return "could not evaluate '<=' comparison between series '" + timestamp_key + "' of dtype: " + display(t) +
+           " and series '" + start_key + "_2' of dtype: " + display(s) + where;
+  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
+  if ((numeric(t) && s == P::kS) || (t == P::kS && numeric(s)))
+    return std::string("cannot compare string with numeric type (") + ((t == P::kS ? s : t) == P::kI ? "i64" : "f64") +
+           ")" + where;
+  return std::nullopt;
+}
+
+// The UDF's error once a pair reaches it: replace(tzinfo=None) on the first
+// argument that is no datetime.
+inline std::string polars_tp_udf_error(PolarsTpDtype t, PolarsTpDtype s, const std::string& timestamp_key,
+                                       const std::string& start_key) {
+  using P = PolarsTpDtype;
+  const P first = t == P::kD ? s : t;
+  const std::string raised = first == P::kS ? "TypeError: str.replace() takes no keyword arguments"
+                             : std::string("AttributeError: '") + (first == P::kI ? "int" : first == P::kF ? "float" : "bool") +
+                                   "' object has no attribute 'replace'";
+  return raised + "\n\nThis error occurred in the following expression:\n\tas_struct(" +
+         polars_frame_quoted(timestamp_key) + ", " + polars_frame_quoted(start_key + "_2") + ").python_udf()\n";
+}
+
 inline std::optional<std::string> polars_typed_tp_business(const EventTable& table, const std::string& case_key,
                                                            const std::string& timestamp_key,
                                                            const std::string& start_key, bool own_start,
                                                            const std::string& side, bool* empty,
                                                            bool* modelled = nullptr) {
-  enum class P { kD, kS, kI, kF, kB };
+  using P = PolarsTpDtype;
   const auto kind_of = [](XesFrameDtype dtype) {
     switch (dtype) {
       case XesFrameDtype::kDatetime: return P::kD;
@@ -290,23 +352,7 @@ inline std::optional<std::string> polars_typed_tp_business(const EventTable& tab
   if (!times || !starts || !cases) return std::nullopt;
   const auto t = kind_of(times->dtype), s = kind_of(starts->dtype);
   if (t == P::kD && s == P::kD) return std::nullopt;
-  if ((t == P::kD && s == P::kS) || (t == P::kS && s == P::kD))
-    return polars_typed_tp_error(table, timestamp_key, start_key, own_start, side);
-  const auto ts = "col(" + polars_frame_quoted(timestamp_key) + ")";
-  const auto st = "col(" + polars_frame_quoted(start_key + "_2") + ")";
-  const auto where = "\n\nThis error occurred in the following expression:\n\t[(" + ts + ") <= (" + st +
-                     ")]\nwhile evaluating this larger expression:\n\t[([(col(\"@@index\")) < (col(\"@@index_2\"))]) & "
-                     "([(" + ts + ") <= (" + st + ")])]\n";
-  const auto display = [](P p) -> std::string {
-    return p == P::kD ? "Datetime('\xce\xbcs', 'UTC')" : p == P::kB ? "Boolean" : p == P::kI ? "Int64" : p == P::kF ? "Float64" : "String";
-  };
-  if ((t == P::kD && s == P::kB) || (t == P::kB && s == P::kD))
-    return "could not evaluate '<=' comparison between series '" + timestamp_key + "' of dtype: " + display(t) +
-           " and series '" + start_key + "_2' of dtype: " + display(s) + where;
-  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
-  if ((numeric(t) && s == P::kS) || (t == P::kS && numeric(s)))
-    return std::string("cannot compare string with numeric type (") + ((t == P::kS ? s : t) == P::kI ? "i64" : "f64") +
-           ")" + where;
+  if (auto error = polars_tp_business_dtype_error(t, s, timestamp_key, start_key, side)) return error;
   // Polars' `a <= b` on two present cells of the kinds above.
   const auto number = [](const PlusCell& cell, P p) -> long double {
     if (p == P::kF) return cell.number;
@@ -336,12 +382,38 @@ inline std::optional<std::string> polars_typed_tp_business(const EventTable& tab
     if (empty) *empty = true;
     return std::nullopt;
   }
-  const P first = t == P::kD ? s : t;
-  const std::string raised = first == P::kS ? "TypeError: str.replace() takes no keyword arguments"
-                             : std::string("AttributeError: '") + (first == P::kI ? "int" : first == P::kF ? "float" : "bool") +
-                                   "' object has no attribute 'replace'";
-  return raised + "\n\nThis error occurred in the following expression:\n\tas_struct(" +
-         polars_frame_quoted(timestamp_key) + ", " + polars_frame_quoted(start_key + "_2") + ").python_udf()\n";
+  return polars_tp_udf_error(t, s, timestamp_key, start_key);
+}
+
+// Polars' conformance pairs the rows as the discovery does, inside the select
+// of its result (round GQ, observed black-box): a plan error after the join
+// fails at that select, the context stack one level deeper.
+inline std::string polars_conformance_plan_error(std::string message) {
+  const std::string stack_marker = "context stack:\n";
+  const std::string head = "---> FAILED HERE RESOLVING '";
+  const auto stack_at = message.find(stack_marker);
+  const auto head_at = message.find(head);
+  if (message.find("INNER JOIN:") == std::string::npos || stack_at == std::string::npos ||
+      head_at == std::string::npos || head_at > stack_at)
+    return message;
+  const auto head_end = message.find(" <---", head_at);
+  if (head_end == std::string::npos) return message;
+  message.replace(head_at, head_end - head_at, head + "select'");
+  const auto entries_at = message.find(stack_marker) + stack_marker.size();
+  std::size_t count = 0;
+  for (auto at = entries_at; at < message.size() && message.compare(at, 2, "\t[") == 0;) {
+    ++count;
+    const auto line_end = message.find('\n', at);
+    if (line_end == std::string::npos) {
+      message += '\n';
+      at = message.size();
+    } else {
+      at = line_end + 1;
+    }
+  }
+  for (const char* name : {"select", "join left", "join", "filter", "select"})
+    message += "\t[" + std::to_string(++count) + "] '" + name + "'\n";
+  return message;
 }
 
 // Raises the error pm4py's `family` raises on the frame of an XES upload

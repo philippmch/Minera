@@ -151,15 +151,21 @@ void handle_active_source_mining(const httplib::Request& request,
   run("temporal_profile", selected, [&](bool& native_returned) {
     auto temporal_options = params.temporal_profile;
     mark_frame_index_rows(*session, temporal_options);
-    // A CSV upload's frame reads its own start column (round GR).
-    if (!xes_frame)
-      csv_frame_temporal_start(*session, session->active_source->selected_kind(), temporal_options,
-                               active_source_supplied(request, "temporal_target_timestamp_attribute") ||
-                                   active_source_supplied(request, "temporal_target_start_timestamp_attribute"));
+    // A CSV upload's frame reads its own start column (round GR); no pair
+    // of Polars' reaches the flow time: an empty profile (round GS).
+    std::string start_name, timestamp_name;
+    const auto verdict = xes_frame ? CsvFrameTpVerdict::kRun
+                                   : csv_frame_temporal_start(
+                                         *session, session->active_source->selected_kind(), temporal_options,
+                                         active_source_supplied(request, "temporal_target_timestamp_attribute") ||
+                                             active_source_supplied(request, "temporal_target_start_timestamp_attribute"),
+                                         &start_name, &timestamp_name);
     temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options,
                                active_source_supplied(request, "temporal_target_timestamp_attribute") ||
                                active_source_supplied(request, "temporal_target_start_timestamp_attribute"))
-                         : minera::discover_temporal_profile(data(), temporal_options);
+               : verdict == CsvFrameTpVerdict::kEmpty ? minera::TemporalProfile{}
+                                                      : minera::discover_temporal_profile_named_start(
+                                                            data(), temporal_options, start_name, timestamp_name);
     native_returned = true;
     return minera::serialize_active_source_temporal_profile_json(*temporal);
   });
