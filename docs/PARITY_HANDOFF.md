@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GU (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–GV (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10047,6 +10047,98 @@ server binary), Python script tests 406 of 406, the 16 manifests replayed
 2,673 responses unchanged, and the frontend type check passes (types.ts
 gains `performance.edges_error`).
 Harness and probes: `review-harness/round-gu/`.
+
+Round GV re-reviewed GU. GU's CI run 45335957548 passed on every job
+(Linux, macOS, Windows, the frontend, the Python scripts and the parity
+verifier), as did GT's Windows job in run 45324381722. Fresh banks (seeds
+in brackets): gvT, 120 CSV uploads whose start_timestamp column holds
+every kind (dates, gaps, ints, uint64 and past-uint64 ints, floats, text,
+booleans, mixed, nothing) [72000-72119]; gvK, 200 CSV uploads keyed by
+K1..K6 with gaps [72200-72399]; gvP, 200 CSV uploads with a valid start
+column [72500-72699]; gvX, 200 uploads, XES and CSV alternating
+[72800-72999]; gvN and gvM, gvP's CSV and gvX's XES files without the
+start column; with GU's guX and GT's gtP. GV1 (GU3-2),
+`/api/dfg-dataframe` on a start column of no dates: the frequency takes
+the column's pandas order (each row ranked as a sort of the whole column
+ranks it, the gaps last; `DfgFrameStartRanks`, `dfg_frame_start_ranks`),
+the performance fails with pandas' `TypeError: cannot subtract
+DatetimeArray from ndarray[float64|object]`, business hours at the `.dt`
+accessor (`dfg_dataframe.cpp`): `ct/dfgdf.py` on guX 0 diffs (GU's binary
+265 wrong), with business hours the same, gtP 600 of 600. GV2, the frame
+DFG start order on the other routes: the stochastic map's frequency and
+performance DFG (`ct/smap.py`, gtP 200 of 200; GU's binary 54 graphs and
+16 maps wrong) and the classic DFG playout, which now raises pm4py's
+`KeyError: '<activity>'` when a popped activity has no outgoing edge and
+is no end activity (`dfg_playout.cpp`; `ct/playc.py`, gtP 200 of 200 with
+12 KeyErrors, GU's binary 47 wrong). GV3, the lazy shape
+(`mining_input_shape=lazyframe`, pm4py on the frame's Polars copy;
+`frame_dfg_start_order(log, polars, columns)`): the whole copy sorted by
+(case, start, timestamp) as Polars' unstable sort orders it, nulls first,
+the start by the copy's dtype (a CSV frame's str and object columns
+String, by bytes); a duration is max_horizontal(start, timestamp) minus
+the timestamp in whole seconds (a null start 0); a start column of no
+dates fails resolving the plan with the copy's dtype (`- not allowed on
+i64|f64`, a uint64 column cast to i64 on both sides, `failed to determine
+supertype of bool`, `got invalid or ambiguous dtypes: '[str, ...]'`; the
+DF node from the frame's columns, an XES frame's in read_xes order). With
+business hours (the DFG performance variant) a numeric start resolves and
+the business-time UDF fails on the number (`'int'|'float' object has no
+attribute 'replace'`, none without a pair), a uint64 start's strict cast
+fails on the pairs' values past int64 (Polars lists up to ten: two, an
+ellipsis and the last, then "Did not show all failed cases"), and the
+UDF's Float64 Series refuses the first Python int duration in the sorted
+rows (`polars_business_int`), also without a start column (each event
+starting at its timestamp; XES frames read the events' timestamps).
+After (`ct/pmapl.py`): gtP, gvP, gvX and guX all equal in frequency,
+start and end counts, performance edges and variant (GU's binary on gtP
+51, 16 and 29 wrong); gvT 119 of 120 (t72074, declared below); with
+business hours gtP 200, gvP 200, gvX 200, gvT 119 and gvN 100 equal
+(before the UDF rules 97 of 200 gvX, 39 of 120 gvT and 61 of 100 gvN
+wrong). GV4, the CSV log shape (probed, no change): `/api/mine`'s default
+shape is the log shape, and its process map and DFG performance variant
+keep the DataFrame contract of the 2026-11-05 sweep and GU
+(`ct/pmap2.py`); pm4py's EventLog from convert_to_event_log names
+start_timestamp in its properties (read_xes's frame names none), and its
+performance DFG then pairs each trace in timestamp order with max(0,
+start - timestamp), a NaT start 0, and fails at the first pair whose start
+is no date (`unsupported operand type(s) for -: '<type>' and
+'Timestamp'`, a gap NaN as float; with business hours Timestamp.replace's
+errors or `cannot convert float NaN to integer`); the routes reviewed
+here (process map, DFG variant, stochastic map, playout) read the frame,
+and `dfg_discovery.apply` without parameters ignores the start key. GT1 on fresh banks: the temporal
+profile (`ct/tpdcsv2.py`, 9 sets) and its conformance (`ct/tpccsv2.py`,
+15 sets) on gvT's 119 uploads: the log shape 1,071 of 1,071 and 1,785 of
+1,785 equal; the pandas frame all but t72012, t72045 and t72109 (text with NaN
+beside dates, carried); Polars all but the three uint64 uploads (carried
+below). `ct/csvdfg.py` on gvK 9,800 of 9,800, `ct/csvvar.py` 1,400 of
+1,400; `ct/csvdcl.py` the same counts as GU's binary (GT2's Declare
+residuals, carried). Declared: an upload whose timestamps are all empty
+(gvT t72074): pm4py's frame functions and convert_to_event_log refuse it
+(`the dataframe should (at least) contain a column of type date`), Minera
+mines it.
+GV's suite: the full ctest 685 of 685 (with the new
+`minera_server_review_gv_tests`: 119 checks, 111 of which fail on GU's
+server binary), Python script tests 406 of 406, the 16 manifests replayed
+2,673 responses unchanged, and the frontend is unchanged.
+Harness and probes: `review-harness/round-gv/`.
+
+Next round (GW) should start by re-reviewing round GV:
+
+- GV's CI run;
+- GV3 on more banks: the lazy shape's other routes that build a DFG
+  (`/api/discover-dfg`, the stochastic map and playout on the lazy shape),
+  Polars' tie order with business hours (which int the SchemaError names);
+- the all-empty timestamp upload (t72074) on the frame shapes, where every
+  pm4py frame function checks the date column first;
+- the temporal profile on a uint64 own start with Polars (the dtype named
+  `i64` for `u64`, and the business-time UDF's `'int'` error where Minera
+  measures);
+- the GT2-GT4 residuals (Declare's separate NaN keys, the Boolean uploads
+  whose gap rows format_dataframe dropped, the transition system on a CSV
+  log shape keyed by mixed objects);
+- the carried items below.
+
+Previous list for round GV (kept for its older items):
 
 Next round (GV) should start by re-reviewing round GU:
 

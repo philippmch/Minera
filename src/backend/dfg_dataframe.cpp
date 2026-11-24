@@ -67,6 +67,8 @@ struct TableRow {
   // neighbouring nanoseconds through a double.
   std::optional<ParsedExactTimestamp> completion_exact;
   std::optional<ParsedExactTimestamp> start_exact;
+  // The start cell's rank in a sort of a start column of no dates (round GV).
+  std::optional<std::size_t> start_rank;
   std::optional<double> cost;
   // This is assigned after adapter sorting. It is the fallback index used by
   // both pair-producing adapters when no source index column is available.
@@ -410,6 +412,18 @@ Event event_from_row(const EventTable::Row& row, const EventTable& table,
 
 // The CSV frame whose labels discover_pandas_dfg's frame overload reads.
 thread_local const EventLog* g_csv_frame = nullptr;
+// The frame's start column of no dates, which the default start key reads.
+thread_local const DfgFrameStartRanks* g_frame_start = nullptr;
+
+// Whether the rows read the default start key from a frame column of no
+// dates (g_frame_start): pandas without an explicit start key, the table
+// holding the conventional column.
+bool ranked_frame_start(const EventTable& table, const DfgTableOptions& options,
+                        DfgTableBackend backend, bool overwrite_omitted_start) {
+  return g_frame_start && backend == DfgTableBackend::kPandas && !overwrite_omitted_start &&
+         (!options.start_timestamp_attribute || options.start_timestamp_attribute->empty()) &&
+         exact_column(table, "start_timestamp").has_value();
+}
 
 std::vector<TableRow> read_rows(const EventTable& table,
                                 const DfgTableOptions& options,
@@ -498,6 +512,8 @@ std::vector<TableRow> read_rows(const EventTable& table,
     if (!value || !type) return;
     if (auto label = csv_frame_cell_label(*type, key, *value, shifted)) value = std::move(*label);
   };
+  const bool ranked_start =
+      need_start && !start_uses_completion && ranked_frame_start(table, options, backend, overwrite_omitted_start);
   std::vector<TableRow> rows;
   rows.reserve(table.rows.size());
   for (std::size_t i = 0; i < table.rows.size(); ++i) {
@@ -540,6 +556,12 @@ std::vector<TableRow> read_rows(const EventTable& table,
     result.completion = need_completion
                             ? parse_time(result.completion_text, "completion")
                             : std::nullopt;
+    if (ranked_start) {
+      // A start column of no dates sorts by its own values (round GV).
+      result.start_rank = i < g_frame_start->ranks.size() ? g_frame_start->ranks[i]
+                                                          : std::numeric_limits<std::size_t>::max();
+      result.start_text.reset();
+    }
     result.start = need_start ? parse_time(result.start_text, "start")
                               : std::nullopt;
     if (result.completion) result.completion_exact = parse_timestamp_exact(*result.completion_text);
@@ -620,7 +642,11 @@ void sort_rows(std::vector<TableRow>& rows, const DfgTableOptions& options,
       return lhs.case_value < rhs.case_value;
     }
     if (options.sort_timestamp_along_case_id) {
-      if (const int order = compare(lhs.start_exact, rhs.start_exact)) return order < 0;
+      if (lhs.start_rank && rhs.start_rank) {
+        if (*lhs.start_rank != *rhs.start_rank) return *lhs.start_rank < *rhs.start_rank;
+      } else if (const int order = compare(lhs.start_exact, rhs.start_exact)) {
+        return order < 0;
+      }
       if (const int order = compare(lhs.completion_exact, rhs.completion_exact)) return order < 0;
     }
     return lhs.original_position < rhs.original_position;
@@ -1195,6 +1221,11 @@ DfgTableResult discover_table_dfg(const EventTable& table,
   // black-box).
   if (!polars && computes_duration && clamp_start && pairs.empty())
     throw std::invalid_argument("cannot subtract DatetimeArray from ndarray[object]");
+  // pandas subtracts the frame's start column of no dates from the
+  // timestamps, pairs or not (round GV, observed black-box).
+  if (computes_duration && ranked_frame_start(table, options, backend, false))
+    throw std::invalid_argument(options.business_hours ? g_frame_start->business_hours_error
+                                                       : g_frame_start->error);
   // A start column blank in every row is a float column there, which the
   // clamp compares with the completions (round BM, observed black-box);
   // not a column the frame declares a datetime column (its values sat in
@@ -1292,6 +1323,16 @@ DfgTableResult discover_pandas_dfg(const EventTable& table, const DfgTableOption
   } scope{g_csv_frame};
   g_csv_frame = csv_frame;
   return discover_table_dfg(table, options, DfgTableBackend::kPandas);
+}
+
+DfgTableResult discover_pandas_dfg(const EventTable& table, const DfgTableOptions& options,
+                                   const EventLog* csv_frame, const DfgFrameStartRanks* frame_start) {
+  struct Scope {
+    const DfgFrameStartRanks* previous;
+    ~Scope() { g_frame_start = previous; }
+  } scope{g_frame_start};
+  g_frame_start = frame_start;
+  return discover_pandas_dfg(table, options, csv_frame);
 }
 
 DfgTableResult discover_polars_dfg(const LazyEventTable& table,

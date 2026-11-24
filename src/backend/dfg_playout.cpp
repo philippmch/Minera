@@ -17,6 +17,7 @@
 #include "minera/filtering_common.hpp"
 #include "minera/random.hpp"
 #include "minera/timestamp.hpp"
+#include "polars_missing_column.hpp"
 
 namespace minera {
 namespace {
@@ -316,7 +317,11 @@ DfgPlayoutResult classic_playout(const DfgFrequency& frequency,
     queue.pop();
     if (state.activities.empty()) continue;
     const auto out_it = transitions.find(state.activities.back());
-    if (out_it == transitions.end()) continue;
+    // pm4py looks the last activity's successors up: one without an
+    // outgoing edge that ends no trace raises (round GV, observed black-box;
+    // a frame DFG of an upload's start_timestamp column has such nodes).
+    if (out_it == transitions.end())
+      throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(state.activities.back()));
 
     std::unordered_map<std::string, std::size_t> occurrences;
     for (const auto& activity : state.activities) ++occurrences[activity];

@@ -295,8 +295,8 @@ void handle_active_source_mining(const httplib::Request& request,
     return "{\"representation\":\"analysis_presentation\"}";
   });
   std::optional<minera::PerformanceMetrics> performance;
-  // The pandas frame's order; Polars' sort (nulls first, clamped durations)
-  // is not modelled here.
+  // The pandas frame's order, or the Polars copy's on the lazy shape (nulls
+  // first, clamped whole-second durations; round GV).
   std::optional<minera::FrameDfgStartOrder> frame_dfg_order;
   std::optional<minera::ResourceNetwork> resources;
   std::optional<std::vector<minera::DurationStats>> durations;
@@ -304,9 +304,7 @@ void handle_active_source_mining(const httplib::Request& request,
   run("log_statistics_preparation", "log", [&](bool& native_returned) {
     const auto& log = require_prepared_log(*session); const auto& graph = require_graph(*session);
     // pm4py's frame DFG reads an upload's start_timestamp column (round GU).
-    if (dataframe_performance_source(session->active_source.get()) &&
-        session->active_source->selected_kind() != minera::EventDataKind::kLazyEventTable)
-      frame_dfg_order = minera::frame_dfg_start_order(log);
+    frame_dfg_order = session_frame_dfg_order(session->active_source.get(), log);
     if (frame_dfg_order)
       performance = minera::compute_performance_metrics(log, minera::frame_dfg_graph(graph, log, *frame_dfg_order),
                                                         true, &*frame_dfg_order);

@@ -614,10 +614,35 @@ std::optional<DfgPerformance> frame_start_performance_dfg(const EventLog& log, c
                                                           const DfgStatisticalOptions& options) {
   if (!options.dataframe_arithmetic || !options.start_timestamp_attribute.empty()) return std::nullopt;
   if (!options.timestamp_attribute.empty() && options.timestamp_attribute != "time:timestamp") return std::nullopt;
-  const auto order = frame_dfg_start_order(log);
-  if (!order) return std::nullopt;
-  if (!order->subtraction_error.empty())
-    throw std::invalid_argument(options.use_business_hours ? order->business_hours_error : order->subtraction_error);
+  const auto order = frame_dfg_start_order(log, options.polars_frame,
+                                           options.polars_frame_columns.empty() ? nullptr
+                                                                                : &options.polars_frame_columns);
+  if (!order) {
+    // Polars' business-time UDF runs over (timestamp, start) pairs without
+    // a start column too, each event starting at its timestamp: its Float64
+    // Series refuses the first Python int in the sorted rows' order.
+    if (options.polars_frame && options.use_business_hours)
+      if (const auto own = frame_dfg_start_order(log, true, nullptr, true)) {
+        const auto slots = detail::normalize_business_hour_slots(options.business_hour_slots,
+                                                                 options.business_hour_slots_explicit,
+                                                                 "DFG discovery");
+        for (const auto& pair : frame_dfg_pairs(log, *own)) {
+          if (!pair.previous_timestamp || !pair.current_start) continue;
+          const auto from = pair.previous_timestamp->seconds * 1000000LL +
+                            static_cast<std::int64_t>(pair.previous_timestamp->nanoseconds / 1000U);
+          const auto to = pair.current_start->seconds * 1000000LL +
+                          static_cast<std::int64_t>(pair.current_start->nanoseconds / 1000U);
+          if (detail::polars_business_int(from, to, slots))
+            throw std::invalid_argument(detail::polars_business_schema_error(
+                "time:timestamp", "start_timestamp",
+                std::max(0.0, detail::business_elapsed_microseconds(from, to, slots))));
+        }
+      }
+    return std::nullopt;
+  }
+  if (const auto& error = options.use_business_hours ? order->business_hours_error : order->subtraction_error;
+      !error.empty())
+    throw std::invalid_argument(error);
   const auto slots = options.use_business_hours
                          ? detail::normalize_business_hour_slots(options.business_hour_slots,
                                                                  options.business_hour_slots_explicit,
@@ -629,7 +654,19 @@ std::optional<DfgPerformance> frame_start_performance_dfg(const EventLog& log, c
   std::map<DfgActivityPair, std::vector<double>> observations;
   for (const auto& pair : frame_dfg_pairs(log, *order)) {
     double elapsed = pair.seconds;
-    if (options.use_business_hours) {
+    if (options.use_business_hours && order->polars) {
+      // Polars: the business time up to max_horizontal(start, timestamp); a
+      // null start 0. The UDF's Float64 Series refuses the first Python int
+      // in the sorted rows' order (detail::polars_business_int).
+      elapsed = 0.0;
+      if (pair.previous_timestamp && pair.current_start) {
+        const auto from = micro(*pair.previous_timestamp), to = micro(*pair.current_start);
+        elapsed = std::max(0.0, detail::business_elapsed_microseconds(from, to, slots));
+        if (detail::polars_business_int(from, to, slots))
+          throw std::invalid_argument(
+              detail::polars_business_schema_error("time:timestamp", "start_timestamp", elapsed));
+      }
+    } else if (options.use_business_hours) {
       if (!pair.previous_timestamp || !pair.current_start)
         throw std::invalid_argument("ValueError: cannot convert float NaN to integer");
       elapsed = std::max(0.0, detail::business_elapsed_microseconds(micro(*pair.previous_timestamp),

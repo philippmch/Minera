@@ -156,6 +156,20 @@ struct DfgConcurrentResult {
 // csv_frame_cell_label). A null frame keeps the cells' text.
 [[nodiscard]] DfgTableResult discover_pandas_dfg(
     const EventTable& table, const DfgTableOptions& options, const EventLog* csv_frame);
+// pandas' default start key on an upload's frame whose start_timestamp
+// column holds no dates (round GV, observed black-box against pm4py
+// 2.7.22): the rows sort by the column's own values (ranks[i] for table row
+// i, its rank in a sort of the whole column, the gaps last), and a duration
+// (the performance and both measures) fails subtracting it: `error`, with
+// business hours `business_hours_error`.
+struct DfgFrameStartRanks {
+  std::vector<std::size_t> ranks;
+  std::string error;
+  std::string business_hours_error;
+};
+[[nodiscard]] DfgTableResult discover_pandas_dfg(
+    const EventTable& table, const DfgTableOptions& options, const EventLog* csv_frame,
+    const DfgFrameStartRanks* frame_start);
 [[nodiscard]] DfgTableResult discover_polars_dfg(
     const LazyEventTable& table, const DfgTableOptions& options = {});
 

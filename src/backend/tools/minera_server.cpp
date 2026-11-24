@@ -2143,10 +2143,43 @@ void prepare_csv_frame_view(const minera::ActiveEventSource& source, CsvFrameVie
   }
 }
 
+// An upload mined as a lazy frame: pm4py's DataFrame functions read the
+// frame's Polars copy (round GV).
+bool polars_frame_source(const minera::ActiveEventSource* source) {
+  return dataframe_performance_source(source) && source->selected_kind() == minera::EventDataKind::kLazyEventTable;
+}
+
+// The columns of an XES upload's Polars copy in read_xes's order, for the
+// plan errors of pm4py's frame DFG there (round GV); empty for a CSV upload,
+// whose frame records its own order.
+std::vector<std::string> polars_frame_dfg_columns(const minera::ActiveEventSource& source) {
+  if (source.file().format != "xes") return {};
+  std::optional<minera::EventTable> storage;
+  return minera::detail::xes_frame_present_columns(source.checked_table(), storage, true).columns;
+}
+
+// pm4py's frame DFG order on the session's upload (rounds GU, GV): the
+// pandas frame's (the log shape's process map reads the frame too), or the
+// Polars copy's on the lazy shape; nullopt for other sources or a frame
+// without a start_timestamp column.
+std::optional<minera::FrameDfgStartOrder> session_frame_dfg_order(const minera::ActiveEventSource* source,
+                                                                  const minera::EventLog& log) {
+  if (!dataframe_performance_source(source)) return std::nullopt;
+  if (polars_frame_source(source)) {
+    const auto columns = polars_frame_dfg_columns(*source);
+    return minera::frame_dfg_start_order(log, true, columns.empty() ? nullptr : &columns);
+  }
+  return minera::frame_dfg_start_order(log);
+}
+
 minera::DfgStatisticalOptions dfg_statistics_for_source(
     minera::DfgStatisticalOptions options,
     const minera::ActiveEventSource* source) {
   options.dataframe_arithmetic = dataframe_performance_source(source);
+  if (polars_frame_source(source)) {
+    options.polars_frame = true;
+    options.polars_frame_columns = polars_frame_dfg_columns(*source);
+  }
   return options;
 }
 
@@ -2628,9 +2661,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     checkpoint("Performance and resources");
     // pm4py's frame DFG reads an upload's start_timestamp column (round GU):
     // the process map's edges and their timings take its order.
-    const auto frame_dfg_order = dataframe_performance_source(active_source.get())
-                                     ? minera::frame_dfg_start_order(log)
-                                     : std::nullopt;
+    const auto frame_dfg_order = session_frame_dfg_order(active_source.get(), log);
     const auto performance = minera::compute_performance_metrics(
         log, frame_dfg_order ? minera::frame_dfg_graph(graph, log, *frame_dfg_order) : graph,
         dataframe_performance_source(active_source.get()), frame_dfg_order ? &*frame_dfg_order : nullptr);
@@ -5263,9 +5294,7 @@ void handle_dfg_discovery(const httplib::Request& request,
     const auto variants = analyze_dfg_variants(require_prepared_log(*session), params.dfg_statistical_variants, params.dfg_causal_variants, dfg_statistics_for_source(params.dfg_statistics, session->active_source.get()));
     for (const auto& activity : minera::dfg_variant_activities(variants)) graph.ensure_activity(activity);
     std::optional<minera::OmitAnalysisTraces> omit_traces(std::in_place, !analysis_include_traces(request));
-    const auto frame_dfg_order = dataframe_performance_source(session->active_source.get())
-                                     ? minera::frame_dfg_start_order(require_prepared_log(*session))
-                                     : std::nullopt;
+    const auto frame_dfg_order = session_frame_dfg_order(session->active_source.get(), require_prepared_log(*session));
     const auto result = minera::analysis_json(
       /* dataset */ session->dataset,
       /* event_log */ require_prepared_log(*session),
@@ -11399,11 +11428,17 @@ void handle_stochastic_map(const httplib::Request& request,
       skipped = report.skipped_traces;
       owned_net = it->second;
     } else {
-      const auto performance = minera::discover_performance_dfg(
-          require_prepared_log(*session),
-          dfg_statistics_for_source({}, session->active_source.get()));
+      // pm4py's frame DFG and performance DFG read an upload's
+      // start_timestamp column (rounds GU, GV).
+      const auto& log = require_prepared_log(*session);
+      const auto frame_dfg_order = session_frame_dfg_order(session->active_source.get(), log);
+      auto statistics = dfg_statistics_for_source({}, session->active_source.get());
+      statistics.variant = minera::DfgStatisticalVariant::kPerformance;
+      const auto performance = minera::discover_dfg_statistics(log, statistics).performance_dfg;
       const auto model = minera::stochastic_map_from_performance_dfg(
-          require_graph(*session), performance, params.performance);
+          frame_dfg_order ? minera::frame_dfg_graph(require_graph(*session), log, *frame_dfg_order)
+                          : require_graph(*session),
+          performance, params.performance);
       map = model.map;
       owned_net = model.net;
       net_json = minera::serialize_dfg_petri_net_json(
@@ -11775,7 +11810,18 @@ void handle_playout(const httplib::Request& request,
         options.max_execution_time_ms = 5000;
       // CSV and XES sources take the DataFrame performance arithmetic.
       const auto dfg_options = dfg_statistics_for_source({}, session->active_source.get());
-      const auto frequency = minera::discover_frequency_dfg(require_prepared_log(*session), dfg_options);
+      auto frequency = minera::discover_frequency_dfg(require_prepared_log(*session), dfg_options);
+      // pm4py's frame DFG pairs an upload's rows in its start_timestamp
+      // column's order (rounds GU, GV).
+      const auto frame_dfg_order =
+          session_frame_dfg_order(session->active_source.get(), require_prepared_log(*session));
+      if (frame_dfg_order) {
+        const auto& log = require_prepared_log(*session);
+        frequency.clear();
+        for (const auto& pair : minera::frame_dfg_pairs(log, *frame_dfg_order))
+          ++frequency[{log.traces[pair.trace].events[pair.previous].activity,
+                       log.traces[pair.trace].events[pair.current].activity}];
+      }
       minera::DfgActivityCounts starts, ends;
       // The reference's start-activity dict lists activities in first-
       // occurrence order; its PERFORMANCE start choice follows that order.
@@ -11789,7 +11835,9 @@ void handle_playout(const httplib::Request& request,
       }
       std::optional<minera::DfgPerformance> performance;
       if (options.variant == minera::DfgPlayoutVariant::kPerformance) {
-        performance = minera::discover_performance_dfg(require_prepared_log(*session), dfg_options);
+        auto statistics = dfg_options;
+        statistics.variant = minera::DfgStatisticalVariant::kPerformance;
+        performance = minera::discover_dfg_statistics(require_prepared_log(*session), statistics).performance_dfg;
       }
       const auto result = minera::dfg_playout_result(
           frequency, starts, ends, options,
@@ -12149,6 +12197,48 @@ void handle_dfg(const httplib::Request& request, httplib::Response& response) {
   }
 }
 
+// pandas' default start key on an upload's frame whose start_timestamp
+// column holds no dates (round GV, observed black-box): each row of the DFG
+// table (a CSV upload's frame table, by its "@@index", or an XES upload's
+// table) ranked as a sort of that column ranks it. nullopt for a column of
+// dates or a frame without one.
+std::optional<minera::DfgFrameStartRanks> dfg_frame_start_ranks(const MinedSession& session,
+                                                                const minera::EventTable& table,
+                                                                bool csv_frame) {
+  if (!dataframe_performance_source(session.active_source.get())) return std::nullopt;
+  const auto& log = session.active_source->checked_log();
+  const auto order = minera::frame_dfg_start_order(log);
+  if (!order || order->subtraction_error.empty()) return std::nullopt;
+  minera::DfgFrameStartRanks result;
+  result.error = order->subtraction_error;
+  result.business_hours_error = order->business_hours_error;
+  result.ranks.assign(table.rows.size(), std::numeric_limits<std::size_t>::max());
+  if (csv_frame) {
+    const auto& frame = *log.dataframe_columns;
+    std::map<std::int64_t, std::size_t> by_index;
+    for (std::size_t t = 0; t < log.traces.size(); ++t)
+      for (std::size_t e = 0; e < log.traces[t].events.size(); ++e)
+        if (const auto input = log.traces[t].events[e].input_order; input < frame.row_index.size())
+          by_index[frame.row_index[input]] = order->rank[t][e];
+    const auto column = std::find(table.columns.begin(), table.columns.end(), "@@index");
+    if (column == table.columns.end()) return std::nullopt;
+    const auto at = static_cast<std::size_t>(column - table.columns.begin());
+    for (std::size_t row = 0; row < table.rows.size(); ++row) {
+      if (at >= table.rows[row].size() || !table.rows[row][at]) continue;
+      const auto* index = std::get_if<std::int64_t>(&table.rows[row][at]->typed_value);
+      if (!index) continue;
+      if (const auto found = by_index.find(*index); found != by_index.end()) result.ranks[row] = found->second;
+    }
+    return result;
+  }
+  const auto& rows = session.active_source->representative_row_ordinals();
+  if (rows.size() != log.traces.size()) return std::nullopt;
+  for (std::size_t t = 0; t < log.traces.size(); ++t)
+    for (std::size_t e = 0; e < rows[t].size() && e < order->rank[t].size(); ++e)
+      if (rows[t][e] && *rows[t][e] < result.ranks.size()) result.ranks[*rows[t][e]] = order->rank[t][e];
+  return result;
+}
+
 void handle_dfg_dataframe(const httplib::Request& request,
                           httplib::Response& response) {
   std::shared_ptr<const MinedSession> session;
@@ -12203,9 +12293,11 @@ void handle_dfg_dataframe(const httplib::Request& request,
     const auto& table = frame_table ? *frame_table : *table_view.table();
     if (params.dfg_operation == minera::DfgTableOperation::kGraph) {
       if (params.dfg_backend == minera::DfgTableBackend::kPandas) {
+        const auto frame_start = dfg_frame_start_ranks(*session, table, frame_table.has_value());
         response.set_content(
             minera::serialize_dfg_dataframe_json(
-                minera::discover_pandas_dfg(table, params.dfg_table_options, csv_frame)),
+                minera::discover_pandas_dfg(table, params.dfg_table_options, csv_frame,
+                                            frame_start ? &*frame_start : nullptr)),
             "application/json");
       } else {
         const auto lazy_view = cached_source_view(*session,minera::EventDataKind::kLazyEventTable);

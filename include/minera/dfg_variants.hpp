@@ -166,6 +166,12 @@ struct DfgStatisticalOptions {
   // Business time on the UTC clock while keeping the EventLog arithmetic
   // (passed time on a CSV or XES source); dataframe_arithmetic implies it.
   bool business_hours_utc_clock = false;
+  // The frame's Polars copy (an upload mined as a lazy frame, round GV): the
+  // performance DFG over its start_timestamp column takes Polars' order and
+  // clamped whole-second durations (frame_dfg.hpp); `polars_frame_columns`
+  // are the copy's columns for its plan errors (empty: a CSV frame's own).
+  bool polars_frame = false;
+  std::vector<std::string> polars_frame_columns;
   // Accepted for compatibility with table adapters. The pinned calculation
   // does not consult this opaque calendar value.
   std::any workcalendar;
