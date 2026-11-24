@@ -481,7 +481,7 @@ int main(int argc, char** argv) {
       {"dcl K3 k68001.csv", "k68001.csv", dcl_f1, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K3"}}, "M nonchainsuccession:2021-03-01 08:00:00+00:00>2021-03-03 10:00:00+00:00,nonchainsuccession:2021-03-02 09:30:00+00:00>2021-03-01 08:00:00+00:00,nonchainsuccession:2021-03-03 10:00:00+00:00>2021-03-01 08:00:00+00:00,noncoexistence:2021-03-01 08:00:00+00:00>2021-03-03 10:00:00+00:00,noncoexistence:2021-03-03 10:00:00+00:00>2021-03-01 08:00:00+00:00,nonsuccession:2021-03-01 08:00:00+00:00>2021-03-03 10:00:00+00:00,nonsuccession:2021-03-02 09:30:00+00:00>2021-03-01 08:00:00+00:00,nonsuccession:2021-03-03 10:00:00+00:00>2021-03-01 08:00:00+00:00 | fit T,T,T"},
       {"dcl K4 k68001.csv", "k68001.csv", dcl_f1, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K4"}}, "error: TypeError: 'float' object is not subscriptable"},
       {"dcl K5 k68001.csv", "k68001.csv", dcl_f1, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K5"}}, "error: TypeError: cannot unpack non-iterable float object"},
-      {"dcl K6 k68001.csv", "k68001.csv", dcl_f1, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K6"}}, "error: TypeError: '<' not supported between instances of 'str' and 'float'"},
+      {"dcl K6 k68001.csv", "k68001.csv", dcl_f1, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K6"}}, "error-class: TypeError"},
       {"dcl K2 k68002.csv", "k68002.csv", dcl_f2, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K2"}}, "error: TypeError: cannot unpack non-iterable float object"},
       {"dcl K3 k68002.csv", "k68002.csv", dcl_f2, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K3"}}, "error: TypeError: 'Timestamp' object is not subscriptable"},
       {"dcl K4 k68002.csv", "k68002.csv", dcl_f2, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K4"}}, "error: TypeError: 'float' object is not subscriptable"},
@@ -495,7 +495,7 @@ int main(int argc, char** argv) {
       {"dcl K2 k68005.csv", "k68005.csv", dcl_f5, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K2"}}, "M nonchainsuccession:1.5>3.0,nonchainsuccession:3.0>1.5,noncoexistence:1.5>3.0,noncoexistence:3.0>1.5,nonsuccession:1.5>3.0,nonsuccession:3.0>1.5 | fit T,T,T,T"},
       {"dcl K1 k68006.csv", "k68006.csv", dcl_f6, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K1"}}, "M existence:r,init:r,nonchainsuccession:q>r,nonsuccession:q>r | fit T,T"},
       {"dcl K3 k68006.csv", "k68006.csv", dcl_f6, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K3"}}, "M exactly_one:2021-03-02 09:30:00+00:00,existence:2021-03-02 09:30:00+00:00,nonchainsuccession:2021-03-01 08:00:00+00:00>2021-03-02 09:30:00+00:00,nonchainsuccession:2021-03-02 09:30:00+00:00>2021-03-01 08:00:00+00:00,nonsuccession:2021-03-01 08:00:00+00:00>2021-03-02 09:30:00+00:00,nonsuccession:2021-03-02 09:30:00+00:00>2021-03-01 08:00:00+00:00 | fit T,T"},
-      {"dcl K6 k68006.csv", "k68006.csv", dcl_f6, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K6"}}, "error: TypeError: '<' not supported between instances of 'str' and 'float'"},
+      {"dcl K6 k68006.csv", "k68006.csv", dcl_f6, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K6"}}, "error-class: TypeError"},
       {"dcl K1 k68007.csv", "k68007.csv", dcl_f7, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K1"}}, "error: TypeError: '<' not supported between instances of 'str' and 'float'"},
       {"dcl K2 k68007.csv", "k68007.csv", dcl_f7, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K2"}}, "M nonchainsuccession:2.5>3.0,nonchainsuccession:3.0>2.5,noncoexistence:2.5>3.0,noncoexistence:3.0>2.5,nonsuccession:2.5>3.0,nonsuccession:3.0>2.5 | fit T,T,T"},
       {"dcl K4 k68007.csv", "k68007.csv", dcl_f7, "dcl", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}, {"declare_activity_attribute", "K4"}}, "M nonchainsuccession:1>3.0,nonchainsuccession:3>1.0,noncoexistence:1>3.0,noncoexistence:3>1.0,nonsuccession:1>3.0,nonsuccession:3>1.0 | fit T,T,T"},
@@ -595,7 +595,14 @@ int main(int argc, char** argv) {
       {"ts ms2 s69031.xes", "s69031.xes", ts_f13, "ts", {{"transition_activity_attribute", "k"}, {"transition_view", "multiset"}, {"transition_window", "2"}}, "S (),(0.0),(0.0,0.0),(0.0,1.0),(0.0,y),(1),(1.0,1.0) | (0.0)-0.0->(),(0.0,0.0)-0.0->(0.0),(0.0,0.0)-0.0->(0.0,1.0),(0.0,1.0)-0.0->(1),(0.0,1.0)-1.0->(0.0,0.0),(0.0,y)-y->(0.0,0.0),(1)-1->(),(1.0,1.0)-1->(1),(1.0,1.0)-1.0->(0.0,1.0),(1.0,1.0)-1.0->(1.0,1.0)"},
   };
 
-  for (const auto& c : cases) check(c.label, outcome(client, c.name, c.content, c.kind, c.fields), c.expected);
+  // Round HB: a pm4py error whose operands follow the hash seed (the typed
+  // rules' sort) compares the error's class.
+  for (const auto& c : cases) {
+    auto shown = outcome(client, c.name, c.content, c.kind, c.fields);
+    if (c.expected.starts_with("error-class: ") && shown.starts_with("error: "))
+      shown = "error-class: " + shown.substr(7, shown.find(':', 7) - 7);
+    check(c.label, shown, c.expected);
+  }
 
   ::kill(server, SIGTERM);
   int status = 0;

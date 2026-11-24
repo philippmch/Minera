@@ -1565,7 +1565,10 @@ bool typed_label_falsy(const TypedLabel& label) {
 struct TypedDeclareTraces {
   std::vector<TypedDeclareClass> classes;
   std::vector<std::vector<std::size_t>> traces;
+  std::vector<std::string> case_ids;  // each trace's case (empty for a row without one)
   detail::XesFrameDtype dtype = detail::XesFrameDtype::kObject;
+  std::optional<std::size_t> shared_nan;  // the class of the column's one NaN object
+  std::optional<std::size_t> nat;         // the class of NaT
 };
 
 std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, std::string_view case_id_key,
@@ -1591,6 +1594,8 @@ std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, 
     else key = python::identity(cell.value);
     const auto [at, added] = class_of.emplace(key, out.classes.size());
     if (added) {
+      if (key == "nan") out.shared_nan = out.classes.size();
+      if (key == "NaT") out.nat = out.classes.size();
       TypedDeclareClass c;
       c.rep = cell.value;
       c.type = cell.type;
@@ -1621,6 +1626,7 @@ std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, 
     const auto& cell = table.rows[row][case_at];
     if (!cell || cell->is_null) {
       out.traces.push_back({class_for(row)});
+      out.case_ids.emplace_back();
       continue;
     }
     const auto& [first, count] = extent.at(cell->value);
@@ -1628,11 +1634,21 @@ std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, 
     std::vector<std::size_t> trace;
     for (std::size_t r = first; r < first + count && r < table.rows.size(); ++r) trace.push_back(class_for(r));
     out.traces.push_back(std::move(trace));
+    out.case_ids.push_back(cell->value);
   }
   return out;
 }
 
-DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareDiscoveryOptions& options) {
+// A rule key of the typed model as pm4py's rules dict holds it: (act, act2),
+// or act alone where act2 is missing or falsy (`collapsed`).
+struct TypedDeclareKey {
+  TypedLabel first, second;
+  bool collapsed = false;
+};
+using TypedDeclareRules = std::map<std::string, std::vector<TypedDeclareKey>>;
+
+DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareDiscoveryOptions& options,
+                                 TypedDeclareRules* typed_rules = nullptr) {
   const auto& classes = input.classes;
   const std::size_t n = classes.size();
   DeclareModel model;
@@ -1905,8 +1921,212 @@ DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareD
     constraint.support = support;
     constraint.confidence = confidence;
     family.push_back(std::move(constraint));
+    if (typed_rules) (*typed_rules)[columns[i].name].push_back({first, second, collapsed});
   }
   return model;
+}
+
+// pm4py's Declare conformance against the typed model (round HB, observed
+// black-box; checked first as a Python model, hb/x/cmodel.py, against
+// pm4py on CSV logs and frames and XES frames): each trace of the
+// projection checks the families in conformance_declare's order, each key
+// of a family in the model's order. `in trace` and the trace's index dict
+// find an object that is identical or ==, so the column's one NaN object and
+// NaT find themselves, a NaN of a float64 level nothing; `!=` holds for NaN
+// and NaT whatever the other. A collapsed key (act alone under a binary
+// template) is subscripted: a str gives its characters (IndexError past its
+// end), anything else TypeError "'<type>' object is not subscriptable";
+// nonsuccession and nonchainsuccession unpack it ("cannot unpack
+// non-iterable <type> object", or a str's ValueError).
+std::vector<std::string> typed_code_points(const std::string& text) {
+  std::vector<std::string> out;
+  for (std::size_t i = 0; i < text.size();) {
+    const auto lead = static_cast<unsigned char>(text[i]);
+    const std::size_t length = lead < 0x80 ? 1 : (lead >> 5) == 0x6 ? 2 : (lead >> 4) == 0xE ? 3 : (lead >> 3) == 0x1E ? 4 : 1;
+    out.push_back(text.substr(i, length));
+    i += length;
+  }
+  return out;
+}
+
+std::vector<DeclareConformance> typed_declare_conformance(const TypedDeclareTraces& input,
+                                                          const TypedDeclareRules& rules) {
+  const auto& classes = input.classes;
+  std::unordered_map<std::string, std::size_t> value_class;
+  for (std::size_t c = 0; c < classes.size(); ++c)
+    if (!classes[c].na) value_class.emplace(python::identity(classes[c].rep), c);
+  const auto class_of = [&](const TypedLabel& label) -> std::optional<std::size_t> {
+    switch (label.kind) {
+      case TypedLabel::Kind::kFreshNaN: return std::nullopt;
+      case TypedLabel::Kind::kSharedNaN: return input.shared_nan;
+      case TypedLabel::Kind::kNaT: return input.nat;
+      case TypedLabel::Kind::kValue: break;
+    }
+    const auto found = value_class.find(python::identity(label.value));
+    if (found == value_class.end()) return std::nullopt;
+    return found->second;
+  };
+  const auto chars = [](const TypedLabel& label) -> std::optional<std::vector<std::string>> {
+    if (label.kind != TypedLabel::Kind::kValue || label.value.kind != python::Scalar::Kind::kText) return std::nullopt;
+    return typed_code_points(label.value.text);
+  };
+  const auto type_name = [](const TypedLabel& label) {
+    if (label.kind == TypedLabel::Kind::kNaT) return std::string("NaTType");
+    return label.type.empty() ? std::string("float") : label.type;
+  };
+  const auto text_label = [](const std::string& text) {
+    TypedLabel out;
+    out.value = python::text(text);
+    out.type = "str";
+    return out;
+  };
+  const auto subscript = [&](const TypedDeclareKey& key, std::size_t at) -> TypedLabel {
+    if (!key.collapsed) return at == 0 ? key.first : key.second;
+    if (const auto points = chars(key.first)) {
+      if (at >= points->size()) throw std::invalid_argument("IndexError: string index out of range");
+      return text_label((*points)[at]);
+    }
+    throw std::invalid_argument("TypeError: '" + type_name(key.first) + "' object is not subscriptable");
+  };
+  const auto unpack = [&](const TypedDeclareKey& key) -> std::pair<TypedLabel, TypedLabel> {
+    if (!key.collapsed) return {key.first, key.second};
+    if (const auto points = chars(key.first)) {
+      if (points->size() < 2)
+        throw std::invalid_argument("ValueError: not enough values to unpack (expected 2, got " +
+                                    std::to_string(points->size()) + ")");
+      if (points->size() > 2) throw std::invalid_argument("ValueError: too many values to unpack (expected 2)");
+      return {text_label((*points)[0]), text_label((*points)[1])};
+    }
+    throw std::invalid_argument("TypeError: cannot unpack non-iterable " + type_name(key.first) + " object");
+  };
+  int total = 0;
+  for (const auto& [family, keys] : rules) total += static_cast<int>(keys.size());
+  static constexpr const char* kOrder[] = {
+      kDeclareExistence, kDeclareExactlyOne, kDeclareInit, kDeclareRespondedExistence, kDeclareCoexistence,
+      kDeclareNonCoexistence, kDeclareResponse, kDeclarePrecedence, kDeclareSuccession, kDeclareAltResponse,
+      kDeclareChainResponse, kDeclareAltPrecedence, kDeclareChainPrecedence, kDeclareAltSuccession,
+      kDeclareChainSuccession, kDeclareAbsence, kDeclareNonSuccession, kDeclareNonChainSuccession};
+  std::vector<DeclareConformance> out;
+  out.reserve(input.traces.size());
+  std::vector<std::vector<int>> positions(classes.size());
+  for (const auto& trace : input.traces) {
+    for (std::size_t i = 0; i < trace.size(); ++i) positions[trace[i]].push_back(static_cast<int>(i));
+    const int n = static_cast<int>(trace.size());
+    const auto at = [&](const TypedLabel& label) -> const std::vector<int>* {
+      const auto c = class_of(label);
+      if (!c || positions[*c].empty()) return nullptr;
+      return &positions[*c];
+    };
+    const auto in = [&](const TypedLabel& label) { return at(label) != nullptr; };
+    // `trace[i] != label`
+    const auto unequal = [&](std::size_t event, const TypedLabel& label) {
+      if (label.kind != TypedLabel::Kind::kValue || classes[event].unequal) return true;
+      const auto c = class_of(label);
+      return !c || *c != event;
+    };
+    const auto alt_response = [&](const TypedLabel& a, const TypedLabel& b) {
+      const auto* ai = at(a);
+      if (!ai) return true;
+      const auto* bi = at(b);
+      if (!bi) return false;
+      return alt_response_positions(*ai, *bi, n);
+    };
+    const auto chain_response = [&](const TypedLabel& a, const TypedLabel& b) {
+      const auto* ai = at(a);
+      if (!ai) return true;
+      for (const int i : *ai)
+        if (i + 1 >= n || unequal(trace[static_cast<std::size_t>(i) + 1], b)) return false;
+      return true;
+    };
+    const auto alt_precedence = [&](const TypedLabel& a, const TypedLabel& b) {
+      const auto* bi = at(b);
+      if (!bi) return true;
+      const auto* ai = at(a);
+      if (!ai) return false;
+      return alt_precedence_positions(*ai, *bi);
+    };
+    const auto chain_precedence = [&](const TypedLabel& a, const TypedLabel& b) {
+      const auto* bi = at(b);
+      if (!bi) return true;
+      for (const int i : *bi)
+        if (i == 0 || unequal(trace[static_cast<std::size_t>(i) - 1], a)) return false;
+      return true;
+    };
+    DeclareConformance result;
+    result.no_constr_total = total;
+    for (const auto* family : kOrder) {
+      const auto found = rules.find(family);
+      if (found == rules.end()) continue;
+      const std::string_view f = family;
+      for (const auto& key : found->second) {
+        bool deviates = false;
+        if (f == kDeclareExistence) deviates = !in(key.first);
+        else if (f == kDeclareAbsence) deviates = in(key.first);
+        else if (f == kDeclareExactlyOne) {
+          const auto* p = at(key.first);
+          deviates = !p || p->size() != 1;
+        } else if (f == kDeclareInit) {
+          deviates = n == 0 || unequal(trace.front(), key.first);
+        } else if (f == kDeclareRespondedExistence) {
+          deviates = in(subscript(key, 0)) && !in(subscript(key, 1));
+        } else if (f == kDeclareCoexistence) {
+          deviates = (in(subscript(key, 0)) && !in(subscript(key, 1))) ||
+                     (in(subscript(key, 1)) && !in(subscript(key, 0)));
+        } else if (f == kDeclareNonCoexistence) {
+          deviates = in(subscript(key, 0)) && in(subscript(key, 1));
+        } else if (f == kDeclareResponse) {
+          if (const auto* a = at(subscript(key, 0))) {
+            const auto* b = at(subscript(key, 1));
+            deviates = !b || a->back() > b->back();
+          }
+        } else if (f == kDeclarePrecedence) {
+          if (const auto* b = at(subscript(key, 1))) {
+            const auto* a = at(subscript(key, 0));
+            deviates = !a || a->front() > b->front();
+          }
+        } else if (f == kDeclareSuccession) {
+          const auto* a = at(subscript(key, 0));
+          const auto* b = at(subscript(key, 1));
+          if (!a && !b) continue;
+          deviates = !a || !b || a->front() > b->front() || a->back() > b->back();
+        } else if (f == kDeclareAltResponse) {
+          deviates = !alt_response(subscript(key, 0), subscript(key, 1));
+        } else if (f == kDeclareChainResponse) {
+          deviates = !chain_response(subscript(key, 0), subscript(key, 1));
+        } else if (f == kDeclareAltPrecedence) {
+          deviates = !alt_precedence(subscript(key, 0), subscript(key, 1));
+        } else if (f == kDeclareChainPrecedence) {
+          deviates = !chain_precedence(subscript(key, 0), subscript(key, 1));
+        } else if (f == kDeclareAltSuccession) {
+          const auto a = subscript(key, 0), b = subscript(key, 1);
+          deviates = !(alt_response(a, b) && alt_precedence(a, b));
+        } else if (f == kDeclareChainSuccession) {
+          const auto a = subscript(key, 0), b = subscript(key, 1);
+          deviates = !(chain_response(a, b) && chain_precedence(a, b));
+        } else {
+          const auto [a, b] = unpack(key);
+          const auto* pa = at(a);
+          const auto* pb = at(b);
+          if (!pa || !pb) continue;
+          if (f == kDeclareNonSuccession) deviates = pa->front() < pb->front() && pa->back() < pb->back();
+          else deviates = chain_response(a, b) && chain_precedence(a, b);
+        }
+        if (!deviates) continue;
+        DeclareDeviation deviation;
+        deviation.template_name = family;
+        deviation.first = typed_label_str(key.first);
+        if (!key.collapsed) deviation.second = typed_label_str(key.second);
+        deviation.binary = !key.collapsed;
+        result.deviations.push_back(std::move(deviation));
+      }
+    }
+    result.no_dev_total = static_cast<int>(result.deviations.size());
+    result.dev_fitness = total > 0 ? 1.0 - static_cast<double>(result.no_dev_total) / static_cast<double>(total) : 1.0;
+    result.is_fit = result.no_dev_total == 0;
+    out.push_back(std::move(result));
+    for (const auto c : trace) positions[c].clear();
+  }
+  return out;
 }
 
 // An activity no model names: pm4py's pandas Declare conformance keeps a row
@@ -2027,9 +2247,35 @@ EventDataView frame_slice_view(const EventDataView& data, std::string_view case_
 
 }  // namespace
 
+std::optional<TypedDeclareResult> discover_declare_typed_frame(const EventTable& frame,
+                                                               const DeclareDiscoveryOptions& options) {
+  std::optional<EventTable> storage;
+  const auto& present = present_columns(frame, storage);
+  const auto activity_name =
+      options.activity_key.empty() ? std::string_view("concept:name") : std::string_view(options.activity_key);
+  // A column of text without gaps: the texts answer, and the caller's own
+  // path runs the frame's checks.
+  auto traces = typed_declare_traces(present, options.case_id_key, activity_name);
+  if (!traces) return std::nullopt;
+  check_pandas_declare_frame(frame, options.case_id_key, options.activity_key, false);
+  TypedDeclareRules rules;
+  TypedDeclareResult out;
+  out.model = typed_declare_model(*traces, options, &rules);
+  out.conformance.case_ids = traces->case_ids;
+  try {
+    out.conformance.results = typed_declare_conformance(*traces, rules);
+  } catch (const OperationCancelled&) {
+    throw;
+  } catch (const std::exception& error) {
+    out.conformance.error = error.what();
+  }
+  return out;
+}
+
 DeclareModel discover_declare_frame_slices(const EventDataView& data,
                                            const DeclareDiscoveryOptions& options,
-                                           std::optional<DeclareModel>* shown) {
+                                           std::optional<DeclareModel>* shown,
+                                           std::optional<DeclareShownConformance>* shown_conformance) {
   std::optional<EventLog> log;
   std::optional<EventTable> table;
   // Round HA (observed black-box): the Polars copy of an object column holds
@@ -2056,22 +2302,34 @@ DeclareModel discover_declare_frame_slices(const EventDataView& data,
       if (relabeled) {
         auto session = discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, true),
                                         options);
-        *shown = discover_declare(
-            EventDataView(polars_projection_table(std::move(materialized), options.case_id_key, options.activity_key, true)),
-            options);
+        const auto projection =
+            polars_projection_table(std::move(materialized), options.case_id_key, options.activity_key, true);
+        *shown = discover_declare(EventDataView(projection), options);
+        // Round HB: its conformance names the deviations by the same str()
+        // labels.
+        if (shown_conformance) {
+          shown_conformance->emplace();
+          DeclareConformanceOptions conformance;
+          conformance.activity_key = options.activity_key;
+          conformance.case_id_key = options.case_id_key;
+          try {
+            (*shown_conformance)->results = check_declare_conformance(EventDataView(projection), **shown, conformance);
+          } catch (const OperationCancelled&) {
+            throw;
+          } catch (const std::exception& error) {
+            (*shown_conformance)->error = error.what();
+          }
+        }
         return session;
       }
     }
   }
   if (shown && data.kind() == EventDataKind::kEventTable && !options.considered_activities) {
-    // Round HA: the typed model (its frame checks first, then its errors).
-    check_pandas_declare_frame(*data.table(), options.case_id_key, options.activity_key, false);
-    std::optional<EventTable> storage;
-    const auto& present = present_columns(*data.table(), storage);
-    const auto activity_name =
-        options.activity_key.empty() ? std::string_view("concept:name") : std::string_view(options.activity_key);
-    if (auto traces = typed_declare_traces(present, options.case_id_key, activity_name)) {
-      *shown = typed_declare_model(*traces, options);
+    // Round HA: the typed model (its frame checks first, then its errors);
+    // round HB: its conformance.
+    if (auto typed = discover_declare_typed_frame(*data.table(), options)) {
+      *shown = std::move(typed->model);
+      if (shown_conformance) *shown_conformance = std::move(typed->conformance);
       try {
         return discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, true),
                                 options);

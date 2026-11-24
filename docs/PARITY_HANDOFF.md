@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HA (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–HB (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10369,6 +10369,93 @@ HA's suite: the full ctest 690 of 690 (39 minutes, -j2) with the new
 server binary), Python script tests 406 of 406, the 16 manifests replayed
 2,673 responses unchanged, no frontend change.
 Harness and probes: `review-harness/round-ha/`.
+
+Round HB re-reviewed HA. HA's CI run 45471275567 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+HB took HA's open Declare items. HB1 CSV-keyed Declare
+(GT2-2, GT2-3): a CSV upload's pandas frame and its log shape feed
+format_dataframe's typed cells (read_csv's numbers, booleans, dates and
+objects, its gaps one NaN of an object column or a NaN per row of a
+float64 column) to HA's rules-frame model through
+`discover_declare_typed_frame`, so the model, its KeyErrors and its sort
+TypeErrors are pm4py's; on the log shape (the legacy response) a
+conformance error fails the whole mine, as pm4py's apply does. The
+Polars frame checks its copy's column first: a column of numbers,
+booleans or dates is no String (`the activity column should be of type
+string.`), read_csv's gaps are nulls (`... should not contain any empty
+value.`), and an object column (True/False beside a gap included) holds
+str() of each object (`csv_polars_declare_view`). HB2 Declare conformance
+keyed by a typed column: `typed_declare_conformance` checks pm4py's
+families in their order against the typed model's keys, `in` and dict
+lookups by identity or equality, `!=` pure (NaN and NaT never equal), a
+collapsed one-element key subscripted (`'<type>' object is not
+subscriptable`) or unpacked (`cannot unpack non-iterable <type> object`),
+a str key indexing its characters; deviations named by the typed labels.
+It answers the declare_conformance family on XES pandas frames and on the
+CSV shapes (the log shape's list in the log's case order); on an XES
+Polars frame keyed by an object column the conformance runs on the same
+str() relabelled projection as the shown model. The session keeps the
+text model and its own conformance. HB3 Heuristics++ and-measures of
+typed nodes: not observable. A node's and-measures name its connected
+neighbours, and pm4py's Petri conversion fails (`"pre_" + act`) on any
+non-str node with an incoming connection, while a str node's neighbours
+are str (mixed pairs already raise in the dependency pass); the
+discover-workflow route serializes the net only after the conversion. Of
+300 gxB/gxE pandas mines keyed by X or start_timestamp, one net carried
+and-measures over typed nodes, and its conversion failed. HB4 exact
+labels: `ct/u64x.py` without date normalization on gxB and gxE, both frame
+shapes, shows no label difference; what is left is declared: sort
+TypeError operands (Inductive, Declare, temporal profile), Declare's
+KeyError template, the log skeleton's bool equal to an int (3 on gxE
+pandas), and two Inductive RecursionErrors on pandas: pm4py's UVCL DFG
+reads start and end activities with `==`, so a NaN is never one; a sublog
+of a NaN and another activity then has no cut and the flower model
+recurses on itself, where Minera fails at str() of the tree. Found while
+probing: a collapsed-key order on the CSV log shape (k68020 K5,
+`'bool' object is not subscriptable`) does not follow the hash seed but
+the set order of tuples holding a NaN, whose hash is its address
+(declared, like HA's operand orders). gtK, 40 uploads, keys K1-K6: log
+shape 79 of 308 judgments differing down to 36, pandas frame 336 of 425
+down to 30, every one a TypeError whose operands follow the hash seed or
+the address order above; Polars frame 180 of 260 down to 0. Declare
+conformance on XES: gxB pandas 98 of 287 down to 61 and gxE pandas 66 of
+323 down to 11, every one a discovery error HA declared (operand orders,
+KeyError templates), gxB Polars 3 down to 0, gxE Polars 0. The fixture
+replay caught a CSV frame whose activity column is text without gaps
+failing the typed path's frame check (no date column, a header-only
+upload) where Minera's own path answers: the typed path now steps aside
+before any check for such a column. Two GT cases
+(`dcl K6 k68001.csv`, `k68006.csv`) pinned an operand order pm4py varies
+by hash seed (checked over seeds 0-5); they compare the error class now.
+Found for the next round: a CSV upload's frame shapes keyed by a typed or
+gapped column for Alpha, Inductive, the log skeleton, the temporal
+profile and Heuristics++ (`ct/csvk.py` on gtK, 30 uploads: pandas 735 of
+1,080 judgments differ, Polars 732; the classic heuristics already
+match): Minera reads the column's texts with gaps as empty labels where
+pm4py reads format_dataframe's objects.
+HB's suite: the full ctest 691 of 691 (38 minutes, -j2) with the new
+`minera_server_review_hb_tests` (230 checks, 170 of which fail on HA's
+server binary), the 16 manifests replayed 2,673 responses unchanged, no
+Python script or frontend change.
+Harness and probes: `review-harness/round-hb/`.
+
+Next round (HC) should start by re-reviewing round HB:
+
+- HB's CI run;
+- activity keys over a CSV upload's typed or gapped columns on its frame
+  shapes for Alpha, Inductive, the log skeleton, the temporal profile and
+  Heuristics++ (`ct/csvk.py`): read format_dataframe's typed cells (or
+  the Polars copy's) as the XES frame paths read theirs, as GM did for
+  the classic heuristics (`csv_frame_typed_heuristics`);
+- the session's Declare routes that replay its model (the playout reads
+  the text model where pm4py would play out the typed one);
+- the declared residuals (sort TypeError operands, KeyError templates,
+  address-ordered collapsed keys, the log skeleton's bool equal to an int,
+  Inductive's RecursionError on a NaN activity, the GU1-2 whole-mine
+  failure, the GT2 and GT4 residuals) if a cheaper model appears;
+- the carried items below.
+
+Previous list for round HB (kept for its older items):
 
 Next round (HB) should start by re-reviewing round HA:
 

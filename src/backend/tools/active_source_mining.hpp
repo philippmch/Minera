@@ -243,21 +243,80 @@ void handle_active_source_mining(const httplib::Request& request,
   // every shape but the event stream (discover_declare_frame_slices).
   const bool declare_slices = session->active_source->file().format == "xes" &&
       session->active_source->selected_kind() != minera::EventDataKind::kEventStream;
+  // Round HB: the conformance against the typed model (pm4py's errors), as
+  // the family shows it; the session's list stays on its own model.
+  std::optional<minera::DeclareModel> declare_shown;
+  std::optional<minera::DeclareShownConformance> declare_shown_conformance;
+  std::optional<minera::LazyEventTable> declare_polars_view;
+  const bool declare_same_keys =
+      params.declare_conformance_options.activity_key == params.declare_options.activity_key &&
+      params.declare_conformance_options.case_id_key == params.declare_options.case_id_key;
   run("declare", selected, [&](bool& native_returned) {
     // Round HA: a pandas frame keyed by a typed column shows pm4py's typed
     // model; the session keeps the model on the XES texts it replays.
+    // Round HB: a CSV upload's pandas frame reads format_dataframe's typed
+    // cells the same way (csv_typed_declare).
+    // A CSV upload's Polars frame checks its copy's columns first
+    // (csv_polars_declare_view).
     std::optional<minera::DeclareModel> shown;
-    session->declare = declare_slices
-        ? minera::discover_declare_frame_slices(data(), params.declare_options, &shown)
-        : minera::discover_declare(data(), params.declare_options);
+    if (!declare_slices && csv_typed_declare_input(*session, params.declare_options)) {
+      if (auto typed = csv_typed_declare(*session, params.declare_options)) {
+        shown = std::move(typed->model);
+        declare_shown_conformance = std::move(typed->conformance);
+      }
+    } else if (!declare_slices) {
+      declare_polars_view = csv_polars_declare_view(*session, params.declare_options);
+      if (declare_polars_view)
+        shown = minera::discover_declare(minera::EventDataView(*declare_polars_view), params.declare_options);
+    }
+    if (!declare_slices && shown) {
+      try {
+        session->declare = minera::discover_declare(data(), params.declare_options);
+      } catch (const minera::OperationCancelled&) {
+        throw;
+      } catch (const std::exception&) {
+        session->declare = minera::DeclareModel{};
+      }
+    } else {
+      session->declare = declare_slices
+          ? minera::discover_declare_frame_slices(data(), params.declare_options, &shown, &declare_shown_conformance)
+          : minera::discover_declare(data(), params.declare_options);
+    }
+    declare_shown = shown;
     session->declare_ready = true;
     native_returned = true;
     return minera::serialize_active_source_declare_json(shown ? *shown : session->declare);
   });
   if (session->declare_ready) run("declare_conformance", selected, [&](bool& native_returned) {
-    declare_conformance = declare_slices
-        ? minera::check_declare_conformance_frame_slices(data(), session->declare, params.declare_conformance_options)
-        : minera::check_declare_conformance(data(), session->declare, params.declare_conformance_options);
+    try {
+      declare_conformance = declare_slices
+          ? minera::check_declare_conformance_frame_slices(data(), session->declare, params.declare_conformance_options)
+          : minera::check_declare_conformance(data(), session->declare, params.declare_conformance_options);
+    } catch (const minera::OperationCancelled&) {
+      throw;
+    } catch (const std::exception&) {
+      if (!(declare_shown_conformance || declare_polars_view) || !declare_same_keys) throw;
+    }
+    if (declare_shown && declare_polars_view && declare_same_keys) {
+      declare_shown_conformance.emplace();
+      try {
+        declare_shown_conformance->results = minera::check_declare_conformance(
+            minera::EventDataView(*declare_polars_view), *declare_shown, params.declare_conformance_options);
+      } catch (const minera::OperationCancelled&) {
+        throw;
+      } catch (const std::exception& error) {
+        declare_shown_conformance->error = error.what();
+      }
+    }
+    if (declare_shown && declare_shown_conformance && declare_same_keys) {
+      if (!declare_shown_conformance->error.empty()) throw std::invalid_argument(declare_shown_conformance->error);
+      native_returned = true;
+      const auto order = declare_case_order(*session->active_source, data(),
+                                            params.declare_conformance_options.activity_key,
+                                            params.declare_conformance_options.case_id_key);
+      const auto ordered = in_constraint_order(declare_shown_conformance->results, order);
+      return minera::serialize_active_source_declare_json(*declare_shown, &ordered);
+    }
     native_returned = true;
     const auto ordered = in_constraint_order(*declare_conformance,
         declare_case_order(*session->active_source, data(),

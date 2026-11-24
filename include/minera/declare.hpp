@@ -185,9 +185,40 @@ std::vector<DeclareConformance> check_declare_conformance_xes_polars(
 // XES texts the session replays (an empty model where that fails). On a
 // Polars frame keyed by an object column it receives the model on str() of
 // each object, as the Polars copy holds them.
+//
+// `shown_conformance` (round HB) then receives pm4py's conformance against
+// that typed model (discover_declare_typed_frame).
+struct DeclareShownConformance {
+  std::vector<std::string> case_ids;         // each result's case, in the projection's order
+  std::vector<DeclareConformance> results;
+  std::string error;                         // the error the conformance raises (no results)
+};
 [[nodiscard]] DeclareModel discover_declare_frame_slices(
     const EventDataView& data, const DeclareDiscoveryOptions& options = {},
-    std::optional<DeclareModel>* shown = nullptr);
+    std::optional<DeclareModel>* shown = nullptr,
+    std::optional<DeclareShownConformance>* shown_conformance = nullptr);
+
+// pm4py's pandas Declare on a frame keyed by a typed column, or a text
+// column with gaps (round HA, typed_declare_model), and its conformance
+// against that model (round HB, observed black-box): each case the frame's
+// rows from its first row on, the column's objects as the activities. The
+// conformance checks the families in pm4py's order on the objects: `in`
+// finds an identical or equal object (the column's one NaN or NaT finds
+// itself, a float64 level's NaN nothing), `!=` holds for NaN and NaT, and a
+// key whose second activity collapsed is subscripted or unpacked (TypeError
+// "'float' object is not subscriptable", "cannot unpack non-iterable bool
+// object", a str's own characters or IndexError/ValueError), an error the
+// conformance then reports. Frame checks and discovery errors are raised;
+// nullopt (before any check: the caller's own path runs them) when the
+// column is text without gaps or outside the model. A CSV
+// upload's frame (its typed cells, read_csv's NaN cells) and its event log
+// (convert_to_event_log of that frame) both read this way.
+struct TypedDeclareResult {
+  DeclareModel model;
+  DeclareShownConformance conformance;
+};
+[[nodiscard]] std::optional<TypedDeclareResult> discover_declare_typed_frame(
+    const EventTable& frame, const DeclareDiscoveryOptions& options = {});
 [[nodiscard]] std::vector<DeclareConformance> check_declare_conformance_frame_slices(
     const EventDataView& data, const DeclareModel& model,
     const DeclareConformanceOptions& options = {});

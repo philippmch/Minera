@@ -433,6 +433,25 @@ void rename_csv_keyed_declare_targets(const minera::FrameKeyedActivities& keyed,
       if (deviation.binary) shown(deviation.second);
 }
 
+// The typed conformance's results (in the frame's case order) in the order of
+// the log's traces, matched by case id; as listed when the cases do not pair
+// up (round HB).
+std::vector<minera::DeclareConformance> csv_typed_conformance_in_log_order(
+    const minera::EventLog& log, const minera::DeclareShownConformance& typed) {
+  if (typed.case_ids.size() != typed.results.size() || typed.results.size() != log.traces.size()) return typed.results;
+  std::unordered_map<std::string, std::size_t> at;
+  for (std::size_t i = 0; i < typed.case_ids.size(); ++i)
+    if (!at.emplace(typed.case_ids[i], i).second) return typed.results;
+  std::vector<minera::DeclareConformance> out;
+  out.reserve(log.traces.size());
+  for (const auto& trace : log.traces) {
+    const auto found = at.find(trace.case_id);
+    if (found == at.end()) return typed.results;
+    out.push_back(typed.results[found->second]);
+  }
+  return out;
+}
+
 // pm4py's temporal profile on a CSV upload's log shape (convert_to_event_log's
 // events; round GT, observed black-box) reads, for each trace in order and
 // each pair i < j, event i's timestamp key and then event j's start key,
@@ -2968,6 +2987,90 @@ std::vector<Result> in_constraint_order(const std::vector<Result>& results,
   return ordered;
 }
 
+// Declare on a CSV upload's pandas frame (round HB, observed black-box):
+// pm4py's rules frame keyed by a column of other values than text, or with
+// gaps, holds format_dataframe's typed cells (read_csv's NaN cells), as
+// discover_declare_typed_frame reads them; nullopt where the column is text
+// without gaps (the frame's texts answer).
+bool csv_typed_declare_input(const MinedSession& session, const minera::DeclareDiscoveryOptions& options) {
+  return session.active_source && session.active_source->file().format == "csv" &&
+         session.active_source->selected_kind() == minera::EventDataKind::kEventTable &&
+         !options.considered_activities;
+}
+std::optional<minera::TypedDeclareResult> csv_typed_declare(const MinedSession& session,
+                                                            const minera::DeclareDiscoveryOptions& options) {
+  const auto table = formatted_csv_frame_table(*session.active_source);
+  if (!table) return std::nullopt;
+  return minera::discover_declare_typed_frame(*table, options);
+}
+
+// Declare on a CSV upload's Polars frame (round HB, observed black-box):
+// pm4py's projection checks the Polars copy's columns first, where a column
+// of numbers, booleans or dates is no String ("the activity column should be
+// of type string.") and read_csv's gaps are nulls ("... should not contain
+// any empty value."); an object column (True/False beside a gap) is String,
+// str() of each object. The frame's view with the key's column so typed;
+// nullopt where the column is text without gaps or a date column (the view
+// already answers) or names no column of the frame.
+std::optional<minera::LazyEventTable> csv_polars_declare_view(const MinedSession& session,
+                                                             const minera::DeclareDiscoveryOptions& options) {
+  if (!session.active_source || session.active_source->file().format != "csv" ||
+      session.active_source->selected_kind() != minera::EventDataKind::kLazyEventTable ||
+      options.considered_activities)
+    return std::nullopt;
+  const auto& source = *session.active_source;
+  const auto& log = source.checked_log();
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+  const auto key = options.activity_key.empty() ? std::string("concept:name") : options.activity_key;
+  const auto column = csv_frame_column(*log.dataframe_columns, key);
+  if (!column || column->role != minera::FirstClassAttributeRole::kNone ||
+      column->type == minera::DataFrameColumnType::kDate || csv_frame_replaced_column(source, key))
+    return std::nullopt;
+  std::optional<minera::EventTable> table;
+  try {
+    table = csv_frame_table(source, false);
+  } catch (const std::exception&) {
+    return std::nullopt;
+  }
+  if (!table || table->dtypes.size() != table->columns.size()) return std::nullopt;
+  const auto found = std::find(table->columns.begin(), table->columns.end(), key);
+  if (found == table->columns.end()) return std::nullopt;
+  const auto at = static_cast<std::size_t>(found - table->columns.begin());
+  // read_csv keeps a True/False column with a gap as objects.
+  const bool objects = column->type == minera::DataFrameColumnType::kObject ||
+                       (column->type == minera::DataFrameColumnType::kBool && column->missing_cell);
+  const char* dtype = nullptr;
+  switch (column->type) {
+    case minera::DataFrameColumnType::kInt64: dtype = "int64"; break;
+    case minera::DataFrameColumnType::kFloat64: dtype = "float64"; break;
+    case minera::DataFrameColumnType::kBool: dtype = objects ? nullptr : "bool"; break;
+    default: break;
+  }
+  bool changed = dtype != nullptr;
+  for (auto& row : table->rows) {
+    if (at >= row.size()) continue;
+    auto& cell = row[at];
+    if (!cell) cell = minera::EventAttribute{key, "", minera::AttributeKind::kString};
+    if (cell->is_null || cell->value.empty() || minera::is_pandas_csv_na_text(cell->value)) {
+      changed = true;
+      cell->value.clear();
+      cell->is_null = true;
+      continue;
+    }
+    if (objects) {
+      const auto text = minera::python::str(minera::python::from_attribute(minera::csv_dataframe_cell(*column, cell->value)));
+      if (text != cell->value) {
+        cell->value = text;
+        cell->kind = minera::AttributeKind::kString;
+        changed = true;
+      }
+    }
+  }
+  if (!changed) return std::nullopt;
+  if (dtype) table->dtypes[at] = dtype;
+  return minera::LazyEventTable::from_table(*table);
+}
+
 #include "active_source_mining.hpp"
 #include "traces_route.hpp"
 
@@ -3351,7 +3454,20 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // (check_csv_keyed_declare_keys). Minera counts the gaps as one activity
     // (closer to pm4py's supports than one per float64 gap, measured), where
     // pm4py's rule sets can also hold equal NaN keys apart (declared).
-    auto declare_keyed = csv_keyed_family(log, params.declare_options.activity_key);
+    // Round HB: a column of other values than text, or with gaps, keys
+    // pm4py's rules frame by its objects (convert_to_event_log of
+    // format_dataframe's frame holds them as the frame does): the typed
+    // model and its conformance (discover_declare_typed_frame), whose errors
+    // fail the mine.
+    std::optional<minera::TypedDeclareResult> declare_typed;
+    if (!xes_input && !params.declare_options.considered_activities &&
+        csv_keyed_family(log, params.declare_options.activity_key) &&
+        params.declare_conformance_options.activity_key == params.declare_options.activity_key)
+      if (const auto frame = formatted_csv_frame_table(*active_source))
+        declare_typed = minera::discover_declare_typed_frame(*frame, params.declare_options);
+    if (declare_typed && !declare_typed->conformance.error.empty())
+      throw std::invalid_argument(declare_typed->conformance.error);
+    auto declare_keyed = declare_typed ? std::nullopt : csv_keyed_family(log, params.declare_options.activity_key);
     if (declare_keyed && declare_keyed->any_missing) {
       if (declare_keyed->any_text)
         throw std::invalid_argument("TypeError: '<' not supported between instances of 'str' and 'float'");
@@ -3361,12 +3477,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     auto declare_conformance_options = params.declare_conformance_options;
     if (declare_keyed) declare_options.activity_key = declare_conformance_options.activity_key = "concept:name";
     const auto& declare_log = declare_keyed ? declare_keyed->log : log;
-    auto declare =
-        minera::discover_declare_as_uploaded(declare_log, declare_options);
+    auto declare = declare_typed ? declare_typed->model
+                                 : minera::discover_declare_as_uploaded(declare_log, declare_options);
     if (declare_keyed) check_csv_keyed_declare_keys(*declare_keyed, declare);
-    auto declare_conformance =
-        minera::check_declare_conformance_as_uploaded(
-            declare_log, declare, declare_conformance_options);
+    auto declare_conformance = declare_typed
+        ? csv_typed_conformance_in_log_order(log, declare_typed->conformance)
+        : minera::check_declare_conformance_as_uploaded(declare_log, declare, declare_conformance_options);
     if (declare_keyed) rename_csv_keyed_declare_targets(*declare_keyed, declare, declare_conformance);
     for (const auto& [family, rules] : declare.rules) {
       (void)family;

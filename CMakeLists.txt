@@ -2780,6 +2780,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_ha_tests minera_server)
     add_test(NAME minera_server_review_ha_tests
              COMMAND minera_server_review_ha_tests $<TARGET_FILE:minera_server>)
+    # Round HB: Declare keyed by typed CSV columns (log, DataFrame, LazyFrame) and its conformance on typed keys.
+    add_executable(minera_server_review_hb_tests
+      src/backend/tests/test_server_review_hb.cpp)
+    target_include_directories(minera_server_review_hb_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_hb_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_hb_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_hb_tests minera_server)
+    add_test(NAME minera_server_review_hb_tests
+             COMMAND minera_server_review_hb_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)
