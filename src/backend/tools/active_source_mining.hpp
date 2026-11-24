@@ -244,12 +244,15 @@ void handle_active_source_mining(const httplib::Request& request,
   const bool declare_slices = session->active_source->file().format == "xes" &&
       session->active_source->selected_kind() != minera::EventDataKind::kEventStream;
   run("declare", selected, [&](bool& native_returned) {
+    // Round HA: a pandas frame keyed by a typed column shows pm4py's typed
+    // model; the session keeps the model on the XES texts it replays.
+    std::optional<minera::DeclareModel> shown;
     session->declare = declare_slices
-        ? minera::discover_declare_frame_slices(data(), params.declare_options)
+        ? minera::discover_declare_frame_slices(data(), params.declare_options, &shown)
         : minera::discover_declare(data(), params.declare_options);
     session->declare_ready = true;
     native_returned = true;
-    return minera::serialize_active_source_declare_json(session->declare);
+    return minera::serialize_active_source_declare_json(shown ? *shown : session->declare);
   });
   if (session->declare_ready) run("declare_conformance", selected, [&](bool& native_returned) {
     declare_conformance = declare_slices

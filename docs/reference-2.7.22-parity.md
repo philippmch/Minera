@@ -39554,3 +39554,84 @@ Carried: Declare's typed values, Heuristics++ keyed by a typed column.
 |---|---|---|
 | gxB, pandas frame, 35 option sets (7,000) | 1,511 differing | 369 differing (Declare 240, Heuristics++ 69, Inductive operands 56 and 2 RecursionErrors, 2 temporal profile operands) |
 | gxB, Polars lazy frame, 35 option sets (7,000) | 903 differing | 74 differing (Heuristics++ 42, Inductive operands 16, Declare 16) |
+
+## Review HA1-HA4: Declare and Heuristics++ keyed by typed XES columns on the frame shapes (2026-11-24)
+
+Observed black-box against pm4py 2.7.22 (review harness round HA:
+`ct/u64.py` dc_aX, dc_ast, hpp_aX, hpp_ast, `tc/mkha.py`), `/api/mine`
+keyed by a typed XES column (ints, ints past int64, floats, booleans,
+dates, a mix, gaps) on an XES upload's DataFrame and LazyFrame shapes
+against the algorithm applies on read_xes's frame and its Polars copy.
+
+- **HA1, Declare (pandas)** answers the model pm4py's classic variant
+  answers through its rules frame (`typed_declare_model` in declare.cpp).
+  Each case is its slice of the frame's rows, each event the column's
+  object (numpy scalars per dtype, Timestamps, the objects of an object
+  column); a float64 column's NaN is a new object per row, so each is an
+  activity of its own, an object or str column's gaps share numpy's NaN,
+  NaT and None are one activity each. Activities pair with themselves where
+  `!=` holds (NaN, NaT): responded existence and the negative templates
+  count those self pairs, the ordering templates find no partner, the
+  chain templates never match a NaN or NaT target, init never matches NaN
+  or NaT. The rules dict becomes a frame whose MultiIndex levels are
+  factorized by Python equality (unary keys padded by NaN): a level's
+  dtype is inferred from its uniques (bool, int64, uint64, float64 where
+  ints meet floats without bools, str, datetime64 for one offset, object
+  otherwise; a collision of two classes is `ValueError: Categorical
+  categories must be unique`), an int level with gaps reads its values
+  back as Python floats, a missing level value is a fresh NaN, NaT or the
+  shared NaN by dtype. Looking a rule up in the frame raises `KeyError`
+  with the full tuple where a level lacks the value (a float that is not
+  an exact integral of an int level, an int past 2**53), and a non-unique
+  index (two NA classes) answers every lookup with the rows, so support
+  and confidence are the row count. The automatic thresholds sort
+  (product, rule key) reversed (`TypeError` where keys do not order). The
+  output collapses a rule to its first activity where the second is
+  missing or falsy (0, 0.0, False, ''), later equal keys overwriting
+  earlier ones. The family result shows that model; the session keeps the
+  model mined on the texts the log replays (an empty model where that
+  fails), so the graph registration and presentation are unchanged.
+- **HA2, Heuristics++** keyed by a typed column reads each cell's Python
+  object as the classic does (`frame_typed_activities`): one node per
+  Python-equal object, named str() of the first (a float64 column's ints
+  past int64 are floats, `9.223372036854776e+18`, equal floats one node;
+  each NaN of a float64 column a node of its own; Polars: an object
+  column's copy holds str() of each value, gaps None). to_interval pairs a
+  complete with the open start of its node. The concurrency keys and the
+  dependency pairs compare the objects as Python does (`TypeError` on mixed
+  objects, None beside anything, NaN beside a number never), and a pair's
+  concurrency key is `tuple(sorted(pair))`, which keeps a pair with a NaN
+  in the order given, so a NaN node's dependency can miss its concurrency
+  (`concurrency_key`). The Petri conversion fails on the first node whose
+  value is no str with an incoming edge, nodes in order, each followed by
+  its successors.
+- **HA3, start_timestamp as the activity key** (Heuristics++): the column
+  is the interval's start too, so the intervals keep their starts (Minera
+  had dropped the column from the events and read instants).
+- **HA4, Declare (Polars)** keyed by an object column: the Polars copy
+  holds str() of each pandas object, so the rules are keyed by `True`, a
+  date's str() with its own offset and a float's repr, not the XES texts
+  (`true`, `2021-03-01T08:07:00.000Z`); values whose str() is equal are one
+  activity.
+
+Declared: the operands of Declare's sort TypeErrors and the template its
+KeyError names. The rules dict is built from sets of activity pairs, so
+the frame's column order follows CPython's set iteration (str, datetime
+and None hashes follow the hash seed or an address): which two keys the
+sort compares first, which rule's lookup fails first, and which of two
+colliding rules survives the collapse. Minera walks the templates in
+their sorted order and raises the same error class; `tc/mkha.py` compares
+the class wherever pm4py's own message differs between hash seeds 0 and 1.
+The object that names an activity where equal objects of two types meet
+(0 and False).
+
+| bank (judgments) | before | after |
+|---|---|---|
+| gxB, pandas frame, Declare keyed by X and start_timestamp (400) | 237 differing | 123 differing, all error operands or KeyError templates of the same class (declared) |
+| gxB, Polars lazy frame, Declare (400) | 16 differing | 0 |
+| gxE, pandas frame, Declare (200) | 56 differing | 11 differing, all TypeError operands (declared) |
+| gxE, Polars lazy frame, Declare (200) | 5 differing (more with dates compared as texts) | 0 (dates compared exactly too) |
+| gxB, pandas frame, Heuristics++ keyed by X and start_timestamp (400) | 69 differing | 0 |
+| gxB, Polars lazy frame, Heuristics++ (400) | 42 differing | 0 |
+| gxE, both shapes, Heuristics++ (400) | 51 differing | 0 |
+| gxB, pandas, Heuristics++ with its other options (1,000) | equal | equal |

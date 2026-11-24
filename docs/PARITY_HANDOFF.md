@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GZ (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–HA (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10327,6 +10327,71 @@ and passing on its own) and the new
 server binary), Python script tests 406 of 406, the 16 manifests replayed
 2,673 responses unchanged, no frontend change.
 Harness and probes: `review-harness/round-gz/`.
+
+Round HA re-reviewed GZ. GZ's CI run 45445812558 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+HA took GZ's open activity keys (`ct/u64.py` dc_aX, dc_ast, hpp_aX,
+hpp_ast on gxB and gxE, both frame shapes). HA1 Declare (pandas): the
+family result is the model pm4py's classic variant answers through its
+rules frame (`typed_declare_model`, first written as a Python model that
+matched pm4py on every value of both banks): each case its slice of the
+frame's rows, the column's objects as events (a float64 column's NaN a
+new object per row, so an activity each; an object or str column's gaps
+the shared NaN; NaT and None one activity each), self pairs where `!=`
+holds (NaN, NaT), the rules frame's MultiIndex levels factorized by
+Python equality with their inferred dtype (an int level with gaps reads
+back floats, a collision raises `Categorical categories must be unique`),
+lookups that raise `KeyError` with the full tuple or, on a non-unique
+index, answer the row count, the reversed (product, key) sort of the
+automatic thresholds, and the output's collapse of a rule whose second
+activity is missing or falsy. The session keeps the text model the log
+replays (empty where the text model fails, so the presentation stays
+valid). HA2 Heuristics++: typed nodes as the classic reads them (float
+labels of ints past int64, equal floats merged, each float64 NaN a node),
+to_interval pairing by node, the concurrency and dependency comparisons of
+the objects (TypeError on mixed objects), and pm4py's
+`tuple(sorted(pair))` concurrency keys, which keep a NaN pair in the given
+order (`concurrency_key`); the Petri conversion type of a non-str node.
+HA3: start_timestamp as the Heuristics++ activity key is the interval's
+start too (Minera had dropped that column from the events). HA4: Polars
+Declare keyed by an object column shows str() of each pandas object, as
+the Polars copy holds them (`True`, a date's str()), not the XES texts
+(the sweep's date normalization had hidden it; `tc/mkha.py` compares
+exactly). gxB: Declare
+pandas 237 of 400 judgments differing down to 123, every one an error of
+the same class whose operands or KeyError template follow the hash seed
+(declared), Polars 16 down to 0; Heuristics++ pandas 69 down to 0, Polars
+42 down to 0; gxE Declare pandas 56 down to 11 operand orders, Polars
+5 down to 0, Heuristics++ both shapes 51 down to 0; the
+other Heuristics++ options and the classic heuristics unchanged.
+HA's suite: the full ctest 690 of 690 (39 minutes, -j2) with the new
+`minera_server_review_ha_tests` (168 checks, 114 of which fail on GZ's
+server binary), Python script tests 406 of 406, the 16 manifests replayed
+2,673 responses unchanged, no frontend change.
+Harness and probes: `review-harness/round-ha/`.
+
+Next round (HB) should start by re-reviewing round HA:
+
+- HA's CI run;
+- Declare keyed by a typed column on a CSV upload's frame shapes (GT2-2,
+  GT2-3: the text column's operand order and pm4py's separate NaN keys):
+  HA's rules-frame model (`typed_declare_model`) may settle them if the
+  CSV frame's objects feed it;
+- Declare conformance keyed by a typed XES column (the model's typed keys
+  read back by `conformance_declare`), and the session's Declare routes
+  that replay the model;
+- the and-measure order of a Heuristics++ net with typed nodes (Python's
+  sorted() of a node's successors, NaN pairs), which the family JSON does
+  not show;
+- `ct/u64.py`'s date normalization (`dnorm`) hides a date label shown as
+  the XES text instead of str(): rerun the other families keyed by typed
+  columns with exact labels (as `tc/mkha.py` compares them);
+- the sort TypeErrors' operands (declared), the log skeleton where a bool
+  equals an int (declared), the GU1-2 whole-mine failure (declared) and the
+  GT2 and GT4 residuals (declared) if a cheaper model appears;
+- the carried items below.
+
+Previous list for round HA (kept for its older items):
 
 Next round (HA) should start by re-reviewing round GZ:
 

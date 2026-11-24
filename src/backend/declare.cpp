@@ -1,11 +1,13 @@
 #include "minera/declare.hpp"
 
+#include "minera/cancellation.hpp"
 #include "minera/log_conversion.hpp"
 #include "frame_cells.hpp"
 #include "minera/dataframe_validation.hpp"
 #include "numpy_object_sort.hpp"
 #include "polars_sort.hpp"
 #include "python_scalar.hpp"
+#include "polars_missing_column.hpp"
 #include "xes_frame_columns.hpp"
 #include "xes_frame_typed.hpp"
 #include "xes_frame_activity.hpp"
@@ -528,13 +530,15 @@ const EventTable& present_columns(const EventTable& table, std::optional<EventTa
 // gaps, NaN floats or valueless cells is still a date column, ints beside a
 // gap float64, a column of NaN alone float64, mixes object; Polars' copy
 // holds an object column (and one of None alone) as String. The table's own
-// inference stays where a column holds kinds outside that model.
+// inference stays where a column holds kinds outside that model. Round HA:
+// ints past int64 are typed too (an object column of them beside negative
+// ints is String in Polars' copy, which pm4py's Polars check accepts).
 EventTable xes_frame_typed_dtypes(const EventTable& table, bool polars) {
   EventTable typed = table;
   std::vector<std::string> dtypes;
   for (std::size_t column = 0; column < table.columns.size(); ++column) {
     detail::XesFrameDtype dtype{};
-    if (!detail::xes_frame_cells(table, column, polars, &dtype)) return typed;
+    if (!detail::xes_frame_cells(table, column, polars, &dtype, true)) return typed;
     using D = detail::XesFrameDtype;
     switch (dtype) {
       case D::kDatetime: dtypes.emplace_back(polars ? "Datetime(time_unit='us', time_zone='UTC')" : "datetime64[us, UTC]"); break;
@@ -1340,6 +1344,571 @@ EventTable frame_slice_table(const EventTable& table, std::string_view case_id_k
   return sliced;
 }
 
+// Round HA (observed black-box against pm4py 2.7.22 on pandas 3.0.5): pm4py's
+// Declare discovery on a pandas frame keyed by a typed column (an XES column
+// read_xes types as ints, floats, booleans, dates or objects, or a text
+// column with gaps). The activities are the column's objects: equal numbers
+// one activity (0, False and 0.0), each NaN of a float64 column an activity
+// of its own (numpy hands out a new object per row), the one NaN object of an
+// object or text column, NaT and None one activity each. NaN and NaT are
+// unequal to themselves, so they pair with themselves in every binary
+// template (where the chain templates and init, which compare with `==`,
+// never hold). The rules table then becomes a pandas frame whose columns are
+// a MultiIndex of (template, first, second): each level infers its dtype from
+// its distinct values (the second level always has the unary rules' missing
+// value), and iterating it hands out an int level as floats where the level
+// has a missing value. Each such float is looked up again: an int past 2**53
+// finds another activity's column or none (KeyError); a frame with two
+// missing activities (two NaNs) has duplicate columns, where every lookup
+// selects a frame and counts every row. The automatic thresholds sort
+// (product, column) in reverse, which raises TypeError on columns whose
+// labels do not order; a rule whose second label is missing or falsy (0,
+// 0.0, False, '') keeps only its first label as its key, and later rules
+// with an equal key replace earlier ones. The order in which pm4py visits the
+// columns follows the hash seed (a set of tuples holding the template
+// names), so the KeyError's column, the TypeError's operands and which of two
+// rules sharing a key survives are declared; Minera visits the columns in
+// (template, first, second) order.
+struct TypedDeclareClass {
+  python::Scalar rep;     // the activity's first object
+  std::string type;       // its Python type name
+  bool na = false;        // NaN, NaT or None: a pandas level's missing value
+  bool unequal = false;   // NaN or NaT: != itself
+  bool none = false;      // None: no init rule holds after it
+};
+
+enum class TypedLevelDtype { kInt64, kUInt64, kFloat64, kBool, kStr, kDatetime, kObject };
+
+// One element of a column label as iterating the MultiIndex hands it out.
+struct TypedLabel {
+  enum class Kind { kValue, kFreshNaN, kSharedNaN, kNaT };
+  Kind kind = Kind::kValue;
+  python::Scalar value;
+  std::string type;
+};
+
+struct TypedLevel {
+  TypedLevelDtype dtype = TypedLevelDtype::kObject;
+  std::vector<TypedLabel> categories;
+  std::unordered_map<std::string, int> code_of;  // python::identity -> code
+  std::vector<int> class_code;                   // activity -> code (-1 missing)
+  bool has_na = false;
+
+  [[nodiscard]] TypedLabel label(int code) const {
+    TypedLabel out;
+    if (code < 0) {
+      out.value = python::real(std::numeric_limits<double>::quiet_NaN());
+      out.type = "float";
+      if (dtype == TypedLevelDtype::kInt64 || dtype == TypedLevelDtype::kUInt64 || dtype == TypedLevelDtype::kFloat64)
+        out.kind = TypedLabel::Kind::kFreshNaN;
+      else if (dtype == TypedLevelDtype::kDatetime) {
+        out.kind = TypedLabel::Kind::kNaT;
+        out.type = "NaTType";
+      } else
+        out.kind = TypedLabel::Kind::kSharedNaN;
+      return out;
+    }
+    out = categories[static_cast<std::size_t>(code)];
+    if (has_na && (dtype == TypedLevelDtype::kInt64 || dtype == TypedLevelDtype::kUInt64)) {
+      out.value = python::real(std::strtod(python::str(out.value).c_str(), nullptr));
+      out.type = "float";
+    }
+    return out;
+  }
+  // Index.get_loc of a label: -1 for a missing one, nullopt for a KeyError.
+  [[nodiscard]] std::optional<int> get_loc(const TypedLabel& label) const {
+    if (label.kind != TypedLabel::Kind::kValue) return -1;
+    const auto found = code_of.find(python::identity(label.value));
+    if (found == code_of.end()) return std::nullopt;
+    return found->second;
+  }
+};
+
+bool typed_int_above_int64(const python::Scalar& s) {
+  return s.kind == python::Scalar::Kind::kInt && !s.negative &&
+         python::compare_digits(s.digits, "9223372036854775807") > 0;
+}
+
+TypedLevel typed_declare_level(const std::vector<TypedDeclareClass>& classes, const std::vector<char>& present,
+                               detail::XesFrameDtype column_dtype) {
+  using K = python::Scalar::Kind;
+  using D = detail::XesFrameDtype;
+  TypedLevel level;
+  level.class_code.assign(classes.size(), -1);
+  std::vector<std::size_t> reps;
+  for (std::size_t c = 0; c < classes.size(); ++c)
+    if (present[c] && !classes[c].na) reps.push_back(c);
+  if (reps.empty()) return level;
+  bool all_bool = true, all_int = true, all_number = true, any_bool = false, all_text = true, all_date = true;
+  bool one_offset = true, any_negative = false, any_above = false, all_in_int64 = true;
+  std::vector<python::Scalar> labels;
+  for (const auto c : reps) {
+    const auto& s = classes[c].rep;
+    all_bool = all_bool && s.kind == K::kBool;
+    all_int = all_int && s.kind == K::kInt;
+    all_number = all_number && (s.kind == K::kInt || s.kind == K::kFloat);
+    any_bool = any_bool || s.kind == K::kBool;
+    all_text = all_text && s.kind == K::kText;
+    all_date = all_date && s.kind == K::kDate && s.date.timezone_aware;
+    if (s.kind == K::kDate && classes[reps.front()].rep.kind == K::kDate)
+      one_offset = one_offset && s.date.offset_minutes == classes[reps.front()].rep.date.offset_minutes;
+    if (s.kind == K::kInt) {
+      any_negative = any_negative || s.negative;
+      any_above = any_above || typed_int_above_int64(s);
+      if (s.negative && python::compare_digits(s.digits, "9223372036854775808") > 0) all_in_int64 = false;
+      if (!s.negative && python::compare_digits(s.digits, "18446744073709551615") > 0) all_in_int64 = false;
+    }
+    labels.push_back(s);
+  }
+  switch (column_dtype) {
+    case D::kInt: level.dtype = any_above ? TypedLevelDtype::kUInt64 : TypedLevelDtype::kInt64; break;
+    case D::kFloat:
+    case D::kNaNFloat: level.dtype = TypedLevelDtype::kFloat64; break;
+    case D::kBool: level.dtype = TypedLevelDtype::kBool; break;
+    case D::kDatetime: level.dtype = TypedLevelDtype::kDatetime; break;
+    case D::kString: level.dtype = TypedLevelDtype::kStr; break;
+    case D::kObject:
+    case D::kNoneObject:
+      if (all_bool) level.dtype = TypedLevelDtype::kBool;
+      else if (all_int)
+        level.dtype = !all_in_int64 || (any_negative && any_above) ? TypedLevelDtype::kObject
+                      : any_above                                 ? TypedLevelDtype::kUInt64
+                                                                  : TypedLevelDtype::kInt64;
+      else if (all_number && !any_bool)
+        level.dtype = python::float_level(labels) ? TypedLevelDtype::kFloat64 : TypedLevelDtype::kObject;
+      else if (all_text) level.dtype = TypedLevelDtype::kStr;
+      else if (all_date && one_offset) level.dtype = TypedLevelDtype::kDatetime;
+      else level.dtype = TypedLevelDtype::kObject;
+      break;
+  }
+  for (const auto c : reps) {
+    TypedLabel category;
+    category.value = classes[c].rep;
+    category.type = classes[c].type;
+    if (level.dtype == TypedLevelDtype::kFloat64 && category.value.kind == K::kInt) {
+      category.value = python::real(std::strtod(python::str(category.value).c_str(), nullptr));
+      category.type = "float";
+    } else if (level.dtype == TypedLevelDtype::kDatetime) {
+      category.type = "Timestamp";
+    } else if (level.dtype == TypedLevelDtype::kInt64 || level.dtype == TypedLevelDtype::kUInt64) {
+      category.type = "int";
+    }
+    const auto id = python::identity(category.value);
+    const auto [found, added] = level.code_of.emplace(id, static_cast<int>(level.categories.size()));
+    // ints past 2**53 beside floats can meet as one float64 category.
+    if (!added) throw std::invalid_argument("ValueError: Categorical categories must be unique");
+    level.class_code[c] = found->second;
+    level.categories.push_back(std::move(category));
+  }
+  return level;
+}
+
+bool typed_same(const TypedLabel& a, const TypedLabel& b) {
+  using L = TypedLabel::Kind;
+  if (a.kind == L::kFreshNaN || b.kind == L::kFreshNaN) return false;
+  if (a.kind != b.kind) return false;
+  if (a.kind != L::kValue) return true;
+  return python::equal(a.value, b.value);
+}
+
+bool typed_less(const TypedLabel& a, const TypedLabel& b) {
+  using L = TypedLabel::Kind;
+  const auto unorderable = [&]() -> bool {
+    throw python::TypeError("'<' not supported between instances of '" + a.type + "' and '" + b.type + "'");
+  };
+  if (a.kind == L::kNaT || b.kind == L::kNaT) {
+    const auto dated = [](const TypedLabel& x) {
+      return x.kind == L::kNaT || (x.kind == L::kValue && x.value.kind == python::Scalar::Kind::kDate);
+    };
+    if (dated(a) && dated(b)) return false;
+    return unorderable();
+  }
+  try {
+    return python::compare(a.value, b.value) < 0;
+  } catch (const python::TypeError& error) {
+    if (std::string_view(error.what()).rfind("'<' not supported", 0) == 0) return unorderable();
+    throw;
+  }
+}
+
+std::string typed_label_repr(const TypedLabel& label) {
+  using L = TypedLabel::Kind;
+  if (label.kind == L::kNaT) return "NaT";
+  if (label.kind != L::kValue) return "nan";
+  if (label.value.kind == python::Scalar::Kind::kText) return detail::frame_python_str_repr(label.value.text);
+  return python::str(label.value);
+}
+
+std::string typed_label_str(const TypedLabel& label) {
+  using L = TypedLabel::Kind;
+  if (label.kind == L::kNaT) return "NaT";
+  if (label.kind != L::kValue) return "nan";
+  return python::str(label.value);
+}
+
+bool typed_label_falsy(const TypedLabel& label) {
+  using K = python::Scalar::Kind;
+  if (label.kind != TypedLabel::Kind::kValue) return true;
+  const auto& s = label.value;
+  switch (s.kind) {
+    case K::kBool: return !s.boolean;
+    case K::kInt: return s.digits == "0";
+    case K::kFloat: return s.real == 0.0;
+    case K::kText: return s.text.empty();
+    default: return false;
+  }
+}
+
+// Activities and their traces as pm4py's pandas projection reads them; the
+// model itself (classes per trace, nullopt when the column is plain text
+// without gaps or outside the typed model).
+struct TypedDeclareTraces {
+  std::vector<TypedDeclareClass> classes;
+  std::vector<std::vector<std::size_t>> traces;
+  detail::XesFrameDtype dtype = detail::XesFrameDtype::kObject;
+};
+
+std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, std::string_view case_id_key,
+                                                       std::string_view activity_name) {
+  const auto column = detail::xes_frame_activity_column(table, std::string(activity_name), false);
+  if (!column) return std::nullopt;
+  bool gaps = false;
+  for (const auto& cell : column->cells) gaps = gaps || cell.missing;
+  if (!column->typed && !gaps) return std::nullopt;
+  const auto found = std::find(table.columns.begin(), table.columns.end(), case_id_key);
+  if (found == table.columns.end()) return std::nullopt;
+  const auto case_at = static_cast<std::size_t>(found - table.columns.begin());
+  TypedDeclareTraces out;
+  out.dtype = column->dtype;
+  const bool fresh_nan = column->dtype == detail::XesFrameDtype::kFloat || column->dtype == detail::XesFrameDtype::kNaNFloat;
+  std::unordered_map<std::string, std::size_t> class_of;
+  const auto class_for = [&](std::size_t row) {
+    const auto& cell = column->cells[row];
+    std::string key;
+    if (cell.nat) key = "NaT";
+    else if (cell.value.kind == python::Scalar::Kind::kNone) key = "N";
+    else if (cell.missing) key = fresh_nan ? "nan#" + std::to_string(row) : "nan";
+    else key = python::identity(cell.value);
+    const auto [at, added] = class_of.emplace(key, out.classes.size());
+    if (added) {
+      TypedDeclareClass c;
+      c.rep = cell.value;
+      c.type = cell.type;
+      c.na = cell.missing;
+      c.unequal = cell.missing && (cell.nat || cell.value.kind != python::Scalar::Kind::kNone);
+      c.none = !cell.nat && cell.value.kind == python::Scalar::Kind::kNone;
+      out.classes.push_back(std::move(c));
+    }
+    return at->second;
+  };
+  // Each case as its slice of the frame's rows (from its first row on, as
+  // many rows as it has), cases by first row (the order only decides which
+  // of two equal objects names an activity, declared above).
+  struct Extent {
+    std::size_t first = 0, count = 0;
+  };
+  std::vector<std::string> order;
+  std::unordered_map<std::string, Extent> extent;
+  std::vector<std::size_t> loose;
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    const auto& cell = table.rows[row][case_at];
+    if (!cell || cell->is_null) continue;
+    const auto [at, added] = extent.emplace(cell->value, Extent{row, 0});
+    if (added) order.push_back(cell->value);
+    ++at->second.count;
+  }
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    const auto& cell = table.rows[row][case_at];
+    if (!cell || cell->is_null) {
+      out.traces.push_back({class_for(row)});
+      continue;
+    }
+    const auto& [first, count] = extent.at(cell->value);
+    if (first != row) continue;
+    std::vector<std::size_t> trace;
+    for (std::size_t r = first; r < first + count && r < table.rows.size(); ++r) trace.push_back(class_for(r));
+    out.traces.push_back(std::move(trace));
+  }
+  return out;
+}
+
+DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareDiscoveryOptions& options) {
+  const auto& classes = input.classes;
+  const std::size_t n = classes.size();
+  DeclareModel model;
+  const std::size_t nrows = input.traces.size();
+  if (n == 0 || nrows == 0) return model;
+  std::set<std::string> allowed;
+  if (!options.allowed_templates.has_value()) allowed.insert(families().begin(), families().end());
+  else allowed = to_set(*options.allowed_templates);
+  const auto allows = [&](std::initializer_list<const char*> names) {
+    for (const auto* name : names)
+      if (!has(allowed, name)) return false;
+    return true;
+  };
+  std::array<bool, kUnaryFamilies> unary{};
+  std::array<bool, kBinaryFamilies> binary{};
+  unary[kExists] = allows({kDeclareExistence});
+  unary[kExactlyOne] = allows({kDeclareExactlyOne});
+  unary[kInit] = allows({kDeclareInit});
+  unary[kAbsent] = allows({kDeclareAbsence, kDeclareExistence});
+  for (const auto f : {kRe, kResp, kPrec, kAltResp, kChainResp, kAltPrec, kChainPrec})
+    binary[f] = allows({kBinaryFamilyNames[f]});
+  binary[kSucc] = allows({kDeclareSuccession, kDeclareResponse, kDeclarePrecedence});
+  binary[kAltSucc] = allows({kDeclareAltSuccession, kDeclareAltResponse, kDeclareAltPrecedence});
+  binary[kChainSucc] = allows({kDeclareChainSuccession, kDeclareChainResponse, kDeclareChainPrecedence});
+  binary[kCoex] = allows({kDeclareCoexistence, kDeclareRespondedExistence});
+  binary[kNonCoex] = allows({kDeclareNonCoexistence, kDeclareCoexistence, kDeclareRespondedExistence});
+  binary[kNonSucc] = allows({kDeclareNonSuccession, kDeclareSuccession, kDeclareResponse, kDeclarePrecedence});
+  binary[kNonChainSucc] =
+      allows({kDeclareNonChainSuccession, kDeclareChainSuccession, kDeclareChainResponse, kDeclareChainPrecedence});
+  // A pair is a column where pm4py's `act2 != act` holds.
+  const auto pairs = [&](std::size_t a, std::size_t b) { return a != b || classes[a].unequal; };
+
+  // Support and confidence per column, over the variants (dense like evaluate_dense, with self pairs).
+  std::map<std::vector<std::size_t>, int> variants;
+  for (const auto& trace : input.traces) ++variants[trace];
+  std::vector<int> bs(kBinaryFamilies * n * n, 0), bc(bs.size(), 0), us(kUnaryFamilies * n, 0), uc(us.size(), 0);
+  const auto at = [&](std::size_t f, std::size_t a, std::size_t b) { return (f * n + a) * n + b; };
+  std::vector<std::vector<int>> positions(n);
+  std::vector<char> in(n, 0), visited(n * n, 0);
+  std::vector<std::size_t> touched, present;
+  for (const auto& [trace, count] : variants) {
+    present.clear();
+    for (std::size_t i = 0; i < trace.size(); ++i) {
+      auto& list = positions[trace[i]];
+      if (list.empty()) present.push_back(trace[i]);
+      list.push_back(static_cast<int>(i));
+    }
+    for (const auto a : present) in[a] = 1;
+    const int length = static_cast<int>(trace.size());
+    const auto add_unary = [&](std::size_t f, std::size_t a, int status) {
+      if (!unary[f]) return;
+      if (status != 0) us[f * n + a] += count;
+      if (status == 1) uc[f * n + a] += count;
+    };
+    for (std::size_t a = 0; a < n; ++a) {
+      const int exists = in[a] ? 1 : -1;
+      add_unary(kExists, a, exists);
+      add_unary(kExactlyOne, a, in[a] && positions[a].size() == 1 ? 1 : -1);
+      add_unary(kInit, a,
+                !trace.empty() && !classes[trace.front()].none && !classes[a].unequal && trace.front() == a ? 1 : -1);
+      add_unary(kAbsent, a, -exists);
+    }
+    // `==` of an event's object with an activity: never for NaN and NaT.
+    const auto is = [&](std::size_t event_class, std::size_t activity) {
+      return event_class == activity && !classes[activity].unequal;
+    };
+    const auto evaluate = [&](std::size_t a, std::size_t b) {
+      if (!pairs(a, b) || visited[a * n + b]) return;
+      visited[a * n + b] = 1;
+      touched.push_back(a * n + b);
+      const bool ia = in[a] != 0, ib = in[b] != 0;
+      const auto& pa = positions[a];
+      const auto& pb = positions[b];
+      std::array<int, kBinaryFamilies> s{};
+      s[kRe] = ia ? (ib ? 1 : -1) : 0;
+      s[kResp] = ia ? ((!ib || pa.back() >= pb.back()) ? -1 : 1) : 0;
+      s[kPrec] = ib ? ((!ia || pa.front() >= pb.front()) ? -1 : 1) : 0;
+      s[kAltResp] = ia ? (alt_response_positions(pa, pb, length) ? 1 : -1) : 0;
+      if (ia) {
+        bool ok = true;
+        for (const int i : pa)
+          if (i + 1 >= length || !is(trace[static_cast<std::size_t>(i) + 1], b)) { ok = false; break; }
+        s[kChainResp] = ok ? 1 : -1;
+      }
+      s[kAltPrec] = ib ? (alt_precedence_positions(pa, pb) ? 1 : -1) : 0;
+      if (ib) {
+        bool ok = true;
+        for (const int i : pb)
+          if (i == 0 || !is(trace[static_cast<std::size_t>(i) - 1], a)) { ok = false; break; }
+        s[kChainPrec] = ok ? 1 : -1;
+      }
+      s[kSucc] = std::min(s[kResp], s[kPrec]);
+      s[kAltSucc] = std::min(s[kAltResp], s[kAltPrec]);
+      s[kChainSucc] = std::min(s[kChainResp], s[kChainPrec]);
+      s[kCoex] = std::min(s[kRe], ib ? (ia ? 1 : -1) : 0);
+      s[kNonCoex] = -s[kCoex];
+      s[kNonSucc] = -s[kSucc];
+      s[kNonChainSucc] = -s[kChainSucc];
+      for (std::size_t f = 0; f < kBinaryFamilies; ++f) {
+        if (!binary[f] || s[f] == 0) continue;
+        bs[at(f, a, b)] += count;
+        if (s[f] == 1) bc[at(f, a, b)] += count;
+      }
+    };
+    for (const auto a : present)
+      for (std::size_t b = 0; b < n; ++b) {
+        evaluate(a, b);
+        evaluate(b, a);
+      }
+    for (const auto index : touched) visited[index] = 0;
+    touched.clear();
+    for (const auto a : present) {
+      in[a] = 0;
+      positions[a].clear();
+    }
+  }
+
+  // The columns, in (template, first, second) order.
+  struct Column {
+    std::size_t family = 0;
+    bool binary = false;
+    std::size_t a = 0, b = 0;
+    std::string name;
+  };
+  std::vector<Column> columns;
+  {
+    std::vector<std::pair<std::string, std::pair<bool, std::size_t>>> order;
+    for (std::size_t f = 0; f < kBinaryFamilies; ++f)
+      if (binary[f]) order.push_back({kBinaryFamilyNames[f], {true, f}});
+    for (std::size_t f = 0; f < kUnaryFamilies; ++f)
+      if (unary[f]) order.push_back({kUnaryFamilyNames[f], {false, f}});
+    std::sort(order.begin(), order.end());
+    for (const auto& [name, family] : order) {
+      for (std::size_t a = 0; a < n; ++a) {
+        if (!family.first) {
+          columns.push_back({family.second, false, a, 0, name});
+          continue;
+        }
+        for (std::size_t b = 0; b < n; ++b)
+          if (pairs(a, b)) columns.push_back({family.second, true, a, b, name});
+      }
+    }
+  }
+  if (columns.empty()) return model;
+  std::vector<char> first_present(n, 0), second_present(n, 0);
+  for (const auto& column : columns) {
+    first_present[column.a] = 1;
+    if (column.binary) second_present[column.b] = 1;
+  }
+  auto level1 = typed_declare_level(classes, first_present, input.dtype);
+  auto level2 = typed_declare_level(classes, second_present, input.dtype);
+  std::map<std::string, int> family_code;
+  struct Codes {
+    int f = 0, c1 = -1, c2 = -1;
+    bool operator==(const Codes& o) const { return f == o.f && c1 == o.c1 && c2 == o.c2; }
+  };
+  struct CodesHash {
+    std::size_t operator()(const Codes& c) const {
+      return std::hash<long long>()((static_cast<long long>(c.f) * 1000003 + c.c1) * 1000003 + c.c2);
+    }
+  };
+  std::vector<Codes> codes;
+  codes.reserve(columns.size());
+  for (const auto& column : columns) {
+    const auto [it, added] = family_code.emplace(column.name, static_cast<int>(family_code.size()));
+    (void)added;
+    codes.push_back({it->second, level1.class_code[column.a], column.binary ? level2.class_code[column.b] : -1});
+    level1.has_na = level1.has_na || codes.back().c1 < 0;
+    level2.has_na = level2.has_na || codes.back().c2 < 0;
+  }
+  std::unordered_map<Codes, std::size_t, CodesHash> column_of;
+  bool unique = true;
+  for (std::size_t i = 0; i < codes.size(); ++i)
+    if (!column_of.emplace(codes[i], i).second) unique = false;
+  std::vector<std::array<TypedLabel, 2>> labels;
+  labels.reserve(columns.size());
+  for (const auto& c : codes) labels.push_back({level1.label(c.c1), level2.label(c.c2)});
+  const auto stats_of = [&](std::size_t i) -> std::pair<int, int> {
+    const auto& column = columns[i];
+    if (column.binary) return {bs[at(column.family, column.a, column.b)], bc[at(column.family, column.a, column.b)]};
+    return {us[column.family * n + column.a], uc[column.family * n + column.a]};
+  };
+  const auto full_repr = [&](std::size_t i) {
+    return "(" + detail::frame_python_str_repr(columns[i].name) + ", " + typed_label_repr(labels[i][0]) + ", " +
+           typed_label_repr(labels[i][1]) + ")";
+  };
+  // rules_df[column]: the column the iterated label finds.
+  const auto lookup = [&](std::size_t i) -> std::pair<int, int> {
+    const auto c1 = level1.get_loc(labels[i][0]);
+    const auto c2 = level2.get_loc(labels[i][1]);
+    if (unique) {
+      if (!c1 || !c2) throw std::invalid_argument("KeyError: " + full_repr(i));
+      const auto found = column_of.find(Codes{codes[i].f, *c1, *c2});
+      if (found == column_of.end()) throw std::invalid_argument("KeyError: " + full_repr(i));
+      return stats_of(found->second);
+    }
+    if (!c1) throw std::invalid_argument("KeyError: " + typed_label_repr(labels[i][0]));
+    if (!c2) throw std::invalid_argument("KeyError: " + typed_label_repr(labels[i][1]));
+    if (column_of.find(Codes{codes[i].f, *c1, *c2}) == column_of.end())
+      throw std::invalid_argument("KeyError: " + full_repr(i));
+    const int rows = static_cast<int>(nrows);
+    return {rows, rows};
+  };
+  const double rows = static_cast<double>(nrows);
+  double min_support = options.has_min_support_ratio ? options.min_support_ratio : 0.0;
+  double min_confidence = options.has_min_confidence_ratio ? options.min_confidence_ratio : 0.0;
+  if (!options.has_min_support_ratio && !options.has_min_confidence_ratio) {
+    struct Product {
+      double product;
+      std::size_t column;
+    };
+    std::vector<Product> products;
+    for (std::size_t i = 0; i < columns.size(); ++i) {
+      const auto [support, confidence] = lookup(i);
+      const double ratio = static_cast<double>(support) / rows;
+      if (ratio > 0)
+        products.push_back({ratio * (static_cast<double>(confidence) / static_cast<double>(support)), i});
+    }
+    if (products.empty()) return model;
+    try {
+      python::sort_reverse(products, [&](const Product& x, const Product& y) {
+        if (x.product != y.product) return x.product < y.product;
+        if (columns[x.column].name != columns[y.column].name) return columns[x.column].name < columns[y.column].name;
+        for (std::size_t k = 0; k < 2; ++k) {
+          const auto& p = labels[x.column][k];
+          const auto& q = labels[y.column][k];
+          if (typed_same(p, q)) continue;
+          return typed_less(p, q);
+        }
+        return false;
+      });
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument(std::string("TypeError: ") + error.what());
+    }
+    const auto [support, confidence] = lookup(products.front().column);
+    min_support = static_cast<double>(support) / rows * options.auto_selection_multiplier;
+    min_confidence = support > 0
+                         ? static_cast<double>(confidence) / static_cast<double>(support) * options.auto_selection_multiplier
+                         : 1.0;
+  }
+  std::map<std::string, std::unordered_map<std::string, std::size_t>> seen;
+  for (std::size_t i = 0; i < columns.size(); ++i) {
+    const auto [support, confidence] = lookup(i);
+    if (!(support >= rows * min_support) || support == 0 || !(confidence >= support * min_confidence)) continue;
+    const auto& first = labels[i][0];
+    const auto& second = labels[i][1];
+    const bool collapsed = typed_label_falsy(second);
+    const auto id = [&](const TypedLabel& label, std::size_t k) {
+      switch (label.kind) {
+        case TypedLabel::Kind::kFreshNaN: return "f#" + std::to_string(i) + "#" + std::to_string(k);
+        case TypedLabel::Kind::kSharedNaN: return std::string("nan");
+        case TypedLabel::Kind::kNaT: return std::string("NaT");
+        case TypedLabel::Kind::kValue: break;
+      }
+      return python::identity(label.value);
+    };
+    const auto key = collapsed ? id(first, 0) : id(first, 0) + "\x1f" + id(second, 1);
+    auto& family = model.rules[columns[i].name];
+    auto& keys = seen[columns[i].name];
+    const auto [found, added] = keys.emplace(key, family.size());
+    if (!added) {
+      family[found->second].support = support;
+      family[found->second].confidence = confidence;
+      continue;
+    }
+    DeclareConstraint constraint;
+    constraint.first = typed_label_str(first);
+    if (!collapsed) constraint.second = typed_label_str(second);
+    constraint.binary = !collapsed;
+    constraint.support = support;
+    constraint.confidence = confidence;
+    family.push_back(std::move(constraint));
+  }
+  return model;
+}
+
 // An activity no model names: pm4py's pandas Declare conformance keeps a row
 // whose activity is missing (NaN) as an event that matches no rule activity
 // (round FW, observed black-box).
@@ -1459,9 +2028,62 @@ EventDataView frame_slice_view(const EventDataView& data, std::string_view case_
 }  // namespace
 
 DeclareModel discover_declare_frame_slices(const EventDataView& data,
-                                           const DeclareDiscoveryOptions& options) {
+                                           const DeclareDiscoveryOptions& options,
+                                           std::optional<DeclareModel>* shown) {
   std::optional<EventLog> log;
   std::optional<EventTable> table;
+  // Round HA (observed black-box): the Polars copy of an object column holds
+  // str() of each pandas object (True, a date's str() with its offset, a
+  // float's repr), which keys pm4py's Polars Declare; the session keeps the
+  // texts.
+  if (shown && data.kind() == EventDataKind::kLazyEventTable && !options.considered_activities) {
+    const std::string activity_name = options.activity_key.empty() ? "concept:name" : options.activity_key;
+    auto materialized = data.lazy_table()->materialize();
+    const auto found = std::find(materialized.columns.begin(), materialized.columns.end(), activity_name);
+    const auto column = detail::xes_frame_activity_column(materialized, activity_name, false);
+    if (found != materialized.columns.end() && column && column->dtype == detail::XesFrameDtype::kObject) {
+      const auto at = static_cast<std::size_t>(found - materialized.columns.begin());
+      bool relabeled = false;
+      for (std::size_t r = 0; r < materialized.rows.size() && r < column->cells.size(); ++r) {
+        auto& row = materialized.rows[r];
+        const auto& cell = column->cells[r];
+        if (cell.missing || at >= row.size() || !row[at] || row[at]->is_null) continue;
+        const auto label = detail::xes_frame_activity_label(cell);
+        if (label == row[at]->value) continue;
+        row[at]->value = label;
+        relabeled = true;
+      }
+      if (relabeled) {
+        auto session = discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, true),
+                                        options);
+        *shown = discover_declare(
+            EventDataView(polars_projection_table(std::move(materialized), options.case_id_key, options.activity_key, true)),
+            options);
+        return session;
+      }
+    }
+  }
+  if (shown && data.kind() == EventDataKind::kEventTable && !options.considered_activities) {
+    // Round HA: the typed model (its frame checks first, then its errors).
+    check_pandas_declare_frame(*data.table(), options.case_id_key, options.activity_key, false);
+    std::optional<EventTable> storage;
+    const auto& present = present_columns(*data.table(), storage);
+    const auto activity_name =
+        options.activity_key.empty() ? std::string_view("concept:name") : std::string_view(options.activity_key);
+    if (auto traces = typed_declare_traces(present, options.case_id_key, activity_name)) {
+      *shown = typed_declare_model(*traces, options);
+      try {
+        return discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, true),
+                                options);
+      } catch (const OperationCancelled&) {
+        throw;
+      } catch (const std::exception&) {
+        // The texts hold no model (a gap): the session's model is empty, as
+        // the shown one names no activity of the session's graph.
+        return DeclareModel{};
+      }
+    }
+  }
   return discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, true), options);
 }
 

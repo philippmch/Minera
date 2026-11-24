@@ -177,8 +177,17 @@ std::vector<DeclareConformance> check_declare_conformance_xes_polars(
 // case (by its case_id_key column) read as the rows from its first row on,
 // as many as it has, in the order of the cases' first rows; an event stream
 // as is (round BK, observed black-box).
+//
+// `shown` (round HA): on a pandas frame keyed by a typed column (or a text
+// column with gaps) it receives the model pm4py's pandas Declare answers,
+// labelled by str() of the column's objects as pandas' rules frame hands
+// them out (its errors are raised); the returned model is then mined on the
+// XES texts the session replays (an empty model where that fails). On a
+// Polars frame keyed by an object column it receives the model on str() of
+// each object, as the Polars copy holds them.
 [[nodiscard]] DeclareModel discover_declare_frame_slices(
-    const EventDataView& data, const DeclareDiscoveryOptions& options = {});
+    const EventDataView& data, const DeclareDiscoveryOptions& options = {},
+    std::optional<DeclareModel>* shown = nullptr);
 [[nodiscard]] std::vector<DeclareConformance> check_declare_conformance_frame_slices(
     const EventDataView& data, const DeclareModel& model,
     const DeclareConformanceOptions& options = {});

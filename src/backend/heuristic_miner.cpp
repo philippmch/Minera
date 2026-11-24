@@ -165,7 +165,17 @@ struct PlusAbstraction {
   std::map<std::string, double> sojourn_means;
   bool pandas_sojourn_statistics = false;
   std::map<NamePair, std::uint64_t> concurrency;
+  // Python's `<` of two activities' objects (a typed frame column, round
+  // HA): the concurrency key is tuple(sorted((a, b))), which keeps the pair
+  // as given where a NaN makes neither side smaller. Empty: the names' order.
+  std::function<bool(const std::string&, const std::string&)> python_less;
 };
+
+// The concurrency key pm4py's Heuristics++ builds of a pair.
+NamePair concurrency_key(const PlusAbstraction& abstraction, const std::string& first, const std::string& second) {
+  if (!abstraction.python_less) return std::minmax(first, second);
+  return abstraction.python_less(second, first) ? NamePair{second, first} : NamePair{first, second};
+}
 
 std::string ascii_lower(std::string value) {
   std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
@@ -1249,8 +1259,10 @@ IntervalTrace to_intervals(const Trace& trace,
 
 PlusAbstraction build_plus_abstraction(
     const EventLog& log, const HeuristicMinerOptions& options,
-    std::optional<InstanceKeyMode> instance_mode = std::nullopt) {
+    std::optional<InstanceKeyMode> instance_mode = std::nullopt,
+    std::function<bool(const std::string&, const std::string&)> python_less = {}) {
   PlusAbstraction out;
+  out.python_less = std::move(python_less);
   std::set<std::string> known;
   const auto business_slots =
       options.use_business_hours
@@ -1391,8 +1403,7 @@ PlusAbstraction build_plus_abstraction(
       for (std::size_t j = i + 1; j < intervals.size(); ++j) {
         if (std::max(start_instant(intervals[i]), start_instant(intervals[j])) <=
             std::min(complete_instant(intervals[i]), complete_instant(intervals[j]))) {
-          ++out.concurrency[std::minmax(intervals[i].activity,
-                                       intervals[j].activity)];
+          ++out.concurrency[concurrency_key(out, intervals[i].activity, intervals[j].activity)];
         } else {
           break;
         }
@@ -1792,7 +1803,7 @@ std::uint64_t get_count(const std::map<NamePair, std::uint64_t>& counts,
 std::uint64_t get_concurrency(const PlusAbstraction& abstraction,
                               const std::string& first,
                               const std::string& second) {
-  const auto it = abstraction.concurrency.find(std::minmax(first, second));
+  const auto it = abstraction.concurrency.find(concurrency_key(abstraction, first, second));
   return it == abstraction.concurrency.end() ? 0 : it->second;
 }
 
@@ -3049,9 +3060,10 @@ HeuristicsNet discover_plus_plus_from_abstraction(
 
 HeuristicsNet discover_plus_plus(const EventLog& log,
                                  const HeuristicMinerOptions& options,
-                                 std::optional<InstanceKeyMode> instance_mode = std::nullopt) {
-  return discover_plus_plus_from_abstraction(build_plus_abstraction(log, options, instance_mode),
-                                             options);
+                                 std::optional<InstanceKeyMode> instance_mode = std::nullopt,
+                                 std::function<bool(const std::string&, const std::string&)> python_less = {}) {
+  return discover_plus_plus_from_abstraction(
+      build_plus_abstraction(log, options, instance_mode, std::move(python_less)), options);
 }
 
 }  // namespace
@@ -4186,6 +4198,31 @@ std::optional<HeuristicsNet> csv_frame_typed_heuristics(const EventDataView& dat
   return net;
 }
 
+// A Heuristics++ net keyed by a typed column (round HA): pm4py's Petri
+// conversion visits the nodes in their order, each followed by its
+// successors, and fails on the first whose value is no str with an
+// incoming edge (check_typed_conversion); pandas' NaN node is the missing
+// label.
+void finish_typed_plus_net(HeuristicsNet& net, const FrameTypedActivities& typed) {
+  std::vector<std::string> appearance;
+  const auto add = [&](const std::string& name) {
+    if (std::find(appearance.begin(), appearance.end(), name) == appearance.end()) appearance.push_back(name);
+  };
+  for (std::size_t a = 0; a < net.activities.size(); ++a) {
+    add(net.activities[a]);
+    for (const auto& edge : net.edges)
+      if (edge.source == a) add(net.activities[edge.target]);
+  }
+  net.petri_conversion_type = typed_conversion_type(net, appearance, [&](const std::string& name) {
+    const auto found = typed.value_of.find(name);
+    return found == typed.value_of.end() ? std::string("str") : found->second->type;
+  });
+  if (typed.missing_name) {
+    const auto at = std::find(net.activities.begin(), net.activities.end(), *typed.missing_name);
+    if (at != net.activities.end()) net.null_activity = static_cast<std::size_t>(at - net.activities.begin());
+  }
+}
+
 HeuristicsNet discover_heuristics_net_xes_frame(
     const EventDataView& data,
     const HeuristicMinerOptions& options) {
@@ -4374,6 +4411,14 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       throw HeuristicPandasError("builtins.KeyError", repr(timestamp_key));
     }
     if (!activity_at && !typed) return finish(discover_heuristics_net(EventLog{}, projected));
+  } else if (activity_at) {
+    // Round HA (observed black-box): Heuristics++ keyed by a typed column
+    // reads each cell's Python object as the classic does (one node per
+    // Python-equal value, a float64 column's ints past int64 as floats,
+    // each NaN of a float64 column its own node), and its sorts compare
+    // those objects. A dict cell keeps the older text path.
+    typed = frame_typed_activities(table, *activity_at, polars);
+    if (typed && typed->dict) typed.reset();
   }
   const auto missing_time = [&](const EventTable::Row& row) {
     if (!timestamp_at || *timestamp_at >= row.size() || !row[*timestamp_at]) return true;
@@ -4427,7 +4472,8 @@ HeuristicsNet discover_heuristics_net_xes_frame(
                                                                       "' object has no attribute 'lower'");
           lifecycle = ascii_lower(*transition);
         }
-        const auto* activity = value(row, *activity_at);
+        // A typed column's start pairs by the cell's Python object (its node).
+        const auto* activity = typed ? &typed->names[r] : value(row, *activity_at);
         const EventAttribute* instance =
             instance_at && *instance_at < row.size() && row[*instance_at] ? &*row[*instance_at] : nullptr;
         const StartKey start_key{activity ? std::optional<std::string>(*activity) : std::nullopt,
@@ -4527,9 +4573,12 @@ HeuristicsNet discover_heuristics_net_xes_frame(
         event.lifecycle_state = FirstClassAttributeState::kPresent;
       }
       // The lifecycle pairing reads the other attributes (concept:instance).
+      // The activity column is the start column too when the start key
+      // names it (start_timestamp as the activity key, round HA): the
+      // interval reads its start there.
       for (std::size_t column = 0; column < table.columns.size(); ++column)
-        if (column != *case_at && column != *activity_at && column != *timestamp_at && column != lifecycle_at &&
-            value(row, column)) {
+        if (column != *case_at && (column != *activity_at || column == start_at) && column != *timestamp_at &&
+            column != lifecycle_at && value(row, column)) {
           auto attribute = *row[column];
           attribute.key = table.columns[column];
           event.attributes.push_back(std::move(attribute));
@@ -4554,9 +4603,15 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     // targets in the order they follow it first): the missing label beside
     // a named one raises TypeError, and on Polars None beside anything
     // (round GB, observed black-box).
-    if (any_missing) {
+    // A typed column's objects compare as Python compares them (round HA,
+    // observed black-box): frame_activity_less raises the TypeError.
+    if (any_missing || typed) {
       const auto type_of = [&](const std::string& label) { return label == null_label ? null_type : std::string("str"); };
       const auto less = [&](const std::string& left, const std::string& right) {
+        if (typed) {
+          (void)frame_activity_less(*typed->value_of.at(left), *typed->value_of.at(right));
+          return;
+        }
         const bool left_null = left == null_label, right_null = right == null_label;
         if (polars ? (left_null || right_null) : left_null != right_null)
           throw HeuristicPandasError("builtins.TypeError", "'<' not supported between instances of '" +
@@ -4601,7 +4656,20 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       }
     }
     // The frame's instance cells: pandas' Python objects, Polars' column text.
-    auto net = finish(discover_plus_plus(log, projected, frame_instance_mode));
+    std::function<bool(const std::string&, const std::string&)> python_less;
+    if (typed)
+      python_less = [&](const std::string& left, const std::string& right) {
+        try {
+          return frame_activity_less(*typed->value_of.at(left), *typed->value_of.at(right));
+        } catch (const HeuristicPandasError&) {
+          return false;
+        }
+      };
+    auto net = finish(discover_plus_plus(log, projected, frame_instance_mode, python_less));
+    if (typed) {
+      finish_typed_plus_net(net, *typed);
+      return net;
+    }
     const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);
     if (any_missing && null_at != net.activities.end())
       net.null_activity = static_cast<std::size_t>(null_at - net.activities.begin());
