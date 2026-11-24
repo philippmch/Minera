@@ -159,8 +159,9 @@ inline void check_xes_frame_replay_columns(const EventDataView& data, const std:
 }
 
 // The dtypes of the model below: a dates column, String, Int64, Float64 and
-// Boolean (a CSV upload's object columns read as String in Polars' copy).
-enum class PolarsTpDtype { kD, kS, kI, kF, kB };
+// Boolean (a CSV upload's object columns read as String in Polars' copy),
+// and UInt64 (read_csv's uint64 column, round GW).
+enum class PolarsTpDtype { kD, kS, kI, kF, kB, kU };
 
 inline std::string polars_tp_datetime_name(bool nanoseconds) {
   return nanoseconds ? "datetime[ns, UTC]" : "datetime[\xce\xbcs, UTC]";
@@ -192,25 +193,29 @@ inline std::optional<std::string> polars_tp_dtype_error(PolarsTpDtype t, PolarsT
       case P::kI: return "i64";
       case P::kF: return "f64";
       case P::kB: return "bool";
+      case P::kU: return "u64";
     }
     return "str";
   };
   const auto cast = [](P p) -> std::string {
-    return p == P::kI ? ".cast(Int64)" : p == P::kF ? ".cast(Float64)" : p == P::kS ? ".cast(String)" : "";
+    return p == P::kI ? ".cast(Int64)" : p == P::kF ? ".cast(Float64)" : p == P::kS ? ".cast(String)"
+         : p == P::kU ? ".cast(UInt64)" : "";
   };
   const auto ts = "col(" + polars_frame_quoted(timestamp_key) + ")";
   const auto st = "col(" + polars_frame_quoted(start_key + "_2") + ")";
   const auto join = "FROM\n  FILTER col(\"@@index\") < col(\"@@index_2\")\n  FROM\n    INNER JOIN:\n" + side + "    END INNER JOIN\n";
-  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
+  const auto numeric = [](P p) { return p == P::kI || p == P::kF || p == P::kU; };
   if ((t == P::kD && s == P::kS) || (t == P::kS && s == P::kD))
     return "cannot compare 'date/datetime/time' to a string value (create native python { 'date', 'datetime', 'time' } "
            "or compare to a temporal column)\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING "
            "'with_columns' <---\nFILTER " + ts + " <= " + st + "\n" + join +
            "\nThis error occurred with the following context stack:\n\t[1] 'filter' failed\n\t[2] 'with_columns'\n";
   if (t == P::kD || s == P::kD) {
-    // The comparison casts the timestamp's side to the other's dtype.
-    const auto filter = t == P::kD ? ts + (s == P::kB ? "" : cast(s)) + " <= " + st
-                                    : ts + " <= " + st + (t == P::kB ? "" : cast(t));
+    // The comparison casts the timestamp's side to the other's dtype; a
+    // UInt64 side casts both to Int64 (round GW, observed black-box).
+    const auto filter = t == P::kU || s == P::kU ? ts + ".cast(Int64) <= " + st + ".cast(Int64)"
+                        : t == P::kD ? ts + (s == P::kB ? "" : cast(s)) + " <= " + st
+                                     : ts + " <= " + st + (t == P::kB ? "" : cast(t));
     return "- not allowed on " + name(s) + " and " + name(t) + "\n\nResolved plan until failure:\n\n\t---> FAILED HERE "
            "RESOLVING 'with_columns' <---\nFILTER " + filter + "\n" + join +
            "\nThis error occurred with the following context stack:\n\t[1] 'with_columns'\n";
@@ -241,8 +246,12 @@ inline std::optional<std::string> polars_tp_dtype_error(PolarsTpDtype t, PolarsT
            "expression:\n\t[(" + lhs + ") - (" + rhs + ")]\nwhile evaluating this larger expression:\n\t[(" + lhs +
            ") - (" + rhs + ")].dt.total_seconds()\n";
   }
-  // Numbers and booleans: the supertype, the narrower side cast to it.
-  const auto super = t == P::kF || s == P::kF ? P::kF : P::kI;
+  // Numbers and booleans: the supertype, the narrower side cast to it
+  // (UInt64 beside Int64 Float64, beside a Boolean UInt64).
+  const auto super = t == P::kF || s == P::kF                                  ? P::kF
+                     : (t == P::kU && s == P::kI) || (t == P::kI && s == P::kU) ? P::kF
+                     : t == P::kU || s == P::kU                                  ? P::kU
+                                                                                 : P::kI;
   const auto lhs = st + (s == super ? "" : cast(super));
   const auto rhs = ts + (t == super ? "" : cast(super));
   return "invalid series dtype: expected `Duration`, got `" + name(super) + "` for series with name `" + start_key +
@@ -309,10 +318,12 @@ inline std::optional<std::string> polars_tp_business_dtype_error(PolarsTpDtype t
   if ((t == P::kD && s == P::kB) || (t == P::kB && s == P::kD))
     return "could not evaluate '<=' comparison between series '" + timestamp_key + "' of dtype: " + display(t) +
            " and series '" + start_key + "_2' of dtype: " + display(s) + where;
-  const auto numeric = [](P p) { return p == P::kI || p == P::kF; };
-  if ((numeric(t) && s == P::kS) || (t == P::kS && numeric(s)))
-    return std::string("cannot compare string with numeric type (") + ((t == P::kS ? s : t) == P::kI ? "i64" : "f64") +
-           ")" + where;
+  const auto numeric = [](P p) { return p == P::kI || p == P::kF || p == P::kU; };
+  if ((numeric(t) && s == P::kS) || (t == P::kS && numeric(s))) {
+    const auto other = t == P::kS ? s : t;
+    return std::string("cannot compare string with numeric type (") +
+           (other == P::kI ? "i64" : other == P::kU ? "u64" : "f64") + ")" + where;
+  }
   return std::nullopt;
 }
 
@@ -323,7 +334,8 @@ inline std::string polars_tp_udf_error(PolarsTpDtype t, PolarsTpDtype s, const s
   using P = PolarsTpDtype;
   const P first = t == P::kD ? s : t;
   const std::string raised = first == P::kS ? "TypeError: str.replace() takes no keyword arguments"
-                             : std::string("AttributeError: '") + (first == P::kI ? "int" : first == P::kF ? "float" : "bool") +
+                             : std::string("AttributeError: '") +
+                                   (first == P::kI || first == P::kU ? "int" : first == P::kF ? "float" : "bool") +
                                    "' object has no attribute 'replace'";
   return raised + "\n\nThis error occurred in the following expression:\n\tas_struct(" +
          polars_frame_quoted(timestamp_key) + ", " + polars_frame_quoted(start_key + "_2") + ").python_udf()\n";

@@ -444,6 +444,24 @@ inline std::vector<std::size_t> xes_pandas_sort_order(const std::vector<const Xe
   return order;
 }
 
+// A text as DatetimeArray._from_sequence reads it (on its own): its UTC
+// microseconds, or nullopt when it does not read as a date.
+inline std::optional<std::int64_t> xes_text_date_micros(const std::string& text) {
+  try {
+    const auto read = pandas_to_datetime::to_datetime(std::vector<std::string_view>{text});
+    if (!read || read->values.empty() || !read->values.front()) return std::nullopt;
+    const auto& v = *read->values.front();
+    char buffer[48];
+    std::snprintf(buffer, sizeof buffer, "%04d-%02d-%02dT%02d:%02d:%02d.%06u", v.year, v.month, v.day, v.hour, v.minute,
+                  v.second, v.nanoseconds / 1000);
+    auto micros = parse_timestamp_microseconds(buffer);
+    if (micros && read->offset_minutes) *micros -= static_cast<std::int64_t>(*read->offset_minutes) * 60000000;
+    return micros;
+  } catch (const std::exception&) {
+    return std::nullopt;
+  }
+}
+
 // Whether every text reads as a date, as DatetimeArray._from_sequence reads
 // a string array (each on its own).
 inline bool xes_texts_read_as_dates(const std::vector<const std::string*>& texts) {
@@ -505,10 +523,15 @@ inline double xes_business_cells(const PlusCell& a, const PlusCell& b, const std
 // With `slots` (business hours) the kept pairs are measured with
 // BusinessHours row by row instead of subtracted (kPairs; no pair kept
 // raises kPandasBusinessEmptyFlow).
+// With `kept_out` (pm4py's eventually-follows graph, which counts the pair
+// frame's rows, round GW) the pairs the filter keeps on two dates columns
+// are returned there (the kDates verdict); the other verdicts and errors
+// are the profile's.
 inline XesPandasTpVerdict xes_pandas_tp(const XesTypedColumn& cases, const XesTypedColumn& timestamps,
                                         const XesTypedColumn& start, const std::string& timestamp_dtype,
                                         const std::string& start_dtype,
-                                        const std::vector<BusinessHourSlot>* slots = nullptr) {
+                                        const std::vector<BusinessHourSlot>* slots = nullptr,
+                                        std::vector<std::pair<std::size_t, std::size_t>>* kept_out = nullptr) {
   using D = XesFrameDtype;
   const auto order = xes_pandas_sort_order({&cases, &start, &timestamps});
   // Pairs (earlier, later) of a case in sorted order, earlier row first.
@@ -544,19 +567,7 @@ inline XesPandasTpVerdict xes_pandas_tp(const XesTypedColumn& cases, const XesTy
   const auto date_of = [](const PlusCell& cell) -> std::optional<std::int64_t> {
     if (plus_date_like(cell.kind)) return cell.micros;
     if (cell.kind != PlusCellKind::kText) return std::nullopt;
-    try {
-      const auto read = pandas_to_datetime::to_datetime(std::vector<std::string_view>{cell.text});
-      if (!read || read->values.empty() || !read->values.front()) return std::nullopt;
-      const auto& v = *read->values.front();
-      char buffer[48];
-      std::snprintf(buffer, sizeof buffer, "%04d-%02d-%02dT%02d:%02d:%02d.%06u", v.year, v.month, v.day, v.hour, v.minute,
-                    v.second, v.nanoseconds / 1000);
-      auto micros = parse_timestamp_microseconds(buffer);
-      if (micros && read->offset_minutes) *micros -= static_cast<std::int64_t>(*read->offset_minutes) * 60000000;
-      return micros;
-    } catch (const std::exception&) {
-      return std::nullopt;
-    }
+    return xes_text_date_micros(cell.text);
   };
   // DatetimeArray._validate_listlike on an object array: dates (and gaps)
   // convert, and so do strings (and gaps) that all read as dates.
@@ -603,7 +614,12 @@ inline XesPandasTpVerdict xes_pandas_tp(const XesTypedColumn& cases, const XesTy
       keep[p] = l && r && *l <= *r;
     }
   };
-  if (tk == 'd' && sk == 'd') return {};
+  if (tk == 'd' && sk == 'd') {
+    if (kept_out)
+      for (const auto& [i, j] : pairs)
+        if (both(i, j) && L[i].micros <= R[j].micros) kept_out->emplace_back(i, j);
+    return {};
+  }
   if (tk == 'd' && sk == 'n')
     throw std::invalid_argument("TypeError: Invalid comparison between dtype=" + timestamp_dtype + " and ndarray");
   if (tk == 'n' && sk == 'd')

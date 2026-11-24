@@ -7095,6 +7095,12 @@ export interface MineraExport {
    * shape as `edges`. Absent in exports from older minera versions.
    */
   eventually_follows?: EdgeStat[];
+  /**
+   * Set when the upload's frame start_timestamp column makes pm4py's
+   * eventually-follows discovery raise (round GW); `eventually_follows` is
+   * then empty and this holds the reference's error text.
+   */
+  eventually_follows_error?: string;
   /** Temporal-profile timing statistics; absent in exports from older versions. */
   temporal_profile?: TemporalProfileEntry[];
   /** Minimum self-distance and witness activities; absent in older exports. */

@@ -35,6 +35,10 @@ struct DataFrameColumn {
   // fraction digits), in any data row: to_datetime then gives
   // datetime64[ns, UTC], else datetime64[us, UTC] (round BO).
   bool nanoseconds = false;
+  // A CSV column with a missing cell in any data row, rows format_dataframe
+  // then drops included (round GW): read_csv keeps a True/False column with
+  // a gap as objects even when the gap's row is dropped.
+  bool missing_cell = false;
 };
 
 // The event columns of a log's frame. For a CSV log (csv_text) the cells are

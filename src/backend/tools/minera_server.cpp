@@ -1008,18 +1008,32 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
       out.push_back(at < row.size() && row[at] && !row[at]->is_null && !row[at]->value.empty() ? &*row[at] : nullptr);
     return out;
   };
+  const bool lazy_frame_kind = kind == minera::EventDataKind::kLazyEventTable;
   // A Boolean column with a gap: read_csv's object column of Python bools
   // and NaN (round GS, observed black-box), text in Polars' copy.
   const auto bool_gap = [&](const minera::DataFrameColumn& entry) {
     if (entry.type != minera::DataFrameColumnType::kBool) return false;
+    // A gap in a row format_dataframe dropped counts too (round GW).
+    if (entry.missing_cell) return true;
     const auto held = cells(entry.key, entry.role);
     return std::find(held.begin(), held.end(), nullptr) != held.end();
+  };
+  // read_csv's uint64 column: ints, one past int64 (none negative; round GW).
+  const auto past_int64 = [](const std::string& text) {
+    return !text.empty() && std::all_of(text.begin(), text.end(), [](char c) { return c >= '0' && c <= '9'; }) &&
+           (text.size() > 19 || (text.size() == 19 && text > "9223372036854775807"));
+  };
+  const auto uint64_column = [&](const minera::DataFrameColumn& entry) {
+    if (entry.type != minera::DataFrameColumnType::kInt64) return false;
+    for (const auto* cell : cells(entry.key, entry.role))
+      if (cell && past_int64(cell->value)) return true;
+    return false;
   };
   const auto dtype_of = [&](const minera::DataFrameColumn& entry) {
     if (bool_gap(entry)) return P::kS;
     switch (entry.type) {
       case minera::DataFrameColumnType::kDate: return P::kD;
-      case minera::DataFrameColumnType::kInt64: return P::kI;
+      case minera::DataFrameColumnType::kInt64: return lazy_frame_kind && uint64_column(entry) ? P::kU : P::kI;
       case minera::DataFrameColumnType::kFloat64: return P::kF;
       case minera::DataFrameColumnType::kBool: return P::kB;
       default: return P::kS;  // text; object columns read as String in Polars' copy
@@ -1033,7 +1047,10 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
     std::string string;
   };
   const bool lazy_frame = kind == minera::EventDataKind::kLazyEventTable;
-  const auto value_of = [lazy_frame](const minera::EventAttribute& cell, P p, bool nanoseconds) -> std::optional<Value> {
+  // `int64_cast`: Polars compares a UInt64 column beside dates through an
+  // Int64 cast, which nulls an int past int64 (round GW).
+  const auto value_of = [lazy_frame](const minera::EventAttribute& cell, P p, bool nanoseconds,
+                                     bool int64_cast = false) -> std::optional<Value> {
     Value out;
     switch (p) {
       case P::kD: {
@@ -1052,9 +1069,10 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
         if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) out.number = static_cast<long double>(*i);
         else if (const auto* d = std::get_if<double>(&cell.typed_value)) out.number = *d;
         else if (const auto* b = std::get_if<bool>(&cell.typed_value)) out.number = *b ? 1 : 0;
-        else if (!lazy_frame && (p == P::kI || p == P::kF)) {
+        else if ((!lazy_frame && (p == P::kI || p == P::kF)) || (p == P::kU && !int64_cast)) {
           // An int past int64 (uint64, or a Python int of an object column)
-          // compares as itself in pandas; Polars' Int64 cast leaves no pair.
+          // compares as itself in pandas, and in Polars' UInt64 column but
+          // beside dates; Polars' Int64 cast leaves no pair.
           char* end = nullptr;
           out.number = std::strtold(cell.value.c_str(), &end);
           if (end == cell.value.c_str() || *end != '\0') return std::nullopt;
@@ -1077,11 +1095,12 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
       (void)id;
       for (std::size_t a = 0; a < members.size(); ++a) {
         if (!times[members[a]]) continue;
-        const auto earlier = value_of(*times[members[a]], t, nanoseconds);
+        const bool int64_cast = t == P::kD || s == P::kD;
+        const auto earlier = value_of(*times[members[a]], t, nanoseconds, int64_cast);
         if (!earlier) continue;
         for (std::size_t b = a + 1; b < members.size(); ++b) {
           if (!starts[members[b]]) continue;
-          const auto later = value_of(*starts[members[b]], s, nanoseconds);
+          const auto later = value_of(*starts[members[b]], s, nanoseconds, int64_cast);
           if (!later) continue;
           if (!compare) return true;
           // Text beside text, or a Boolean's "true"/"false" beside text.
@@ -1197,6 +1216,49 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
                                   (ints ? "int" : "bool") + "'");
     if (options.use_business_hours) throw std::invalid_argument(minera::detail::kPandasBusinessEmptyFlow);
     throw std::invalid_argument("TypeError: cannot subtract DatetimeArray from ndarray[object]");
+  }
+  if (start_column->type == minera::DataFrameColumnType::kString) {
+    // A text start column (round GW, observed black-box): the pairs' filter
+    // compares the dates with the later rows' start cells (each case's rows
+    // after its first by "@@index"), converting that text to dates; when
+    // every present one converts (or there is no pair) the comparison holds
+    // and the flow time's subtraction fails on the object array; with
+    // business hours a pair that passes the filter reaches BusinessHours
+    // with its text, else the flow is empty.
+    const auto case_cells = cells(options.case_id_attribute, minera::FirstClassAttributeRole::kCaseId);
+    const auto times = cells(timestamp, minera::FirstClassAttributeRole::kTimestamp);
+    const auto starts = cells(start, minera::FirstClassAttributeRole::kNone);
+    if (!case_cells.empty() && times.size() == case_cells.size() && starts.size() == case_cells.size()) {
+      const auto micros = [](const minera::ParsedExactTimestamp& at) {
+        return static_cast<long double>(at.seconds) * 1e6L + at.nanoseconds / 1000;
+      };
+      std::map<std::string, std::vector<std::size_t>> rows;
+      for (std::size_t row = 0; row < case_cells.size(); ++row)
+        if (case_cells[row]) rows[case_cells[row]->value].push_back(row);
+      bool converts = true, passes = false;
+      for (const auto& [id, members] : rows) {
+        (void)id;
+        for (std::size_t b = 1; b < members.size() && converts; ++b) {
+          if (!starts[members[b]]) continue;
+          const auto later = minera::detail::xes_text_date_micros(starts[members[b]]->value);
+          if (!later) {
+            converts = false;
+            break;
+          }
+          for (std::size_t a = 0; a < b && !passes; ++a) {
+            if (!times[members[a]]) continue;
+            const auto earlier = minera::parse_timestamp_exact(times[members[a]]->value);
+            passes = earlier && micros(*earlier) <= static_cast<long double>(*later);
+          }
+        }
+      }
+      if (converts) {
+        if (!options.use_business_hours)
+          throw std::invalid_argument("TypeError: cannot subtract DatetimeArray from ndarray[object]");
+        if (passes) throw std::invalid_argument("TypeError: str.replace() takes no keyword arguments");
+        throw std::invalid_argument(minera::detail::kPandasBusinessEmptyFlow);
+      }
+    }
   }
   std::string array;
   switch (start_column->type) {
@@ -2172,6 +2234,175 @@ std::optional<minera::FrameDfgStartOrder> session_frame_dfg_order(const minera::
   return minera::frame_dfg_start_order(log);
 }
 
+// pm4py's eventually-follows graph on an upload's pandas frame with a
+// start_timestamp column (round GW, observed black-box): the pair frame of
+// the temporal profile (each case's rows paired with its later rows, a CSV
+// frame in its "@@index" order, read_xes's frame sorted by case, start and
+// timestamp), kept where the earlier timestamp is at most the later start,
+// counted per activity pair. The pairs are measured as the temporal
+// profile measures them, with its errors (a numeric start column, text, the
+// first object cell that is no date); only two dates columns, or one kept
+// pair on read_xes's frame, give a graph. Polars' copy
+// (the lazy shape) ignores the column, and so do explicit start or
+// timestamp attributes (the native interval option): nullopt there, as for
+// a frame without the column.
+struct FrameEventuallyFollows {
+  std::vector<minera::EventuallyFollowsEdge> edges;
+  std::string error;
+};
+
+std::optional<FrameEventuallyFollows> frame_eventually_follows(const minera::ActiveEventSource* source,
+                                                               const minera::EventLog& log,
+                                                               const minera::DirectlyFollowsGraph& graph,
+                                                               const minera::EventuallyFollowsOptions& options) {
+  if (!source || polars_frame_source(source)) return std::nullopt;
+  const auto& format = source->file().format;
+  if (format != "csv" && format != "xes") return std::nullopt;
+  if (!options.start_timestamp_attribute.empty()) return std::nullopt;
+  if (!options.timestamp_attribute.empty() && options.timestamp_attribute != "timestamp" &&
+      options.timestamp_attribute != "time:timestamp")
+    return std::nullopt;
+  std::map<std::pair<std::string, std::string>, std::uint64_t> counts;
+  FrameEventuallyFollows result;
+  const auto finish = [&]() {
+    std::map<std::pair<std::size_t, std::size_t>, std::uint64_t> by_id;
+    for (const auto& [pair, count] : counts) {
+      const auto from = graph.activity_id(pair.first), to = graph.activity_id(pair.second);
+      if (from && to) by_id[{*from, *to}] += count;
+    }
+    for (const auto& [ids, count] : by_id) result.edges.push_back({ids.first, ids.second, count});
+    return result;
+  };
+  try {
+    if (format == "csv") {
+      if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+      const auto& frame = *log.dataframe_columns;
+      const minera::DataFrameColumn* start = nullptr;
+      bool nanoseconds = false;
+      for (const auto& entry : frame.columns) {
+        if (entry.key == "start_timestamp" && entry.role == minera::FirstClassAttributeRole::kNone) start = &entry;
+        if (entry.role == minera::FirstClassAttributeRole::kTimestamp) nanoseconds = nanoseconds || entry.nanoseconds;
+      }
+      if (!start) return std::nullopt;
+      const std::string dtype = std::string("datetime64[") + (nanoseconds ? "ns" : "us") + ", UTC]";
+      // Each case's rows in "@@index" order: (activity, timestamp, start cell).
+      struct Row {
+        const std::string* activity;
+        std::optional<minera::ParsedExactTimestamp> timestamp;
+        const minera::EventAttribute* start;
+      };
+      std::vector<std::vector<Row>> cases;
+      for (const auto& trace : log.traces) {
+        std::vector<std::pair<std::int64_t, Row>> rows;
+        for (const auto& event : trace.events) {
+          const minera::EventAttribute* cell = nullptr;
+          for (const auto& attribute : event.attributes)
+            if (attribute.key == "start_timestamp") cell = &attribute;
+          if (cell && (cell->is_null || cell->value.empty())) cell = nullptr;
+          const auto index = event.input_order < frame.row_index.size()
+                                 ? frame.row_index[event.input_order]
+                                 : static_cast<std::int64_t>(event.input_order);
+          rows.push_back({index, Row{&event.activity, minera::parse_timestamp_exact(event.timestamp), cell}});
+        }
+        std::stable_sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+        auto& out = cases.emplace_back();
+        for (auto& row : rows) out.push_back(row.second);
+      }
+      const auto earlier_or_equal = [](const minera::ParsedExactTimestamp& a, const minera::ParsedExactTimestamp& b) {
+        return a.seconds != b.seconds ? a.seconds < b.seconds : a.nanoseconds <= b.nanoseconds;
+      };
+      const auto keep_pairs = [&](const std::function<std::optional<minera::ParsedExactTimestamp>(const Row&)>& later_start) {
+        for (const auto& rows : cases)
+          for (std::size_t j = 1; j < rows.size(); ++j) {
+            const auto start_j = later_start(rows[j]);
+            if (!start_j) continue;
+            for (std::size_t i = 0; i < j; ++i)
+              if (rows[i].timestamp && earlier_or_equal(*rows[i].timestamp, *start_j))
+                ++counts[{*rows[i].activity, *rows[j].activity}];
+          }
+      };
+      const bool object_bools = start->type == minera::DataFrameColumnType::kBool && start->missing_cell;
+      const auto any_later_start = [&]() {
+        for (const auto& rows : cases)
+          for (std::size_t j = 1; j < rows.size(); ++j)
+            if (rows[j].start) return true;
+        return false;
+      };
+      // The flow time's subtraction then fails on an object array.
+      const std::string object_subtraction = "TypeError: cannot subtract DatetimeArray from ndarray[object]";
+      if (object_bools || start->type == minera::DataFrameColumnType::kObject) {
+        // Python objects compare one by one: the first present later start.
+        if (any_later_start())
+          throw std::invalid_argument(std::string("TypeError: '<=' not supported between instances of 'Timestamp' and '") +
+                                      (object_bools ? "bool" : "int") + "'");
+        throw std::invalid_argument(object_subtraction);
+      }
+      switch (start->type) {
+        case minera::DataFrameColumnType::kDate:
+          keep_pairs([](const Row& row) -> std::optional<minera::ParsedExactTimestamp> {
+            if (!row.start) return std::nullopt;
+            return minera::parse_timestamp_exact(row.start->value);
+          });
+          return finish();
+        case minera::DataFrameColumnType::kString: {
+          // The later rows' text converts to dates as a whole, or raises.
+          for (const auto& rows : cases)
+            for (std::size_t j = 1; j < rows.size(); ++j)
+              if (rows[j].start && !minera::detail::xes_text_date_micros(rows[j].start->value))
+                throw std::invalid_argument("TypeError: Invalid comparison between dtype=" + dtype + " and StringArray");
+          throw std::invalid_argument(object_subtraction);
+        }
+        default:
+          // Numbers and Booleans (an all-empty column is float64).
+          throw std::invalid_argument("TypeError: Invalid comparison between dtype=" + dtype + " and ndarray");
+      }
+    }
+    // read_xes's frame.
+    std::optional<minera::EventTable> storage;
+    const auto& table = minera::detail::xes_frame_present_columns(source->checked_table(), storage, false);
+    const auto has = [&](const std::string& name) {
+      return std::find(table.columns.begin(), table.columns.end(), name) != table.columns.end();
+    };
+    if (!has("start_timestamp") || !has("case:concept:name") || !has("time:timestamp")) return std::nullopt;
+    const auto cases = minera::detail::xes_typed_column(table, "case:concept:name");
+    const auto times = minera::detail::xes_typed_column(table, "time:timestamp");
+    const auto starts = minera::detail::xes_typed_column(table, "start_timestamp");
+    if (!cases || !times || !starts) return std::nullopt;
+    const auto dtype_name = [&](const std::string& name, const minera::detail::XesTypedColumn& column) {
+      for (std::size_t i = 0; i < table.columns.size() && i < table.dtypes.size(); ++i)
+        if (table.columns[i] == name && !table.dtypes[i].empty()) return table.dtypes[i];
+      using D = minera::detail::XesFrameDtype;
+      switch (column.dtype) {
+        case D::kDatetime: return std::string("datetime64[us, UTC]");
+        case D::kString: return std::string("str");
+        case D::kInt: return std::string("int64");
+        case D::kFloat:
+        case D::kNaNFloat: return std::string("float64");
+        case D::kBool: return std::string("bool");
+        default: return std::string("object");
+      }
+    };
+    // The table's rows as the log's events (activities by the log's names).
+    std::vector<const std::string*> activity(table.rows.size(), nullptr);
+    const auto& rows = source->representative_row_ordinals();
+    for (std::size_t t = 0; t < log.traces.size() && t < rows.size(); ++t)
+      for (std::size_t e = 0; e < log.traces[t].events.size() && e < rows[t].size(); ++e)
+        if (rows[t][e] && *rows[t][e] < activity.size()) activity[*rows[t][e]] = &log.traces[t].events[e].activity;
+    std::vector<std::pair<std::size_t, std::size_t>> kept;
+    const auto verdict = minera::detail::xes_pandas_tp(*cases, *times, *starts, dtype_name("time:timestamp", *times),
+                                                       dtype_name("start_timestamp", *starts), nullptr, &kept);
+    // One kept pair is measured as a scalar (the profile's kSingle).
+    if (verdict.kind == minera::detail::XesPandasTpVerdict::Kind::kSingle) kept = {{verdict.earlier, verdict.later}};
+    for (const auto& [i, j] : kept)
+      if (activity[i] && activity[j]) ++counts[{*activity[i], *activity[j]}];
+    return finish();
+  } catch (const std::invalid_argument& error) {
+    result.edges.clear();
+    result.error = error.what();
+    return result;
+  }
+}
+
 minera::DfgStatisticalOptions dfg_statistics_for_source(
     minera::DfgStatisticalOptions options,
     const minera::ActiveEventSource* source) {
@@ -2668,8 +2899,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto variant_durations =
         minera::compute_variant_durations(log, graph);
     const auto resources = minera::discover_resource_network(log);
-    const auto eventually =
-        minera::discover_eventually_follows(log, graph, params.eventually_follows);
+    // pm4py's eventually-follows graph on an upload's pandas frame reads its
+    // start_timestamp column (round GW); its errors leave the graph empty.
+    auto frame_eventually = frame_eventually_follows(active_source.get(), log, graph, params.eventually_follows);
+    const auto eventually = frame_eventually
+                                ? std::move(frame_eventually->edges)
+                                : minera::discover_eventually_follows(log, graph, params.eventually_follows);
+    const std::string eventually_error = frame_eventually ? frame_eventually->error : std::string{};
     std::optional<minera::PerformanceSpectrum> spectrum;
     if (!params.spectrum_activities.empty()) {
       spectrum = discover_selected_performance_spectrum(
@@ -2958,6 +3194,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
              ? ",\"sampling\":" +
                    minera::sampling_options_json(*params.filter.sampling)
              : std::string{}) +
+        (eventually_error.empty()
+             ? std::string{}
+             : ",\"eventually_follows_error\":" + minera::embedding_runtime::detail::escape_json(eventually_error)) +
         '}';
     // The tail replaces the closing brace in place when the buffer has room
     // (the stream's spare capacity usually does), with no second body copy;

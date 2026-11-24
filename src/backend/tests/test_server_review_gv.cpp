@@ -50,6 +50,44 @@ namespace {
 
 int g_failures = 0;
 
+// A classic playout's occurrences are ceil(probability * max_variants), and a
+// probability is exp(-sum(-log p)), so its last bits follow the platform's
+// libm (test_dfg_performance_playout_parity.cpp): the expected values were
+// captured with glibc, which Minera's std::log and std::exp match on Linux.
+// Elsewhere (Apple libm) a product next to an integer can round the other way
+// in pm4py and Minera alike, so the same variants with counts one away from
+// the capture pass there and are counted (declared).
+std::size_t g_tolerated = 0;
+
+bool playout_close(const std::string& seen, const std::string& expected) {
+#if defined(__GLIBC__)
+  (void)seen;
+  (void)expected;
+  return false;
+#else
+  if (!seen.starts_with("W ") || !expected.starts_with("W ")) return false;
+  const auto split = [](const std::string& text) {
+    std::vector<std::pair<std::string, long long>> out;
+    std::size_t from = 2;
+    while (from <= text.size()) {
+      auto to = text.find(',', from);
+      if (to == std::string::npos) to = text.size();
+      const auto item = text.substr(from, to - from);
+      const auto equals = item.rfind('=');
+      if (equals == std::string::npos) return std::vector<std::pair<std::string, long long>>{};
+      out.emplace_back(item.substr(0, equals), std::atoll(item.c_str() + equals + 1));
+      from = to + 1;
+    }
+    return out;
+  };
+  const auto a = split(seen), b = split(expected);
+  if (a.empty() || a.size() != b.size()) return false;
+  for (std::size_t k = 0; k < a.size(); ++k)
+    if (a[k].first != b[k].first || a[k].second - b[k].second > 1 || b[k].second - a[k].second > 1) return false;
+  return true;
+#endif
+}
+
 void check(const std::string& label, const std::string& seen, const std::string& expected) {
   if (seen == expected) return;
   ++g_failures;
@@ -512,7 +550,16 @@ int main(int argc, char** argv) {
       {"po  s69670.csv", "s69670.csv", f61, "po", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}}, "error: KeyError: 'c'"},
       {"po  s69684.csv", "s69684.csv", f62, "po", {{"case_column", "case:concept:name"}, {"activity_column", "concept:name"}, {"timestamp_column", "time:timestamp"}}, "error: KeyError: 'c'"},
   };
-  for (const auto& c : cases) check(c.label, outcome(client, c.name, c.content, c.kind, c.fields), c.expected);
+  for (const auto& c : cases) {
+    const auto seen = outcome(client, c.name, c.content, c.kind, c.fields);
+    if (seen != c.expected && c.kind == "po" && playout_close(seen, c.expected)) {
+      ++g_tolerated;
+      continue;
+    }
+    check(c.label, seen, c.expected);
+  }
+  if (g_tolerated != 0)
+    std::cout << g_tolerated << " playout(s) with counts one away from the glibc capture (platform libm)\n";
 
   ::kill(server, SIGTERM);
   int status = 0;

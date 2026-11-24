@@ -412,6 +412,9 @@ std::optional<DataFrameColumnType> frame_column_type(const EventLog& frame, cons
   // (observed black-box); the importer records it as bool. A case: column
   // too (round BA: case statistics on it raised numpy's bool subtraction).
   const auto typed = [&](const DataFrameColumn& column) {
+    // A gap in a row format_dataframe dropped counts too (round GW).
+    if (column.type == DataFrameColumnType::kBool && columns.csv_text && column.missing_cell)
+      return DataFrameColumnType::kObject;
     if (column.type == DataFrameColumnType::kBool && columns.csv_text)
       for (const auto& trace : frame.traces)
         for (const auto& event : trace.events)

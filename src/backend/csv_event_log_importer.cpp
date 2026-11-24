@@ -2727,6 +2727,8 @@ CsvEventData import_csv_event_data_impl(
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;
       column.type = column_type(typed.kind, ints);
+      column.missing_cell = std::any_of(typed.text.begin(), typed.text.end(),
+                                        [](const std::optional<std::string>& cell) { return !cell; });
       if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text)) {
         column.type = DataFrameColumnType::kDate;
         column.nanoseconds = nanosecond_cells(cells, typed.text);
@@ -2790,6 +2792,8 @@ CsvEventData import_csv_event_data_impl(
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;
       column.type = column_type(typed.kind, ints);
+      column.missing_cell = std::any_of(typed.text.begin(), typed.text.end(),
+                                        [](const std::optional<std::string>& cell) { return !cell; });
       if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text)) {
         column.type = DataFrameColumnType::kDate;
         column.nanoseconds = nanosecond_cells(cells, typed.text);

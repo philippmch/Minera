@@ -21,6 +21,20 @@ export function EventuallyFollows({ data }: { data: MineraExport }) {
     [data.activities, edges],
   );
 
+  if (data.eventually_follows_error) {
+    return (
+      <section className="panel efg-panel reveal">
+        <div className="panel-head">
+          <h2>Eventually Follows</h2>
+        </div>
+        <div className="model-empty">
+          The eventually-follows graph could not be computed:{" "}
+          {data.eventually_follows_error}
+        </div>
+      </section>
+    );
+  }
+
   if (!edges) {
     return (
       <section className="panel efg-panel reveal">

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GV (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–GW (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10121,6 +10121,80 @@ GV's suite: the full ctest 685 of 685 (with the new
 server binary), Python script tests 406 of 406, the 16 manifests replayed
 2,673 responses unchanged, and the frontend is unchanged.
 Harness and probes: `review-harness/round-gv/`.
+
+Round GW re-reviewed GV. GV's CI run 45360152483 passed Linux, Windows,
+the frontend, the Python scripts and the parity verifier; macOS failed one
+check of the new `minera_server_review_gv_tests`: the classic DFG playout
+of gtP s69503 counted `a;c` 401 times instead of glibc's 400. A variant's occurrences are
+ceil(probability * max_variants) with the probability exp(-sum(-log p)), so
+a product next to an integer follows the platform's libm in pm4py and Minera
+alike (`test_dfg_performance_playout_parity.cpp` declares the same for the
+probabilities); off glibc the GV test now accepts the same variants with
+counts one away and prints how many (declared). GV3 on more banks, with the
+GV banks plus gtT, gtP and guX: the lazy shape's `/api/discover-dfg`
+(`ct/ddfg.py`, frequency, start and end counts and performance; gvP, gvX
+and gvT, and with business hours gtP and guX), the stochastic map and the
+classic playout on the lazy shape (`ct/smap.py`, `ct/playc.py`, gtP, guX,
+gvT) are all equal but t72074; Polars' business-hours SchemaError names the
+same int on 220 erroring uploads. t72074 (every timestamp empty) stays
+declared: the frame shapes raise Minera's subtraction or plan errors where
+pm4py's frame functions refuse the frame first (`the dataframe should (at
+least) contain a column of type date`, the `.dt` accessor), part of the
+open CSV non-date timestamp contract. GW1, `/api/mine`'s eventually-follows
+graph on the default shape now reads the upload's start_timestamp column
+as pm4py's frame discovery does (`frame_eventually_follows` in
+`minera_server.cpp`): the pairs (i<j) of a case whose end is at or before
+the later event's start, CSV rows in the frame's @@index order, XES rows
+stably sorted by (case, start, timestamp) (`xes_pandas_tp` with a pair
+list); a start column of no dates raises what the reference raises,
+`'<=' not supported between instances of 'Timestamp' and 'bool'|'int'` on an
+object column with a later start, `Invalid comparison between
+dtype=datetime64[us|ns, UTC] and StringArray|ndarray` on text that does not
+parse or other dtypes, else the flow time's `cannot subtract DatetimeArray
+from ndarray[object]`, reported as `eventually_follows_error` with an empty
+graph (the frontend shows it). The Polars lazy shape ignores the column (no
+change), and an explicit start or another timestamp key keeps the log
+graph. `ct/efg.py`: gvP and gtP 400 of 400 (GV's binary 27 of gvP's 200),
+gvX and guX 199 graphs and 201 errors equal, gvT and gtT 46 graphs and 193
+errors equal (t72074 declared), gvN and gvM 200 of 200, the lazy shape 400
+of 400. GW2, the Polars temporal profile with a uint64 start column (11
+gvT uploads, all wrong before): the dtype model gains u64; beside dates both
+sides are cast to Int64 (values past int64 null), the supertype of u64 and
+i64 is f64 and of u64 and bool u64, the business-time UDF fails with
+`'int'`; discovery (`ct/tpdcsv2.py`) and conformance (`ct/tpccsv2.py`) 11 of
+11 on every set. GW3 (GT3's residuals): the pandas temporal profile on a
+text start column whose values all parse as dates raises the subtraction
+TypeError, with business hours the UDF's `str.replace() takes no keyword
+arguments` when a pair passes and the empty-flow error otherwise
+(`xes_text_date_micros`); a True/False column with a gap in a row
+format_dataframe dropped stays object (read_csv typed it with the row;
+`DataFrameColumn::missing_cell`), so its temporal profile follows the object rules. gtT's 9 wrong uploads
+now equal; the DFG variants keyed by those columns stay 120 of 120. Regressions: GV's sweep
+(`ct/pmap2.py`, `ct/dfgdf.py`, `ct/smap.py`, `ct/playc.py`, `ct/pmapl.py`)
+and the temporal profile on gvT's three shapes equal but t72074, the log
+shape 1,071 of 1,071 and 1,785 of 1,785.
+GW's suite: the full ctest 686 of 686 (with the new
+`minera_server_review_gw_tests`: 64 checks, 56 of which fail on GV's server
+binary), Python script tests 406 of 406, the 16 manifests replayed 2,673
+responses unchanged, the frontend's tsc and the eventually-follows tests
+clean.
+Harness and probes: `review-harness/round-gw/`.
+
+Next round (GX) should start by re-reviewing round GW:
+
+- GW's CI run (GV's macOS playout check now tolerates libm-driven counts);
+- the eventually-follows graph's other inputs: an explicit
+  `start_timestamp_attribute` or another timestamp key (Minera keeps the log
+  graph there), XES frames where a typed column cannot be built, the
+  eventually-follows filter and any other route that reads pm4py's frame
+  partial order;
+- the libm-sensitive counts elsewhere (any ceil or floor of a probability
+  product next to an integer) on macOS and Windows;
+- the GT2 and GT4 residuals still open (Declare's separate NaN keys, the
+  transition system on a CSV log shape keyed by mixed objects);
+- the carried items below.
+
+Previous list for round GW (kept for its older items):
 
 Next round (GW) should start by re-reviewing round GV:
 
