@@ -27,6 +27,9 @@ struct TraceSequence {
   std::size_t occurrence_trace_index = 0;
   TransitionPayload activities;
   std::vector<std::size_t> event_indices;
+  // A typed column's own str() of each cell when `activities` holds the
+  // name of its value's first label (empty otherwise).
+  TransitionPayload shown;
 };
 
 Payload make_payload(const TransitionPayload& activities,
@@ -479,7 +482,14 @@ TransitionSystem build_transition_system(
   std::vector<TransitionSystemState> result_states;
   std::vector<StateKey> state_keys;
   std::vector<TransitionSystemTransition> result_transitions;
-  const auto lookup_state = [&](const StateKey& key, TransitionSystemState state) {
+  // The step that created each state and transition.
+  struct Origin {
+    std::size_t sequence = 0;
+    std::size_t index = 0;
+  };
+  std::vector<Origin> state_origins;
+  std::vector<Origin> edge_origins;
+  const auto lookup_state = [&](const StateKey& key, TransitionSystemState state, Origin origin) {
     if (const auto found = roots_by_value.find(key.payload); found != roots_by_value.end())
       return found->second;
     const auto identity = result_states.size();
@@ -487,17 +497,45 @@ TransitionSystem build_transition_system(
     state.id = identity;
     result_states.push_back(std::move(state));
     state_keys.push_back(key);
+    state_origins.push_back(origin);
     return identity;
   };
-  for (const auto& sequence : sequences) {
+  // A typed column's own objects of a window, in the order of `values` (the
+  // window's position for a sequence, a value's first cell for a set or
+  // multiset): its repr, which places a state in the root set.
+  const auto shown_order = [&](const TraceSequence& sequence, std::size_t index, const Payload& values) {
+    const auto [begin, end] = window_bounds(index, sequence.activities.size(), options);
+    Payload out;
+    if (options.view == TransitionView::kSequence) {
+      for (auto position = begin; position < end; ++position) out.push_back(sequence.shown[position]);
+      return out;
+    }
+    for (const auto& value : values) {
+      auto shown = value;
+      for (auto position = begin; position < end; ++position)
+        if (sequence.activities[position] == value) {
+          shown = sequence.shown[position];
+          break;
+        }
+      out.push_back(std::move(shown));
+    }
+    return out;
+  };
+  for (std::size_t sequence_index = 0; sequence_index < sequences.size(); ++sequence_index) {
+    const auto& sequence = sequences[sequence_index];
     const auto& activities = sequence.activities;
+    const bool shown = sequence.shown.size() == activities.size();
     for (std::size_t index = 0; index < activities.size(); ++index) {
       auto [source_key, source_state] = window_state(activities, index, options);
       auto [target_key, target_state] = window_state(activities, index + 1, options);
+      if (shown) {
+        source_key.representation_order = shown_order(sequence, index, source_key.representation_order);
+        target_key.representation_order = shown_order(sequence, index + 1, target_key.representation_order);
+      }
       // Both lookups precede registration. A new equal-valued target remains
       // a distinct endpoint object when the source takes the root-set slot.
-      const auto source = lookup_state(source_key, std::move(source_state));
-      const auto target = lookup_state(target_key, std::move(target_state));
+      const auto source = lookup_state(source_key, std::move(source_state), Origin{sequence_index, index});
+      const auto target = lookup_state(target_key, std::move(target_state), Origin{sequence_index, index + 1});
       const auto register_root = [&](std::size_t identity) {
         if (!roots.emplace(state_keys[identity], identity).second) return;
         result_states[identity].in_root = true;
@@ -527,6 +565,7 @@ TransitionSystem build_transition_system(
         edge.target = target;
         edge.label = activities[index];
         result_transitions.push_back(std::move(edge));
+        edge_origins.push_back(Origin{sequence_index, index});
       }
       auto& edge = result_transitions[edge_index];
       ++edge.count;
@@ -537,6 +576,37 @@ TransitionSystem build_transition_system(
         edge.occurrences.push_back(occurrence);
       }
     }
+  }
+  // A typed column's equal values (1 and True, 0 and False, 1 and 1.0) share
+  // a node, named after the object that created it: a state shows the window
+  // of its first step, a transition the activity of its first step, as
+  // Python's dict and set keep the first of equal keys (round GT, observed
+  // black-box).
+  for (std::size_t identity = 0; identity < result_states.size(); ++identity) {
+    const auto& origin = state_origins[identity];
+    const auto& sequence = sequences[origin.sequence];
+    if (sequence.shown.size() != sequence.activities.size()) continue;
+    const auto [begin, end] = window_bounds(origin.index, sequence.activities.size(), options);
+    auto& state = result_states[identity];
+    if (options.view == TransitionView::kSequence) {
+      for (std::size_t k = 0; k < state.payload.size() && begin + k < end; ++k)
+        state.payload[k] = sequence.shown[begin + k];
+      state.name_order = state.payload;
+      continue;
+    }
+    const auto own = [&](const TransitionActivity& value) {
+      for (auto position = begin; position < end; ++position)
+        if (sequence.activities[position] == value) return sequence.shown[position];
+      return value;
+    };
+    for (auto& value : state.payload) value = own(value);
+    for (auto& value : state.name_order) value = own(value);
+  }
+  for (std::size_t index = 0; index < result_transitions.size(); ++index) {
+    const auto& origin = edge_origins[index];
+    const auto& sequence = sequences[origin.sequence];
+    if (sequence.shown.size() == sequence.activities.size() && origin.index < sequence.shown.size())
+      result_transitions[index].label = sequence.shown[origin.index];
   }
   std::vector<std::size_t> order(result_states.size());
   std::iota(order.begin(), order.end(), 0);
@@ -704,6 +774,12 @@ std::vector<TraceSequence> xes_frame_sequences(const EventTable& source, bool po
           sequence.activities.push_back("\x1d" + name);
         else
           sequence.activities.push_back(name);
+        // pandas' cells keep their own objects; Polars' typed column one
+        // dtype, whose equal values print alike.
+        sequence.shown.push_back(!polars && !value.missing && !value.nan && value.type != "NaTType" &&
+                                         value.type != "NoneType"
+                                     ? TransitionActivity(value.label)
+                                     : sequence.activities.back());
       } else {
         const auto* activity = cell(table.rows[row], *activity_at);
         sequence.activities.push_back(activity ? TransitionActivity(activity->value) : std::nullopt);

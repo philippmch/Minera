@@ -2596,18 +2596,22 @@ CsvEventData import_csv_event_data_impl(
   bool activity_ints = false;
   between_passes();
   if (reference_batch) {
-    auto typed_cases = infer_reference_column(case_tokens, &case_padded_na);
+    // A column read_csv keeps as its text (values above int64 beside a
+    // negative or NA cell) is str, not Python ints.
+    bool case_literal = false;
+    auto typed_cases = infer_reference_column(case_tokens, &case_padded_na, &case_literal);
     case_kind = typed_cases.kind;
-    if (case_kind == ReferenceCsvColumnKind::kObject) {
+    if (case_kind == ReferenceCsvColumnKind::kObject && !case_literal) {
       case_ints = true;
       for (std::size_t i = 0; i < typed_cases.text.size() && case_ints; ++i)
         if (typed_cases.text[i] && !python_int_text(case_tokens[i])) case_ints = false;
     }
     case_ids = std::move(typed_cases.text);
     between_passes();
-    auto typed_activities = infer_reference_column(activity_tokens, &activity_padded_na);
+    bool activity_literal = false;
+    auto typed_activities = infer_reference_column(activity_tokens, &activity_padded_na, &activity_literal);
     activity_kind = typed_activities.kind;
-    if (activity_kind == ReferenceCsvColumnKind::kObject) {
+    if (activity_kind == ReferenceCsvColumnKind::kObject && !activity_literal) {
       activity_ints = true;
       for (std::size_t i = 0; i < typed_activities.text.size() && activity_ints; ++i)
         if (typed_activities.text[i] && !python_int_text(activity_tokens[i])) activity_ints = false;
@@ -2713,11 +2717,12 @@ CsvEventData import_csv_event_data_impl(
         cells.push_back(text ? *text : std::string{});
         padded.push_back(text ? 1 : 0);
       }
-      const auto typed = infer_reference_column(cells, &padded);
+      bool literal = false;
+      const auto typed = infer_reference_column(cells, &padded, &literal);
       DataFrameColumn column;
       column.key = header[index];
       column.role = role;
-      bool ints = true;
+      bool ints = !literal;
       if (typed.kind == ReferenceCsvColumnKind::kObject)
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;
@@ -2776,10 +2781,11 @@ CsvEventData import_csv_event_data_impl(
       cells.reserve(pending.size());
       for (const auto& row : pending)
         cells.push_back(j < row.case_attributes.size() ? row.case_attributes[j].value : std::string{});
-      const auto typed = infer_reference_column(cells);
+      bool literal = false;
+      const auto typed = infer_reference_column(cells, nullptr, &literal);
       DataFrameColumn column;
       column.key = name.substr(kCasePrefix.size());
-      bool ints = true;
+      bool ints = !literal;
       if (typed.kind == ReferenceCsvColumnKind::kObject)
         for (std::size_t i = 0; i < cells.size() && ints; ++i)
           if (typed.text[i] && !python_int_text(cells[i])) ints = false;

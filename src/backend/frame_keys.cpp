@@ -655,7 +655,12 @@ std::string frame_keyed_inductive_error(const FrameKeyedActivities& keyed) {
   if (keyed.any_text)
     return column_type_error("TypeError: '<' not supported between instances of '" + keyed.first_non_text_type +
                              "' and 'str'", keyed.column);
-  if (keyed.distinct == 1)
+  // One activity once in every trace: the tree is that leaf, whose __str__
+  // returns the label; any other tree concatenates it (round GT, observed
+  // black-box: one value repeated in a trace mines a loop).
+  const bool leaf = keyed.distinct == 1 && std::all_of(keyed.log.traces.begin(), keyed.log.traces.end(),
+                                                       [](const auto& trace) { return trace.events.size() == 1; });
+  if (leaf)
     return column_type_error("TypeError: __str__ returned non-string (type " + keyed.first_non_text_type + ")",
                              keyed.column);
   return column_type_error("TypeError: can only concatenate str (not \"" + keyed.first_non_text_type + "\") to str",

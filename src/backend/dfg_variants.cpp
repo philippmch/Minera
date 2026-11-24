@@ -649,8 +649,18 @@ DfgStatisticalAnalysis discover_dfg_statistics(
     const EventLog& log, const DfgStatisticalOptions& options) {
   // pm4py's EventLog variants keyed by a typed column of an upload's frame
   // read its cells as Python objects (round BT).
-  if (const auto keyed = dfg_frame_keyed(log, options))
+  if (auto keyed = dfg_frame_keyed(log, options)) {
+    // convert_to_event_log gives each gap of a CSV upload's float64 column
+    // its own NaN object, so pm4py's EventLog counters (native, triples,
+    // case attributes) key one node per gap; the frame variants group the
+    // column's values (round GT).
+    const bool event_log_counter = options.variant == DfgStatisticalVariant::kNative ||
+                                   options.variant == DfgStatisticalVariant::kFrequencyTriples ||
+                                   options.variant == DfgStatisticalVariant::kCaseAttributes;
+    if (event_log_counter && log.dataframe_columns && log.dataframe_columns->csv_text)
+      distinct_float_gap_labels(*keyed);
     return frame_keyed_dfg_statistics(*keyed, options);
+  }
   DfgStatisticalAnalysis result;
   result.variant = options.variant;
   if (options.variant == DfgStatisticalVariant::kNative) {

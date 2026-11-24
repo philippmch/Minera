@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GS (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–GT (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9897,6 +9897,114 @@ GS's suite: the full ctest 682 of 682 (with the new
 server binary), Python script tests 406 of 406, and the 16 manifests
 replayed 2,673 responses unchanged (the frontend is untouched).
 Harness and probes: `review-harness/round-gs/`.
+
+Round GT re-reviewed GS and the carried CSV families (fresh banks:
+`gen/gentp.py` gtT, 120 CSV uploads with start columns of every kind,
+seeds 68500-68619; gtK, 200 CSV uploads keyed by six columns with gaps,
+seeds 68000-68199; `gen/gents.py` gtS, 200 XES uploads whose column k
+mixes Python-equal values, seeds 69000-69199; `gen/genst.py` gtP, 200 CSV
+uploads with a valid start_timestamp column, seeds 69500-69699).
+GT1-1, the temporal profile and its conformance on a CSV upload's log
+shape read convert_to_event_log's events, per trace and pair i < j the
+earlier event's source cell then the later one's target cell through
+`.timestamp()` (the default target key is time:timestamp, not the source
+key): the first cell that is no Timestamp raises `AttributeError: '<type>'
+object has no attribute 'timestamp'`, a NaT `ValueError: NaTType does not
+support timestamp`, an absent key `KeyError` (new
+`check_csv_log_temporal_reads`, also on `/api/analyze-behavior`'s variant
+log). GT1-2, read_csv keeps a column of ints above int64 beside a negative
+cell, or of uint64 ints beside a gap, as its text (str); the importer typed
+it Python ints (`csv_event_log_importer.cpp`, the event, case, case-id and
+activity columns). GT1-3, a pandas frame's start column of Python ints
+past uint64 (object) compares with the dates (`'<=' not supported between
+instances of 'Timestamp' and 'int'`), and a uint64 own start with business
+hours measures as itself; Polars' Int64 cast of such a column leaves no
+pair. After, on gtT: the log shape's discovery (`ct/tpdcsv2.py`, 9 sets)
+1,080 of 1,080 judgments (GS's binary 580) and conformance
+(`ct/tpccsv2.py`, 15 sets) 1,800 of 1,800 (GS's 1,009); the pandas frame
+1,042 of 1,080 (GS's 923), the rest 4 uploads of carried kinds (a Boolean
+column whose gap rows format_dataframe dropped, text with NaN beside
+dates); Polars 1,025 of 1,080 as before (a uint64 column's plan text and
+business-hours UDF error, carried).
+GT2-1, Declare keyed by a typed column: pm4py's rule table holds (template,
+act, act2), so an int64 column's second activities show as floats ("2.0"),
+and a falsy or missing second activity (0, 0.0, False, NaN, NaT) leaves
+the rule under act alone, which the conformance fails on in its template
+order (`TypeError: '<type>' object is not subscriptable`, or `cannot
+unpack non-iterable <type> object` from nonsuccession and
+nonchainsuccession; `check_csv_keyed_declare_keys`,
+`rename_csv_keyed_declare_targets`). GT2-2, a text column with gaps fails
+the rules' sort (`'<' not supported between instances of 'str' and
+'float'`; the operands' order follows the NaN's hash, declared). GT2-3, a
+float64 column's gaps are one activity each, an object column's one;
+pm4py's rule sets can also hold equal NaN keys apart (declared). GT2-4,
+Inductive keyed by a column of one value in one-event traces fails with
+`__str__ returned non-string`, other single-value logs concatenate
+(`frame_keyed_inductive_error`). After (`ct/csvdcl.py`, gtK, 6 keys):
+1,315 of 1,460 judgments (GS's binary 393 of 1,416); the rest are the text
+column's operand order and pm4py's separate NaN keys (one activity per
+float64 gap measured worse, 1,306). GT3, the DFG's EventLog counters (native, frequency_triples,
+case_attributes) give each gap of a CSV upload's float64 key column its
+own node, as convert_to_event_log's NaN objects never match
+(`dfg_variants.cpp`): `ct/csvdfg.py` on gtK (7 keys, 6 variants) 8,400 of
+8,400 (an earlier binary differed on the float64 key in 2 of the first
+6 uploads); the variants route
+keyed by those columns (`ct/csvvar.py`) 1,400 of 1,400 and 118 of 120 on
+gtT's start columns (the 2 carried Boolean uploads). GT4, the transition
+system keyed by a column of mixed objects (0 and False, 1, True and 1.0)
+names each state after the window that created it and each transition
+after the activity of its first step, and places a state in the root set
+by its own objects' repr (`transition_system.cpp`, `TraceSequence::shown`):
+`ct/tsgraph2.py` on gtS (5 view/window sets) on pandas 967 of 1,000
+judgments (GS's binary 691); the rest pick between two value-equal root
+states (a step from [0] to [False]) the one Python's set iterates first,
+which follows str hashes (PYTHONHASHSEED 0, 1, 4 and 5 [False], 2 and 3
+[0]; declared); on Polars 990 of 1,000 before and after (a set's repr
+order, the same hash rule; declared). The 2 grAs footprints uploads with
+time:timestamp as the activity key are the same kind (declared): two
+traces' NaN start activities stay two objects in pm4py's sets, and 0 and
+False keep the object the frame's grouping meets first.
+Found and carried (GT5): pm4py's `discover_dfg` and
+`discover_performance_dfg` on an upload's frame read its start_timestamp
+column when it has one (as GC1-4's Alpha and temporal profile do): each
+case's rows sorted by (start, timestamp), NaT last and ties stable, give
+the directly-follows pairs; a pair's duration is the later start minus the
+earlier completion, signed (business hours clamp below at 0), a NaT start
+NaN (skipped by the aggregations; an edge of only NaN durations has sum 0
+and NaN otherwise); start and end activities keep the timestamp order; an
+all-empty start column raises `TypeError: cannot subtract DatetimeArray
+from ndarray[float64]`, a text or mixed one its own errors. The EventLog
+path (native table sources) reads the start attribute too, clamped at 0,
+in timestamp order. Minera's process map (`/api/mine` edges, start and end
+counts, `performance.edges`) and the DFG performance variant ignore it:
+`ct/pmap.py` on gtP 47 of 200 uploads with equal frequency edges and 16
+with equal performance edges (`x/pst.py` holds the probes).
+GT's suite: the full ctest 683 of 683 (with the new
+`minera_server_review_gt_tests`: 169 checks, 133 of which fail on GS's
+server binary), Python script tests 406 of 406, and the 16 manifests
+replayed 2,673 responses unchanged (the frontend is untouched).
+Harness and probes: `review-harness/round-gt/`.
+
+Next round (GU) should start by re-reviewing round GT:
+
+- GT's CI run (and GS's macOS and Windows ctest, still running at GT's
+  handoff);
+- GT5, the start_timestamp column of an upload's frame in the process map
+  (`/api/mine` edges, start and end counts, `performance.edges`) and the
+  DFG performance variant, on CSV and XES uploads and the EventLog path of
+  table sources (`ct/pmap.py`, `x/pst.py`, gtP), then the other routes
+  that read pm4py's frame DFG (the Inductive miner's frame path, the
+  heuristics and footprints frame paths, `/api/dfg-dataframe`);
+- GT1 on fresh banks: the CSV log shape's temporal reads with business
+  hours and custom keys on other routes, read_csv's str typing of big ints
+  on the other CSV families;
+- the GT2-GT4 residuals: Declare's separate NaN keys, the 2 Boolean
+  uploads whose gap rows format_dataframe dropped (variants, the temporal
+  profile), Polars' uint64 plan text and business-hours UDF (11 judgments),
+  the transition system on a CSV log shape keyed by mixed objects;
+- the carried items below.
+
+Previous list for round GT (kept for its older items):
 
 Next round (GT) should start by re-reviewing round GS:
 

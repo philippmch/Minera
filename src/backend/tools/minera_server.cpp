@@ -361,6 +361,129 @@ std::optional<minera::EventLog> csv_keyed_family_log(const minera::EventLog& log
   return std::move(keyed->log);
 }
 
+// pm4py's Declare keyed by a typed column of a CSV log without gaps (round
+// GT, observed black-box): its rule table's columns are (template, act,
+// act2), act2 missing for the unary templates, so an int64 column's act2
+// level holds floats (a rule (1, 2) reads (1, 2.0)) while a bool, date,
+// float or object column keeps its objects. A binary rule whose act2 is
+// falsy (False, 0, 0.0) is stored under act alone, which the conformance
+// /api/mine runs on the model then fails on, in the first template it
+// checks holding one (responded_existence, coexistence, noncoexistence,
+// response, precedence, succession, altresponse, chainresponse,
+// altprecedence, chainprecedence, altsuccession, chainsuccession:
+// "'int' object is not subscriptable"; nonsuccession, nonchainsuccession:
+// "cannot unpack non-iterable int object").
+std::map<std::string, std::string> csv_keyed_label_types(const minera::FrameKeyedActivities& keyed) {
+  std::map<std::string, std::string> type_of;
+  for (std::size_t t = 0; t < keyed.log.traces.size(); ++t)
+    for (std::size_t e = 0; e < keyed.log.traces[t].events.size(); ++e)
+      type_of.emplace(keyed.log.traces[t].events[e].activity, keyed.types[t][e]);
+  return type_of;
+}
+
+void check_csv_keyed_declare_keys(const minera::FrameKeyedActivities& keyed, const minera::DeclareModel& model) {
+  if (!keyed.non_text) return;
+  const auto type_of = csv_keyed_label_types(keyed);
+  const auto type = [&](const std::string& label) {
+    const auto found = type_of.find(label);
+    return found == type_of.end() ? std::string() : found->second;
+  };
+  const auto falsy = [&](const std::string& label) {
+    const auto kind = type(label);
+    if (kind == "bool") return label == "False";
+    // A gap (NaN or NaT) is no activity of the rule table either.
+    if (kind == "NaTType") return true;
+    if (kind == "float" && label.starts_with("nan")) return true;
+    if (kind == "int" || kind == "float") return std::strtod(label.c_str(), nullptr) == 0.0;
+    return false;
+  };
+  static constexpr std::string_view kConformanceOrder[] = {
+      "responded_existence", "coexistence", "noncoexistence", "response", "precedence", "succession", "altresponse",
+      "chainresponse", "altprecedence", "chainprecedence", "altsuccession", "chainsuccession", "nonsuccession",
+      "nonchainsuccession"};
+  for (const auto family : kConformanceOrder) {
+    const auto found = model.rules.find(std::string(family));
+    if (found == model.rules.end()) continue;
+    for (const auto& rule : found->second) {
+      if (!rule.binary || !falsy(rule.second)) continue;
+      const auto kind = type(rule.first);
+      if (family == "nonsuccession" || family == "nonchainsuccession")
+        throw std::invalid_argument("TypeError: cannot unpack non-iterable " + kind + " object");
+      throw std::invalid_argument("TypeError: '" + kind + "' object is not subscriptable");
+    }
+  }
+}
+
+void rename_csv_keyed_declare_targets(const minera::FrameKeyedActivities& keyed, minera::DeclareModel& model,
+                                      std::vector<minera::DeclareConformance>& conformance) {
+  if (!keyed.non_text || keyed.column != minera::DataFrameColumnType::kInt64) return;
+  const auto shown = [](std::string& label) {
+    label = minera::python::float_repr(std::strtod(label.c_str(), nullptr));
+  };
+  for (auto& [family, rules] : model.rules) {
+    (void)family;
+    for (auto& rule : rules)
+      if (rule.binary) shown(rule.second);
+  }
+  for (auto& result : conformance)
+    for (auto& deviation : result.deviations)
+      if (deviation.binary) shown(deviation.second);
+}
+
+// pm4py's temporal profile on a CSV upload's log shape (convert_to_event_log's
+// events; round GT, observed black-box) reads, for each trace in order and
+// each pair i < j, event i's timestamp key and then event j's start key,
+// each through .timestamp(): the first read of a value that is no date
+// raises AttributeError ("'int' object has no attribute 'timestamp'", a gap
+// NaN 'float'), of NaT ValueError, of a key no event holds KeyError. A
+// trace of one event reads nothing.
+void check_csv_log_temporal_reads(const minera::EventLog& log, const std::string& timestamp_key,
+                                  const std::string& start_key) {
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return;
+  struct Reads {
+    std::optional<minera::FrameKeyedActivities> keyed;
+    bool absent = false;
+    bool text = false;
+  };
+  const auto reads = [&](const std::string& key) {
+    Reads out;
+    if (key.empty() || key == "time:timestamp") return out;
+    if (key == "concept:name") {
+      out.text = true;
+      return out;
+    }
+    out.keyed = minera::frame_keyed_activities(log, key);
+    if (!out.keyed) {
+      const auto& columns = log.dataframe_columns->columns;
+      out.absent = std::none_of(columns.begin(), columns.end(), [&](const auto& c) { return c.key == key; });
+    }
+    return out;
+  };
+  // Without a start key pm4py's own default, time:timestamp, is read.
+  const auto& target_key = start_key.empty() ? std::string("time:timestamp") : start_key;
+  const auto source = reads(timestamp_key);
+  const auto target = reads(target_key);
+  const auto check = [](const Reads& r, const std::string& key, std::size_t t, std::size_t e) {
+    if (r.absent) throw std::invalid_argument("KeyError: '" + key + "'");
+    std::string type = r.text ? "str" : "";
+    if (r.keyed) {
+      type = r.keyed->types[t][e];
+      if (type.empty()) type = "str";
+    }
+    if (type.empty() || type == "Timestamp") return;
+    if (type == "NaTType") throw std::invalid_argument("ValueError: NaTType does not support timestamp");
+    throw std::invalid_argument("AttributeError: '" + type + "' object has no attribute 'timestamp'");
+  };
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    // The reads in pair order: (0, 1), (0, 2), ..., (1, 2), ...
+    const auto size = log.traces[t].events.size();
+    if (size < 2) continue;
+    check(source, timestamp_key, t, 0);
+    for (std::size_t j = 1; j < size; ++j) check(target, target_key, t, j);
+    for (std::size_t i = 1; i + 1 < size; ++i) check(source, timestamp_key, t, i);
+  }
+}
+
 // pm4py's token replay sorts the net's transitions by name; an Alpha net
 // mined on such a log names a text or object column's gap NaN, which
 // raises TypeError beside a str name (round GR; the operands' order follows
@@ -908,7 +1031,8 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
     long double number = 0;
     std::string string;
   };
-  const auto value_of = [](const minera::EventAttribute& cell, P p, bool nanoseconds) -> std::optional<Value> {
+  const bool lazy_frame = kind == minera::EventDataKind::kLazyEventTable;
+  const auto value_of = [lazy_frame](const minera::EventAttribute& cell, P p, bool nanoseconds) -> std::optional<Value> {
     Value out;
     switch (p) {
       case P::kD: {
@@ -927,7 +1051,13 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
         if (const auto* i = std::get_if<std::int64_t>(&cell.typed_value)) out.number = static_cast<long double>(*i);
         else if (const auto* d = std::get_if<double>(&cell.typed_value)) out.number = *d;
         else if (const auto* b = std::get_if<bool>(&cell.typed_value)) out.number = *b ? 1 : 0;
-        else return std::nullopt;
+        else if (!lazy_frame && (p == P::kI || p == P::kF)) {
+          // An int past int64 (uint64, or a Python int of an object column)
+          // compares as itself in pandas; Polars' Int64 cast leaves no pair.
+          char* end = nullptr;
+          out.number = std::strtold(cell.value.c_str(), &end);
+          if (end == cell.value.c_str() || *end != '\0') return std::nullopt;
+        } else return std::nullopt;
         if (p == P::kB) out.string = out.number != 0 ? "true" : "false";
         return out;
     }
@@ -1025,7 +1155,9 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
       throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(timestamp));
     if (!time_column) return Verdict::kRun;
     const bool object_bools = bool_gap(*time_column);
-    const auto t = object_bools ? P::kB : dtype_of(*time_column);
+    // An object column of Python ints (round GT) measures as numbers do.
+    const bool object_ints = time_column->type == minera::DataFrameColumnType::kObject;
+    const auto t = object_bools ? P::kB : object_ints ? P::kI : dtype_of(*time_column);
     if (t == P::kD) return Verdict::kRun;
     if (options.use_business_hours) {
       if (!any_pair(timestamp, t, t, false)) throw std::invalid_argument(minera::detail::kPandasBusinessEmptyFlow);
@@ -1038,7 +1170,7 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
     // .dt; text subtracts only when a pair passes the filter; numpy refuses
     // a Boolean subtraction of any length (round GS, observed black-box).
     const std::string no_dt = "AttributeError: Can only use .dt accessor with datetimelike values";
-    if (object_bools) throw std::invalid_argument(no_dt);
+    if (object_bools || object_ints) throw std::invalid_argument(no_dt);
     switch (time_column->type) {
       case minera::DataFrameColumnType::kInt64:
       case minera::DataFrameColumnType::kFloat64: throw std::invalid_argument(no_dt);
@@ -1054,11 +1186,14 @@ CsvFrameTpVerdict csv_frame_temporal_start(const MinedSession& session, minera::
   }
   const auto* start_column = column(start);
   if (!start_column || !time_column || time_column->type != minera::DataFrameColumnType::kDate) return Verdict::kRun;
-  if (bool_gap(*start_column)) {
-    // Object bools: the dates compare with each present pair's start (NaN
-    // skipped) and fail at the first; no such pair leaves an empty frame.
-    if (any_pair(start, P::kD, P::kB, false, false))
-      throw std::invalid_argument("TypeError: '<=' not supported between instances of 'Timestamp' and 'bool'");
+  if (bool_gap(*start_column) || start_column->type == minera::DataFrameColumnType::kObject) {
+    // Object bools (or Python ints, round GT): the dates compare with each
+    // present pair's start (NaN skipped) and fail at the first; no such
+    // pair leaves an empty frame.
+    const bool ints = start_column->type == minera::DataFrameColumnType::kObject;
+    if (any_pair(start, P::kD, ints ? P::kI : P::kB, false, false))
+      throw std::invalid_argument(std::string("TypeError: '<=' not supported between instances of 'Timestamp' and '") +
+                                  (ints ? "int" : "bool") + "'");
     if (options.use_business_hours) throw std::invalid_argument(minera::detail::kPandasBusinessEmptyFlow);
     throw std::invalid_argument("TypeError: cannot subtract DatetimeArray from ndarray[object]");
   }
@@ -2373,6 +2508,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto temporal_keyed = csv_keyed_family_log(log, params.temporal_profile.activity_attribute);
     auto temporal_options = params.temporal_profile;
     if (temporal_keyed) temporal_options.activity_attribute = "concept:name";
+    {
+      const auto& tp = params.temporal_profile;
+      check_csv_log_temporal_reads(log,
+                                   tp.source_timestamp_attribute.empty() ? tp.source_completion_timestamp_attribute
+                                                                         : tp.source_timestamp_attribute,
+                                   tp.target_timestamp_attribute.empty() ? tp.target_start_timestamp_attribute
+                                                                         : tp.target_timestamp_attribute);
+    }
     const auto temporal_profile =
         minera::discover_temporal_profile_as_uploaded(temporal_keyed ? *temporal_keyed : log, temporal_options, cancelled);
     const auto minimum_self_distances =
@@ -2533,20 +2676,31 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       graph.ensure_activity(activity);
     }
     checkpoint("Declare constraints");
-    // Declare keyed by a column with gaps or mixed types is not modelled
-    // (pm4py's rules keep a NaN in odd places or raise TypeError; carried):
-    // only a column without gaps reads its cells.
+    // Declare keyed by a text column with gaps sorts its rule columns, a str
+    // beside the gap's NaN: TypeError, its operands in an order that follows
+    // the NaN's address-based hash (Minera names 'str' first, as on frames;
+    // round GT). A typed column with gaps keeps its rules with a NaN or NaT
+    // second activity under act alone, which the conformance fails on
+    // (check_csv_keyed_declare_keys). Minera counts the gaps as one activity
+    // (closer to pm4py's supports than one per float64 gap, measured), where
+    // pm4py's rule sets can also hold equal NaN keys apart (declared).
     auto declare_keyed = csv_keyed_family(log, params.declare_options.activity_key);
-    if (declare_keyed && declare_keyed->any_missing) declare_keyed.reset();
+    if (declare_keyed && declare_keyed->any_missing) {
+      if (declare_keyed->any_text)
+        throw std::invalid_argument("TypeError: '<' not supported between instances of 'str' and 'float'");
+      declare_keyed = minera::frame_keyed_activities(log, params.declare_options.activity_key);
+    }
     auto declare_options = params.declare_options;
     auto declare_conformance_options = params.declare_conformance_options;
     if (declare_keyed) declare_options.activity_key = declare_conformance_options.activity_key = "concept:name";
     const auto& declare_log = declare_keyed ? declare_keyed->log : log;
-    const auto declare =
+    auto declare =
         minera::discover_declare_as_uploaded(declare_log, declare_options);
-    const auto declare_conformance =
+    if (declare_keyed) check_csv_keyed_declare_keys(*declare_keyed, declare);
+    auto declare_conformance =
         minera::check_declare_conformance_as_uploaded(
             declare_log, declare, declare_conformance_options);
+    if (declare_keyed) rename_csv_keyed_declare_targets(*declare_keyed, declare, declare_conformance);
     for (const auto& [family, rules] : declare.rules) {
       (void)family;
       for (const auto& rule : rules) {
@@ -5222,6 +5376,18 @@ void handle_behavior_analysis(const httplib::Request& request,
     std::optional<minera::CorrelationVariantsAnalysis> correlations;
     std::optional<minera::TemporalConformanceResult> conformance;
     if (temporal) {
+      // A CSV upload's log shape: pm4py's EventLog algorithms read every
+      // pair's timestamps first (round GT, discovery and conformance alike).
+      if (adapter == "log" && session->active_source && session->active_source->file().format == "csv") {
+        const auto view = input();
+        const auto& tp = params.temporal_profile;
+        if (view.kind() == minera::EventDataKind::kEventLog)
+          check_csv_log_temporal_reads(*view.log(),
+                                       tp.source_timestamp_attribute.empty() ? tp.source_completion_timestamp_attribute
+                                                                             : tp.source_timestamp_attribute,
+                                       tp.target_timestamp_attribute.empty() ? tp.target_start_timestamp_attribute
+                                                                             : tp.target_timestamp_attribute);
+      }
       auto verdict = CsvFrameTpVerdict::kRun;
       std::string start_name, timestamp_name;
       if (adapter == "dataframe" || adapter == "lazyframe") {
