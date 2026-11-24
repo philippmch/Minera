@@ -599,7 +599,7 @@ EventTable polars_projection_table(EventTable table, std::string_view case_id_ke
   // types it (a missing value first, text by its bytes, numbers, dates and
   // booleans by value; xes_polars_cell_compare).
   const auto typed_time = xes_columns && time_at && table.dtypes.empty()
-                              ? detail::xes_typed_column(table, "time:timestamp", true)
+                              ? detail::xes_typed_column(table, "time:timestamp", true, true)
                               : std::optional<detail::XesTypedColumn>();
   const auto index_at = column_of("@@index");
   const bool index_numeric = index_at && numeric(dtype(*index_at));

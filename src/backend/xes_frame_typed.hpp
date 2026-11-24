@@ -353,6 +353,14 @@ inline long double xes_cell_number(const PlusCell& cell) {
 inline int xes_cell_compare(const PlusCell& a, const PlusCell& b) {
   switch (xes_cell_family(a)) {
     case XesCellFamily::kNumber: {
+      // Two ints (an XES uint64 cell as decimal text, round GY) exactly.
+      const auto integral = [](const PlusCell& cell) {
+        return cell.kind == PlusCellKind::kInt || cell.kind == PlusCellKind::kBool;
+      };
+      if (integral(a) && integral(b) && (!a.text.empty() || !b.text.empty())) {
+        const auto x = plus_int_text(a), y = plus_int_text(b);
+        return plus_decimal_less(x, y) ? -1 : (plus_decimal_less(y, x) ? 1 : 0);
+      }
       const auto x = xes_cell_number(a), y = xes_cell_number(b);
       return x < y ? -1 : (y < x ? 1 : 0);
     }
@@ -410,8 +418,17 @@ inline std::vector<std::size_t> xes_pandas_codes(const XesTypedColumn& column) {
     if (object && cell.kind == kPlusDictCell) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
     const auto family = xes_cell_family(cell);
     Key key{static_cast<int>(family), 0.0L, std::string(), 0, 0};
-    if (family == XesCellFamily::kNumber) std::get<1>(key) = xes_cell_number(cell);
-    else if (family == XesCellFamily::kText) std::get<2>(key) = cell.text;
+    if (family == XesCellFamily::kNumber) {
+      std::get<1>(key) = xes_cell_number(cell);
+      // An int past int64 that no double holds equals no float: keyed by its
+      // digits too, whatever the platform's long double (round GY).
+      if (cell.kind == PlusCellKind::kInt && !cell.text.empty()) {
+        const double as_double = std::strtod(cell.text.c_str(), nullptr);
+        const bool exact = as_double < 18446744073709551616.0 &&
+                           std::to_string(static_cast<std::uint64_t>(as_double)) == cell.text;
+        if (!exact) std::get<2>(key) = cell.text;
+      }
+    } else if (family == XesCellFamily::kText) std::get<2>(key) = cell.text;
     else if (family == XesCellFamily::kDate) {
       std::get<3>(key) = cell.micros;
       std::get<4>(key) = cell.nanos;
@@ -722,6 +739,11 @@ inline int xes_polars_cell_compare(const PlusCell& a, const PlusCell& b) {
     const double x = a.kind == PlusCellKind::kFloat ? a.number : static_cast<double>(a.micros);
     const double y = b.kind == PlusCellKind::kFloat ? b.number : static_cast<double>(b.micros);
     return x < y ? -1 : y < x ? 1 : 0;
+  }
+  // A UInt64 column's ints past int64 hold their decimal text (round GY).
+  if (!a.text.empty() || !b.text.empty()) {
+    const auto x = plus_int_text(a), y = plus_int_text(b);
+    return plus_decimal_less(x, y) ? -1 : (plus_decimal_less(y, x) ? 1 : 0);
   }
   return a.micros < b.micros ? -1 : b.micros < a.micros ? 1 : 0;
 }

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GX (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–GY (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10229,6 +10229,77 @@ on the pandas and Polars logs, XES uint64 columns), Python script tests 406
 of 406, the 16 manifests replayed 2,673 responses unchanged, the frontend's
 tsc clean.
 Harness and probes: `review-harness/round-gx/`.
+
+Round GY re-reviewed GX. GX's CI run 45395730735 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+New checker `ct/u64.py`: `/api/mine` families keyed by an XES upload's
+columns (activity, timestamp and start keys of Alpha, heuristics,
+Heuristics++, the classic performance view, Inductive, the log skeleton,
+the temporal profile with and without business hours, Declare) on the
+DataFrame and LazyFrame shapes vs the algorithm applies on read_xes's
+frame and its Polars copy, run on GX's gxB (ints past int64 in X and
+start_timestamp) and gxE. GY1, a log skeleton keyed by another column
+(`log_skeleton_activity_attribute`, even org:resource) failed the whole
+mine on the explicit DataFrame and LazyFrame shapes with a
+presentation_error (`log skeleton pair activity is not registered`,
+`log skeleton activity is not registered: r1`): the skeleton's labels now
+join the process map's activities as on the default shape since GR
+(`active_source_mining.hpp`; a Polars frame's missing activity stays out).
+gxB: 163 and 122 whole-mine failures (keys X and start_timestamp) on
+pandas, 199 and 146 on Polars, now none. GY2, the routes that kept a
+fallback on an XES column of ints past INT64_MAX now type it as pandas
+does (`xes_frame_cells(..., big_ints)` on every timestamp and start
+column: Heuristics++ and its interval checks, the classic performance
+view, the temporal profile's pandas and Polars models, Alpha's and
+Inductive's frame keys, Declare's Polars timestamp): uint64 alone (Polars
+UInt64, `u64` in its plan errors), float64 beside floats or gaps, object
+beside a negative int (Polars String). Two ints compare exactly by their
+digits (`xes_cell_compare`, `xes_polars_cell_compare`) and an int no
+double holds is its own Categorical value whatever the platform's long
+double. Before, Heuristics++ answered `requires a valid start timestamp`,
+Inductive `timestamp field 'X' is invalid`, and the temporal profile and
+the classic view Minera's own errors. gxB, all 200 uploads: pandas 3,794
+non-equal judgments of 7,000 down to 1,511, Polars 3,654 down to 903; every
+timestamp and start key set is now equal on both shapes, the rest are
+activity keys (carried below). Activity and case columns keep their
+fallback on such ints (`classic_frame_cells(..., false)`). Checked without a
+change: the eventually-follows filter (pandas and Polars LTL) reads no start
+column (`x/p2.py`); the only ceil or floor of a libm product remains the
+DFG playout (GW's tolerance), CPython's random.sample set size ceil(log(3k)
+/ log(4)) cannot land on an integer and the stochastic Petri slices divide
+only; GU1-2 stays declared (pm4py's discover_dfg refuses the frame, the
+process map is the mine's core result); GT2 and GT4's residuals stay
+declared (hash order). Regressions: GX's `ct/efg2.py` on gxB (keys none,
+X, start_timestamp) equal to GX's binary (108 graphs and 452 errors equal,
+40 GU1-2 runs).
+GY's suite: the full ctest 687 of 687 (34 minutes, -j2) and the new
+`minera_server_review_gy_tests` on its own (186 checks, 158 of which fail
+on GX's server binary), Python script tests 406 of 406, the 16 manifests replayed
+2,673 responses unchanged, no frontend change.
+Harness and probes: `review-harness/round-gy/`.
+
+Next round (GZ) should start by re-reviewing round GY:
+
+- GY's CI run;
+- activity keys over typed XES columns on the frame shapes (`ct/u64.py`
+  keys a_aX, i_aX, dc_aX, hpp_aX, ls_aX, tp_aX): ints past int64 as labels
+  (Alpha mixes floats from its shifted pairs with the column's ints,
+  Declare raises a KeyError on a float, heuristics a subscript TypeError,
+  Inductive refuses), int64 labels that Alpha shows as floats ("-3.0"),
+  the sort and concatenation TypeErrors pm4py's Inductive, Alpha,
+  Declare and Heuristics++ raise on mixed-object keys where Minera answers,
+  the log skeleton's `KeyError: NaT` (Minera `nan`), and an activity key
+  named start_timestamp on a frame without that column (pm4py's frame paths
+  add start_timestamp as the timestamp first, so the timestamps become the
+  activities); the log skeleton keyed by a typed XES column on the frame
+  shapes, which now answers instead of failing the mine but labels its pairs
+  with the XES text (pandas' str of the typed value: dates as Timestamps,
+  booleans True/False, 0 and False one key);
+- the GU1-2 whole-mine failure (declared) and the GT2 and GT4 residuals
+  (declared) if a cheaper model appears;
+- the carried items below.
+
+Previous list for round GY (kept for its older items):
 
 Next round (GY) should start by re-reviewing round GX:
 

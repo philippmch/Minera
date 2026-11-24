@@ -432,6 +432,18 @@ void handle_active_source_mining(const httplib::Request& request,
       if (distances) for (const auto& item : *distances) {if (!item.activity_is_null) graph.ensure_activity(item.activity); for (const auto& witness : item.witnesses) graph.ensure_activity(witness);}
       if (correlations) minera::register_correlation_activities(graph, *correlations);
       if (session->declare_ready) for (const auto& [name, rules] : session->declare.rules) { (void)name; for (const auto& rule : rules) {graph.ensure_activity(rule.first); if (rule.binary) graph.ensure_activity(rule.second);} }
+      // A keyed log skeleton's labels, as the default shape registers them
+      // (round GY: a custom key failed the whole mine's presentation); a
+      // Polars frame's missing activity has no graph id.
+      if (skeleton) {
+        const auto label = [&](const std::string& activity) {
+          if (activity != minera::kLogSkeletonNullActivity) graph.ensure_activity(activity);
+        };
+        for (const auto* relation : {&skeleton->equivalence, &skeleton->always_after, &skeleton->always_before,
+                                     &skeleton->never_together, &skeleton->directly_follows})
+          for (const auto& pair : *relation) {label(pair.source); label(pair.target);}
+        for (const auto& [activity, counts] : skeleton->activ_freq) {(void)counts; label(activity);}
+      }
       std::vector<minera::ModelConformance> conformance;
       for (const auto& [name, petri] : session->nets) run(name + "_conformance", "model_prepared_log", [&](bool& native_returned) {
         std::optional<minera::EventLog> projected_powl;

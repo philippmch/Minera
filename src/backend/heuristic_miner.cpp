@@ -1093,8 +1093,9 @@ std::optional<std::vector<std::vector<double>>> legacy_classic_waits(const Event
 using ClassicFrameDtype = detail::XesFrameDtype;
 
 std::optional<std::vector<detail::PlusCell>> classic_frame_cells(const EventTable& table, std::size_t column,
-                                                                 bool polars, ClassicFrameDtype* dtype_out = nullptr) {
-  return detail::xes_frame_cells(table, column, polars, dtype_out);
+                                                                 bool polars, ClassicFrameDtype* dtype_out = nullptr,
+                                                                 bool big_ints = true) {
+  return detail::xes_frame_cells(table, column, polars, dtype_out, big_ints);
 }
 
 // `selected_keys`: a CSV frame, whose session selects its own case,
@@ -3911,7 +3912,7 @@ std::optional<FrameTypedActivities> frame_typed_activities(const EventTable& tab
                                                            bool force) {
   using detail::PlusCellKind;
   auto dtype = ClassicFrameDtype::kObject;
-  const auto cells = classic_frame_cells(table, column, false, &dtype);
+  const auto cells = classic_frame_cells(table, column, false, &dtype, false);
   if (!cells) return std::nullopt;
   const bool object = dtype == ClassicFrameDtype::kObject || dtype == ClassicFrameDtype::kNoneObject;
   const bool float64 = dtype == ClassicFrameDtype::kFloat || dtype == ClassicFrameDtype::kNaNFloat;
@@ -4259,7 +4260,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     const auto start_column = start_key.starts_with("case:") || start_key == timestamp_key ? std::nullopt
                                                                                             : column_of(start_key);
     if (start_column) {
-      if (const auto starts = detail::xes_frame_cells(table, *start_column, polars)) {
+      if (const auto starts = detail::xes_frame_cells(table, *start_column, polars, nullptr, true)) {
         std::vector<std::size_t> first;
         const auto case_key = [&](std::size_t r) -> std::optional<std::string> {
           const auto* id = value(table.rows[r], *case_at);
@@ -4289,10 +4290,10 @@ HeuristicsNet discover_heuristics_net_xes_frame(
   // timestamp columns of other kinds raise pm4py's own errors in the
   // abstraction's sort, eventually-follows comparison, performance
   // subtraction and timestamp() calls (check_plus_interval_cells).
-  const auto time_cells = plus && timestamp_at ? detail::xes_frame_cells(table, *timestamp_at, polars)
+  const auto time_cells = plus && timestamp_at ? detail::xes_frame_cells(table, *timestamp_at, polars, nullptr, true)
                                                : std::optional<std::vector<detail::PlusCell>>();
   if (start_at) {
-    const auto start_cells = detail::xes_frame_cells(table, *start_at, polars);
+    const auto start_cells = detail::xes_frame_cells(table, *start_at, polars, nullptr, true);
     if (!time_cells || !start_cells) return discover_heuristics_net(data, options);
     // Cases in order of their first row, rows in frame order; the rows
     // without a case id are one trace.

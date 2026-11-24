@@ -2317,7 +2317,7 @@ void check_xes_frame_projection(const EventDataView& data, const InductiveMinerO
   // types them raises first (xes_frame_typed.hpp).
   if (!polars) {
     const auto cases = detail::xes_typed_column(table, options.case_id_key);
-    const auto times = detail::xes_typed_column(table, options.timestamp_key);
+    const auto times = detail::xes_typed_column(table, options.timestamp_key, false, true);
     if (cases && times) (void)detail::xes_pandas_sort_order({&*cases, &*times});
   }
   if (!polars) {
@@ -2366,7 +2366,7 @@ EventLog event_data_to_log(const EventDataView& data,
     std::optional<EventTable> storage;
     const auto& table = detail::xes_frame_present_columns(whole, storage, true);
     const auto cases = detail::xes_typed_column(table, options.case_id_key, true);
-    const auto times = detail::xes_typed_column(table, options.timestamp_key, true);
+    const auto times = detail::xes_typed_column(table, options.timestamp_key, true, true);
     if (cases && times && times->cells.size() == records.size()) {
       std::vector<IndexedRecord> sorted;
       sorted.reserve(records.size());
@@ -2411,7 +2411,7 @@ EventLog event_data_to_log(const EventDataView& data,
   if (xes_frame && !polars) {
     std::optional<EventTable> storage;
     const auto& table = detail::xes_frame_present_columns(*data.table(), storage, false);
-    if (const auto times = detail::xes_typed_column(table, options.timestamp_key);
+    if (const auto times = detail::xes_typed_column(table, options.timestamp_key, false, true);
         times && times->cells.size() == records.size())
       time_codes = detail::xes_pandas_codes(*times);
   }

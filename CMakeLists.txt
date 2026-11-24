@@ -2752,6 +2752,16 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_gx_tests minera_server)
     add_test(NAME minera_server_review_gx_tests
              COMMAND minera_server_review_gx_tests $<TARGET_FILE:minera_server>)
+    # Round GY: XES ints past int64 in timestamp and start columns, and log
+    # skeletons keyed by another column on the explicit frame shapes.
+    add_executable(minera_server_review_gy_tests
+      src/backend/tests/test_server_review_gy.cpp)
+    target_include_directories(minera_server_review_gy_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_gy_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_gy_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_gy_tests minera_server)
+    add_test(NAME minera_server_review_gy_tests
+             COMMAND minera_server_review_gy_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

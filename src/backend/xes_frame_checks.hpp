@@ -264,11 +264,15 @@ inline std::optional<std::string> polars_typed_tp_error(const EventTable& table,
                                                         const std::string& side, bool* modelled = nullptr) {
   using P = PolarsTpDtype;
   const auto dtype = [&](const std::string& name) -> std::optional<P> {
-    const auto column = xes_typed_column(table, name);
+    const auto column = xes_typed_column(table, name, false, true);
     if (!column) return std::nullopt;
     switch (column->dtype) {
       case XesFrameDtype::kDatetime: return P::kD;
-      case XesFrameDtype::kInt: return P::kI;
+      case XesFrameDtype::kInt:
+        // ints past int64 (none negative): pandas' uint64, Polars' UInt64.
+        for (const auto& cell : column->cells)
+          if (cell.kind == PlusCellKind::kInt && !cell.text.empty()) return P::kU;
+        return P::kI;
       case XesFrameDtype::kFloat:
       case XesFrameDtype::kNaNFloat: return P::kF;
       case XesFrameDtype::kBool: return P::kB;
@@ -357,8 +361,8 @@ inline std::optional<std::string> polars_typed_tp_business(const EventTable& tab
       default: return P::kS;
     }
   };
-  const auto times = xes_typed_column(table, timestamp_key, true);
-  const auto starts = own_start ? xes_typed_column(table, start_key, true) : times;
+  const auto times = xes_typed_column(table, timestamp_key, true, true);
+  const auto starts = own_start ? xes_typed_column(table, start_key, true, true) : times;
   const auto cases = xes_typed_column(table, case_key, true);
   if (modelled) *modelled = times && starts && cases;
   if (!times || !starts || !cases) return std::nullopt;
@@ -473,8 +477,8 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
                                                                               family == XesFrameFamily::kTemporalProfile)) {
     const bool own_start = explicit_start ? start_held : has(start_key);
     const auto cases = xes_typed_column(table, case_key);
-    const auto times = xes_typed_column(table, timestamp_key);
-    const auto starts = own_start ? xes_typed_column(table, start_key) : times;
+    const auto times = xes_typed_column(table, timestamp_key, false, true);
+    const auto starts = own_start ? xes_typed_column(table, start_key, false, true) : times;
     if (cases && times && starts) {
       const auto dtype_name = [&](const std::string& name, const XesTypedColumn& column) {
         const auto given = dtype_of(name);

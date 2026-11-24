@@ -285,8 +285,8 @@ PetriNet discover_classic_table(const EventTable& table,
   // Datetime columns) with its unstable sort, a missing value first.
   if (xes_frame && reads_time && options.sort_caseid_required && (!polars || has_completion)) {
     const auto cases = detail::xes_typed_column(table, options.case_id_attribute, polars);
-    const auto times = detail::xes_typed_column(table, options.timestamp_attribute, polars);
-    const auto starts = has_start ? detail::xes_typed_column(table, start, polars) : times;
+    const auto times = detail::xes_typed_column(table, options.timestamp_attribute, polars, true);
+    const auto starts = has_start ? detail::xes_typed_column(table, start, polars, true) : times;
     if (cases && times && starts && cases->cells.size() == stream.events.size())
       typed_order = polars ? detail::xes_polars_sort_order({&*cases, &*starts, &*times})
                            : detail::xes_pandas_sort_order({&*cases, &*starts, &*times});

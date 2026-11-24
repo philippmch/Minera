@@ -39446,3 +39446,46 @@ which fail on GW's server binary) carries the reference values. The full
 ctest passed 686 of 686 (-j2) and the new test on its own; the fixture
 replay left all 2,673 responses unchanged; the Python script tests passed
 406 of 406.
+
+## Review GY1-GY2: keyed log skeletons on the explicit frame shapes and XES ints past int64 in timestamp and start columns (2026-11-24)
+
+Observed black-box against pm4py 2.7.22 (review harness round GY:
+`ct/u64.py`, `tc/mkgy.py`), `/api/mine` on an XES upload's DataFrame and
+LazyFrame shapes against the algorithm applies on read_xes's frame and its
+Polars copy:
+
+- **GY1, a log skeleton keyed by another column**
+  (`log_skeleton_activity_attribute`, a text column such as org:resource
+  included) failed the whole mine's presentation on the explicit shapes
+  (`log skeleton pair activity is not registered`). Its labels now join the
+  process map's activities as on the default shape (round GR); a Polars
+  frame's missing activity has no graph id and stays out.
+- **GY2, ints past INT64_MAX (within uint64) in the timestamp or start
+  column** of Heuristics++, the classic performance view, the temporal
+  profile (with and without business hours), Alpha's start key, the
+  Inductive miner's timestamp key and Declare's Polars timestamp are typed
+  as pandas types them: a column of such ints (none negative) is uint64,
+  beside floats or gaps float64, beside a negative int an object column of
+  Python ints; Polars' copy is UInt64 (`u64` in the temporal profile's plan
+  errors), Float64 or String. The routes then raise pm4py's own errors (the
+  abstraction's sort, the subtraction with a Timestamp, the plan errors)
+  or answer, where Minera answered with its fallbacks (`Heuristics Miner
+  PLUSPLUS requires a valid start timestamp`, `timestamp field 'X' is
+  invalid`). Two ints compare exactly; an int that no double holds is its
+  own value in pandas' Categorical ranks.
+- Activity and case columns of such ints keep the fallback (carried: pm4py's
+  Alpha mixes float labels from its shifted pairs with the column's ints,
+  Declare raises a KeyError on a float, heuristics a subscript TypeError,
+  Inductive refuses the column).
+
+Checked without a change: the eventually-follows filter (pandas and Polars
+LTL checkers) reads no start column; no other ceil or floor of a libm
+product than the DFG playout's (round GW's tolerance).
+
+| bank (judgments) | before | after |
+|---|---|---|
+| gxB, pandas frame, 35 option sets (7,000) | 3,794 differing | 1,511 differing, all activity keys |
+| gxB, Polars lazy frame, 35 option sets (7,000) | 3,654 differing | 903 differing, all activity keys |
+| gxB, eventually-follows graph, keys none, X, start_timestamp (600) | 108 graphs and 452 errors equal | the same (40 declared GU1-2 runs) |
+
+Declared: none new.
