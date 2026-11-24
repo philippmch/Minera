@@ -1961,14 +1961,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "45880",
+        "Content-Length": "45850",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-literal-optional-missing.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-literal-optional-missing.response.json",
-        "bytes": 45880,
-        "sha256": "b15449b035a96931952b507627f316d45b99d0961014d47706d37896c7d12742",
+        "bytes": 45850,
+        "sha256": "cc35da4db040cbe2f7db98c7dd0376d2c0b7b8441de858a092c92c7aa277cfda",
         "status": 200
       },
       "exports": {},
@@ -2187,14 +2187,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "38493",
+        "Content-Length": "38460",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "csv-omitted-optional-bindings.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/csv-omitted-optional-bindings.response.json",
-        "bytes": 38493,
-        "sha256": "5028bb0721a8bf9b5d8079e8d8740c6c3fa9dfcec4597b01f74ea5e1aaff0fbe",
+        "bytes": 38460,
+        "sha256": "fb74e380a5969e071769a09fd41ea1277d3ce05c49752b1849acdd5ab96954a9",
         "status": 200
       },
       "exports": {},

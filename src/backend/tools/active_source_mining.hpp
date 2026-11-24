@@ -24,6 +24,9 @@ void handle_active_source_mining(const httplib::Request& request,
   // row order (session_selected_view; rounds BM and BN).
   const auto data = [&] {return session_selected_view(*session);};
   std::map<std::string, std::string> records;
+  // Each failed family's exception, for the footprints bundle of an XES
+  // frame session (round GR).
+  std::map<std::string, std::exception_ptr> family_failures;
   std::map<std::string, std::string> options_overrides;
   // A client that disconnected stops the request too, before a family and
   // inside the model decorations.
@@ -41,8 +44,10 @@ void handle_active_source_mining(const httplib::Request& request,
     try {result = call(native_returned);}
     catch (const minera::OperationCancelled&) {throw;}
     catch (const minera::HeuristicPandasError& e) {
+      family_failures[family] = std::current_exception();
       error = "{\"type\":" + active_source_quote(e.reference_type()) + ",\"message\":" + active_source_quote(e.what()) + '}';
     } catch (const std::exception& e) {
+      family_failures[family] = std::current_exception();
       if(family=="heuristic_petri_conversion")minera::record_exact_optional_artifact("conversion",e.what(),true);
       error = "{\"type\":\"native_error\",\"message\":" + active_source_quote(e.what()) + '}';
     }
@@ -146,6 +151,11 @@ void handle_active_source_mining(const httplib::Request& request,
   run("temporal_profile", selected, [&](bool& native_returned) {
     auto temporal_options = params.temporal_profile;
     mark_frame_index_rows(*session, temporal_options);
+    // A CSV upload's frame reads its own start column (round GR).
+    if (!xes_frame)
+      csv_frame_temporal_start(*session, session->active_source->selected_kind(), temporal_options,
+                               active_source_supplied(request, "temporal_target_timestamp_attribute") ||
+                                   active_source_supplied(request, "temporal_target_start_timestamp_attribute"));
     temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options,
                                active_source_supplied(request, "temporal_target_timestamp_attribute") ||
                                active_source_supplied(request, "temporal_target_start_timestamp_attribute"))
@@ -344,7 +354,20 @@ void handle_active_source_mining(const httplib::Request& request,
         (model != "process_tree" || (session->tree_ready && (!reach || net("inductive")))) &&
         (model != "inductive" || net("inductive")) && (model != "powl" || (session->powl && (!reach || net("powl")))) &&
         (model != "alpha" || (net("alpha") && session->alpha_log_ready)) && (model != "heuristic" || net("heuristic"));
-    if (!ready) throw std::invalid_argument("requested footprint bundle requires successfully discovered source models");
+    if (!ready) {
+      // pm4py raises the error of the model's own discovery (round GR):
+      // the model's family first, then the discovery variants' models.
+      std::vector<std::string> sources;
+      if (model == "heuristic") sources = {"heuristic", "heuristic_petri_conversion"};
+      else if (model == "alpha") sources = {"alpha", "alpha_log_preparation"};
+      else if (model == "inductive" || model == "process_tree") sources = {"inductive", "inductive_petri_conversion"};
+      else if (model == "powl") sources = {"powl", "powl_petri_conversion"};
+      if (options.discovery_variants.contains("process_tree")) sources.push_back("inductive");
+      if (options.discovery_variants.contains("powl")) sources.push_back("powl");
+      for (const auto& source : sources)
+        if (const auto failure = family_failures.find(source); failure != family_failures.end()) std::rethrow_exception(failure->second);
+      throw std::invalid_argument("requested footprint bundle requires successfully discovered source models");
+    }
     // pm4py converts an XES session's frame to an EventLog (round GP): a
     // missing activity is one more activity (NaN, Polars None), the traces
     // without a case id one trace.
@@ -375,6 +398,8 @@ void handle_active_source_mining(const httplib::Request& request,
                  ? missing
                  : labelled) = true;
         if (missing && labelled) graph.ensure_activity(*footprints_missing_label);
+        // A custom key's labels (round GR).
+        if (footprints_custom_keys(params.footprints)) register_footprints_activities(graph, *footprints);
       }
       if (temporal) for (const auto& entry : temporal->entries) {graph.ensure_activity(entry.source); graph.ensure_activity(entry.target);}
       if (transition)

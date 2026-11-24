@@ -573,6 +573,14 @@ TransitionSystem build_transition_system(
 TransitionSystem build_event_log_system(
     const EventLog& log, const TransitionSystemOptions& options) {
   const auto sequences = event_log_sequences(log, options);
+  // A CSV log keyed by a column with gaps labels a NaN "\x1e" and a NaT
+  // "\x1d" (round GR, the server's csv_keyed_family_log): they equal no
+  // label, as on an XES frame (round GQ).
+  bool typed_labels = false;
+  for (const auto& sequence : sequences)
+    for (const auto& activity : sequence.activities)
+      if (activity && !activity->empty() && (activity->front() == '\x1e' || activity->front() == '\x1d'))
+        typed_labels = true;
   return build_transition_system(
       sequences, options, [](const TraceSequence& sequence,
                              std::size_t event_index) {
@@ -581,7 +589,7 @@ TransitionSystem build_event_log_system(
                                       : event_index;
         return TransitionOccurrence{sequence.occurrence_trace_index,
                                     source_index};
-      });
+      }, false, typed_labels);
 }
 
 TransitionSystem build_flat_system(

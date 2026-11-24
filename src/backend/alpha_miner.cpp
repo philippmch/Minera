@@ -503,8 +503,12 @@ std::vector<Place> maximal_places(const Footprint& fp) {
 // concept:name, or nullopt for the log's own activities.
 std::optional<EventLog> alpha_frame_keyed_log(const EventLog& log,
                                               const AlphaMinerOptions& options) {
-  if (auto keyed = frame_keyed_activities(log, options.activity_attribute); keyed && keyed->non_text)
+  if (auto keyed = frame_keyed_activities(log, options.activity_attribute); keyed && keyed->non_text) {
+    // A CSV log's float64 gaps: one transition each (round GR, as GQ's
+    // heuristics nodes).
+    if (log.dataframe_columns && log.dataframe_columns->csv_text) distinct_float_gap_labels(*keyed);
     return std::move(keyed->log);
+  }
   return std::nullopt;
 }
 

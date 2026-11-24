@@ -78,6 +78,7 @@
 #include "../gzip_codec.hpp"
 #include "../json_utf8.hpp"
 #include "../xes_frame_checks.hpp"
+#include "../frame_typed_activities.hpp"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
@@ -336,6 +337,46 @@ std::string trim_text(std::string_view value) {
   if (first == std::string_view::npos) return {};
   const auto last = value.find_last_not_of(" \t\r\n");
   return std::string(value.substr(first, last - first + 1));
+}
+
+// A CSV upload's log shape keyed by another column of its frame (round GR,
+// observed black-box): pm4py's EventLog families read convert_to_event_log's
+// cells, a gap NaN (one shared object in a text or object column, a fresh
+// float per cell in a float64 column) or NaT, the frame's dates UTC
+// Timestamps: frame_keyed_activities' labels under concept:name, a float64
+// column's gaps one label each (distinct_float_gap_labels). nullopt when
+// the log is no CSV log or the key names no column of its frame.
+std::optional<minera::FrameKeyedActivities> csv_keyed_family(const minera::EventLog& log, const std::string& key) {
+  if (key.empty() || key == "concept:name" || key == "activity" || !log.dataframe_columns ||
+      !log.dataframe_columns->csv_text)
+    return std::nullopt;
+  auto keyed = minera::frame_keyed_activities(log, key);
+  if (!keyed) return std::nullopt;
+  minera::distinct_float_gap_labels(*keyed);
+  return keyed;
+}
+std::optional<minera::EventLog> csv_keyed_family_log(const minera::EventLog& log, const std::string& key) {
+  auto keyed = csv_keyed_family(log, key);
+  if (!keyed) return std::nullopt;
+  return std::move(keyed->log);
+}
+
+// pm4py's token replay sorts the net's transitions by name; an Alpha net
+// mined on such a log names a text or object column's gap NaN, which
+// raises TypeError beside a str name (round GR; the operands' order follows
+// a Python set, declared as in check_alpha_null_transition_names).
+void check_csv_keyed_alpha_transition_names(const minera::EventLog& log, const std::string& key,
+                                            const minera::PetriNet& net) {
+  if (net.transitions().size() < 2 || !log.dataframe_columns || !log.dataframe_columns->csv_text) return;
+  const auto keyed = minera::frame_keyed_activities(log, key);
+  if (!keyed || !keyed->any_missing || !keyed->column ||
+      (*keyed->column != minera::DataFrameColumnType::kString && *keyed->column != minera::DataFrameColumnType::kObject))
+    return;
+  bool text = false;
+  for (const auto& types : keyed->types)
+    for (std::size_t e = 0; e < types.size() && !text; ++e) text = types[e].empty();
+  if (text)
+    throw std::invalid_argument("TypeError: '<' not supported between instances of 'float' and 'str'");
 }
 
 void register_activity_selector_values(
@@ -780,6 +821,64 @@ const minera::DataFrameColumns* csv_frame_columns(const MinedSession& session) {
   if (kind != minera::EventDataKind::kEventTable && kind != minera::EventDataKind::kLazyEventTable) return nullptr;
   const auto& log = session.active_source->checked_log();
   return log.dataframe_columns && log.dataframe_columns->csv_text ? log.dataframe_columns.get() : nullptr;
+}
+
+// pm4py's temporal profile on a CSV upload's frame (round GR, observed
+// black-box): without a start key it reads the frame's start_timestamp
+// column when the frame has one, else the timestamp itself (the routes fill
+// in time:timestamp); pandas then compares the timestamp with a start
+// column of numbers or text at once and raises, business hours or not.
+void csv_frame_temporal_start(const MinedSession& session, minera::EventDataKind kind,
+                              minera::TemporalProfileOptions& options, bool explicit_start) {
+  if (!session.active_source || session.active_source->file().format != "csv") return;
+  if (kind != minera::EventDataKind::kEventTable && kind != minera::EventDataKind::kLazyEventTable) return;
+  const auto& log = session.active_source->checked_log();
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return;
+  const auto column = [&](const std::string& key) -> const minera::DataFrameColumn* {
+    for (const auto& entry : log.dataframe_columns->columns)
+      if (entry.key == key) return &entry;
+    return nullptr;
+  };
+  const auto& source = options.source_timestamp_attribute.empty() ? options.source_completion_timestamp_attribute
+                                                                  : options.source_timestamp_attribute;
+  const std::string timestamp = source.empty() ? std::string("time:timestamp") : source;
+  if (!explicit_start) {
+    options.target_timestamp_attribute = column("start_timestamp") ? std::string("start_timestamp") : timestamp;
+    options.target_start_timestamp_attribute.clear();
+  }
+  if (kind != minera::EventDataKind::kEventTable) return;
+  const auto& start = options.target_timestamp_attribute.empty() ? options.target_start_timestamp_attribute
+                                                                 : options.target_timestamp_attribute;
+  const auto* time_column = column(timestamp);
+  if (start.empty() || start == timestamp) {
+    // The timestamp as its own start, without business hours: pandas reads
+    // the column (KeyError), then measures the pairs with .dt.
+    const auto& order = log.dataframe_columns->order;
+    if (options.use_business_hours || order.empty()) return;
+    if (std::find(order.begin(), order.end(), timestamp) == order.end())
+      throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(timestamp));
+    if (!time_column) return;
+    switch (time_column->type) {
+      case minera::DataFrameColumnType::kInt64:
+      case minera::DataFrameColumnType::kFloat64:
+        throw std::invalid_argument("AttributeError: Can only use .dt accessor with datetimelike values");
+      case minera::DataFrameColumnType::kString:
+        throw std::invalid_argument("TypeError: unsupported operand type(s) for -: 'str' and 'str'");
+      default: return;
+    }
+  }
+  const auto* start_column = column(start);
+  if (!start_column || !time_column || time_column->type != minera::DataFrameColumnType::kDate) return;
+  std::string array;
+  switch (start_column->type) {
+    case minera::DataFrameColumnType::kInt64:
+    case minera::DataFrameColumnType::kFloat64:
+    case minera::DataFrameColumnType::kBool: array = "ndarray"; break;
+    case minera::DataFrameColumnType::kString: array = "StringArray"; break;
+    default: return;
+  }
+  throw std::invalid_argument(std::string("TypeError: Invalid comparison between dtype=datetime64[") +
+                              (time_column->nanoseconds ? "ns" : "us") + ", UTC] and " + array);
 }
 
 // Whether the session holds an XES upload mined as a pandas or Polars frame:
@@ -1232,6 +1331,114 @@ minera::FootprintsDiscoveryOptions footprints_discovery_options(
   return result;
 }
 
+// A custom footprints key on an XES frame session (round GR, observed
+// black-box): pm4py converts the frame to an EventLog grouping its rows by
+// the case key's column (KeyError when the frame lacks it), traces in the
+// order of their first row, rows in frame order (no time sort), values
+// equal as Python keys them (frame_typed_activities' identity: int 1,
+// float 1.0 and True alike, each NaN of a float64 column its own, a text
+// column's gaps the one NaN, NaT one key; Polars' copy: an object column's
+// str() of each, a gap None). The events lack the case columns (the
+// "case:" prefix moves them to the trace), so an activity key naming one,
+// or a column the frame lacks, raises KeyError after the case key's. Each
+// event's activity is its cell's Python object: one more label per value
+// Python tells apart (named apart with trailing \x1f), a dict unhashable.
+// nullopt: a kind frame_typed_activities does not model.
+std::optional<minera::EventLog> frame_keyed_footprints_log(const minera::ActiveEventSource& source,
+                                                           const std::string& case_key,
+                                                           const std::string& activity_key) {
+  const bool polars = source.selected_kind() == minera::EventDataKind::kLazyEventTable;
+  std::optional<minera::EventTable> materialized;
+  const minera::EventTable* raw =
+      polars ? &materialized.emplace(source.checked_lazy().materialize()) : &source.checked_table();
+  std::optional<minera::EventTable> storage;
+  const auto& table = minera::detail::xes_frame_present_columns(*raw, storage, polars);
+  const auto column_of = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto case_at = column_of(case_key);
+  if (!case_at) throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(case_key));
+  const auto activity_at = activity_key.starts_with("case:") ? std::nullopt : column_of(activity_key);
+  if (!activity_at) throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(activity_key));
+  const auto cases = minera::frame_typed_activities(table, *case_at, polars, true);
+  const auto activities = minera::frame_typed_activities(table, *activity_at, polars, true);
+  if (!cases || !activities) return std::nullopt;
+  if (!polars && (cases->dict || activities->dict)) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+  minera::EventLog log;
+  std::map<std::string, std::size_t> trace_of;  // case identity -> trace
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    const auto [at, added] = trace_of.try_emplace(cases->cells[row].identity, log.traces.size());
+    if (added) {
+      auto& trace = log.traces.emplace_back();
+      trace.case_id = cases->names[row];
+      trace.case_id_state = minera::FirstClassAttributeState::kPresent;
+      trace.case_id_attribute =
+          minera::EventAttribute{"case:concept:name", cases->names[row], minera::AttributeKind::kString};
+    }
+    auto& trace = log.traces[at->second];
+    minera::Event event;
+    const auto& name = activities->names[row];
+    event.activity = name;
+    event.activity_state = minera::FirstClassAttributeState::kPresent;
+    event.activity_attribute = minera::EventAttribute{"concept:name", name, minera::AttributeKind::kString};
+    event.case_id = trace.case_id;
+    event.case_id_state = trace.case_id_state;
+    event.input_order = row;
+    trace.events.push_back(std::move(event));
+  }
+  return log;
+}
+
+// Every activity a footprints analysis names, for the graph its JSON indexes
+// (a custom key's labels on an XES frame session, round GR).
+void register_footprints_activities(minera::DirectlyFollowsGraph& graph, const minera::FootprintsAnalysis& analysis) {
+  const auto pairs = [&](const auto& items) {
+    for (const auto& pair : items) {
+      graph.ensure_activity(pair.first);
+      graph.ensure_activity(pair.second);
+    }
+  };
+  const auto names = [&](const auto& items) {
+    for (const auto& name : items) graph.ensure_activity(name);
+  };
+  const auto footprint = [&](const minera::Footprint& item) {
+    for (const auto& [pair, count] : item.dfg) {
+      (void)count;
+      graph.ensure_activity(pair.first);
+      graph.ensure_activity(pair.second);
+    }
+    pairs(item.sequence);
+    pairs(item.parallel);
+    names(item.activities);
+    names(item.start_activities);
+    names(item.end_activities);
+    if (item.activities_always_happening) names(*item.activities_always_happening);
+    if (item.trace) names(*item.trace);
+  };
+  for (const auto* item : {&analysis.entire_event_log, &analysis.entire_dataframe, &analysis.polars_lazyframes,
+                           &analysis.dfg, &analysis.process_tree, &analysis.powl, &analysis.petri_reach_graph})
+    if (*item) footprint(**item);
+  if (analysis.trace_by_trace) for (const auto& item : *analysis.trace_by_trace) footprint(item);
+  footprint(analysis.model_footprint);
+  const auto extensive = [&](const minera::FootprintsExtensiveResult& item) {
+    pairs(item.footprints);
+    names(item.start_activities);
+    names(item.end_activities);
+    names(item.activities_always_happening);
+  };
+  if (analysis.log_extensive) extensive(*analysis.log_extensive);
+  if (analysis.trace_extensive) for (const auto& item : *analysis.trace_extensive) extensive(item);
+  if (analysis.log_model) pairs(*analysis.log_model);
+}
+
+// Whether footprints options name a key other than the frame's standard ones.
+bool footprints_custom_keys(const minera::FootprintsOptions& options) {
+  return (!options.activity_attribute.empty() && options.activity_attribute != "concept:name") ||
+         (!options.case_id_attribute.empty() && options.case_id_attribute != "case:concept:name");
+}
+
 // The footprints bundle over the models it reads; a model the session lacks
 // (nullptr: its discovery failed on the upload) raises only when the
 // selected model or a requested variant reads it (round GD).
@@ -1252,10 +1459,21 @@ minera::FootprintsAnalysis analyze_footprints_models(
   minera::FootprintsAnalysis analysis;
   analysis.model = options.model;
   analysis.strict = options.strict;
-  const auto discovery_options = footprints_discovery_options(options);
+  auto discovery_options = footprints_discovery_options(options);
   const auto& checked_log = options.model == "alpha"
       ? need(alpha_log_model, "the cached Alpha prepared log is unavailable")
       : active_source ? active_source->checked_log() : log;
+  // A custom key on an XES frame session reads the frame (round GR).
+  std::optional<minera::EventLog> keyed_log;
+  if (missing_activity_label && options.model != "alpha" && active_source && footprints_custom_keys(options)) {
+    keyed_log = frame_keyed_footprints_log(*active_source,
+                                           options.case_id_attribute.empty() ? "case:concept:name" : options.case_id_attribute,
+                                           options.activity_attribute.empty() ? "concept:name" : options.activity_attribute);
+    if (keyed_log) {
+      discovery_options.activity_attribute = "concept:name";
+      discovery_options.case_id_attribute = "case:concept:name";
+    }
+  }
   // XES frame sessions (round GP): pm4py converts read_xes's frame to an
   // EventLog, grouping the rows by case id in order of first appearance (the
   // rows without one are one trace), in which a missing activity stays NaN
@@ -1263,7 +1481,7 @@ minera::FootprintsAnalysis analyze_footprints_models(
   // more activity in the log's and the traces' footprints, observed
   // black-box.
   std::optional<minera::EventLog> labelled_log;
-  if (missing_activity_label && options.model != "alpha") {
+  if (missing_activity_label && options.model != "alpha" && !keyed_log) {
     const auto missing = [](const minera::Event& event) {
       return !event.has_activity() || event.activity_state == minera::FirstClassAttributeState::kNull ||
              (event.activity_attribute && event.activity_attribute->is_null);
@@ -1307,9 +1525,9 @@ minera::FootprintsAnalysis analyze_footprints_models(
             }
     }
   }
-  const auto& selected_log = labelled_log ? *labelled_log : checked_log;
-  analysis.activity_attribute = discovery_options.activity_attribute;
-  analysis.case_id_attribute = discovery_options.case_id_attribute;
+  const auto& selected_log = keyed_log ? *keyed_log : labelled_log ? *labelled_log : checked_log;
+  analysis.activity_attribute = options.activity_attribute;
+  analysis.case_id_attribute = options.case_id_attribute;
   analysis.trace_case_ids = minera::resolve_footprints_case_ids(
       selected_log, discovery_options.case_id_attribute);
   const auto projected_log =
@@ -1956,8 +2174,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     checkpoint("Temporal profile and transition system");
     // Quadratic in the trace length: one long case can keep it busy for
     // minutes, so a disconnect (or a cancel) stops it.
+    // A CSV log keyed by another column of its frame reads its cells (round
+    // GR; csv_keyed_family_log), as do the transition system, the log
+    // skeleton and Declare below.
+    const auto temporal_keyed = csv_keyed_family_log(log, params.temporal_profile.activity_attribute);
+    auto temporal_options = params.temporal_profile;
+    if (temporal_keyed) temporal_options.activity_attribute = "concept:name";
     const auto temporal_profile =
-        minera::discover_temporal_profile_as_uploaded(log, params.temporal_profile, cancelled);
+        minera::discover_temporal_profile_as_uploaded(temporal_keyed ? *temporal_keyed : log, temporal_options, cancelled);
     const auto minimum_self_distances =
         discover_selected_minimum_self_distances(
             log, params.minimum_self_distance);
@@ -1975,10 +2199,25 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       graph.ensure_activity(entry.source);
       graph.ensure_activity(entry.target);
     }
+    // pm4py's transition system compares labels with ==: a NaN or NaT one
+    // equals none (each step its own transition), while a state's list
+    // matches it by the object (round GR, as round GQ on XES frames).
+    auto transition_keyed = csv_keyed_family(log,
+        params.transition_system.activity_attribute.empty() ? params.transition_system.activity_key
+                                                            : params.transition_system.activity_attribute);
+    if (transition_keyed)
+      for (std::size_t t = 0; t < transition_keyed->log.traces.size(); ++t)
+        for (std::size_t e = 0; e < transition_keyed->log.traces[t].events.size(); ++e)
+          if (transition_keyed->missing[t][e]) {
+            auto& activity = transition_keyed->log.traces[t].events[e].activity;
+            activity = (transition_keyed->types[t][e] == "NaTType" ? "\x1d" : "\x1e") + activity;
+          }
+    auto transition_options = params.transition_system;
+    if (transition_keyed) transition_options.activity_attribute = transition_options.activity_key = "concept:name";
     const auto transition_system =
-        minera::discover_transition_system(log, params.transition_system);
+        minera::discover_transition_system(transition_keyed ? transition_keyed->log : log, transition_options);
     for (const auto& transition : transition_system.transitions()) {
-      if (transition.label) graph.ensure_activity(*transition.label);
+      if (const auto shown = minera::transition_activity_shown(transition.label)) graph.ensure_activity(*shown);
     }
     checkpoint("Inductive miner");
     // A preparation that changed nothing is dropped and the checked log
@@ -2071,17 +2310,50 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // case-id order and list their conformance in it (a CSV log is already
     // in that order); the native results stay indexed by trace.
     const auto constraint_order = constraint_case_order(*active_source, log);
-    const auto log_skeleton = constraint_order
-        ? minera::discover_log_skeleton(log, params.log_skeleton, *constraint_order)
-        : minera::discover_log_skeleton(log, params.log_skeleton);
+    const auto skeleton_keyed = csv_keyed_family(log, params.log_skeleton.activity_key);
+    auto skeleton_options = params.log_skeleton;
+    if (skeleton_keyed) skeleton_options.activity_key = "concept:name";
+    const auto& skeleton_log = skeleton_keyed ? skeleton_keyed->log : log;
+    auto log_skeleton = constraint_order
+        ? minera::discover_log_skeleton(skeleton_log, skeleton_options, *constraint_order)
+        : minera::discover_log_skeleton(skeleton_log, skeleton_options);
+    // pm4py pairs two activities a != b: a NaN or NaT is unequal to itself,
+    // so each is its own equivalence (round GR, observed black-box).
+    if (skeleton_keyed) {
+      std::set<std::string> missing;
+      for (std::size_t t = 0; t < skeleton_keyed->log.traces.size(); ++t)
+        for (std::size_t e = 0; e < skeleton_keyed->log.traces[t].events.size(); ++e)
+          if (skeleton_keyed->missing[t][e]) missing.insert(skeleton_keyed->log.traces[t].events[e].activity);
+      for (const auto& label : missing) log_skeleton.equivalence.push_back({label, label});
+    }
     const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
-        log, log_skeleton, params.log_skeleton);
+        skeleton_log, log_skeleton, skeleton_options);
+    // A custom key's labels (round GR).
+    for (const auto* relation : {&log_skeleton.equivalence, &log_skeleton.always_after, &log_skeleton.always_before,
+                                 &log_skeleton.never_together, &log_skeleton.directly_follows})
+      for (const auto& pair : *relation) {
+        graph.ensure_activity(pair.source);
+        graph.ensure_activity(pair.target);
+      }
+    for (const auto& [activity, counts] : log_skeleton.activ_freq) {
+      (void)counts;
+      graph.ensure_activity(activity);
+    }
     checkpoint("Declare constraints");
+    // Declare keyed by a column with gaps or mixed types is not modelled
+    // (pm4py's rules keep a NaN in odd places or raise TypeError; carried):
+    // only a column without gaps reads its cells.
+    auto declare_keyed = csv_keyed_family(log, params.declare_options.activity_key);
+    if (declare_keyed && declare_keyed->any_missing) declare_keyed.reset();
+    auto declare_options = params.declare_options;
+    auto declare_conformance_options = params.declare_conformance_options;
+    if (declare_keyed) declare_options.activity_key = declare_conformance_options.activity_key = "concept:name";
+    const auto& declare_log = declare_keyed ? declare_keyed->log : log;
     const auto declare =
-        minera::discover_declare_as_uploaded(log, params.declare_options);
+        minera::discover_declare_as_uploaded(declare_log, declare_options);
     const auto declare_conformance =
         minera::check_declare_conformance_as_uploaded(
-            log, declare, params.declare_conformance_options);
+            declare_log, declare, declare_conformance_options);
     for (const auto& [family, rules] : declare.rules) {
       (void)family;
       for (const auto& rule : rules) {
@@ -2111,6 +2383,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                                        params.overlap_options);
     }
 
+    // The Alpha net's replay keyed by such a column reads the same cells
+    // (round GR, as round GO's heuristics replay).
+    const auto& alpha_key = params.alpha.activity_attribute;
+    std::optional<minera::EventLog> alpha_keyed_log;
+    if (!params.token_replay_activity_attribute_supplied && csv_keyed_family_log(log, alpha_key)) {
+      check_csv_keyed_alpha_transition_names(log, alpha_key, net);
+      alpha_keyed_log = minera::detail::csv_log_keyed_replay_log(log, alpha_key);
+    }
     const auto& heuristic_key = params.heuristic.activity_attribute;
     const auto heuristic_keyed_log = !heuristic_key.empty() && heuristic_key != "concept:name" && heuristic_key != "activity"
         ? minera::detail::csv_log_keyed_replay_log(log, heuristic_key, &heuristics, &heuristic_net)
@@ -2142,6 +2422,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       // A CSV upload's log keyed by another column of its frame replays the
       // cells as convert_to_event_log holds them, gaps included (round GO;
       // csv_log_keyed_replay_log).
+      if (is_alpha && alpha_keyed_log) {
+        conformance_log = &*alpha_keyed_log;
+        replay_options.activity_attribute = "concept:name";
+      }
       if (id == "heuristic" && heuristic_keyed_log && replay_options.activity_attribute == params.heuristic.activity_attribute) {
         conformance_log = &*heuristic_keyed_log;
         replay_options.activity_attribute = "concept:name";
@@ -4745,6 +5029,12 @@ void handle_behavior_analysis(const httplib::Request& request,
     std::optional<minera::CorrelationVariantsAnalysis> correlations;
     std::optional<minera::TemporalConformanceResult> conformance;
     if (temporal) {
+      if (adapter == "dataframe" || adapter == "lazyframe")
+        csv_frame_temporal_start(*session,
+                                 adapter == "dataframe" ? minera::EventDataKind::kEventTable : minera::EventDataKind::kLazyEventTable,
+                                 params.temporal_profile,
+                                 request.has_param("temporal_target_timestamp_attribute") ||
+                                     request.has_param("temporal_target_start_timestamp_attribute"));
       if (conform) {
         if (!request.has_param("temporal_profile_json")) throw std::invalid_argument("temporal_profile_json is required");
         profile = minera::parse_temporal_profile_json(request.get_param_value("temporal_profile_json"));
@@ -5008,6 +5298,8 @@ void handle_graph_discovery(const httplib::Request& request,
         session->tree_ready ? &session->tree : nullptr, session->powl ? &*session->powl : nullptr,
         session_net("inductive"), session_net("alpha"), session_net("heuristic"), session_net("powl"),
         params.footprints, session->active_source.get(), nullptr, missing_label ? &*missing_label : nullptr);
+      if (missing_label && params.footprints.model != "alpha" && footprints_custom_keys(params.footprints))
+        register_footprints_activities(graph, *footprints);
       model_footprint = minera::footprint_json(footprints->model_footprint, graph);
       model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
     } else {

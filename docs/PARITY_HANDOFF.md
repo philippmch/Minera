@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GQ (2026-11-05 to 2026-11-23, cloud container)
+## Review-fix loop, rounds T–GR (2026-11-05 to 2026-11-23, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -9752,6 +9752,97 @@ system, server and review tests passed again), Python script tests 406 of
 replay caught the footprints family's bundle error changing on a table
 session: the selection rule now applies to XES frame sessions only).
 Harness and probes: `review-harness/round-gq/`.
+
+Round GR re-reviewed GQ and aligned `/api/mine`'s footprints family with a
+custom footprints key on XES frame sessions (Review GR1), the families of a
+CSV upload's log shape keyed by a typed column or one with gaps (GR2), the
+footprints bundle's error when its model's discovery fails on a frame
+session (GR3) and the temporal profile on CSV uploads' frame shapes (GR4,
+the re-review of GQ1). GQ's CI run 45270284863 passed every job that ran
+(Linux and Windows ctest, the frontend, the Python script tests and the
+verifier); macOS was cancelled without a runner. No
+device was reachable, so no newer reviewer handoff was read from the Mac.
+Fixed: GR1-1, pm4py converts the frame to an EventLog grouped by the
+footprints case key's column (traces in the order of their first row, rows
+in frame order, values equal as Python keys them: int 1, float 1.0 and True
+alike, each NaN of a float64 column its own case, a text column's gaps one,
+NaT one); Minera kept the XES traces. GR1-2, the activity key reads each
+cell's Python object (`frame_typed_activities`): one label per value Python
+tells apart, a dict `TypeError: unhashable type: 'dict'` on pandas; a key
+the frame lacks raises `KeyError` (the case key's first), and a `case:`
+column, which the conversion moves to the trace, raises it as an activity
+key (Minera answered "activity selector is missing or null"). GR2-1, a CSV
+log shape keyed by another column of its frame reads convert_to_event_log's
+cells for Alpha (with its token replay), the temporal profile, the
+transition system and the log skeleton: a gap is NaN (one object in a text
+column, one per cell in a float64 column, `distinct_float_gap_labels`) or
+NaT, dates UTC Timestamps; the transition system's NaN or NaT label equals
+none (each step its own transition), the log skeleton's NaN or NaT is its
+own equivalence, and an Alpha net naming a text column's NaN raises the
+replay's sort TypeError beside a str name (operand order declared, a set).
+GR3-1, on a frame session a footprints bundle whose model failed answered
+"requested footprint bundle requires successfully discovered source
+models"; pm4py raises the model discovery's own error (the heuristics
+miner's `TypeError: 'float' object is not subscriptable` on pandas, the
+`'NoneType'` one on Polars), which the bundle now forwards (the model's
+family, then its Petri conversion, then the discovery variants' models).
+GR4-1, pm4py's temporal profile on a CSV upload's frame without a start key
+reads the frame's `start_timestamp` column when there is one (format_dataframe
+types it as dates), else the timestamp itself; Minera read the timestamp
+(discovery and `/api/analyze-behavior` conformance, both shapes). GR4-2,
+pandas compares the timestamp with a start column of ints or floats
+(`TypeError: Invalid comparison between dtype=datetime64[us, UTC] and
+ndarray`) or text (`... and StringArray`) before anything else, business
+hours or not; with the timestamp as its own start (a custom timestamp key
+and no start column) it raises `KeyError` for a column the frame lacks, and
+without business hours `AttributeError: Can only use .dt accessor with
+datetimelike values` (numbers) or `TypeError: unsupported operand type(s)
+for -: 'str' and 'str'` (text). Two workbench fixtures on CSV frames
+without their timestamp column now show `KeyError: 'absent clock'` and
+`KeyError: 'timestamp'` for the temporal profile family (rewritten).
+Open: footprints with time:timestamp as the activity key on pandas (2 of
+250 grAs uploads): two traces' NaN start activities stay two objects in
+pm4py's sets (Minera one `nan`), and 0 and False are named after the first
+object (as GQ's transition systems).
+After, per shape: the footprints family with custom keys (`ct/fpmine.py`,
+7 key sets: case key concept:name, start_timestamp, time:timestamp;
+activity key org:resource, start_timestamp, time:timestamp,
+case:concept:name) on grAs (250 uploads) 11,892 of 11,900 judgments over
+both shapes with a heuristics net (42 fail on both sides: unbounded nets,
+reference timeouts, unhashable dicts) and on grA60 2,669 of 2,674; the
+model-error uploads (`ct/fpmine.py` now compares them) 18 of 18 per shape on
+grA60; the CSV log families (`ct/csvfam.py`, K1-K6) on fresh grK uploads (61) 1,464 of 1,464 judgments for Alpha with its replay, the temporal profile, the transition system and the log skeleton (`out/c2_*` and `out/c3_*` on grK40 before the fixes); the CSV
+frames' temporal profile (`ct/tpdcsv.py`, kcT 100 uploads, 6 option sets)
+on pandas 600 of 600 judgments (GQ's binary 308 of 600, `out/td_*`) and on Polars 445 of 600 (GQ's 307): 132 reference-only Polars plan errors on start columns of other values than dates and 23 plan errors of a missing timestamp column are open; the conformance (`ct/tpccsv.py`, 12 sets) on pandas 1,126 of 1,200 (GQ's binary 575 of 1,100 sets without `szzz`, `out/t4_*`; open: 51 business-hours judgments with the start column as the timestamp key, 23 reference-only ValueErrors of business hours on an empty pair frame), on Polars 504 of 1,200 (GQ's 387 of 1,100; open: the deviations' order within a case, Polars' plan errors and business hours).
+GR's suite: the full ctest 681 of 681 (680 at -j2 beside sweeps, then the
+new `minera_server_review_gr_tests`: 194 checks, 175 of which fail on GQ's
+server binary), Python script tests 406 of 406, the active-source fixture
+vitest files 298 of 298, and the 16 manifests replayed 2,673 responses with
+the 2 CSV frame captures above changed as intended (rewritten on a fresh
+server over the whole manifest).
+Harness and probes: `review-harness/round-gr/`.
+
+Next round (GS) should start by re-reviewing round GR:
+
+- GR's CI run;
+- GR1 on fresh banks: other custom footprints keys (concept:instance,
+  lifecycle:transition, a bool or dict column) and `/api/discover-graph`
+  footprints with custom keys on frame sessions; the 2 open grAs uploads;
+- GR4 on the rest of the CSV frame shapes: Polars' temporal profile on a
+  start column of other values than dates (plan errors such as `- not
+  allowed on f64 and datetime[μs, UTC]`), Polars' conformance deviation
+  order within a case (`ct/tpccsv.py` lazyframe: 40 of 100 default
+  judgments differ only in order), pandas business hours with the start
+  column as the timestamp key, the empty pair frame's ValueError in CSV
+  conformance, an object start column;
+- GR2's carried families: Declare and Inductive on a CSV log keyed by a
+  column with gaps (pm4py keeps a NaN in odd places or raises TypeError;
+  Minera's messages differ), the DFG and variants families there;
+- the open transition-system item from GQ (0 and False named by the
+  creating object) and the carried items below.
+
+Previous list for round GR (kept for its older items):
+
 
 Next round (GR) should start by re-reviewing round GQ:
 

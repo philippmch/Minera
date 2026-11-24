@@ -2186,7 +2186,9 @@ void write_activity_stats(std::ostream& out,
   for (std::size_t i = 0; i < activities.size(); ++i) {
     const auto& name = activities[i];
     out << "    {\"name\": ";
-    write_json_string(out, name);
+    // Values printed alike are named apart with trailing \x1f (rounds GM,
+    // GQ, GR): shown as printed.
+    write_activity_label(out, name);
     out << ", \"count\": " << graph.activity_count(name)
         << ", \"start_count\": " << graph.start_activity_count(name)
         << ", \"end_count\": " << graph.end_activity_count(name)
@@ -3498,7 +3500,9 @@ ResolvedTransitionSystem resolve_transition_system(
     if (transition.count == 0) throw std::invalid_argument("transition system transition counts must be positive");
     // A missing label of a pandas frame (NaN) equals no other, so pm4py keeps
     // one transition per step it labels (round FY): only those may repeat.
-    const bool repeatable = !transition.label;
+    // So does a typed column's NaN or NaT ("\x1e", "\x1d"; rounds GQ, GR).
+    const bool repeatable = !transition.label ||
+        (!transition.label->empty() && (transition.label->front() == '\x1e' || transition.label->front() == '\x1d'));
     if (!seen.emplace(transition.source, transition.target, transition.label).second && !repeatable)
       throw std::invalid_argument("transition system contains duplicate transitions");
     const auto transition_key = std::make_tuple(transition.source, transition.target,
