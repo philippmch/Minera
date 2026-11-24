@@ -1,6 +1,7 @@
 #include "minera/log_skeleton.hpp"
 
 #include "minera/log_conversion.hpp"
+#include "minera/cancellation.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -19,6 +20,7 @@
 #include "python_list_sort.hpp"
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
+#include "xes_frame_activity.hpp"
 
 namespace minera {
 namespace {
@@ -725,6 +727,11 @@ struct SkeletonFrame {
   std::size_t case_at = 0, activity_at = 0;
   std::vector<std::vector<std::size_t>> groups;
   std::map<std::string, std::size_t> outside;
+  // Round GZ: an activity column of other values than text holds Python
+  // objects (xes_frame_activity.hpp); each row's label is str() of the first
+  // object equal to its own (groups in order, then the rows without a case).
+  std::optional<detail::XesFrameActivityColumn> typed;
+  std::vector<std::string> labels;
 
   const EventAttribute* cell(std::size_t row, std::size_t at) const {
     const auto& values = table->rows[row];
@@ -733,7 +740,28 @@ struct SkeletonFrame {
   }
 };
 
-void read_skeleton_frame(const EventDataView& data, const LogSkeletonOptions& options, SkeletonFrame& frame) {
+void type_skeleton_labels(SkeletonFrame& frame) {
+  const auto& cells = frame.typed->cells;
+  frame.labels.assign(cells.size(), std::string());
+  std::map<std::string, std::string> first;
+  const auto label = [&](std::size_t row) {
+    if (cells[row].missing) return;
+    const auto [it, added] = first.try_emplace(detail::xes_frame_activity_identity(cells[row]),
+                                               detail::xes_frame_activity_label(cells[row]));
+    frame.labels[row] = it->second;
+  };
+  std::vector<bool> seen(cells.size(), false);
+  for (const auto& group : frame.groups)
+    for (const auto row : group) {
+      seen[row] = true;
+      label(row);
+    }
+  for (std::size_t row = 0; row < cells.size(); ++row)
+    if (!seen[row]) label(row);
+}
+
+void read_skeleton_frame(const EventDataView& data, const LogSkeletonOptions& options, SkeletonFrame& frame,
+                         bool typed_labels = true) {
   validate_activity_key(options.activity_key);
   validate_case_selector_key(options.case_id_key);
   frame.polars = data.kind() == EventDataKind::kLazyEventTable;
@@ -759,6 +787,8 @@ void read_skeleton_frame(const EventDataView& data, const LogSkeletonOptions& op
   }
   frame.case_at = *column_of(case_key);
   frame.activity_at = *column_of(activity_key);
+  if (typed_labels) frame.typed = detail::xes_frame_activity_column(table, activity_key, frame.polars);
+  if (frame.typed && (!frame.typed->typed || frame.typed->cells.size() != table.rows.size())) frame.typed.reset();
   if (frame.polars) {
     std::map<std::optional<std::string>, std::size_t> index;
     for (std::size_t row = 0; row < table.rows.size(); ++row) {
@@ -769,6 +799,7 @@ void read_skeleton_frame(const EventDataView& data, const LogSkeletonOptions& op
       if (added) frame.groups.emplace_back();
       frame.groups[it->second].push_back(row);
     }
+    if (frame.typed) type_skeleton_labels(frame);
     return;
   }
   std::vector<std::vector<python::Scalar>> keys;
@@ -776,10 +807,17 @@ void read_skeleton_frame(const EventDataView& data, const LogSkeletonOptions& op
   for (std::size_t row = 0; row < table.rows.size(); ++row) {
     const auto* id = frame.cell(row, frame.case_at);
     keys.push_back({id ? python::from_attribute(*id) : python::real(std::numeric_limits<double>::quiet_NaN())});
-    if (!id)
-      if (const auto* activity = frame.cell(row, frame.activity_at)) ++frame.outside[activity->value];
   }
   for (auto& group : python::groupby(keys)) frame.groups.push_back(std::move(group.rows));
+  if (frame.typed) type_skeleton_labels(frame);
+  for (std::size_t row = 0; row < table.rows.size(); ++row) {
+    if (frame.cell(row, frame.case_at)) continue;
+    if (frame.typed) {
+      if (!frame.typed->cells[row].missing) ++frame.outside[frame.labels[row]];
+    } else if (const auto* activity = frame.cell(row, frame.activity_at)) {
+      ++frame.outside[activity->value];
+    }
+  }
 }
 
 // A case's activities: a missing one is None on Polars (with `null_labels`)
@@ -789,7 +827,19 @@ void skeleton_frame_sequence(const SkeletonFrame& frame, const std::vector<std::
                              std::vector<const std::string*>& sequence) {
   sequence.clear();
   for (const auto row : rows) {
-    const auto* activity = frame.cell(row, frame.activity_at);
+    if (frame.typed) {
+      // Round GZ: pandas' KeyError names the missing object (None, nan or
+      // NaT).
+      const auto& cell = frame.typed->cells[row];
+      if (!cell.missing) {
+        sequence.push_back(&frame.labels[row]);
+        continue;
+      }
+      if (!frame.polars)
+        throw std::invalid_argument(std::string("KeyError: ") +
+                                    (cell.nat ? "NaT" : cell.value.kind == python::Scalar::Kind::kNone ? "None" : "nan"));
+    }
+    const auto* activity = frame.typed ? nullptr : frame.cell(row, frame.activity_at);
     if (!activity) {
       if (!frame.polars) throw std::invalid_argument("KeyError: nan");
       if (null_labels) {
@@ -830,6 +880,58 @@ LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
   if (frame.polars) return discover_from_variants(variants.finish(), options);
   for (const auto& [name, count] : frame.outside) variants.add_name(name);
   return discover_from_variants(variants.finish(), options, &frame.outside, frame.table->rows.size());
+}
+
+LogSkeletonModel log_skeleton_xes_frame_texts(const EventDataView& data, const LogSkeletonOptions& options,
+                                              LogSkeletonModel model) {
+  if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable) return model;
+  SkeletonFrame frame;
+  try {
+    read_skeleton_frame(data, options, frame);
+  } catch (const std::exception&) {
+    return model;
+  }
+  if (!frame.typed) return model;
+  // The session log names each activity by its text: the frame mined on
+  // the texts (equal objects of distinct texts stay apart there).
+  try {
+    SkeletonFrame texts;
+    read_skeleton_frame(data, options, texts, false);
+    VariantCollector variants;
+    std::vector<const std::string*> sequence;
+    for (const auto& rows : texts.groups) {
+      skeleton_frame_sequence(texts, rows, options, true, sequence);
+      variants.add(sequence);
+    }
+    if (texts.polars) return discover_from_variants(variants.finish(), options);
+    for (const auto& [name, count] : texts.outside) variants.add_name(name);
+    return discover_from_variants(variants.finish(), options, &texts.outside, texts.table->rows.size());
+  } catch (const OperationCancelled&) {
+    throw;
+  } catch (const std::exception&) {
+  }
+  std::map<std::string, std::string> text_of;
+  for (std::size_t row = 0; row < frame.labels.size(); ++row) {
+    if (frame.typed->cells[row].missing) continue;
+    if (const auto* cell = frame.cell(row, frame.activity_at)) text_of.try_emplace(frame.labels[row], cell->value);
+  }
+  const auto rename = [&](std::string& label) {
+    if (const auto found = text_of.find(label); found != text_of.end()) label = found->second;
+  };
+  for (auto* pairs : {&model.equivalence, &model.always_after, &model.always_before, &model.never_together,
+                      &model.directly_follows})
+    for (auto& pair : *pairs) {
+      rename(pair.source);
+      rename(pair.target);
+    }
+  std::map<std::string, std::vector<std::size_t>> frequencies;
+  for (auto& [label, counts] : model.activ_freq) {
+    auto name = label;
+    rename(name);
+    frequencies.emplace(std::move(name), std::move(counts));
+  }
+  model.activ_freq = std::move(frequencies);
+  return model;
 }
 
 std::vector<std::size_t> log_skeleton_case_order(const EventDataView& data,

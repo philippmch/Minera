@@ -195,8 +195,20 @@ enumerate_alpha_plus_cleanup_alternatives(
 // rows without a case id leave pandas' groups, and on Polars form one case
 // whose first and last rows are boundary activities (its pairs never count).
 // Alpha+ (short_loops) stays on discover_petri_net.
+// Round GZ: an activity column of other values than text keys the model by
+// the Python objects (xes_frame_activity.hpp); the net keeps each value's
+// first row text as its activity (what the log replays) and `display`, when
+// given, receives the labels pm4py's net shows, one per net activity (empty
+// for a text column): str() of the first object its label set holds, a
+// pandas int64 column's directly-follows targets being floats (shift()).
+// pandas' sort of a level's values raises its TypeError; a dates column's
+// case without a date starts and ends with NaT. The activity key
+// start_timestamp names the timestamp column's copy pm4py adds when the
+// frame lacks one (pandas); Polars fails on the duplicate "_2" column when
+// the activity names the case, timestamp or start column.
 [[nodiscard]] PetriNet discover_petri_net_xes_frame(
-    const EventDataView& data, const AlphaMinerOptions& options = {});
+    const EventDataView& data, const AlphaMinerOptions& options = {},
+    std::vector<std::string>* display = nullptr);
 // pm4py's Alpha+ on the frame of an XES upload (round GA, observed
 // black-box): the frame converts to an event log, one trace per case value
 // in first-row order (the rows without a case id one trace), events in row

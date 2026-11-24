@@ -28,6 +28,7 @@
 #include "frame_times.hpp"
 #include "polars_sort.hpp"
 #include "xes_frame_checks.hpp"
+#include "xes_frame_activity.hpp"
 
 namespace minera {
 namespace {
@@ -1106,10 +1107,133 @@ TemporalProfile discover_temporal_profile(
   return discover_temporal_profile_table(polars_partial_order_table(table.materialize(), options), options, true);
 }
 
+// Round GZ (observed black-box): pm4py adds its start key's column (the
+// given key, else start_timestamp) as a copy of the timestamp column when
+// the frame lacks it, so an activity key naming it reads the timestamps.
+static std::string xes_frame_tp_activity_key(const EventDataView& data, const TemporalProfileOptions& options,
+                                      bool explicit_start_key) {
+  const auto timestamp = source_timestamp_key(options);
+  const std::string start = explicit_start_key
+                                ? configured_attribute(options.target_timestamp_attribute,
+                                                       options.target_start_timestamp_attribute)
+                                : std::string("start_timestamp");
+  if (options.activity_attribute == start && !start.empty() && !detail::xes_frame_has_column(data, start) &&
+      detail::xes_frame_has_column(data, timestamp))
+    return timestamp;
+  return options.activity_attribute;
+}
+
+TemporalProfile temporal_profile_xes_frame_labels(const EventDataView& data, const TemporalProfileOptions& options,
+                                                  bool explicit_start_key, TemporalProfile profile) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (!polars && data.kind() != EventDataKind::kEventTable) return profile;
+  const auto activity = xes_frame_tp_activity_key(data, options, explicit_start_key);
+  std::optional<EventTable> materialized, storage;
+  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  const auto column = detail::xes_frame_activity_column(table, activity, polars);
+  if (!column || !column->typed) return profile;
+  const auto at = static_cast<std::size_t>(std::find(table.columns.begin(), table.columns.end(), activity) -
+                                           table.columns.begin());
+  std::map<std::string, std::string> label_of;
+  for (std::size_t r = 0; r < table.rows.size() && r < column->cells.size(); ++r) {
+    const auto& row = table.rows[r];
+    if (column->cells[r].missing || at >= row.size() || !row[at]) continue;
+    label_of.try_emplace(row[at]->value, detail::xes_frame_activity_label(column->cells[r]));
+  }
+  for (auto& entry : profile.entries) {
+    if (const auto found = label_of.find(entry.source); found != label_of.end()) entry.source = found->second;
+    if (const auto found = label_of.find(entry.target); found != label_of.end()) entry.target = found->second;
+  }
+  return profile;
+}
+
+// Round GZ (observed black-box): pandas groups the event pairs by their
+// activities, factorizing each column with safe_sort: numbers and dates of
+// a typed column that do not order raise numpy's TypeError there. The pairs
+// hold the activities of the cases with two events or more.
+static void check_xes_frame_tp_groupby(const EventDataView& data, const TemporalProfileOptions& options) {
+  if (data.kind() != EventDataKind::kEventTable) return;
+  std::optional<EventTable> storage;
+  const auto& table = detail::xes_frame_present_columns(*data.table(), storage, false);
+  const auto column_at = [&](const std::string& name) -> std::optional<std::size_t> {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    if (found == table.columns.end()) return std::nullopt;
+    return static_cast<std::size_t>(found - table.columns.begin());
+  };
+  const auto case_at = column_at(options.case_id_attribute);
+  if (!case_at || !column_at(source_timestamp_key(options))) return;
+  const auto column = detail::xes_frame_activity_column(table, options.activity_attribute, false);
+  if (!column || !column->typed) return;
+  std::map<std::string, std::size_t> events;
+  for (const auto& row : table.rows)
+    if (*case_at < row.size() && row[*case_at] && !row[*case_at]->is_null) ++events[row[*case_at]->value];
+  std::vector<python::Scalar> uniques;
+  std::set<std::string> seen;
+  for (std::size_t r = 0; r < table.rows.size() && r < column->cells.size(); ++r) {
+    const auto& row = table.rows[r];
+    if (*case_at >= row.size() || !row[*case_at] || row[*case_at]->is_null || events[row[*case_at]->value] < 2) continue;
+    const auto& cell = column->cells[r];
+    if (cell.missing) continue;
+    if (seen.insert(detail::xes_frame_activity_identity(cell)).second) uniques.push_back(cell.value);
+  }
+  try {
+    (void)python::safe_sort_order(uniques);
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument("TypeError: " + detail::xes_frame_activity_type_error(*column, error.what()));
+  }
+}
+
+static TemporalProfile discover_temporal_profile_xes_frame_pairs(
+    const EventDataView& data, const TemporalProfileOptions& requested, bool explicit_start_key);
+
+// The groupby comes last: the frame's other errors (its columns, the pairs'
+// time comparisons) come first.
 TemporalProfile discover_temporal_profile_xes_frame(
+    const EventDataView& data, const TemporalProfileOptions& requested, bool explicit_start_key) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (!polars && data.kind() != EventDataKind::kEventTable)
+    return discover_temporal_profile_xes_frame_pairs(data, requested, explicit_start_key);
+  auto options = requested;
+  options.activity_attribute = xes_frame_tp_activity_key(data, options, explicit_start_key);
+  // Round GZ (observed black-box): pandas groups a typed column's equal
+  // objects as one activity (ints past 2**53 a float64 column holds as one
+  // float, 1 and True), Polars its equal values (an object column's copy
+  // holds str() of each): each row's text becomes its group's first text.
+  std::optional<EventTable> materialized, storage, merged;
+  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  if (const auto column = detail::xes_frame_activity_column(table, options.activity_attribute, polars);
+      column && column->typed) {
+    const auto at = static_cast<std::size_t>(
+        std::find(table.columns.begin(), table.columns.end(), options.activity_attribute) - table.columns.begin());
+    std::map<std::string, std::string> first_text;
+    for (std::size_t r = 0; r < table.rows.size() && r < column->cells.size(); ++r) {
+      const auto& row = table.rows[r];
+      if (column->cells[r].missing || at >= row.size() || !row[at]) continue;
+      const auto& cell = column->cells[r];
+      const auto key = polars && column->dtype == detail::XesFrameDtype::kObject
+                           ? "s" + detail::xes_frame_activity_label(cell)
+                           : detail::xes_frame_activity_identity(cell);
+      const auto& text = first_text.try_emplace(key, row[at]->value).first->second;
+      if (text == row[at]->value) continue;
+      if (!merged) merged = table;
+      merged->rows[r][at]->value = text;
+    }
+  }
+  std::optional<LazyEventTable> merged_lazy;
+  if (merged && polars) merged_lazy = LazyEventTable::from_table(*merged);
+  auto profile = discover_temporal_profile_xes_frame_pairs(
+      merged_lazy ? EventDataView(*merged_lazy) : merged ? EventDataView(*merged) : data, requested, explicit_start_key);
+  if (!polars) check_xes_frame_tp_groupby(data, options);
+  return profile;
+}
+
+static TemporalProfile discover_temporal_profile_xes_frame_pairs(
     const EventDataView& data, const TemporalProfileOptions& requested, bool explicit_start_key) {
   auto options = requested;
   if (data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable) {
+    options.activity_attribute = xes_frame_tp_activity_key(data, options, explicit_start_key);
     // A start key other than the timestamp is read as given (round GB); the
     // routes pass the timestamp when none is given. The timestamp given as
     // the start key reads the same in pandas, while Polars selects it once

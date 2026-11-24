@@ -8,6 +8,7 @@
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
 #include "xes_frame_typed.hpp"
+#include "xes_frame_activity.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -1387,9 +1388,32 @@ void check_pandas_declare_frame(const EventTable& source, std::string_view case_
       return python::compare(cases[a], cases[b]);
     });
   if (!discovery) return;
+  // Round GZ (observed black-box): an activity column of other values than
+  // text sorts its objects (a float64 column's NaN a float that orders
+  // with the rest; NaT apart): Python's TypeError where two do not order,
+  // the operands in the set's order, which the hash seed decides (declared,
+  // Minera sorts them in row order).
+  if (const auto typed = detail::xes_frame_activity_column(table, std::string(activity_name), false);
+      typed && typed->typed) {
+    std::vector<python::Scalar> distinct;
+    std::set<std::string> seen;
+    for (std::size_t r = 0; r < typed->cells.size(); ++r) {
+      const auto& cell = typed->cells[r];
+      if (cell.nat) continue;
+      const auto key = cell.missing && cell.value.kind != python::Scalar::Kind::kNone ? "nan#" + std::to_string(r)
+                                                                                     : python::identity(cell.value);
+      if (seen.insert(key).second) distinct.push_back(cell.value);
+    }
+    try {
+      python::sort(distinct, [](const python::Scalar& a, const python::Scalar& b) { return python::less(a, b); });
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument("TypeError: " + detail::xes_frame_activity_type_error(*typed, error.what()));
+    }
+    return;
+  }
   for (const auto& row : table.rows)
     if (!row[*activity_at] || row[*activity_at]->is_null)
-      throw python::TypeError("'<' not supported between instances of 'str' and 'float'");
+      throw std::invalid_argument("TypeError: '<' not supported between instances of 'str' and 'float'");
 }
 
 // A row without an activity as an event no rule names (conformance).

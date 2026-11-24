@@ -39489,3 +39489,68 @@ product than the DFG playout's (round GW's tolerance).
 | gxB, eventually-follows graph, keys none, X, start_timestamp (600) | 108 graphs and 452 errors equal | the same (40 declared GU1-2 runs) |
 
 Declared: none new.
+
+## Review GZ1-GZ6: activity keys over typed XES columns on the frame shapes (2026-11-24)
+
+Observed black-box against pm4py 2.7.22 (review harness round GZ:
+`ct/u64.py`, `tc/mkgz.py`), `/api/mine` keyed by a typed XES column (ints,
+ints past int64, floats, booleans, dates, a mix, gaps) on an XES upload's
+DataFrame and LazyFrame shapes against the algorithm applies on read_xes's
+frame and its Polars copy. Each cell is read as the Python object pm4py's
+frame holds (`xes_frame_activity.hpp`): its str() is the label, Python
+equality is the key (0, False and 0.0 one key; an int past 2**53 equals
+only the float that holds it exactly), the first object inserted names it.
+The session's nets, trees and models keep the XES texts the log replays;
+the family results show the typed labels.
+
+- **GZ1, Alpha (pandas)** groups the consecutive pairs of a case by their
+  objects, the target read after shift() (an int64 or uint64 column's ints
+  become floats there), and names each node str() of its first object. A
+  case without a named activity starts and ends with its gap: a NaN of its
+  own per case in a float64 column, NaT in a dates column, None in an
+  object column. Mixed objects raise the groupby sort's TypeError (an
+  object column's dates are datetime.datetime). Without a start key pandas
+  adds the frame's missing start_timestamp column as a copy of the
+  timestamp column, which the activity key start_timestamp reads. Polars:
+  an object column's copy holds str() of each value; an activity key equal
+  to the case, timestamp or start key is Polars' duplicate-column error.
+- **GZ2, Inductive** sorts the column's distinct objects (TypeError where
+  two do not order; Polars: None beside the typed value), and pm4py's fold
+  takes str() of the tree: a root leaf that is no str raises
+  `__str__ returned non-string (type T)`, any other tree `can only
+  concatenate str (not "T") to str` at its first such leaf. pandas' gaps
+  reach the miner as objects of their own. Polars object columns show
+  str() labels.
+- **GZ3, log skeleton**: typed labels; a pandas trace with a gap raises
+  `KeyError: NaT`, `None` or `nan` after its object. The session's model is
+  mined on the texts (the mine had failed with `log skeleton activity is
+  not registered: 0`).
+- **GZ4, temporal profile**: typed labels; equal objects are one activity
+  (pandas by Python equality, Polars by value, an object column by its
+  str()); pandas factorizes each activity column of the pairs with
+  safe_sort, so numbers and dates that do not order raise numpy's
+  TypeError, after the frame's other errors.
+- **GZ5, classic heuristics** (and Heuristics++ and transition systems,
+  which share the reader) read an activity column of ints past int64 typed
+  (uint64, float64 beside floats or gaps, object beside a negative int)
+  instead of its text: pm4py's subscript TypeError, float labels such as
+  9.223372036854776e+18; ties of ints past 2**53 compare exactly on every
+  platform.
+- **GZ6, Declare** sorts a typed column's objects (TypeError on mixed
+  objects; a float64 column's NaN orders with the rest), and the gap rule's
+  error carries its `TypeError:` prefix.
+
+Declared: the operands of these sort TypeErrors. pm4py sorts
+`set(activities)`, so they follow CPython's set iteration order (in 3.11
+hash(None) is the object's address; str and datetime hashes follow the hash
+seed); Minera sorts in row order and raises the same error class.
+Inductive's RecursionError on NaN or NaT leaves, and which of NaT or a
+Timestamp a tree with both shows first. A log skeleton over an object column
+where a bool equals an int (False and 0): pm4py's relation sets keep the
+equal object each relation inserted first, Minera the key's first row's.
+Carried: Declare's typed values, Heuristics++ keyed by a typed column.
+
+| bank (judgments) | before | after |
+|---|---|---|
+| gxB, pandas frame, 35 option sets (7,000) | 1,511 differing | 369 differing (Declare 240, Heuristics++ 69, Inductive operands 56 and 2 RecursionErrors, 2 temporal profile operands) |
+| gxB, Polars lazy frame, 35 option sets (7,000) | 903 differing | 74 differing (Heuristics++ 42, Inductive operands 16, Declare 16) |

@@ -80,10 +80,19 @@ void handle_active_source_mining(const httplib::Request& request,
                              : minera::discover_alpha_plus_result(data(), params.alpha);
       alpha = alpha_plus->net;
     }
-    else alpha = xes_frame ? minera::discover_petri_net_xes_frame(data(), params.alpha)
-                           : minera::discover_petri_net(data(), params.alpha);
+    // Round GZ: a typed activity column's labels as pm4py's net shows them
+    // (the session's net keeps each value's text for replay).
+    std::vector<std::string> alpha_display;
+    if (!params.alpha.short_loops)
+      alpha = xes_frame ? minera::discover_petri_net_xes_frame(data(), params.alpha, &alpha_display)
+                        : minera::discover_petri_net(data(), params.alpha);
     session->nets.emplace("alpha", *alpha);
     native_returned = true;
+    if (!alpha_plus && !alpha_display.empty()) {
+      auto shown = *alpha;
+      shown.set_activities(alpha_display);
+      return minera::workflow_input_petri_json(shown);
+    }
     return alpha_plus ? minera::alpha_plus_result_json(*alpha_plus) : minera::workflow_input_petri_json(*alpha);
   });
   run("alpha_log_preparation", selected, [&](bool& native_returned) {
@@ -112,10 +121,15 @@ void handle_active_source_mining(const httplib::Request& request,
     catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_petri_json",e.what(),true);throw;}
   });
   run("inductive", selected, [&](bool& native_returned) {
-    session->tree = xes_frame ? minera::discover_process_tree_xes_frame(data(), params.inductive)
+    std::vector<std::string> tree_display;
+    session->tree = xes_frame ? minera::discover_process_tree_xes_frame(data(), params.inductive, &tree_display)
                               : minera::discover_process_tree(data(), params.inductive);
     session->tree_ready = true;
     native_returned = true;
+    // Round GZ: the labels pm4py's Polars frame shows; the session's tree
+    // keeps the texts the log replays.
+    if (!tree_display.empty())
+      return minera::serialize_inductive_process_tree_json(minera::ProcessTree(tree_display, session->tree.root()));
     return minera::serialize_inductive_process_tree_json(session->tree);
   });
   run("inductive_log_preparation", selected, [&](bool& native_returned) {
@@ -160,13 +174,18 @@ void handle_active_source_mining(const httplib::Request& request,
                                          active_source_supplied(request, "temporal_target_timestamp_attribute") ||
                                              active_source_supplied(request, "temporal_target_start_timestamp_attribute"),
                                          &start_name, &timestamp_name);
-    temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options,
-                               active_source_supplied(request, "temporal_target_timestamp_attribute") ||
-                               active_source_supplied(request, "temporal_target_start_timestamp_attribute"))
+    const bool temporal_explicit_start =
+        active_source_supplied(request, "temporal_target_timestamp_attribute") ||
+        active_source_supplied(request, "temporal_target_start_timestamp_attribute");
+    temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options, temporal_explicit_start)
                : verdict == CsvFrameTpVerdict::kEmpty ? minera::TemporalProfile{}
                                                       : minera::discover_temporal_profile_named_start(
                                                             data(), temporal_options, start_name, timestamp_name);
     native_returned = true;
+    // Round GZ: a typed activity column's labels as pm4py's frame shows them.
+    if (xes_frame)
+      return minera::serialize_active_source_temporal_profile_json(
+          minera::temporal_profile_xes_frame_labels(data(), temporal_options, temporal_explicit_start, *temporal));
     return minera::serialize_active_source_temporal_profile_json(*temporal);
   });
   std::optional<minera::TransitionSystem> transition;
@@ -178,6 +197,9 @@ void handle_active_source_mining(const httplib::Request& request,
     return minera::serialize_active_source_transition_json(*transition);
   });
   std::optional<minera::LogSkeletonModel> skeleton;
+  // Round GZ: a typed activity column's model as pm4py labels it (the
+  // session's model names each activity by its text, as the log does).
+  std::optional<minera::LogSkeletonModel> skeleton_shown;
   std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance;
   // pm4py's DataFrame log skeleton and Declare meet an XES frame's cases in
   // case-id order and list their conformance in it (constraint_case_order).
@@ -188,25 +210,27 @@ void handle_active_source_mining(const httplib::Request& request,
   run("log_skeleton", selected, [&](bool& native_returned) {
     if (xes_frame) {
       // A Polars row without an activity is the label None (round FZ).
-      skeleton = minera::discover_log_skeleton_xes_frame(data(), params.log_skeleton, true);
+      skeleton_shown = minera::discover_log_skeleton_xes_frame(data(), params.log_skeleton, true);
+      skeleton = minera::log_skeleton_xes_frame_texts(data(), params.log_skeleton, *skeleton_shown);
     } else {
       const auto order = skeleton_order();
       skeleton = order ? minera::discover_log_skeleton(data(), params.log_skeleton, *order)
                        : minera::discover_log_skeleton(data(), params.log_skeleton);
     }
     native_returned = true;
-    return minera::serialize_active_source_skeleton_json(*skeleton);
+    return minera::serialize_active_source_skeleton_json(skeleton_shown ? *skeleton_shown : *skeleton);
   });
   if (skeleton) run("log_skeleton_conformance", selected, [&](bool& native_returned) {
     if (xes_frame) {
       // The cases of pm4py's groupby, in its order (round GA). The analysis
       // presentation keeps its one result per trace of the session log.
-      const auto frame = minera::check_log_skeleton_conformance_xes_frame(data(), *skeleton, params.log_skeleton);
+      const auto& shown = skeleton_shown ? *skeleton_shown : *skeleton;
+      const auto frame = minera::check_log_skeleton_conformance_xes_frame(data(), shown, params.log_skeleton);
       native_returned = true;
       try {skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);}
       catch (const minera::OperationCancelled&) {throw;}
       catch (const std::exception&) {}
-      return minera::serialize_active_source_skeleton_json(*skeleton, &frame);
+      return minera::serialize_active_source_skeleton_json(shown, &frame);
     }
     skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);
     native_returned = true;

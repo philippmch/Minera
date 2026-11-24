@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GY (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–GZ (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10277,6 +10277,79 @@ GY's suite: the full ctest 687 of 687 (34 minutes, -j2) and the new
 on GX's server binary), Python script tests 406 of 406, the 16 manifests replayed
 2,673 responses unchanged, no frontend change.
 Harness and probes: `review-harness/round-gy/`.
+
+Round GZ re-reviewed GY. GY's CI run 45415196193 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+GZ took GY's open activity keys (`ct/u64.py` on gxE and gxB, both frame
+shapes): the families keyed by a typed XES column now read it as read_xes
+types it and key their models by the Python objects (new
+`xes_frame_activity.hpp`: each cell's object, its str() label and its
+Python-equality identity, ints past int64 included). GZ1 Alpha (pandas):
+the consecutive pairs of a case are grouped by the objects, the targets
+after shift() (an int64 or uint64 column's ints become floats), labels str()
+of the first equal object, a case without a named activity starts and ends
+with its gap (float64: a NaN per case; dates NaT; object None), the groupby
+sort's TypeError on mixed objects (an object column's dates named
+datetime.datetime); without a start key pandas adds the frame's missing
+start_timestamp column as a copy of the timestamp column, which the activity
+key start_timestamp reads; Polars' object copy is str() of each value, and
+an activity key equal to the case, timestamp or start key is Polars'
+duplicate-column error. GZ2 Inductive: the distinct objects are sorted
+(TypeError; Polars None beside the typed value), str() of a tree with
+non-str leaves fails as pm4py's fold does (`__str__ returned non-string`
+for a root leaf, `can only concatenate str (not "T") to str` otherwise),
+pandas gaps reach the miner as objects of their own, Polars object columns
+show str() labels. GZ3 log skeleton: typed labels, pandas' `KeyError:
+NaT|None|nan`; the session's model is mined on the texts so its
+registration and replay keep the log's labels (the mine had failed with
+`log skeleton activity is not registered: 0`). GZ4 temporal profile: typed
+labels, equal objects one activity (pandas Python equality, ints past 2**53
+in a float64 column one float; Polars equal values, an object column's
+str()), pandas' groupby safe_sort TypeError after the frame's other errors.
+GZ5 classic heuristics (and Heuristics++, transition systems) read activity
+columns of ints past int64 typed instead of the text fallback (the
+subscript TypeError, float labels), ties compared exactly. GZ6 Declare: a
+typed column's objects are sorted (TypeError) and the gap rule carries its
+`TypeError:` prefix. The session nets, trees and models keep the XES texts
+the log replays; only the family JSON shows the typed labels. gxB, all 200
+uploads: pandas 1,511 non-equal judgments of 7,000 down to 369, Polars 903
+down to 74. Left on pandas: Declare's
+typed values (240 on gxB pandas), Heuristics++ activity keys (69),
+Inductive's sort operands (56) and RecursionErrors (2), two temporal
+profile operand orders. Found while probing: pm4py's Inductive sorts
+`set(activities)`, so a TypeError's operands follow CPython's set iteration
+(hash(None) is the object's address in 3.11, str and datetime hashes follow
+the hash seed): declared, Minera sorts in row order (same error class).
+GZ's suite: the full ctest 688 of 689 (39 minutes, -j2; the Declare unit
+test pinned the gap's message without its new `TypeError:` prefix, updated
+and passing on its own) and the new
+`minera_server_review_gz_tests` (194 checks, 147 of which fail on GY's
+server binary), Python script tests 406 of 406, the 16 manifests replayed
+2,673 responses unchanged, no frontend change.
+Harness and probes: `review-harness/round-gz/`.
+
+Next round (HA) should start by re-reviewing round GZ:
+
+- GZ's CI run;
+- Declare keyed by a typed XES column (`ct/u64.py` dc_aX, dc_ast): pm4py's
+  rule keys mix the column's objects with floats (`('1', '5.0')`), raise
+  `KeyError: ('precedence', 0, 1.8446744073709552e+19)` on ints past 2**53,
+  and keep one-element keys in binary families (`'True': (5, 4)`); Minera
+  answers with the texts, and on a float64 column with gaps it refuses
+  (`event activity selector is missing or null`) where pm4py answers;
+- Heuristics++ keyed by a typed column (hpp_aX, hpp_ast): float labels of
+  ints past int64 (`9.223372036854776e+18`), the abstraction's sort
+  TypeErrors and missing-value nodes;
+- the sort TypeErrors' operands (declared): emulating CPython's set order
+  for numbers and None would settle Polars' `'T' and 'NoneType'` cases, but
+  hash(None) is an address in 3.11, so it stays declared unless a cheaper
+  model appears; the log skeleton where a bool equals an int (declared:
+  pm4py's relation sets keep whichever equal object each inserted first);
+- the GU1-2 whole-mine failure (declared) and the GT2 and GT4 residuals
+  (declared) if a cheaper model appears;
+- the carried items below.
+
+Previous list for round GZ (kept for its older items):
 
 Next round (GZ) should start by re-reviewing round GY:
 

@@ -1113,9 +1113,10 @@ void pandas_frame_runs_the_algorithm_checks() {
       {{{c("a"), c("a")}, {c("b"), c("a")}, {c("c"), c("a")}, {c("d"), c("a")}, {none, c("a")}}, sf}};
   for (const auto& [rows, message] : cases)
     for (const bool discovery : {true, false}) assert(fw_declare_error(fw_pandas_frame(rows), discovery) == message);
-  // A missing activity: discovery raises, conformance reads an event no rule names.
+  // A missing activity: discovery raises (Python's TypeError, round GZ),
+  // conformance reads an event no rule names.
   const auto gap = fw_pandas_frame({{c("c1"), c("b")}, {c("c1"), none}, {c("c1"), c("c")}});
-  assert(fw_declare_error(gap, true) == sf);
+  assert(fw_declare_error(gap, true) == "TypeError: " + sf);
   DeclareModel model;
   model.rules[kDeclareChainResponse].push_back({"b", "c", true, 1, 1});
   model.rules[kDeclareChainPrecedence].push_back({"b", "c", true, 1, 1});

@@ -3912,7 +3912,9 @@ std::optional<FrameTypedActivities> frame_typed_activities(const EventTable& tab
                                                            bool force) {
   using detail::PlusCellKind;
   auto dtype = ClassicFrameDtype::kObject;
-  const auto cells = classic_frame_cells(table, column, false, &dtype, false);
+  // Round GZ: ints past int64 as read_xes types them (uint64 alone, float64
+  // beside floats or gaps, object beside a negative int).
+  const auto cells = classic_frame_cells(table, column, false, &dtype, true);
   if (!cells) return std::nullopt;
   const bool object = dtype == ClassicFrameDtype::kObject || dtype == ClassicFrameDtype::kNoneObject;
   const bool float64 = dtype == ClassicFrameDtype::kFloat || dtype == ClassicFrameDtype::kNaNFloat;
@@ -3963,22 +3965,31 @@ std::optional<FrameTypedActivities> frame_typed_activities(const EventTable& tab
         break;
       case PlusCellKind::kInt:
         value.type = "int";
-        set_number(static_cast<long double>(cell.micros), std::to_string(cell.micros));
+        if (!cell.text.empty()) {
+          // An int past int64 (its text): equal only to the float that
+          // holds it exactly.
+          const auto parsed = python::integer_literal(cell.text);
+          if (!parsed) return std::nullopt;
+          value.number = std::strtold(cell.text.c_str(), nullptr);
+          value.label = python::str(*parsed);
+          value.identity = "n" + python::identity(*parsed);
+        } else {
+          set_number(static_cast<long double>(cell.micros), std::to_string(cell.micros));
+          value.identity = "n" + python::identity(python::integer(cell.micros));
+        }
         break;
       case PlusCellKind::kFloat: {
         value.type = "float";
         value.number = cell.number;
         value.label = python::float_repr(cell.number);
-        value.identity = std::trunc(cell.number) == cell.number && std::fabs(cell.number) < 9.2e18
-                             ? "n" + std::to_string(static_cast<long long>(cell.number))
-                             : "f" + value.label;
+        value.identity = "n" + python::identity(python::real(cell.number));
         break;
       }
       case PlusCellKind::kBool:
         value.type = "bool";
         value.number = cell.micros ? 1.0L : 0.0L;
         value.label = cell.micros ? "True" : "False";
-        value.identity = cell.micros ? "n1" : "n0";
+        value.identity = "n" + python::identity(python::integer(cell.micros ? 1 : 0));
         break;
       case PlusCellKind::kTimestamp:
       case PlusCellKind::kDatetime:
@@ -4045,7 +4056,19 @@ std::optional<FrameTypedActivities> frame_typed_activities(const EventTable& tab
 bool frame_activity_less(const FrameActivityCell& a, const FrameActivityCell& b) {
   const auto number = [](const std::string& type) { return type == "int" || type == "float" || type == "bool"; };
   if (a.type == "str" && b.type == "str") return a.label < b.label;
-  if (number(a.type) && number(b.type)) return !a.nan && !b.nan && a.number < b.number;
+  if (number(a.type) && number(b.type)) {
+    if (a.nan || b.nan) return false;
+    if (a.number != b.number) return a.number < b.number;
+    // Equal as long double (a double on some platforms): ints past 2**53
+    // compare exactly, as Python does.
+    const auto exact = [](const FrameActivityCell& cell) -> std::optional<python::Scalar> {
+      if (cell.type == "int") return python::integer_literal(cell.label);
+      if (cell.type == "float") return python::real(static_cast<double>(cell.number));
+      return python::boolean(cell.number != 0);
+    };
+    const auto x = exact(a), y = exact(b);
+    return x && y && python::compare(*x, *y) < 0;
+  }
   const auto stamp = [](const std::string& type) { return type == "Timestamp" || type == "NaTType"; };
   if (stamp(a.type) && stamp(b.type)) return a.type == "Timestamp" && b.type == "Timestamp" && a.micros < b.micros;
   if (a.type == "datetime.datetime" && b.type == "datetime.datetime") return a.micros < b.micros;

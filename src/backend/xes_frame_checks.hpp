@@ -46,16 +46,22 @@ inline std::string polars_select_plan_missing_column(const std::string& missing,
                                                      const std::vector<std::string>& sort_by,
                                                      std::string_view failed_at,
                                                      const std::vector<std::string>& stack,
-                                                     bool aliased = true) {
+                                                     bool aliased = true, const std::string* head = nullptr) {
   const auto cols = [](const std::vector<std::string>& names) {
     std::string out = "[";
     for (std::size_t i = 0; i < names.size(); ++i) out += (i ? ", col(" : "col(") + polars_frame_quoted(names[i]) + ")";
     return out + "]";
   };
-  std::string message = "unable to find column " + polars_frame_quoted(missing) + "; valid columns: [";
-  for (std::size_t i = 0; i < selected.size(); ++i) message += (i ? ", " : "") + polars_frame_quoted(selected[i]);
-  message += "]";
-  if (const auto hint = polars_column_hint(missing, selected)) message += "\n\nDid you mean " + polars_frame_quoted(*hint) + "?";
+  std::string message;
+  if (head) {
+    message = *head;
+  } else {
+    message = "unable to find column " + polars_frame_quoted(missing) + "; valid columns: [";
+    for (std::size_t i = 0; i < selected.size(); ++i) message += (i ? ", " : "") + polars_frame_quoted(selected[i]);
+    message += "]";
+    if (const auto hint = polars_column_hint(missing, selected))
+      message += "\n\nDid you mean " + polars_frame_quoted(*hint) + "?";
+  }
   message += "\n\nResolved plan until failure:\n\n\t---> FAILED HERE RESOLVING '" + std::string(failed_at) + "' <---\n";
   std::size_t level = 0;
   const auto pad = [&](std::size_t at) { return std::string(2 * at, ' '); };
@@ -78,6 +84,14 @@ inline std::string polars_select_plan_missing_column(const std::string& missing,
   message += pad(level) + frame + "\n\nThis error occurred with the following context stack:\n";
   for (std::size_t i = 0; i < stack.size(); ++i) message += "\t[" + std::to_string(i + 1) + "] '" + stack[i] + "'\n";
   return message;
+}
+
+// The head of Polars' error for a with_columns expression naming an
+// existing column again.
+inline std::string polars_duplicate_column_head(const std::string& name) {
+  return "the name '" + name + "' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that multiple "
+         "expressions are returning the same default column name. If this is the case, try renaming the columns with "
+         "`.alias(\"new_name\")` to avoid duplicate column names.";
 }
 
 // The "DF [...]; PROJECT */n COLUMNS" node of a Polars plan over `columns`.
@@ -620,6 +634,15 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
         throw std::invalid_argument(polars_select_plan_missing_column(
             activity_key, table.columns, selected, timestamp_key, start_key, sort_by, "group_by",
             {"with_columns", "filter", "filter", "group_by"}, false));
+      // Round GZ: an activity naming the case, timestamp or start column
+      // gives the pairs' "_2" copy twice.
+      if (start_key != timestamp_key &&
+          (activity_key == case_key || activity_key == timestamp_key || activity_key == start_key)) {
+        const auto head = polars_duplicate_column_head(activity_key + "_2");
+        throw std::invalid_argument(polars_select_plan_missing_column(
+            activity_key, table.columns, selected, timestamp_key, start_key, sort_by, "group_by",
+            {"with_columns", "filter", "filter", "group_by"}, false, &head));
+      }
       if (start_key == timestamp_key)
         throw std::invalid_argument(
             "the name '" + timestamp_key + "_2' passed to `LazyFrame.with_columns` is duplicate\n\nIt's possible that "
@@ -685,6 +708,23 @@ inline void check_xes_frame_columns(const EventDataView& data, XesFrameFamily fa
     } else if (const auto typed = polars_typed_tp_error(table, timestamp_key, start_key, false, {})) {
       throw std::invalid_argument(*typed);
     }
+  }
+  // Round GZ: Polars' Alpha with the activity naming the case, timestamp
+  // or start column (the timestamp's alias when the frame lacks it) gives
+  // the pairs' "_2" copy twice.
+  if (polars && family == XesFrameFamily::kAlpha && !start_held && has(case_key) && has(timestamp_key) &&
+      (activity_key == case_key || activity_key == timestamp_key || activity_key == start_key)) {
+    const bool own_start_key = start_key == timestamp_key;
+    std::vector<std::string> selected;
+    for (const auto& column : table.columns)
+      if ((own_start_key || column != start_key) &&
+          (column == case_key || column == activity_key || column == timestamp_key))
+        selected.push_back(column);
+    if (!own_start_key) selected.push_back(start_key);
+    const auto head = polars_duplicate_column_head(activity_key + "_2");
+    throw std::invalid_argument(polars_select_plan_missing_column(
+        activity_key, table.columns, selected, timestamp_key, start_key, {case_key, start_key, timestamp_key},
+        "group_by", {"with_columns", "filter", "filter", "group_by"}, !own_start_key, &head));
   }
   if (has(case_key) && has(activity_key) && has(timestamp_key)) return;
   if (start_held && !polars) return;

@@ -14,6 +14,7 @@
 #include "alpha_python_nan.hpp"
 #include "frame_key_column.hpp"
 #include "xes_frame_typed.hpp"
+#include "xes_frame_activity.hpp"
 #include "polars_sort.hpp"
 #include "xes_frame_checks.hpp"
 
@@ -205,7 +206,8 @@ bool text_dtype(std::string_view dtype) {
 // pairs need a case id); a pair with a missing activity never counts.
 PetriNet discover_classic_table(const EventTable& table,
                                 const AlphaMinerOptions& options,
-                                bool polars = false, bool xes_frame = false) {
+                                bool polars = false, bool xes_frame = false,
+                                std::vector<std::string>* display = nullptr) {
   enforce_cap(table.size(), options);
   auto stream = table_stream(table);
   const std::string activity = options.activity_attribute.empty()
@@ -259,8 +261,21 @@ PetriNet discover_classic_table(const EventTable& table,
     std::optional<std::string> start_text;
     std::optional<std::string> completion_text;
     std::size_t start_rank = 0;
+    std::size_t index = 0;  // the frame row
   };
   std::vector<Row> rows;
+  // Round GZ: an activity column of other values than text, as the Python
+  // objects pandas or Polars holds (xes_frame_activity.hpp). Rows key their
+  // activity by the object's identity; the net names each identity by its
+  // first row's text.
+  std::optional<detail::XesFrameActivityColumn> typed_activity;
+  if (xes_frame) {
+    typed_activity = detail::xes_frame_activity_column(table, activity, polars);
+    if (typed_activity && (!typed_activity->typed || typed_activity->cells.size() != stream.events.size()))
+      typed_activity.reset();
+  }
+  std::map<std::string, std::string> typed_name;  // identity -> the net's activity
+  std::set<std::string> typed_names;
   const auto value = [](const EventAttribute* field) -> std::optional<std::string> {
     if (!field || field->is_null ||
         (field->first_class_role != FirstClassAttributeRole::kNone &&
@@ -305,8 +320,28 @@ PetriNet discover_classic_table(const EventTable& table,
     if (row.case_id)
       row.case_id = std::to_string(static_cast<int>(selected_case->kind)) +
                     ":" + *row.case_id;
+    row.index = rows.size();
     row.activity = value(select_field(record, activity,
         FirstClassAttributeRole::kActivity, false, true));
+    if (typed_activity) {
+      const auto& cell = typed_activity->cells[row.index];
+      if (cell.missing) {
+        row.activity.reset();
+      } else {
+        const auto identity = detail::xes_frame_activity_identity(cell);
+        auto [entry, added] = typed_name.try_emplace(identity);
+        if (added) {
+          // Two objects of one text (an int and a str "5") stay apart.
+          std::string name = row.activity ? *row.activity : detail::xes_frame_activity_label(cell);
+          if (!typed_names.insert(name).second) {
+            name += "\x1f" + identity;
+            typed_names.insert(name);
+          }
+          entry->second = std::move(name);
+        }
+        row.activity = identity;
+      }
+    }
     if (typed_order) {
       // The typed order decides; nothing to read.
     } else if (reads_time && explicit_frame_start) {
@@ -417,12 +452,64 @@ PetriNet discover_classic_table(const EventTable& table,
     rows = std::move(sorted_rows);
   }
   DfgFrequency graph;
-  for (std::size_t index = 1; index < rows.size(); ++index) {
-    const auto& previous = rows[index - 1];
-    const auto& current = rows[index];
-    if (previous.case_id && previous.case_id == current.case_id &&
-        previous.activity && current.activity)
-      ++graph[{*previous.activity, *current.activity}];
+  // Round GZ: the labels pm4py's net shows for a typed activity column
+  // (identity -> str() of the first object its label set holds).
+  std::map<std::string, std::string> shown;
+  if (typed_activity && !polars) {
+    // get_dfg_graph pairs each row with the next (shift(), which makes an
+    // int64 or uint64 column float64) where the case ids match, and groups
+    // the pairs by both activities (sorted, a missing one dropped); the
+    // label set takes each pair's source, then its target.
+    const auto& column = *typed_activity;
+    std::vector<std::vector<python::Scalar>> keys;
+    for (std::size_t index = 1; index < rows.size(); ++index) {
+      const auto& previous = rows[index - 1];
+      const auto& current = rows[index];
+      if (!previous.case_id || previous.case_id != current.case_id) continue;
+      keys.push_back({column.cells[previous.index].value,
+                      detail::xes_frame_activity_shifted(column, column.cells[current.index]).value});
+    }
+    std::vector<python::Group> groups;
+    try {
+      groups = python::groupby(keys);
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument("TypeError: " + detail::xes_frame_activity_type_error(column, error.what()));
+    }
+    for (const auto& group : groups) {
+      const auto source = python::identity(group.labels[0]);
+      const auto target = python::identity(group.labels[1]);
+      shown.try_emplace(source, python::str(group.labels[0]));
+      shown.try_emplace(target, python::str(group.labels[1]));
+      // A float target no int of the column equals (an int past 2**53)
+      // is an activity of its own.
+      auto [entry, added] = typed_name.try_emplace(target);
+      if (added) {
+        std::string name = python::str(group.labels[1]);
+        if (!typed_names.insert(name).second) {
+          name += "\x1f" + target;
+          typed_names.insert(name);
+        }
+        entry->second = std::move(name);
+      }
+      graph[{typed_name.at(source), typed_name.at(target)}] += group.rows.size();
+    }
+  } else {
+    for (std::size_t index = 1; index < rows.size(); ++index) {
+      const auto& previous = rows[index - 1];
+      const auto& current = rows[index];
+      if (previous.case_id && previous.case_id == current.case_id &&
+          previous.activity && current.activity) {
+        if (!typed_activity) {
+          ++graph[{*previous.activity, *current.activity}];
+          continue;
+        }
+        // Polars keeps each column's dtype: the labels are str() of the
+        // values.
+        for (const auto* row : {&previous, &current})
+          shown.try_emplace(*row->activity, detail::xes_frame_activity_label(typed_activity->cells[row->index]));
+        ++graph[{typed_name.at(*previous.activity), typed_name.at(*current.activity)}];
+      }
+    }
   }
   std::map<std::string, std::uint64_t> starts;
   std::map<std::string, std::uint64_t> ends;
@@ -433,12 +520,70 @@ PetriNet discover_classic_table(const EventTable& table,
   }
   if (!xes_frame) return discover_petri_net(graph, starts, ends, options);
   bool null_start = false, null_end = false;
+  // A case without an activity starts and ends with pandas' GroupBy.first
+  // and last of the column (round GZ, observed black-box): a dates column's
+  // NaT and an object column's None are one activity of their own, while a
+  // float64 column's NaN is a new object each time, so every such case adds
+  // a "nan" start and a "nan" end activity.
+  const auto typed_dtype = typed_activity ? typed_activity->dtype : detail::XesFrameDtype::kString;
+  const bool float_bounds = typed_activity && !polars &&
+                            (typed_dtype == detail::XesFrameDtype::kFloat || typed_dtype == detail::XesFrameDtype::kNaNFloat);
+  const bool nat_bounds = typed_activity && !polars &&
+                          (typed_dtype == detail::XesFrameDtype::kDatetime || typed_dtype == detail::XesFrameDtype::kObject ||
+                           typed_dtype == detail::XesFrameDtype::kNoneObject || float_bounds);
+  std::size_t float_bound_count = 0;
+  std::map<std::string, std::string> first_label;  // identity -> its first row's object
+  if (typed_activity)
+    for (const auto& row : rows)
+      if (row.activity)
+        first_label.try_emplace(*row.activity, detail::xes_frame_activity_label(typed_activity->cells[row.index]));
+  const auto bound = [&](const std::optional<std::string>& activity, std::map<std::string, std::uint64_t>& counts,
+                         bool& null_bound) {
+    if (!activity) {
+      if (!nat_bounds) {
+        null_bound = true;
+        return;
+      }
+      const std::string label = typed_dtype == detail::XesFrameDtype::kDatetime ? "NaT" : float_bounds ? "nan" : "None";
+      const std::string identity =
+          float_bounds ? "\x1fnan#" + std::to_string(float_bound_count++) : "\x1f" + label;
+      auto [entry, added] = typed_name.try_emplace(identity);
+      if (added) {
+        std::string name = label;
+        if (!typed_names.insert(name).second) {
+          name += identity;
+          typed_names.insert(name);
+        }
+        entry->second = std::move(name);
+      }
+      shown.try_emplace(identity, label);
+      ++counts[entry->second];
+      return;
+    }
+    if (!typed_activity) {
+      ++counts[*activity];
+      return;
+    }
+    shown.try_emplace(*activity, first_label.at(*activity));
+    ++counts[typed_name.at(*activity)];
+  };
   for (const auto& [case_id, bounds] : frame_ends) {
     (void)case_id;
-    if (bounds.first) ++starts[*bounds.first]; else null_start = true;
-    if (bounds.last) ++ends[*bounds.last]; else null_end = true;
+    bound(bounds.first, starts, null_start);
+    bound(bounds.last, ends, null_end);
   }
-  return discover_petri_net_with_null_endpoints(graph, starts, ends, null_start, null_end, options);
+  auto net = discover_petri_net_with_null_endpoints(graph, starts, ends, null_start, null_end, options);
+  if (display && typed_activity) {
+    std::map<std::string, std::string> by_name;
+    for (const auto& [identity, name] : typed_name)
+      if (const auto found = shown.find(identity); found != shown.end()) by_name.emplace(name, found->second);
+    display->clear();
+    for (const auto& name : net.activities()) {
+      const auto found = by_name.find(name);
+      display->push_back(found != by_name.end() ? found->second : name);
+    }
+  }
+  return net;
 }
 
 }  // namespace
@@ -573,14 +718,45 @@ AlphaPlusDiscoveryResult discover_alpha_plus_result_xes_frame(const EventDataVie
 }
 
 PetriNet discover_petri_net_xes_frame(const EventDataView& data,
-                                      const AlphaMinerOptions& given) {
+                                      const AlphaMinerOptions& given,
+                                      std::vector<std::string>* display) {
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (display) display->clear();
   if (given.short_loops || (!polars && data.kind() != EventDataKind::kEventTable))
     return discover_petri_net(data, given);
   // The frame's own start column when no start key is given (round GC).
   auto options = given;
-  if (options.start_timestamp_attribute.empty() && detail::xes_frame_has_column(data, "start_timestamp"))
+  const bool frame_start = detail::xes_frame_has_column(data, "start_timestamp");
+  if (options.start_timestamp_attribute.empty() && frame_start)
     options.start_timestamp_attribute = "start_timestamp";
+  // Round GZ (observed black-box): without a start key pandas adds the
+  // frame's missing start_timestamp column as a copy of the timestamp
+  // column, which the activity key start_timestamp then reads.
+  std::optional<EventTable> with_start;
+  if (!polars && given.start_timestamp_attribute.empty() && !frame_start &&
+      options.activity_attribute == "start_timestamp" && detail::xes_frame_has_column(data, options.timestamp_attribute)) {
+    std::optional<EventTable> present_storage;
+    const auto& present = detail::xes_frame_present_columns(*data.table(), present_storage, false);
+    with_start = present;
+    const auto at = static_cast<std::size_t>(
+        std::find(with_start->columns.begin(), with_start->columns.end(), options.timestamp_attribute) -
+        with_start->columns.begin());
+    with_start->columns.push_back("start_timestamp");
+    if (!with_start->dtypes.empty())
+      with_start->dtypes.push_back(at < with_start->dtypes.size() ? with_start->dtypes[at] : std::string());
+    if (!with_start->categorical_dtypes.empty()) with_start->categorical_dtypes.push_back(std::nullopt);
+    for (auto& row : with_start->rows) {
+      std::optional<EventAttribute> copy;
+      if (at < row.size() && row[at]) {
+        copy = *row[at];
+        copy->key = "start_timestamp";
+        copy->first_class_role = FirstClassAttributeRole::kNone;
+        copy->first_class_source_key.clear();
+      }
+      row.push_back(std::move(copy));
+    }
+    return discover_petri_net_xes_frame(EventDataView(*with_start), given, display);
+  }
   const std::string activity = options.activity_attribute.empty()
                                    ? "concept:name" : options.activity_attribute;
   const std::string start = options.start_timestamp_attribute.empty()
@@ -594,7 +770,7 @@ PetriNet discover_petri_net_xes_frame(const EventDataView& data,
       : data.table();
   std::optional<EventTable> storage;
   const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
-  return discover_classic_table(table, options, polars, true);
+  return discover_classic_table(table, options, polars, true, display);
 }
 PetriNet discover_petri_net(const EventTable& data,
                             const AlphaMinerOptions& options) {

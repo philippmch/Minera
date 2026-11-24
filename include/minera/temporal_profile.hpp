@@ -145,6 +145,16 @@ struct TemporalDeviation {
 [[nodiscard]] TemporalProfile discover_temporal_profile_xes_frame(
     const EventDataView& data, const TemporalProfileOptions& options = {}, bool explicit_start_key = false);
 
+// Round GZ (observed black-box): the profile of discover_temporal_profile_xes_frame
+// with its activities as pm4py's frame shows them, str() of the Python
+// objects an activity column of other values than text holds (an int of a
+// float64 column "5.0", a boolean "True", a date its Timestamp's str());
+// the activity key naming the start column pm4py adds as the timestamp's
+// copy reads the timestamps.
+[[nodiscard]] TemporalProfile temporal_profile_xes_frame_labels(const EventDataView& data,
+                                                                const TemporalProfileOptions& options,
+                                                                bool explicit_start_key, TemporalProfile profile);
+
 // Return only observations whose absolute z-score exceeds options.zeta, or
 // whose zero-variance profile disagrees with the observed duration.
 [[nodiscard]] std::vector<TemporalDeviation> check_temporal_profile_conformance(

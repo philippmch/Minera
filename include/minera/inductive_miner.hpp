@@ -145,8 +145,12 @@ using InductiveMinerVariantLog =
     const EventDataView& data,
     const InductiveMinerOptions& options = {});
 
+// Round GZ: display, when given, receives the tree's activity names as
+// pm4py's Polars frame shows them (an object column's copy holds str() of
+// each value: True, a date's str()); empty when they are the texts.
 [[nodiscard]] ProcessTree discover_process_tree_xes_frame(
     const EventDataView& data,
-    const InductiveMinerOptions& options = {});
+    const InductiveMinerOptions& options = {},
+    std::vector<std::string>* display = nullptr);
 
 }  // namespace minera

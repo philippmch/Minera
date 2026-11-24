@@ -2,6 +2,7 @@
 #include "minera/cancellation.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <array>
 #include <atomic>
 #include <bit>
@@ -30,6 +31,7 @@
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
 #include "xes_frame_typed.hpp"
+#include "xes_frame_activity.hpp"
 
 namespace minera {
 namespace inductive_detail {
@@ -2340,6 +2342,38 @@ void check_xes_frame_projection(const EventDataView& data, const InductiveMinerO
       }
     }
   }
+  // Round GZ (observed black-box): an activity column of other values than
+  // text sorts its distinct objects (Python's TypeError where two do not
+  // order; the operands follow the set's order, which the hash seed
+  // decides: declared, Minera sorts them in row order); Polars puts a
+  // missing value (None) before the typed one.
+  if (const auto typed = detail::xes_frame_activity_column(table, options.activity_key, polars);
+      typed && typed->typed) {
+    std::vector<python::Scalar> distinct;
+    std::set<std::string> seen;
+    std::optional<std::string> named_type;
+    bool gap = false;
+    for (std::size_t r = 0; r < typed->cells.size(); ++r) {
+      const auto& cell = typed->cells[r];
+      if (cell.nat) continue;
+      if (!cell.missing && !named_type) named_type = cell.type;
+      gap = gap || cell.missing;
+      const auto key = cell.missing && !polars ? "nan#" + std::to_string(r) : python::identity(cell.value);
+      if (seen.insert(key).second) distinct.push_back(cell.value);
+    }
+    if (polars) {
+      if (gap && named_type)
+        throw std::invalid_argument("TypeError: '<' not supported between instances of 'NoneType' and '" +
+                                    *named_type + "'");
+      return;
+    }
+    try {
+      python::sort(distinct, [](const python::Scalar& a, const python::Scalar& b) { return python::less(a, b); });
+    } catch (const python::TypeError& error) {
+      throw std::invalid_argument("TypeError: " + detail::xes_frame_activity_type_error(*typed, error.what()));
+    }
+    return;
+  }
   bool named_activity = false, missing_activity = false;
   for (const auto& row : table.rows) (missing(row, activity_at) ? missing_activity : named_activity) = true;
   if (named_activity && missing_activity)
@@ -2348,7 +2382,8 @@ void check_xes_frame_projection(const EventDataView& data, const InductiveMinerO
 }
 
 EventLog event_data_to_log(const EventDataView& data,
-                           const InductiveMinerOptions& options, bool xes_frame = false) {
+                           const InductiveMinerOptions& options, bool xes_frame = false,
+                           const std::vector<std::string>* gap_activities = nullptr) {
   const bool frame = data.kind() == EventDataKind::kEventTable || data.kind() == EventDataKind::kLazyEventTable;
   xes_frame = xes_frame && frame;
   if (xes_frame) check_xes_frame_projection(data, options);
@@ -2434,8 +2469,12 @@ EventLog event_data_to_log(const EventDataView& data,
       case_id = required_record_value(indexed.record, options.case_id_key, "case id", indexed.input_order);
       trace_key = case_id;
     }
-    const std::string activity = required_record_value(
-        indexed.record, options.activity_key, "activity", indexed.input_order);
+    // Round GZ: a gap of a typed pandas column is an object of its own.
+    const std::string activity =
+        gap_activities && indexed.input_order < gap_activities->size() &&
+                !(*gap_activities)[indexed.input_order].empty() && !present(indexed.record, options.activity_key)
+            ? (*gap_activities)[indexed.input_order]
+            : required_record_value(indexed.record, options.activity_key, "activity", indexed.input_order);
     if (time_codes || polars_typed) {
       // Only the codes order the case: the value is kept as it reads.
       if (const auto* field = present(indexed.record, options.timestamp_key)) timestamp = field->value;
@@ -2709,11 +2748,109 @@ EventLog prepare_inductive_event_log_xes_frame(const EventDataView& data,
   return event_data_to_log(data, options, true);
 }
 
+// Round GZ (observed black-box): pm4py folds the tree it discovered, which
+// takes str() of the tree: a leaf's label that is no str fails there (the
+// root leaf's __str__ returns it as it is; an operator's string concatenates
+// its children's labels, the first leaf in order failing). Each text of the
+// frame's activity column is the first object equal to its row's.
+static void check_xes_frame_tree_str(const EventDataView& data, const InductiveMinerOptions& options,
+                              const ProcessTree& tree, const std::map<std::string, std::string>& gap_types = {}) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  std::optional<EventTable> materialized, storage;
+  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  const auto typed = detail::xes_frame_activity_column(table, options.activity_key, polars);
+  if (!typed || !typed->typed) return;
+  const auto at = static_cast<std::size_t>(std::find(table.columns.begin(), table.columns.end(), options.activity_key) -
+                                           table.columns.begin());
+  std::map<std::string, std::string> first_type, type_of = gap_types;
+  for (std::size_t r = 0; r < table.rows.size() && r < typed->cells.size(); ++r) {
+    const auto& cell = typed->cells[r];
+    const auto& row = table.rows[r];
+    if (cell.missing || at >= row.size() || !row[at]) continue;
+    const auto [first, added] = first_type.try_emplace(detail::xes_frame_activity_identity(cell), cell.type);
+    (void)added;
+    type_of.try_emplace(row[at]->value, first->second);
+  }
+  const auto type = [&](std::size_t activity) -> std::string {
+    if (activity >= tree.activities().size()) return "str";
+    const auto found = type_of.find(tree.activities()[activity]);
+    return found == type_of.end() ? std::string("str") : found->second;
+  };
+  const auto& root = tree.root();
+  if (root.op == ProcessTreeOperator::kActivity) {
+    const auto name = type(root.activity);
+    if (name != "str") throw std::invalid_argument("TypeError: __str__ returned non-string (type " + name + ")");
+    return;
+  }
+  std::function<void(const ProcessTreeNode&)> visit = [&](const ProcessTreeNode& node) {
+    if (node.op == ProcessTreeOperator::kActivity) {
+      const auto name = type(node.activity);
+      if (name != "str")
+        throw std::invalid_argument("TypeError: can only concatenate str (not \"" + name + "\") to str");
+      return;
+    }
+    for (const auto& child : node.children) visit(child);
+  };
+  visit(root);
+}
+
 ProcessTree discover_process_tree_xes_frame(const EventDataView& data,
-                                            const InductiveMinerOptions& options) {
+                                            const InductiveMinerOptions& options,
+                                            std::vector<std::string>* display) {
   validate_options(options);
+  if (display) display->clear();
   if (data.kind() == EventDataKind::kEventLog) return discover_process_tree(data, options);
-  return discover_from_event_log(event_data_to_log(data, options, true), options);
+  std::vector<std::string> gap_activities;
+  std::map<std::string, std::string> gap_types;
+  if (data.kind() == EventDataKind::kEventTable) {
+    std::optional<EventTable> storage;
+    const auto& table = detail::xes_frame_present_columns(*data.table(), storage, false);
+    // Round GZ: a typed column's gaps reach the miner as objects (a
+    // float64 column's NaN each its own, numpy's one NaN of an object
+    // column, NaT, None), which then fail str() of the tree.
+    check_xes_frame_projection(data, options);
+    if (const auto typed = detail::xes_frame_activity_column(table, options.activity_key, false);
+        typed && typed->typed) {
+      for (std::size_t r = 0; r < typed->cells.size(); ++r) {
+        const auto& cell = typed->cells[r];
+        if (!cell.missing) continue;
+        gap_activities.resize(typed->cells.size());
+        if (cell.nat) gap_activities[r] = "\x1fNaT";
+        else if (cell.value.kind == python::Scalar::Kind::kNone) gap_activities[r] = "\x1fNone";
+        else if (typed->dtype == detail::XesFrameDtype::kFloat) gap_activities[r] = "\x1fnan#" + std::to_string(r);
+        else gap_activities[r] = "\x1fnan";
+        gap_types.emplace(gap_activities[r], cell.type);
+      }
+    }
+  }
+  auto tree = discover_from_event_log(
+      event_data_to_log(data, options, true, gap_activities.empty() ? nullptr : &gap_activities), options);
+  check_xes_frame_tree_str(data, options, tree, gap_types);
+  if (display && data.kind() == EventDataKind::kLazyEventTable) {
+    const auto whole = data.lazy_table()->materialize();
+    std::optional<EventTable> storage;
+    const auto& table = detail::xes_frame_present_columns(whole, storage, true);
+    const auto typed = detail::xes_frame_activity_column(table, options.activity_key, true);
+    const auto found = std::find(table.columns.begin(), table.columns.end(), options.activity_key);
+    if (typed && typed->dtype == detail::XesFrameDtype::kObject && found != table.columns.end()) {
+      const auto at = static_cast<std::size_t>(found - table.columns.begin());
+      std::map<std::string, std::string> label_of;
+      for (std::size_t r = 0; r < table.rows.size() && r < typed->cells.size(); ++r) {
+        const auto& row = table.rows[r];
+        if (typed->cells[r].missing || at >= row.size() || !row[at]) continue;
+        label_of.try_emplace(row[at]->value, detail::xes_frame_activity_label(typed->cells[r]));
+      }
+      bool renamed = false;
+      for (const auto& name : tree.activities()) {
+        const auto label = label_of.find(name);
+        display->push_back(label == label_of.end() ? name : label->second);
+        renamed = renamed || display->back() != name;
+      }
+      if (!renamed) display->clear();
+    }
+  }
+  return tree;
 }
 
 ProcessTree discover_process_tree(const InductiveMinerVariantLog& variants,

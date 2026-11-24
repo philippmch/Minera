@@ -93,6 +93,15 @@ struct LogSkeletonModel {
 // pm4py answers; without it such a row is refused.
 [[nodiscard]] LogSkeletonModel discover_log_skeleton_xes_frame(
     const EventDataView& data, const LogSkeletonOptions& options, bool null_labels = false);
+// Round GZ: an activity column of other values than text keys the model of
+// discover_log_skeleton_xes_frame by the Python objects and labels it with
+// str() of each (a boolean True, a date its Timestamp's str(); 0 and False
+// one activity, the first met naming it; pandas' KeyError names a missing
+// None, nan or NaT). This gives that model with each label's first row
+// text instead, as the session's log names the activities.
+[[nodiscard]] LogSkeletonModel log_skeleton_xes_frame_texts(const EventDataView& data,
+                                                            const LogSkeletonOptions& options,
+                                                            LogSkeletonModel model);
 
 // The model's name for a missing activity (Python's None): no XES or CSV
 // label holds a NUL character. The JSON shows it as null.
