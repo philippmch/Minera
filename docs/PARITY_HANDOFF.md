@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–GW (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–GX (2026-11-05 to 2026-11-24, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10179,6 +10179,74 @@ binary), Python script tests 406 of 406, the 16 manifests replayed 2,673
 responses unchanged, the frontend's tsc and the eventually-follows tests
 clean.
 Harness and probes: `review-harness/round-gw/`.
+
+Round GX re-reviewed GW. GW's CI run 45376350277 passed Linux, macOS (GV's
+playout check with its libm tolerance), Windows, the frontend, the Python
+scripts and the parity verifier. GX1, `/api/mine`'s eventually-follows graph
+with another timestamp key K (`eventually_follows_timestamp_attribute`) is
+now `discover_eventually_follows_graph(frame, timestamp_key=K)` on CSV and
+XES uploads (`frame_eventually_follows` in `minera_server.cpp`): the frame's
+check of K first (`not contained in the dataframe. Available columns:` with
+the sorted columns, `should be of time datetime` / Polars `of type datetime`,
+`should not contain any empty value.`), then the pairs i<j of a case kept
+where K of the earlier row is at most the later row's start (the frame's
+start_timestamp column, else K; CSV rows in @@index order, read_xes's frame
+sorted by case, start and K). The lazy shape follows Polars' copy: the whole
+copy sorted by case and K with Polars' unstable sort (`polars_sort.hpp`),
+every pair counted, and K = start_timestamp a DuplicateError plan error; the
+Polars default (time:timestamp) is that graph too, so its ties now follow
+Polars (93 of gxL's 200 lazy default graphs were wrong). The explicit
+DataFrame, LazyFrame and stream shapes (`active_source_mining.hpp`) now use
+the same frame graph and nest `eventually_follows_error` in their analysis
+(the frontend reads it there). gxE (400 uploads; K in X, start_timestamp,
+the CSV header, res, a missing key): default shape 273 graphs and 719
+errors equal (before 158 and 37), the explicit DataFrame and stream shapes
+273 and 717, the lazy shape 1,000 of 1,000 (217 graphs and every error
+wrong before); the remaining runs are 2 uploads whose whole mine fails
+(declared GU1-2). GX2, an explicit start key S
+(`eventually_follows_start_attribute`) keeps FT1-1's log variant on the
+frame's EventLog, now as Python runs it (`frame_interval_eventually_follows`):
+each trace sorted by S with CPython's list.sort (KeyError for an event
+without S), then event by event its completion (KeyError when missing, on
+the last event too) compared by `<=` with each later start, values as the
+frame's Python objects (Timestamp to the nanosecond, float/NaN, int, bool,
+str, NaT; datetime.datetime in an XES object column), cross-family compares
+raising TypeError; the lazy shape converts the Polars copy (datetime.datetime,
+None, str of an object column). Before, 582 of the GW banks' 1,040 runs and
+345 of gxE's 400 had Minera's own errors; now every start key (start_timestamp,
+X, time:timestamp, @@index, concept:name, case:concept:name, org:resource, a
+missing key) is equal on both shapes but GU1-2 and t72074. GX3, XES ints past
+INT64_MAX (within uint64) on these routes are typed as pandas types them
+(`xes_frame_cells(..., big_ints)`): uint64 alone, float64 beside floats or
+gaps, object beside a negative int; gxB (200 uploads) was 140 of 200 keyed
+runs wrong, now equal but GU1-2. Other routes keep their fallback on such
+columns (carried). Regressions: GW's `ct/efg.py` on gvP/gtP, gvX/guX,
+gvT/gtT, gvN/gvM and the lazy shape unchanged (t72074 declared).
+GX's suite: the full ctest 686 of 686 (33 minutes, -j2) plus the new
+`minera_server_review_gx_tests` (162 checks, 138 of which fail on GW's
+server binary: another timestamp key on three shapes, explicit start keys
+on the pandas and Polars logs, XES uint64 columns), Python script tests 406
+of 406, the 16 manifests replayed 2,673 responses unchanged, the frontend's
+tsc clean.
+Harness and probes: `review-harness/round-gx/`.
+
+Next round (GY) should start by re-reviewing round GX:
+
+- GX's CI run;
+- the routes besides the eventually-follows graph that still fall back on
+  an XES column of ints past int64 (the temporal profile, the frame DFG,
+  heuristics, Declare), and the whole-mine `'values' is not ordered`
+  failure on XES mixed-object columns (GU1-2), now the only difference left
+  in the eventually-follows sweeps;
+- the eventually-follows filter and any other route that reads pm4py's
+  frame partial order;
+- the libm-sensitive counts elsewhere (any ceil or floor of a probability
+  product next to an integer) on macOS and Windows;
+- the GT2 and GT4 residuals still open (Declare's separate NaN keys, the
+  transition system on a CSV log shape keyed by mixed objects);
+- the carried items below.
+
+Previous list for round GX (kept for its older items):
 
 Next round (GX) should start by re-reviewing round GW:
 

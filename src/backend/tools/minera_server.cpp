@@ -78,6 +78,8 @@
 #include "../gzip_codec.hpp"
 #include "../json_utf8.hpp"
 #include "../xes_frame_checks.hpp"
+#include "../polars_sort.hpp"
+#include "minera/dataframe_validation.hpp"
 #include "../frame_typed_activities.hpp"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
@@ -2242,26 +2244,272 @@ std::optional<minera::FrameDfgStartOrder> session_frame_dfg_order(const minera::
 // counted per activity pair. The pairs are measured as the temporal
 // profile measures them, with its errors (a numeric start column, text, the
 // first object cell that is no date); only two dates columns, or one kept
-// pair on read_xes's frame, give a graph. Polars' copy
-// (the lazy shape) ignores the column, and so do explicit start or
-// timestamp attributes (the native interval option): nullopt there, as for
-// a frame without the column.
+// pair on read_xes's frame, give a graph. An explicit start attribute keeps
+// the log variant on the frame's EventLog (round FT), modelled by
+// frame_interval_eventually_follows (round GX); nullopt for a pandas frame
+// without the column and the default keys.
+//
+// Another timestamp key K (`eventually_follows_timestamp_attribute`) is
+// discover_eventually_follows_graph(frame, timestamp_key=K) (round GX,
+// observed black-box): the frame's check of K first (a column of the frame,
+// else "not contained" with the sorted columns; datetime64, else "should be
+// of time datetime", Polars "of type datetime"; no gap, else "should not
+// contain any empty value"), then pairs i < j of a case, kept where K of the
+// earlier row is at most the later row's start. The pandas start is the
+// frame's start_timestamp column (a CSV's format_dataframe names it in its
+// attrs, read_xes's frame holds it), else K itself; a CSV frame keeps its
+// "@@index" order, read_xes's frame sorts by case, start and K. Polars'
+// copy ignores the start column: it sorts the whole copy by case and K
+// (Polars' unstable sort, polars_sort.hpp) and keeps every pair, and K =
+// start_timestamp beside the alias raises a DuplicateError. The Polars
+// default (K = time:timestamp) is the same graph over the timestamps.
 struct FrameEventuallyFollows {
   std::vector<minera::EventuallyFollowsEdge> edges;
   std::string error;
 };
 
+// pm4py's interval eventually-follows graph (an explicit start key S) on an
+// upload: the log variant on convert_to_event_log of the pandas frame (round
+// FT) as Python runs it (round GX, observed black-box): each trace's events
+// sorted by S with CPython's list.sort (every event's S read first, a
+// missing one raising KeyError), then event by event in that order its
+// completion T (time:timestamp, or the timestamp key; a missing one raises
+// KeyError, on the last event too) compared by `<=` with the start of each
+// later event, the pair counted where true. Each event holds every column of the
+// frame but the `case:` ones (a gap NaN, NaT in a date column) as a Python
+// object (Timestamp with its nanoseconds, float, int, bool, str; on an XES
+// frame's object column datetime.datetime too): NaN and NaT compare false,
+// kinds of different families raise TypeError. A CSV frame's traces and
+// rows follow "@@index" (format_dataframe sorts by case and timestamp),
+// read_xes's frame groups its rows by case in order of first appearance.
+// The lazy shape converts the Polars copy instead: its events hold
+// datetime.datetime (microseconds), int, float, bool and str (an object
+// column's str of each cell), None for every gap, its traces in order of
+// first appearance. nullopt where the frame's cells are not modelled.
+std::optional<FrameEventuallyFollows> frame_interval_eventually_follows(const minera::ActiveEventSource& source,
+                                                                        const minera::EventLog& log,
+                                                                        const minera::DirectlyFollowsGraph& graph,
+                                                                        const minera::EventuallyFollowsOptions& options,
+                                                                        bool polars) {
+  using minera::detail::PlusCell;
+  using Kind = minera::detail::PlusCellKind;
+  const auto& format = source.file().format;
+  const std::string& start_key = options.start_timestamp_attribute;
+  const std::string time_key =
+      options.timestamp_attribute.empty() || options.timestamp_attribute == "timestamp" ? std::string("time:timestamp")
+                                                                                        : options.timestamp_attribute;
+  // Each trace's events: (activity, S cell, T cell); a cell nullopt where
+  // the event lacks the key.
+  struct Row {
+    const std::string* activity = nullptr;
+    std::optional<PlusCell> start, completion;
+  };
+  std::vector<std::vector<Row>> traces;
+  const auto python_cell = [](const minera::EventAttribute& cell) {
+    PlusCell out;
+    if (cell.is_null) {
+      out.kind = Kind::kNone;
+    } else if (const auto* flag = std::get_if<bool>(&cell.typed_value)) {
+      out.kind = Kind::kBool;
+      out.micros = *flag ? 1 : 0;
+    } else if (const auto* integer = std::get_if<std::int64_t>(&cell.typed_value)) {
+      out.kind = Kind::kInt;
+      out.micros = *integer;
+    } else if (const auto* natural = std::get_if<std::uint64_t>(&cell.typed_value)) {
+      out.kind = Kind::kInt;
+      out.text = std::to_string(*natural);
+    } else if (const auto* number = std::get_if<double>(&cell.typed_value)) {
+      out.kind = std::isnan(*number) ? Kind::kNaN : Kind::kFloat;
+      out.number = *number;
+    } else if (cell.kind == minera::AttributeKind::kDate || std::holds_alternative<minera::NativeDate>(cell.typed_value)) {
+      const auto instant = cell.value == "NaT" ? std::nullopt : minera::parse_timestamp_exact(cell.value);
+      if (!instant) {
+        out.kind = Kind::kNaT;
+      } else {
+        out.kind = Kind::kTimestamp;
+        out.micros = instant->seconds * 1000000 + static_cast<std::int64_t>(instant->nanoseconds / 1000);
+        out.nanos = static_cast<std::int32_t>(instant->nanoseconds % 1000);
+      }
+    } else if (cell.kind == minera::AttributeKind::kInt) {
+      out.kind = Kind::kInt;
+      out.text = cell.value;
+    } else {
+      out.kind = Kind::kText;
+      out.text = cell.value;
+    }
+    return out;
+  };
+  // The Polars copy's Python object of a pandas cell (an object column's
+  // cells as their str).
+  const auto polars_cell = [&](PlusCell cell, bool object_column) {
+    if (!polars) return cell;
+    switch (cell.kind) {
+      case Kind::kNaT:
+      case Kind::kNaN:
+      case Kind::kNone: cell.kind = Kind::kNone; break;
+      case Kind::kTimestamp:
+        cell.kind = Kind::kDatetime;
+        cell.nanos = 0;
+        break;
+      case Kind::kInt:
+      case Kind::kBool:
+      case Kind::kFloat:
+        if (!object_column) break;
+        cell.text = cell.kind == Kind::kInt    ? minera::detail::plus_int_text(cell)
+                    : cell.kind == Kind::kBool ? std::string(cell.micros ? "True" : "False")
+                                               : minera::python::float_repr(cell.number);
+        cell.kind = Kind::kText;
+        break;
+      default: break;
+    }
+    return cell;
+  };
+  if (format == "csv") {
+    if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+    const auto& frame = *log.dataframe_columns;
+    const auto index_of = [](const std::vector<std::int64_t>& values, const minera::Event& event) {
+      return event.input_order < values.size() ? values[event.input_order] : static_cast<std::int64_t>(event.input_order);
+    };
+    const auto cell_of = [&](const minera::Event& event, const std::string& key) -> std::optional<PlusCell> {
+      if (key.starts_with("case:")) return std::nullopt;
+      PlusCell out;
+      if (key == "concept:name") {
+        out.kind = Kind::kText;
+        out.text = event.activity;
+        return out;
+      }
+      if (key == "@@index" || key == "@@case_index") {
+        out.kind = Kind::kInt;
+        out.micros = index_of(key == "@@index" ? frame.row_index : frame.case_index, event);
+        return out;
+      }
+      const auto object_column = [](const minera::DataFrameColumn& column) {
+        return column.type == minera::DataFrameColumnType::kObject ||
+               (column.type == minera::DataFrameColumnType::kBool && column.missing_cell);
+      };
+      for (const auto& column : frame.columns)
+        if (column.key == key) {
+          if (const auto cell = minera::dataframe_event_cell(frame, column, event))
+            return polars_cell(python_cell(*cell), object_column(column));
+          out.kind = column.type == minera::DataFrameColumnType::kDate ? Kind::kNaT : Kind::kNaN;
+          return polars_cell(out, false);
+        }
+      if (!event.activity_source_key.empty() && key == event.activity_source_key) {
+        minera::DataFrameColumn column;
+        column.key = key;
+        column.type = frame.activity_type;
+        return polars_cell(python_cell(minera::csv_dataframe_cell(column, event.activity)), object_column(column));
+      }
+      return std::nullopt;
+    };
+    std::vector<std::pair<std::int64_t, std::vector<std::pair<std::int64_t, Row>>>> ordered;
+    for (const auto& trace : log.traces) {
+      auto& rows = ordered.emplace_back(std::numeric_limits<std::int64_t>::max(),
+                                        std::vector<std::pair<std::int64_t, Row>>{}).second;
+      for (const auto& event : trace.events) {
+        const auto position = index_of(frame.row_index, event);
+        ordered.back().first = std::min(ordered.back().first, position);
+        rows.push_back({position, Row{&event.activity, cell_of(event, start_key), cell_of(event, time_key)}});
+      }
+      std::stable_sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    }
+    std::stable_sort(ordered.begin(), ordered.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    for (auto& [first, rows] : ordered) {
+      auto& out = traces.emplace_back();
+      for (auto& row : rows) out.push_back(std::move(row.second));
+    }
+  } else if (format == "xes") {
+    std::optional<minera::EventTable> storage;
+    const auto& table = minera::detail::xes_frame_present_columns(source.checked_table(), storage, polars);
+    const auto typed = [&](const std::string& key) -> std::optional<std::optional<minera::detail::XesTypedColumn>> {
+      if (key.starts_with("case:") ||
+          std::find(table.columns.begin(), table.columns.end(), key) == table.columns.end())
+        return std::optional<minera::detail::XesTypedColumn>{};
+      auto column = minera::detail::xes_typed_column(table, key, polars, true);
+      if (!column) return std::nullopt;
+      return column;
+    };
+    const auto starts = typed(start_key), completions = typed(time_key);
+    if (!starts || !completions) return std::nullopt;
+    const auto cases = minera::detail::xes_typed_column(table, "case:concept:name", polars);
+    if (!cases) return std::nullopt;
+    std::vector<const std::string*> activity(table.rows.size(), nullptr);
+    const auto& ordinals = source.representative_row_ordinals();
+    for (std::size_t t = 0; t < log.traces.size() && t < ordinals.size(); ++t)
+      for (std::size_t e = 0; e < log.traces[t].events.size() && e < ordinals[t].size(); ++e)
+        if (ordinals[t][e] && *ordinals[t][e] < activity.size()) activity[*ordinals[t][e]] = &log.traces[t].events[e].activity;
+    std::map<std::string, std::size_t> trace_of;
+    for (std::size_t r = 0; r < table.rows.size(); ++r) {
+      const auto& case_cell = cases->cells[r];
+      if (case_cell.kind != Kind::kText) return std::nullopt;
+      const auto [it, inserted] = trace_of.try_emplace(case_cell.text, traces.size());
+      if (inserted) traces.emplace_back();
+      Row row;
+      row.activity = activity[r];
+      if (*starts) row.start = (*starts)->cells[r];
+      if (*completions) row.completion = (*completions)->cells[r];
+      traces[it->second].push_back(std::move(row));
+    }
+  } else {
+    return std::nullopt;
+  }
+  // Python's `<` / `<=` (Timestamps to the nanosecond).
+  const auto compare = [](const PlusCell& a, const PlusCell& b, bool or_equal) {
+    if (minera::detail::plus_date_like(a.kind) && minera::detail::plus_date_like(b.kind)) {
+      const auto lhs = std::make_pair(a.micros, a.nanos), rhs = std::make_pair(b.micros, b.nanos);
+      return or_equal ? lhs <= rhs : lhs < rhs;
+    }
+    return minera::detail::plus_compare(a, b, or_equal);
+  };
+  const auto key_error = [](const std::string& key) {
+    return std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(key));
+  };
+  FrameEventuallyFollows result;
+  std::map<std::pair<std::string, std::string>, std::uint64_t> counts;
+  try {
+    for (auto& rows : traces) {
+      for (const auto& row : rows)
+        if (!row.start) throw key_error(start_key);
+      minera::detail::python_list_sort(rows, [&](const Row& a, const Row& b) { return compare(*a.start, *b.start, false); });
+      // Each event's completion is read before its later events (the last
+      // event's too).
+      for (std::size_t i = 0; i < rows.size(); ++i) {
+        if (!rows[i].completion) throw key_error(time_key);
+        for (std::size_t j = i + 1; j < rows.size(); ++j)
+          if (compare(*rows[i].completion, *rows[j].start, true) && rows[i].activity && rows[j].activity)
+            ++counts[{*rows[i].activity, *rows[j].activity}];
+      }
+    }
+  } catch (const minera::HeuristicPandasError& error) {
+    auto type = error.reference_type();
+    if (type.starts_with("builtins.")) type = type.substr(9);
+    result.error = type + ": " + error.what();
+    return result;
+  } catch (const std::invalid_argument& error) {
+    result.error = error.what();
+    return result;
+  }
+  std::map<std::pair<std::size_t, std::size_t>, std::uint64_t> by_id;
+  for (const auto& [pair, count] : counts) {
+    const auto from = graph.activity_id(pair.first), to = graph.activity_id(pair.second);
+    if (from && to) by_id[{*from, *to}] += count;
+  }
+  for (const auto& [ids, count] : by_id) result.edges.push_back({ids.first, ids.second, count});
+  return result;
+}
+
 std::optional<FrameEventuallyFollows> frame_eventually_follows(const minera::ActiveEventSource* source,
                                                                const minera::EventLog& log,
                                                                const minera::DirectlyFollowsGraph& graph,
                                                                const minera::EventuallyFollowsOptions& options) {
-  if (!source || polars_frame_source(source)) return std::nullopt;
+  if (!source) return std::nullopt;
+  const bool polars = polars_frame_source(source);
   const auto& format = source->file().format;
   if (format != "csv" && format != "xes") return std::nullopt;
-  if (!options.start_timestamp_attribute.empty()) return std::nullopt;
-  if (!options.timestamp_attribute.empty() && options.timestamp_attribute != "timestamp" &&
-      options.timestamp_attribute != "time:timestamp")
-    return std::nullopt;
+  if (!options.start_timestamp_attribute.empty())
+    return frame_interval_eventually_follows(*source, log, graph, options, polars);
+  const auto& key = options.timestamp_attribute;
+  const bool keyed = !key.empty() && key != "timestamp" && key != "time:timestamp";
   std::map<std::pair<std::string, std::string>, std::uint64_t> counts;
   FrameEventuallyFollows result;
   const auto finish = [&]() {
@@ -2273,19 +2521,125 @@ std::optional<FrameEventuallyFollows> frame_eventually_follows(const minera::Act
     for (const auto& [ids, count] : by_id) result.edges.push_back({ids.first, ids.second, count});
     return result;
   };
+  // check_pandas_dataframe_columns' verdict on K.
+  const auto check_key = [&](const std::vector<std::string>& columns, bool present, bool datetime, bool gap) {
+    if (!present)
+      throw std::invalid_argument("the specified timestamp column is not contained in the dataframe. Available columns: " +
+                                  minera::dataframe_available_columns(columns));
+    if (!datetime)
+      throw std::invalid_argument(std::string("the timestamp column should be of ") + (polars ? "type" : "time") +
+                                  " datetime. Use the function pandas.to_datetime");
+    if (gap) throw std::invalid_argument("the timestamp column should not contain any empty value.");
+  };
+  const auto earlier_or_equal = [](const minera::ParsedExactTimestamp& a, const minera::ParsedExactTimestamp& b) {
+    return a.seconds != b.seconds ? a.seconds < b.seconds : a.nanoseconds <= b.nanoseconds;
+  };
+  // Polars' sort of the copy's rows (frame order) by case and K; every
+  // pair of a case in that order counts.
+  struct PolarsRow {
+    const std::string* case_id;
+    const std::string* activity;
+    minera::ParsedExactTimestamp instant;
+  };
+  const auto polars_pairs = [&](std::vector<PolarsRow> rows) {
+    minera::polars_sort::sort_unstable(rows, [](const PolarsRow& lhs, const PolarsRow& rhs) {
+      if (*lhs.case_id != *rhs.case_id) return *lhs.case_id < *rhs.case_id;
+      return std::tie(lhs.instant.seconds, lhs.instant.nanoseconds) <
+             std::tie(rhs.instant.seconds, rhs.instant.nanoseconds);
+    });
+    for (std::size_t begin = 0; begin < rows.size();) {
+      std::size_t end = begin;
+      while (end < rows.size() && *rows[end].case_id == *rows[begin].case_id) ++end;
+      for (std::size_t j = begin + 1; j < end; ++j)
+        for (std::size_t i = begin; i < j; ++i)
+          if (rows[i].activity && rows[j].activity) ++counts[{*rows[i].activity, *rows[j].activity}];
+      begin = end;
+    }
+  };
+  // Polars' plan error for K = start_timestamp beside the start alias.
+  const auto duplicate_start = [](const std::vector<std::string>& columns) {
+    return std::invalid_argument(
+        "projections contained duplicate output name 'start_timestamp'. It's possible that multiple expressions are "
+        "returning the same default column name. If this is the case, try renaming the columns with "
+        "`.alias(\"new_name\")` to avoid duplicate column names.\n\nResolved plan until failure:\n\n\t---> FAILED "
+        "HERE RESOLVING 'group_by' <---\n WITH_COLUMNS:\n [col(\"start_timestamp\")] \n  " +
+        minera::detail::polars_df_node(columns) +
+        "\n\nThis error occurred with the following context stack:\n\t[1] 'select'\n\t[2] 'select'\n\t[3] "
+        "row_index\n\t[4] 'join left'\n\t[5] 'join'\n\t[6] 'filter'\n\t[7] 'with_columns'\n\t[8] 'group_by'\n");
+  };
+  // The copy's rows in frame order (a CSV frame's "@@index").
+  const auto frame_ordered = [&](std::vector<std::pair<std::int64_t, PolarsRow>> rows) {
+    std::stable_sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    std::vector<PolarsRow> out;
+    out.reserve(rows.size());
+    for (auto& row : rows) out.push_back(row.second);
+    return out;
+  };
   try {
     if (format == "csv") {
       if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
       const auto& frame = *log.dataframe_columns;
+      const auto row_position = [&](const minera::Event& event) {
+        return event.input_order < frame.row_index.size() ? frame.row_index[event.input_order]
+                                                          : static_cast<std::int64_t>(event.input_order);
+      };
+      if (polars && !keyed) {
+        // The default over each event's timestamp; an untimed event keeps
+        // the log graph.
+        std::vector<std::pair<std::int64_t, PolarsRow>> rows;
+        for (const auto& trace : log.traces)
+          for (const auto& event : trace.events) {
+            const auto instant = minera::parse_timestamp_exact(event.timestamp);
+            if (!instant) return std::nullopt;
+            rows.push_back({row_position(event), PolarsRow{&trace.case_id, &event.activity, *instant}});
+          }
+        polars_pairs(frame_ordered(std::move(rows)));
+        return finish();
+      }
       const minera::DataFrameColumn* start = nullptr;
+      const minera::DataFrameColumn* key_column = nullptr;
       bool nanoseconds = false;
       for (const auto& entry : frame.columns) {
         if (entry.key == "start_timestamp" && entry.role == minera::FirstClassAttributeRole::kNone) start = &entry;
         if (entry.role == minera::FirstClassAttributeRole::kTimestamp) nanoseconds = nanoseconds || entry.nanoseconds;
+        if (keyed && entry.key == key) key_column = &entry;
       }
-      if (!start) return std::nullopt;
+      // K's cell of an event: the timestamp column's own instant, else the
+      // CSV text of a date column (nullopt for a gap).
+      const bool key_timestamps = key_column && key_column->role == minera::FirstClassAttributeRole::kTimestamp;
+      const auto key_cell = [&](const minera::Event& event) -> std::optional<minera::ParsedExactTimestamp> {
+        if (!keyed || key_timestamps) return minera::parse_timestamp_exact(event.timestamp);
+        for (auto it = event.attributes.rbegin(); it != event.attributes.rend(); ++it)
+          if (it->key == key) {
+            if (it->is_null || it->value.empty()) return std::nullopt;
+            return minera::parse_timestamp_exact(it->value);
+          }
+        return std::nullopt;
+      };
+      if (keyed) {
+        if (frame.order.empty()) return std::nullopt;
+        const bool present = std::find(frame.order.begin(), frame.order.end(), key) != frame.order.end();
+        const bool datetime =
+            key_column && (key_timestamps || key_column->type == minera::DataFrameColumnType::kDate);
+        bool gap = false;
+        if (present && datetime)
+          for (const auto& trace : log.traces)
+            for (const auto& event : trace.events) gap = gap || !key_cell(event);
+        check_key(frame.order, present, datetime, gap);
+        nanoseconds = key_column->nanoseconds;
+        if (polars) {
+          if (key == "start_timestamp") throw duplicate_start(frame.order);
+          std::vector<std::pair<std::int64_t, PolarsRow>> rows;
+          for (const auto& trace : log.traces)
+            for (const auto& event : trace.events)
+              rows.push_back({row_position(event), PolarsRow{&trace.case_id, &event.activity, *key_cell(event)}});
+          polars_pairs(frame_ordered(std::move(rows)));
+          return finish();
+        }
+      }
+      if (!start && !keyed) return std::nullopt;
       const std::string dtype = std::string("datetime64[") + (nanoseconds ? "ns" : "us") + ", UTC]";
-      // Each case's rows in "@@index" order: (activity, timestamp, start cell).
+      // Each case's rows in "@@index" order: (activity, K, start cell).
       struct Row {
         const std::string* activity;
         std::optional<minera::ParsedExactTimestamp> timestamp;
@@ -2302,15 +2656,12 @@ std::optional<FrameEventuallyFollows> frame_eventually_follows(const minera::Act
           const auto index = event.input_order < frame.row_index.size()
                                  ? frame.row_index[event.input_order]
                                  : static_cast<std::int64_t>(event.input_order);
-          rows.push_back({index, Row{&event.activity, minera::parse_timestamp_exact(event.timestamp), cell}});
+          rows.push_back({index, Row{&event.activity, key_cell(event), cell}});
         }
         std::stable_sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
         auto& out = cases.emplace_back();
         for (auto& row : rows) out.push_back(row.second);
       }
-      const auto earlier_or_equal = [](const minera::ParsedExactTimestamp& a, const minera::ParsedExactTimestamp& b) {
-        return a.seconds != b.seconds ? a.seconds < b.seconds : a.nanoseconds <= b.nanoseconds;
-      };
       const auto keep_pairs = [&](const std::function<std::optional<minera::ParsedExactTimestamp>(const Row&)>& later_start) {
         for (const auto& rows : cases)
           for (std::size_t j = 1; j < rows.size(); ++j) {
@@ -2321,6 +2672,11 @@ std::optional<FrameEventuallyFollows> frame_eventually_follows(const minera::Act
                 ++counts[{*rows[i].activity, *rows[j].activity}];
           }
       };
+      if (!start) {
+        // K is its own start.
+        keep_pairs([](const Row& row) { return row.timestamp; });
+        return finish();
+      }
       const bool object_bools = start->type == minera::DataFrameColumnType::kBool && start->missing_cell;
       const auto any_later_start = [&]() {
         for (const auto& rows : cases)
@@ -2357,17 +2713,59 @@ std::optional<FrameEventuallyFollows> frame_eventually_follows(const minera::Act
           throw std::invalid_argument("TypeError: Invalid comparison between dtype=" + dtype + " and ndarray");
       }
     }
-    // read_xes's frame.
+    // read_xes's frame (Polars' copy on the lazy shape).
     std::optional<minera::EventTable> storage;
-    const auto& table = minera::detail::xes_frame_present_columns(source->checked_table(), storage, false);
+    const auto& table = minera::detail::xes_frame_present_columns(source->checked_table(), storage, polars);
     const auto has = [&](const std::string& name) {
       return std::find(table.columns.begin(), table.columns.end(), name) != table.columns.end();
     };
-    if (!has("start_timestamp") || !has("case:concept:name") || !has("time:timestamp")) return std::nullopt;
-    const auto cases = minera::detail::xes_typed_column(table, "case:concept:name");
-    const auto times = minera::detail::xes_typed_column(table, "time:timestamp");
-    const auto starts = minera::detail::xes_typed_column(table, "start_timestamp");
-    if (!cases || !times || !starts) return std::nullopt;
+    const std::string time_key = keyed ? key : std::string("time:timestamp");
+    std::optional<minera::detail::XesTypedColumn> times;
+    if (has(time_key)) {
+      times = minera::detail::xes_typed_column(table, time_key, polars, true);
+      if (!times) return std::nullopt;
+    }
+    const bool datetime = times && times->dtype == minera::detail::XesFrameDtype::kDatetime;
+    bool gap = false;
+    if (datetime)
+      for (const auto& cell : times->cells) gap = gap || minera::detail::xes_cell_null(cell);
+    if (keyed) check_key(table.columns, times.has_value(), datetime, gap);
+    else if (!times || (polars && (!datetime || gap))) return std::nullopt;
+    if (!has("case:concept:name")) return std::nullopt;
+    const auto cases = minera::detail::xes_typed_column(table, "case:concept:name", polars);
+    if (!cases) return std::nullopt;
+    // The table's rows as the log's events (activities by the log's names).
+    std::vector<const std::string*> activity(table.rows.size(), nullptr);
+    {
+      const auto& rows = source->representative_row_ordinals();
+      for (std::size_t t = 0; t < log.traces.size() && t < rows.size(); ++t)
+        for (std::size_t e = 0; e < log.traces[t].events.size() && e < rows[t].size(); ++e)
+          if (rows[t][e] && *rows[t][e] < activity.size()) activity[*rows[t][e]] = &log.traces[t].events[e].activity;
+    }
+    if (polars) {
+      if (keyed && key == "start_timestamp") throw duplicate_start(table.columns);
+      static const std::string no_case;
+      std::vector<std::pair<std::int64_t, PolarsRow>> rows;
+      for (std::size_t r = 0; r < table.rows.size(); ++r) {
+        const auto& cell = times->cells[r];
+        minera::ParsedExactTimestamp instant;
+        instant.seconds = cell.micros >= 0 ? cell.micros / 1000000 : -((-cell.micros + 999999) / 1000000);
+        instant.nanoseconds = static_cast<std::uint32_t>((cell.micros - instant.seconds * 1000000) * 1000 + cell.nanos);
+        const auto& case_cell = cases->cells[r];
+        rows.push_back({static_cast<std::int64_t>(r),
+                        PolarsRow{minera::detail::xes_cell_null(case_cell) ? &no_case : &case_cell.text, activity[r],
+                                  instant}});
+      }
+      polars_pairs(frame_ordered(std::move(rows)));
+      return finish();
+    }
+    if (!keyed && !has("start_timestamp")) return std::nullopt;
+    std::optional<minera::detail::XesTypedColumn> start_storage;
+    if (has("start_timestamp")) {
+      start_storage = minera::detail::xes_typed_column(table, "start_timestamp", false, true);
+      if (!start_storage) return std::nullopt;
+    }
+    const auto& starts = start_storage ? start_storage : times;
     const auto dtype_name = [&](const std::string& name, const minera::detail::XesTypedColumn& column) {
       for (std::size_t i = 0; i < table.columns.size() && i < table.dtypes.size(); ++i)
         if (table.columns[i] == name && !table.dtypes[i].empty()) return table.dtypes[i];
@@ -2382,15 +2780,10 @@ std::optional<FrameEventuallyFollows> frame_eventually_follows(const minera::Act
         default: return std::string("object");
       }
     };
-    // The table's rows as the log's events (activities by the log's names).
-    std::vector<const std::string*> activity(table.rows.size(), nullptr);
-    const auto& rows = source->representative_row_ordinals();
-    for (std::size_t t = 0; t < log.traces.size() && t < rows.size(); ++t)
-      for (std::size_t e = 0; e < log.traces[t].events.size() && e < rows[t].size(); ++e)
-        if (rows[t][e] && *rows[t][e] < activity.size()) activity[*rows[t][e]] = &log.traces[t].events[e].activity;
     std::vector<std::pair<std::size_t, std::size_t>> kept;
-    const auto verdict = minera::detail::xes_pandas_tp(*cases, *times, *starts, dtype_name("time:timestamp", *times),
-                                                       dtype_name("start_timestamp", *starts), nullptr, &kept);
+    const auto verdict = minera::detail::xes_pandas_tp(*cases, *times, *starts, dtype_name(time_key, *times),
+                                                       dtype_name(start_storage ? "start_timestamp" : time_key, *starts),
+                                                       nullptr, &kept);
     // One kept pair is measured as a scalar (the profile's kSingle).
     if (verdict.kind == minera::detail::XesPandasTpVerdict::Kind::kSingle) kept = {{verdict.earlier, verdict.later}};
     for (const auto& [i, j] : kept)

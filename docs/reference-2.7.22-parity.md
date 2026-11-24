@@ -39379,3 +39379,70 @@ the key, 1 and 1.0; another timestamp key on CSV uploads' three shapes)
 carries the reference values. The full ctest passed 675 of 675 (38
 minutes, -j2) on the first run. The fixture replay left all 2,673
 responses unchanged; the Python script tests passed 406 of 406.
+
+## Review GX1: the eventually-follows graph of an upload with another timestamp key, an explicit start key or ints past int64 (2026-11-24)
+
+`/api/mine`'s eventually-follows graph on a CSV or XES upload kept Minera's
+log reading whenever `eventually_follows_timestamp_attribute` or
+`eventually_follows_start_attribute` was set, and on XES frames whose typed
+column could not be built. Observed black-box against pm4py 2.7.22 (review
+harness round GX: `ct/efg2.py`, `tc/mkgx.py`):
+
+- **Another timestamp key K** is
+  `discover_eventually_follows_graph(frame, timestamp_key=K)`. The frame's
+  check of K comes first: a column of the frame, else `the specified
+  timestamp column is not contained in the dataframe. Available columns:`
+  with the sorted columns; datetime64, else `the timestamp column should be
+  of time datetime. Use the function pandas.to_datetime` (Polars: `of type
+  datetime`); no gap, else `the timestamp column should not contain any
+  empty value.` Then the pairs i < j of a case are kept where K of the
+  earlier row is at most the later row's start. The pandas start is the
+  frame's start_timestamp column (a CSV's format_dataframe names it, read_xes's
+  frame holds it), else K itself; a CSV frame keeps its "@@index" order,
+  read_xes's frame is sorted by case, start and K. Polars' copy ignores the
+  start column: it sorts the whole copy by case and K with Polars' unstable
+  sort and keeps every pair, and K = start_timestamp beside the alias raises
+  a DuplicateError plan error. The Polars default (time:timestamp) is the
+  same graph over the timestamps, so ties now follow Polars' sort too (the
+  GW binary had 93 of 200 lazy default graphs wrong on gxL).
+- **An explicit start key S** keeps the log variant on the frame's EventLog
+  (FT1-1), now as Python runs it: each trace's events are sorted by S with
+  CPython's list.sort (every event's S read first: KeyError for an event
+  without it), then event by event in that order its completion T (the
+  timestamp key, else time:timestamp; KeyError when missing, on the last
+  event too) is compared by `<=` with the start of each later event, the
+  pair counted where true. Each event holds every column of the frame but
+  the `case:` ones, a gap as NaN (NaT in a date column), the values as
+  Python objects: Timestamp (to the nanosecond), float, int, bool, str, and
+  datetime.datetime in an XES frame's object column. NaN and NaT compare
+  false; kinds of different families raise `TypeError: '<' not supported
+  between instances of 'A' and 'B'` (sorting) or `'<='` (pairs). CSV traces
+  and rows follow "@@index" (format_dataframe sorts by case and timestamp);
+  read_xes's frame groups its rows by case in order of first appearance.
+  The lazy shape converts the Polars copy: datetime.datetime at
+  microseconds, None for every gap, an object column's cells as their str.
+  Minera raised its own "missing start timestamp attribute" and "invalid
+  start timestamp" errors, or counted where Python raises.
+- **XES ints past INT64_MAX** (within uint64) are typed as pandas types
+  them on these routes: alone a uint64 column (each an int), beside floats
+  or gaps float64, beside a negative int an object column of ints (Polars:
+  UInt64, Float64, or str of each cell). Ints past uint64 or below INT64_MIN
+  stay the declared XES drop.
+
+| sweep | before | after |
+|---|---|---|
+| gxE (400 uploads), K in X, start_timestamp, the CSV header, res, a missing key; default shape | 158 graphs, 37 errors equal | 273 graphs and 719 errors equal; 8 runs on 2 uploads whose whole mine fails (declared GU1-2) |
+| gxE, the same keys, explicit DataFrame and stream shapes | | 273 + 717 equal; the same 2 uploads |
+| gxE, the same keys, lazy shape (1,000) | 217 graphs wrong, every error wrong | 1,000 |
+| gxL lazy default, X, start_timestamp (600) | 93 of 200 default graphs wrong | 600 |
+| explicit start_timestamp, GW banks (1,040) and gxE (400) | 582 and 345 errors differ | equal but the declared GU1-2 uploads and t72074 |
+| start keys X, time:timestamp, @@index, concept:name, case:concept:name, a missing key, org:resource on gxE, default and lazy shapes | | equal but GU1-2 |
+| gxB, XES ints past int64 (200 uploads, keyed, default, start keys, both shapes) | 140 of 200 keyed runs differ | equal but GU1-2 |
+
+Declared: none new (GU1-2's whole-mine failure and t72074 stand).
+
+In the suite: the new `minera_server_review_gx_tests` (162 checks, 138 of
+which fail on GW's server binary) carries the reference values. The full
+ctest passed 686 of 686 (-j2) and the new test on its own; the fixture
+replay left all 2,673 responses unchanged; the Python script tests passed
+406 of 406.

@@ -301,6 +301,7 @@ void handle_active_source_mining(const httplib::Request& request,
   std::optional<minera::ResourceNetwork> resources;
   std::optional<std::vector<minera::DurationStats>> durations;
   std::optional<std::vector<minera::EventuallyFollowsEdge>> eventually;
+  std::string eventually_error;
   run("log_statistics_preparation", "log", [&](bool& native_returned) {
     const auto& log = require_prepared_log(*session); const auto& graph = require_graph(*session);
     // pm4py's frame DFG reads an upload's start_timestamp column (round GU).
@@ -312,7 +313,15 @@ void handle_active_source_mining(const httplib::Request& request,
       performance = minera::compute_performance_metrics(log, graph, dataframe_performance_source(session->active_source.get()));
     resources = minera::discover_resource_network(log);
     durations = minera::compute_variant_durations(log, graph);
-    eventually = minera::discover_eventually_follows(log, graph, params.eventually_follows);
+    // pm4py's eventually-follows graph on the upload's frame, as /api/mine's
+    // default shape reads it (rounds GW, GX); its errors leave it empty.
+    if (auto frame_eventually = frame_eventually_follows(session->active_source.get(), log, graph,
+                                                         params.eventually_follows)) {
+      eventually = std::move(frame_eventually->edges);
+      eventually_error = std::move(frame_eventually->error);
+    } else {
+      eventually = minera::discover_eventually_follows(log, graph, params.eventually_follows);
+    }
     // These remain established presentation metrics, not complete raw native
     // snapshots. The full source is independently available in active_source.
     native_returned = true;
@@ -499,7 +508,8 @@ void handle_active_source_mining(const httplib::Request& request,
           event_overlap ? &*event_overlap : nullptr, case_overlap ? &*case_overlap : nullptr,
           concurrent_overlap ? &*concurrent_overlap : nullptr, nullptr, params.minimum_self_distance.variant);
       const auto end = analysis.find_last_not_of(" \t\r\n");
-      analysis = analysis.substr(0, end) + ",\"source_id\":" + active_source_quote(std::to_string(session->query_source_id)) + '}';
+      analysis = analysis.substr(0, end) + ",\"source_id\":" + active_source_quote(std::to_string(session->query_source_id)) +
+                 (eventually_error.empty() ? std::string{} : ",\"eventually_follows_error\":" + active_source_quote(eventually_error)) + '}';
     } catch (const std::exception& error) {analysis = "null"; presentation_error = "{\"type\":\"presentation_error\",\"message\":" + active_source_quote(error.what()) + '}';}
   }
   std::string records_json = "{";

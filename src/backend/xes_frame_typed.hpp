@@ -141,13 +141,18 @@ inline std::optional<std::string> xes_frame_value_repr(const EventAttribute& val
 // How pandas types the column (round GM: `dtype`, when given).
 enum class XesFrameDtype { kDatetime, kString, kInt, kFloat, kBool, kObject, kNoneObject, kNaNFloat };
 
+//
+// `big_ints` (round GX): ints past INT64_MAX (an XES uint64 cell) are typed
+// as pandas types them: a column of such ints alone is uint64 (each an int),
+// beside floats or gaps float64, beside a negative int an object column of
+// ints; the cells keep the decimal text of each such int.
 inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& table, std::size_t column, bool polars,
-                                                           XesFrameDtype* dtype_out = nullptr) {
+                                                           XesFrameDtype* dtype_out = nullptr, bool big_ints = false) {
   enum class Cell { kGap, kNone, kDict, kDate, kText, kInt, kFloat, kBool };
   std::vector<Cell> kinds;
   kinds.reserve(table.rows.size());
   bool gap = false, none = false, dict = false, date = false, text = false, integer = false, real = false,
-       boolean = false;
+       boolean = false, above_int64 = false, negative_int = false;
   for (const auto& row : table.rows) {
     Cell kind = Cell::kGap;
     if (column < row.size() && row[column] && row[column]->xes_public_shape != XesPublicShape::kAbsent) {
@@ -170,7 +175,13 @@ inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& ta
           case AttributeKind::kString:
           case AttributeKind::kId: kind = Cell::kText; break;
           case AttributeKind::kInt:
-            if (!std::holds_alternative<std::int64_t>(cell.typed_value)) return std::nullopt;
+            if (const auto* value = std::get_if<std::int64_t>(&cell.typed_value)) {
+              negative_int = negative_int || *value < 0;
+            } else if (big_ints && std::holds_alternative<std::uint64_t>(cell.typed_value)) {
+              above_int64 = true;
+            } else {
+              return std::nullopt;
+            }
             kind = Cell::kInt;
             break;
           case AttributeKind::kFloat:
@@ -204,6 +215,7 @@ inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& ta
   else if (families > 1 || dict) dtype = Dtype::kObject;
   else if (date) dtype = Dtype::kDatetime;
   else if (text) dtype = Dtype::kString;
+  else if (above_int64 && negative_int) dtype = Dtype::kObject;
   else if (integer || real) dtype = real || gap || none ? Dtype::kFloat : Dtype::kInt;
   else dtype = gap || none ? Dtype::kObject : Dtype::kBool;
   if (dtype_out) *dtype_out = dtype;
@@ -226,7 +238,10 @@ inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& ta
       out.kind = PlusCellKind::kText;
       switch (kind) {
         case Cell::kDate: out.text = plus_python_datetime_str(cell.value); break;
-        case Cell::kInt: out.text = std::to_string(std::get<std::int64_t>(cell.typed_value)); break;
+        case Cell::kInt:
+          if (const auto* natural = std::get_if<std::uint64_t>(&cell.typed_value)) out.text = std::to_string(*natural);
+          else out.text = std::to_string(std::get<std::int64_t>(cell.typed_value));
+          break;
         case Cell::kFloat: out.text = python::float_repr(std::get<double>(cell.typed_value)); break;
         case Cell::kBool: out.text = std::get<bool>(cell.typed_value) ? "True" : "False"; break;
         case Cell::kDict: {
@@ -254,15 +269,20 @@ inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& ta
         out.kind = PlusCellKind::kText;
         out.text = cell.value;
         break;
-      case Cell::kInt:
+      case Cell::kInt: {
+        const auto* natural = std::get_if<std::uint64_t>(&cell.typed_value);
         if (dtype == Dtype::kFloat) {
           out.kind = PlusCellKind::kFloat;
-          out.number = static_cast<double>(std::get<std::int64_t>(cell.typed_value));
+          out.number = natural ? static_cast<double>(*natural) : static_cast<double>(std::get<std::int64_t>(cell.typed_value));
+        } else if (natural) {
+          out.kind = PlusCellKind::kInt;
+          out.text = std::to_string(*natural);
         } else {
           out.kind = PlusCellKind::kInt;
           out.micros = std::get<std::int64_t>(cell.typed_value);
         }
         break;
+      }
       case Cell::kFloat:
         out.kind = PlusCellKind::kFloat;
         out.number = std::get<double>(cell.typed_value);
@@ -286,11 +306,13 @@ struct XesTypedColumn {
 
 // The frame's column `name` typed as read_xes types it; nullopt when the
 // table lacks it or holds kinds outside xes_frame_cells' model.
-inline std::optional<XesTypedColumn> xes_typed_column(const EventTable& table, std::string_view name, bool polars = false) {
+inline std::optional<XesTypedColumn> xes_typed_column(const EventTable& table, std::string_view name, bool polars = false,
+                                                      bool big_ints = false) {
   const auto found = std::find(table.columns.begin(), table.columns.end(), name);
   if (found == table.columns.end()) return std::nullopt;
   XesTypedColumn column;
-  auto cells = xes_frame_cells(table, static_cast<std::size_t>(found - table.columns.begin()), polars, &column.dtype);
+  auto cells = xes_frame_cells(table, static_cast<std::size_t>(found - table.columns.begin()), polars, &column.dtype,
+                               big_ints);
   if (!cells) return std::nullopt;
   column.cells = std::move(*cells);
   return column;

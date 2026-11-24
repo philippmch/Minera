@@ -7096,9 +7096,11 @@ export interface MineraExport {
    */
   eventually_follows?: EdgeStat[];
   /**
-   * Set when the upload's frame start_timestamp column makes pm4py's
-   * eventually-follows discovery raise (round GW); `eventually_follows` is
-   * then empty and this holds the reference's error text.
+   * Set when pm4py's eventually-follows discovery raises on the upload's
+   * frame: its start_timestamp column (round GW), another timestamp key or an
+   * explicit start key (round GX, also in the analysis an explicit frame
+   * shape nests); `eventually_follows` is then empty and this holds the
+   * reference's error text.
    */
   eventually_follows_error?: string;
   /** Temporal-profile timing statistics; absent in exports from older versions. */
