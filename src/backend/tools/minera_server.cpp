@@ -359,6 +359,34 @@ std::optional<minera::FrameKeyedActivities> csv_keyed_family(const minera::Event
   minera::distinct_float_gap_labels(*keyed);
   return keyed;
 }
+// An XES upload's log shape keyed by an event attribute (round HF): pm4py's
+// EventLog families read read_xes' legacy objects (legacy_keyed_activities).
+// nullopt for a CSV log, a key every event holds as text, or an event
+// without the key or with a dict there (each family's older path raises
+// those as it did), unless `absent_ok`.
+std::optional<minera::FrameKeyedActivities> legacy_keyed_family(const minera::EventLog& log, const std::string& key,
+                                                                bool absent_ok = false) {
+  auto keyed = minera::legacy_keyed_activities(log, key);
+  if (!keyed || (!absent_ok && (keyed->any_absent || keyed->any_dict))) return std::nullopt;
+  return keyed;
+}
+
+// pm4py's temporal profile on such a log reads the key of both events of
+// every pair of a trace, (i, j) for i < j in order, and keys its dict by the
+// pair: KeyError for an event without it, TypeError for a dict there; a
+// trace of one event reads nothing (round HF, observed black-box).
+void check_legacy_temporal_keys(const minera::FrameKeyedActivities& keyed, const std::string& key) {
+  for (std::size_t t = 0; t < keyed.absent.size(); ++t) {
+    const auto& absent = keyed.absent[t];
+    const auto& types = keyed.types[t];
+    for (std::size_t i = 0; i < absent.size(); ++i)
+      for (std::size_t j = i + 1; j < absent.size(); ++j) {
+        if (absent[i] || absent[j]) throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(key));
+        if (types[i] == "dict" || types[j] == "dict") throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+      }
+  }
+}
+
 std::optional<minera::EventLog> csv_keyed_family_log(const minera::EventLog& log, const std::string& key) {
   auto keyed = csv_keyed_family(log, key);
   if (!keyed) return std::nullopt;
@@ -523,6 +551,44 @@ void check_csv_keyed_alpha_transition_names(const minera::EventLog& log, const s
     for (std::size_t e = 0; e < types.size() && !text; ++e) text = types[e].empty();
   if (text)
     throw std::invalid_argument("TypeError: '<' not supported between instances of 'float' and 'str'");
+}
+
+// The replay sorts the Alpha net's transitions (and the converted
+// Heuristics++ net's) by name, each the legacy object of its activity
+// (round HF): values Python cannot order (text
+// beside a number, None beside anything else, a date beside another kind)
+// raise TypeError. Its operands follow the transitions' set, ordered by
+// their addresses (declared); Minera names the later activity's type first.
+void check_legacy_alpha_transition_names(const minera::FrameKeyedActivities& keyed, const minera::PetriNet& net) {
+  if (net.transitions().size() < 2) return;
+  // A silent transition's name is text (the converted heuristics net's; set
+  // first here, its place in the set declared too).
+  const bool silent = std::any_of(net.transitions().begin(), net.transitions().end(),
+                                  [](const auto& transition) { return transition.silent(); });
+  const auto kind = [](const std::string& type) {
+    if (type.empty()) return 0;
+    if (type == "int" || type == "float" || type == "bool") return 1;
+    if (type == "datetime.datetime") return 2;
+    if (type == "NoneType") return 3;
+    return 4;
+  };
+  std::vector<std::pair<int, std::string>> seen;  // kind, Python type, in log order
+  if (silent) seen.push_back({0, "str"});
+  std::set<std::string> labels;
+  for (const auto& transition : net.transitions())
+    if (!transition.silent()) labels.insert(net.activities().at(*transition.activity));
+  for (std::size_t t = 0; t < keyed.types.size(); ++t)
+    for (std::size_t e = 0; e < keyed.types[t].size(); ++e) {
+      if (!labels.erase(keyed.log.traces[t].events[e].activity)) continue;
+      const auto& type = keyed.types[t][e];
+      const auto k = kind(type);
+      const auto python_type = type.empty() ? std::string("str") : type;
+      for (const auto& [earlier, earlier_type] : seen)
+        if (earlier != k || k == 3)
+          throw std::invalid_argument("TypeError: '<' not supported between instances of '" + python_type + "' and '" +
+                                      earlier_type + "'");
+      seen.push_back({k, python_type});
+    }
 }
 
 void register_activity_selector_values(
@@ -3428,7 +3494,12 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // A CSV log keyed by another column of its frame reads its cells (round
     // GR; csv_keyed_family_log), as do the transition system, the log
     // skeleton and Declare below.
-    const auto temporal_keyed = csv_keyed_family_log(log, params.temporal_profile.activity_attribute);
+    auto temporal_keyed = csv_keyed_family_log(log, params.temporal_profile.activity_attribute);
+    if (xes_input)
+      if (auto legacy = legacy_keyed_family(log, params.temporal_profile.activity_attribute, true)) {
+        check_legacy_temporal_keys(*legacy, params.temporal_profile.activity_attribute);
+        temporal_keyed = std::move(legacy->log);
+      }
     auto temporal_options = params.temporal_profile;
     if (temporal_keyed) temporal_options.activity_attribute = "concept:name";
     {
@@ -3461,9 +3532,10 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // pm4py's transition system compares labels with ==: a NaN or NaT one
     // equals none (each step its own transition), while a state's list
     // matches it by the object (round GR, as round GQ on XES frames).
-    auto transition_keyed = csv_keyed_family(log,
-        params.transition_system.activity_attribute.empty() ? params.transition_system.activity_key
-                                                            : params.transition_system.activity_attribute);
+    const auto& transition_key = params.transition_system.activity_attribute.empty()
+                                     ? params.transition_system.activity_key
+                                     : params.transition_system.activity_attribute;
+    auto transition_keyed = xes_input ? legacy_keyed_family(log, transition_key) : csv_keyed_family(log, transition_key);
     if (transition_keyed)
       for (std::size_t t = 0; t < transition_keyed->log.traces.size(); ++t)
         for (std::size_t e = 0; e < transition_keyed->log.traces[t].events.size(); ++e)
@@ -3601,7 +3673,18 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // case-id order and list their conformance in it (a CSV log is already
     // in that order); the native results stay indexed by trace.
     const auto constraint_order = constraint_case_order(*active_source, log);
-    const auto skeleton_keyed = csv_keyed_family(log, params.log_skeleton.activity_key);
+    // On an XES upload's log shape pm4py reads every event's key first: an
+    // event without it raises KeyError, then a dict value TypeError
+    // unhashable (round HF, observed black-box).
+    if (xes_input)
+      if (const auto legacy = legacy_keyed_family(log, params.log_skeleton.activity_key, true)) {
+        if (legacy->any_absent)
+          throw std::invalid_argument("KeyError: " +
+                                      minera::detail::frame_python_str_repr(params.log_skeleton.activity_key));
+        if (legacy->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+      }
+    const auto skeleton_keyed = xes_input ? legacy_keyed_family(log, params.log_skeleton.activity_key)
+                                          : csv_keyed_family(log, params.log_skeleton.activity_key);
     auto skeleton_options = params.log_skeleton;
     if (skeleton_keyed) skeleton_options.activity_key = "concept:name";
     const auto& skeleton_log = skeleton_keyed ? skeleton_keyed->log : log;
@@ -3711,10 +3794,34 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       check_csv_keyed_alpha_transition_names(log, alpha_key, net);
       alpha_keyed_log = minera::detail::csv_log_keyed_replay_log(log, alpha_key);
     }
+    // An XES upload's log shape replays the legacy objects (round HF). An
+    // event without the key in a trace of one event (Alpha leaves it out; in
+    // a pair the older path's KeyError stands) raises KeyError once the
+    // transitions are sorted.
+    const auto single_absent = [](const minera::FrameKeyedActivities& keyed) {
+      for (const auto& trace : keyed.absent)
+        if (trace.size() > 1 && std::find(trace.begin(), trace.end(), true) != trace.end()) return false;
+      return true;
+    };
+    if (xes_input && !params.token_replay_activity_attribute_supplied)
+      if (const auto legacy = legacy_keyed_family(log, alpha_key, true);
+          legacy && !legacy->any_dict && single_absent(*legacy)) {
+        check_legacy_alpha_transition_names(*legacy, net);
+        if (legacy->any_absent)
+          throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(alpha_key));
+        alpha_keyed_log = minera::detail::legacy_log_keyed_replay_log(log, alpha_key);
+      }
     const auto& heuristic_key = params.heuristic.activity_attribute;
-    const auto heuristic_keyed_log = !heuristic_key.empty() && heuristic_key != "concept:name" && heuristic_key != "activity"
+    auto heuristic_keyed_log = !heuristic_key.empty() && heuristic_key != "concept:name" && heuristic_key != "activity"
         ? minera::detail::csv_log_keyed_replay_log(log, heuristic_key, &heuristics, &heuristic_net)
         : std::nullopt;
+    // An XES upload's log shape replays the legacy objects (round HF): the
+    // converted net's transitions are named by them, as the Alpha net's.
+    if (xes_input && !heuristic_keyed_log && !params.token_replay_activity_attribute_supplied)
+      if (const auto legacy = legacy_keyed_family(log, heuristic_key)) {
+        check_legacy_alpha_transition_names(*legacy, heuristic_net);
+        heuristic_keyed_log = minera::detail::legacy_log_keyed_replay_log(log, heuristic_key);
+      }
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
     const auto model = [&](std::string id, const minera::PetriNet& petri) {

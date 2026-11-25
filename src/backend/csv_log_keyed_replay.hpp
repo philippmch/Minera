@@ -34,8 +34,80 @@
 #include "frame_cells.hpp"
 #include "python_scalar.hpp"
 #include "xes_frame_token_replay.hpp"
+#include "xes_legacy_cell.hpp"
 
 namespace minera::detail {
+
+// One replayed cell: its value, a gap (NaN or NaT) and its identity (equal
+// cells by Python's ==; a shared NaN equal to itself).
+struct KeyedReplayCell {
+  enum class Gap { kNone, kNaN, kNaT };
+  python::Scalar value;
+  Gap gap = Gap::kNone;
+  std::string identity;
+  std::string type;  // the Python type name when set (a legacy XES object)
+};
+
+// The replay's variants (traces grouped by their tuples of cells) sorted by
+// (number of traces, tuple), descending, as Python sorts them: raises the
+// first comparison's TypeError between cells that do not order.
+inline void check_keyed_replay_variant_sort(const std::vector<std::vector<KeyedReplayCell>>& traces) {
+  using Cell = KeyedReplayCell;
+  using Gap = KeyedReplayCell::Gap;
+  const auto type_of = [](const Cell& cell) -> std::string {
+    if (!cell.type.empty()) return cell.type;
+    if (cell.gap == Gap::kNaT) return "NaTType";
+    if (cell.gap == Gap::kNaN) return "float";
+    return python::type_name(cell.value);
+  };
+  std::vector<const std::vector<Cell>*> variants;
+  std::vector<std::size_t> counts;
+  std::map<std::vector<std::string>, std::size_t> index;
+  for (const auto& tuple : traces) {
+    std::vector<std::string> identity;
+    for (const auto& cell : tuple) identity.push_back(cell.identity);
+    const auto [it, added] = index.emplace(std::move(identity), variants.size());
+    if (added) {
+      variants.push_back(&tuple);
+      counts.push_back(0);
+    }
+    ++counts[it->second];
+  }
+  const auto unorderable = [&](const Cell& a, const Cell& b) {
+    throw std::invalid_argument("TypeError: '<' not supported between instances of '" + type_of(a) + "' and '" +
+                                type_of(b) + "'");
+  };
+  // a < b on two unequal cells: NaN against a number and NaT against a
+  // Timestamp are False, against anything else TypeError.
+  const auto less = [&](const Cell& a, const Cell& b) -> bool {
+    if (a.gap == Gap::kNone && b.gap == Gap::kNone) {
+      try {
+        return python::compare(a.value, b.value) < 0;
+      } catch (const python::TypeError&) {
+        unorderable(a, b);
+      }
+    }
+    const auto numeric = [](const Cell& c) { return c.gap == Gap::kNaN || (c.gap == Gap::kNone && python::is_number(c.value)); };
+    const auto dated = [](const Cell& c) {
+      return c.gap == Gap::kNaT || (c.gap == Gap::kNone && c.value.kind == python::Scalar::Kind::kDate);
+    };
+    if ((numeric(a) && numeric(b)) || (dated(a) && dated(b))) return false;
+    unorderable(a, b);
+    return false;
+  };
+  std::vector<std::size_t> order(variants.size());
+  for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
+  python::sort_reverse(order, [&](std::size_t a, std::size_t b) {
+    if (counts[a] != counts[b]) return counts[a] < counts[b];
+    const auto& x = *variants[a];
+    const auto& y = *variants[b];
+    for (std::size_t i = 0; i < x.size() && i < y.size(); ++i) {
+      if (x[i].identity == y[i].identity) continue;
+      return less(x[i], y[i]);
+    }
+    return x.size() < y.size();
+  });
+}
 
 // The log to replay with "concept:name" in place of `key` (nullopt when the
 // log is no CSV upload's log shape or `key` names no column of its frame).
@@ -67,30 +139,16 @@ inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, con
       check_heuristics_null_transition_names(named, *net);
     }
   }
-  enum class Gap { kNone, kNaN, kNaT };
-  struct Cell {
-    python::Scalar value;
-    Gap gap = Gap::kNone;
-    std::string identity;
-  };
-  const auto type_of = [](const Cell& cell) -> std::string {
-    if (cell.gap == Gap::kNaT) return "NaTType";
-    if (cell.gap == Gap::kNaN) return "float";
-    return python::type_name(cell.value);
-  };
-  std::vector<std::vector<Cell>> variants;
-  std::vector<std::size_t> counts;
-  std::map<std::vector<std::string>, std::size_t> index;
+  std::vector<std::vector<KeyedReplayCell>> cells;
   for (std::size_t t = 0; t < frame.traces.size(); ++t) {
     const auto& trace = frame.traces[t];
-    std::vector<Cell> tuple;
-    std::vector<std::string> identity;
+    std::vector<KeyedReplayCell> tuple;
     for (std::size_t e = 0; e < trace.events.size(); ++e) {
-      Cell cell;
+      KeyedReplayCell cell;
       const auto value = frame_scalar(frame, trace, trace.events[e], key, FrameKeyScope::kEventLog);
       if (!value || python::is_missing(*value)) {
         const bool dates = column && *column == DataFrameColumnType::kDate;
-        cell.gap = dates ? Gap::kNaT : Gap::kNaN;
+        cell.gap = dates ? KeyedReplayCell::Gap::kNaT : KeyedReplayCell::Gap::kNaN;
         // A float64 column's gaps are distinct objects, never equal.
         cell.identity = dates ? "NaT"
             : column && *column == DataFrameColumnType::kFloat64 ? "nan#" + std::to_string(t) + ":" + std::to_string(e)
@@ -99,50 +157,39 @@ inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, con
         cell.value = *value;
         cell.identity = python::identity(*value);
       }
-      identity.push_back(cell.identity);
       tuple.push_back(std::move(cell));
     }
-    const auto [it, added] = index.emplace(std::move(identity), variants.size());
-    if (added) {
-      variants.push_back(std::move(tuple));
-      counts.push_back(0);
-    }
-    ++counts[it->second];
+    cells.push_back(std::move(tuple));
   }
-  const auto unorderable = [&](const Cell& a, const Cell& b) {
-    throw std::invalid_argument("TypeError: '<' not supported between instances of '" + type_of(a) + "' and '" +
-                                type_of(b) + "'");
-  };
-  // a < b on two unequal cells: NaN against a number and NaT against a
-  // Timestamp are False, against anything else TypeError.
-  const auto less = [&](const Cell& a, const Cell& b) -> bool {
-    if (a.gap == Gap::kNone && b.gap == Gap::kNone) {
-      try {
-        return python::compare(a.value, b.value) < 0;
-      } catch (const python::TypeError&) {
-        unorderable(a, b);
+  check_keyed_replay_variant_sort(cells);
+  return std::move(keyed->log);
+}
+
+// The same on an XES upload's log shape keyed by an event attribute (round
+// HF): the replay reads read_xes' legacy objects (legacy_keyed_activities),
+// each NaN float its own; nullopt where that model does not apply.
+inline std::optional<EventLog> legacy_log_keyed_replay_log(const EventLog& log, const std::string& key) {
+  auto keyed = legacy_keyed_activities(log, key);
+  if (!keyed || keyed->any_absent || keyed->any_dict) return std::nullopt;
+  std::vector<std::vector<KeyedReplayCell>> cells;
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    std::vector<KeyedReplayCell> tuple;
+    for (std::size_t e = 0; e < log.traces[t].events.size(); ++e) {
+      const auto legacy = legacy_declare_cell(log.traces[t].events[e], key);
+      KeyedReplayCell cell;
+      cell.type = legacy.type;
+      if (keyed->missing[t][e]) {
+        cell.gap = KeyedReplayCell::Gap::kNaN;
+        cell.identity = "nan#" + std::to_string(t) + ":" + std::to_string(e);
+      } else {
+        cell.value = legacy.value;
+        cell.identity = python::identity(legacy.value);
       }
+      tuple.push_back(std::move(cell));
     }
-    const auto numeric = [](const Cell& c) { return c.gap == Gap::kNaN || (c.gap == Gap::kNone && python::is_number(c.value)); };
-    const auto dated = [](const Cell& c) {
-      return c.gap == Gap::kNaT || (c.gap == Gap::kNone && c.value.kind == python::Scalar::Kind::kDate);
-    };
-    if ((numeric(a) && numeric(b)) || (dated(a) && dated(b))) return false;
-    unorderable(a, b);
-    return false;
-  };
-  std::vector<std::size_t> order(variants.size());
-  for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
-  python::sort_reverse(order, [&](std::size_t a, std::size_t b) {
-    if (counts[a] != counts[b]) return counts[a] < counts[b];
-    const auto& x = variants[a];
-    const auto& y = variants[b];
-    for (std::size_t i = 0; i < x.size() && i < y.size(); ++i) {
-      if (x[i].identity == y[i].identity) continue;
-      return less(x[i], y[i]);
-    }
-    return x.size() < y.size();
-  });
+    cells.push_back(std::move(tuple));
+  }
+  check_keyed_replay_variant_sort(cells);
   return std::move(keyed->log);
 }
 

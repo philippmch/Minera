@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HE (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HF (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10601,6 +10601,83 @@ HE's suite: the full ctest 694 of 694 (-j2, 32 minutes) with the new
 server binary), the 16 manifests replayed 2,673 responses unchanged, no
 Python script or frontend change.
 Harness and probes: `review-harness/round-he/`.
+
+Round HF re-reviewed HE. HE's CI run 45547956280 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+HF1 the other families keyed by a typed attribute on an XES upload's log
+shape: `legacy_keyed_activities` (frame_keys.cpp) reads read_xes' legacy
+objects (`legacy_declare_cell`, moved to xes_legacy_cell.hpp). Values equal
+as dict keys (1, 1.0 and True) are one activity, named str() of the first
+one met in log order; values printed alike but unequal ('1' beside 1, each
+NaN float) take trailing `\x1f`; an event without the key and a dict (a
+list with children) are flagged. `handle_mine` feeds it to the transition
+system, the temporal profile (each pair (i, j) of a trace reads both
+events' keys: KeyError, then unhashable dict; a trace of one event reads
+nothing), the log skeleton (every key read first: KeyError, then
+unhashable dict) and Alpha (an event without the key in a trace of one
+event is left out, in a longer trace the KeyError stands; the token replay
+sorts the net's transitions by their legacy objects, so values that do not
+order raise TypeError and the left-out event a KeyError after it:
+`check_legacy_alpha_transition_names`, `legacy_log_keyed_replay_log`).
+HF2 Heuristics++ on that log shape (`legacy_keyed_plus_plus`): the typed
+labels and comparisons (`plus_label_comparisons`, split out of the frame
+path), the converted net named by the typed objects, its replay as Alpha's,
+and pm4py's read order with a start key: in interval mode the log-order
+KeyError or unhashable dict; before the interval a dict first, then per
+trace the start reads (KeyError), the sort and the activity reads
+interleaved with the comparisons (`check_legacy_plus_intervals` over
+`check_plus_interval_cells`' new read callbacks), and a typed start
+column's subtraction TypeError. HF3 the Inductive miner on that log shape
+(`legacy_inductive_outcome`): every key is read first (KeyError with the
+key's repr, also when no event holds it), then the activity set is hashed
+(unhashable dict) and sorted: its first failing comparison names its
+operands in CPython's set order of the objects under PYTHONHASHSEED=0
+(`python_object_set.hpp`: str, number, None and datetime hashes, None by
+its address); a log of None alone mines a tau when every trace holds one
+event, else networkx's DFG fails; otherwise the tree's str() fails on the
+first leaf that is no str. Minera mines over ranks of Python's order of the
+values (numbers by value, dates by instant) when no NaN is among them,
+which reaches pm4py's first leaf more often than their printed text. HF4
+Declare: a binary rule ending in an empty str (falsy, as a typed 0 or
+False) is keyed by its first activity alone on all three shapes, and the
+export validator accepts it.
+Sweeps (`xesfam.py`) over hfA (100 uploads), hfG (60, keys missing) and
+hfN (60, valueless values) with keys K1..K6 and gxB with X and
+start_timestamp, 1,720 judgments per family, same as pm4py on HE's server
+vs HF's: Heuristics++ 455 -> 1,720, Alpha 482 -> 1,556, Inductive
+877 -> 1,689, the log skeleton 983 -> 1,666, the temporal profile
+910 -> 1,652, the transition system 998 -> 1,651; Declare (`dcx.py`, hfE
+on the three shapes) every judgment (375 on the log, 470 on the DataFrame,
+290 on the LazyFrame). Declared: Alpha's and Heuristics++'s
+replay sort operands (the transitions' set in address order, 159), the
+log skeleton's, temporal profile's and transition system's entries named
+by whichever of two equal values printed differently (1 and 1.0, -0.0 and
+0.0) each dict keeps (hfA/hfG/hfN K2 and K5), Inductive's leaf order of
+pm4py's raw tree before folding (31, K2 and K5), the transition system's
+states over dict values (named by their repr), and GU1-2's whole-mine
+`'values' is not ordered` on gxB's typed start columns.
+HF's suite: the full ctest 695 of 695 (-j2, 39 minutes) with the new
+`minera_server_review_hf_tests` (415 checks, 386 of which fail on HE's
+server binary), the 16 manifests replayed 2,673 responses unchanged, no
+Python script or frontend change.
+Harness and probes: `review-harness/round-hf/`.
+
+Next round (HG) should start by re-reviewing round HF:
+
+- HF's CI run;
+- the families keyed by a typed attribute on an XES upload's log shape on
+  routes past /api/mine's defaults: the token replay with an explicitly
+  supplied replay key, the workbench and evaluate routes on the Alpha and
+  Heuristics++ nets, and the conformance families of the log skeleton and
+  temporal profile with such keys;
+- whether other routes iterate a copied Python set (HE2, not reached in
+  HF);
+- the declared residuals (HF's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HF (kept for its older items):
 
 Next round (HF) should start by re-reviewing round HE:
 

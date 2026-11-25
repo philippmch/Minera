@@ -2816,6 +2816,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_he_tests minera_server)
     add_test(NAME minera_server_review_he_tests
              COMMAND minera_server_review_he_tests $<TARGET_FILE:minera_server>)
+    # Round HF: the families keyed by typed XES attributes on the log shape (Alpha, Inductive, LS, TP, TS, HPP, Declare).
+    add_executable(minera_server_review_hf_tests
+      src/backend/tests/test_server_review_hf.cpp)
+    target_include_directories(minera_server_review_hf_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_hf_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_hf_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_hf_tests minera_server)
+    add_test(NAME minera_server_review_hf_tests
+             COMMAND minera_server_review_hf_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

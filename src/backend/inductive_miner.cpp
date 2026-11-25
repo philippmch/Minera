@@ -8,8 +8,10 @@
 #include <bit>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <exception>
 #include <limits>
+#include <map>
 #include <numeric>
 #include <optional>
 #include <set>
@@ -30,6 +32,8 @@
 #include "polars_sort.hpp"
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
+#include "xes_legacy_cell.hpp"
+#include "python_object_set.hpp"
 #include "xes_frame_typed.hpp"
 #include "xes_frame_activity.hpp"
 
@@ -2695,9 +2699,176 @@ ProcessTree discover_from_variants(const InductiveMinerVariantLog& variants,
 
 using namespace inductive_detail;
 
+namespace {
+
+// The Inductive miner on an XES upload's log shape keyed by an event
+// attribute (round HF, observed black-box): pm4py reads read_xes' legacy
+// objects. None sorts with nothing (its type named second, as None leads
+// the activity set), nor does text with another kind; a log of None alone
+// mines a tau when every trace holds one event, else networkx's DFG fails;
+// otherwise the tree is mined and its str() fails on the first leaf that is
+// no str (check_xes_frame_tree_str), a column of NaN alone as round HE's
+// (each NaN its own object; RecursionErrors of NaN beside other values stay
+// declared). nullopt when the log is no such log or the key is text.
+struct LegacyInductiveOutcome {
+  bool tau = false;
+};
+
+InductiveMinerOptions legacy_concept_options(InductiveMinerOptions options) {
+  options.activity_key = "concept:name";
+  return options;
+}
+
+std::optional<LegacyInductiveOutcome> legacy_inductive_outcome(const EventLog& event_log,
+                                                               const InductiveMinerOptions& options,
+                                                               const std::function<ProcessTree(const EventLog&)>& mine) {
+  if (!event_log.dataframe_columns || event_log.dataframe_columns->csv_text) return std::nullopt;
+  const auto keyed = legacy_keyed_activities(event_log, options.activity_key);
+  if (!keyed) return std::nullopt;
+  // Every event's key is read first (KeyError, a key no event holds too),
+  // then the activity set hashes them (a dict raises).
+  if (keyed->any_absent)
+    throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(options.activity_key));
+  if (keyed->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+  if (!keyed->non_text) return std::nullopt;
+  // sorted() of the activity set: its first comparison of two objects that
+  // do not order raises, its operands as the set lists them (hashes under
+  // PYTHONHASHSEED=0, None by its address; a NaN's address is declared).
+  {
+    std::vector<python::Scalar> values;
+    std::vector<std::string> identities, types;
+    std::size_t fresh = 0;
+    for (std::size_t t = 0; t < event_log.traces.size(); ++t)
+      for (std::size_t e = 0; e < event_log.traces[t].events.size(); ++e) {
+        const auto cell = legacy_declare_cell(event_log.traces[t].events[e], options.activity_key);
+        const bool nan = keyed->missing[t][e];
+        values.push_back(cell.value);
+        identities.push_back(nan ? "nan#" + std::to_string(fresh++) : python::identity(cell.value));
+        types.push_back(cell.type);
+      }
+    if (const auto order = detail::python_object_set_order(values, identities)) {
+      std::vector<std::size_t> items = *order;
+      python::sort(items, [&](std::size_t a, std::size_t b) {
+        try {
+          return python::compare(values[a], values[b]) < 0;
+        } catch (const python::TypeError&) {
+          throw std::invalid_argument("TypeError: '<' not supported between instances of '" + types[a] + "' and '" +
+                                      types[b] + "'");
+        }
+      });
+    }
+  }
+  std::string first_other;  // the first type in log order other than NoneType
+  bool none = false, single = true, all_nan = true;
+  std::size_t events = 0;
+  for (std::size_t t = 0; t < keyed->types.size(); ++t) {
+    single = single && keyed->types[t].size() <= 1;
+    for (std::size_t e = 0; e < keyed->types[t].size(); ++e) {
+      ++events;
+      const auto& type = keyed->types[t][e];
+      all_nan = all_nan && keyed->missing[t][e];
+      if (type == "NoneType") none = true;
+      else if (first_other.empty()) first_other = type.empty() ? "str" : type;
+    }
+  }
+  if (none) {
+    if (first_other.empty()) {
+      if (!single) throw std::invalid_argument("ValueError: None cannot be a node");
+      return LegacyInductiveOutcome{true};
+    }
+    throw std::invalid_argument("TypeError: '<' not supported between instances of '" + first_other +
+                                "' and 'NoneType'");
+  }
+  if (keyed->any_text)
+    throw std::invalid_argument("TypeError: '<' not supported between instances of '" + keyed->first_non_text_type +
+                                "' and 'str'");
+  if (all_nan && events > 0) {
+    if (events == 1) throw std::invalid_argument("TypeError: __str__ returned non-string (type float)");
+    if (single) throw std::invalid_argument("maximum recursion depth exceeded in comparison");
+    throw std::invalid_argument("TypeError: can only concatenate str (not \"float\") to str");
+  }
+  // The tree's str() fails on the first leaf of pm4py's tree before it is
+  // folded and sorted, in the order its cuts list their groups (a component
+  // with directly-follows pairs before an activity alone; not modelled,
+  // declared). Minera's sorted tree over names ranked by Python's order of
+  // the objects (numbers by value, dates by instant) reaches pm4py's first
+  // leaf more often than over their printed text (measured), so it mines
+  // those ranks when no NaN is among the values.
+  auto mined_log = keyed->log;
+  if (!keyed->any_missing) {
+    std::map<std::string, python::Scalar> value_of;
+    for (std::size_t t = 0; t < event_log.traces.size(); ++t)
+      for (std::size_t e = 0; e < event_log.traces[t].events.size(); ++e)
+        value_of.try_emplace(keyed->log.traces[t].events[e].activity,
+                             legacy_declare_cell(event_log.traces[t].events[e], options.activity_key).value);
+    std::vector<std::string> names;
+    for (const auto& [name, value] : value_of) names.push_back(name);
+    bool ordered = true;
+    try {
+      std::stable_sort(names.begin(), names.end(), [&](const std::string& a, const std::string& b) {
+        return python::compare(value_of.at(a), value_of.at(b)) < 0;
+      });
+    } catch (const python::TypeError&) {
+      ordered = false;
+    }
+    if (ordered) {
+      std::map<std::string, std::string> rank_of;
+      for (std::size_t i = 0; i < names.size(); ++i) {
+        char rank[24];
+        std::snprintf(rank, sizeof rank, "%012zu", i);
+        rank_of.emplace(names[i], rank);
+      }
+      for (auto& trace : mined_log.traces)
+        for (auto& event : trace.events) event.activity = rank_of.at(event.activity);
+    }
+  }
+  std::map<std::string, std::string> type_of;
+  for (std::size_t t = 0; t < keyed->types.size(); ++t)
+    for (std::size_t e = 0; e < keyed->types[t].size(); ++e)
+      type_of.try_emplace(mined_log.traces[t].events[e].activity, keyed->types[t][e]);
+  const auto tree = mine(mined_log);
+  const auto type = [&](std::size_t activity) -> std::string {
+    if (activity >= tree.activities().size()) return "str";
+    const auto found = type_of.find(tree.activities()[activity]);
+    return found == type_of.end() || found->second.empty() ? std::string("str") : found->second;
+  };
+  const auto& root = tree.root();
+  if (root.op == ProcessTreeOperator::kActivity) {
+    const auto name = type(root.activity);
+    if (name != "str") throw std::invalid_argument("TypeError: __str__ returned non-string (type " + name + ")");
+    return LegacyInductiveOutcome{};
+  }
+  std::function<void(const ProcessTreeNode&)> visit = [&](const ProcessTreeNode& node) {
+    if (node.op == ProcessTreeOperator::kActivity) {
+      const auto name = type(node.activity);
+      if (name != "str")
+        throw std::invalid_argument("TypeError: can only concatenate str (not \"" + name + "\") to str");
+      return;
+    }
+    for (const auto& child : node.children) visit(child);
+  };
+  visit(root);
+  return LegacyInductiveOutcome{};
+}
+
+std::optional<LegacyInductiveOutcome> legacy_inductive_outcome(const EventLog& event_log,
+                                                               const InductiveMinerOptions& options) {
+  const auto concept_options = legacy_concept_options(options);
+  return legacy_inductive_outcome(event_log, options, [&](const EventLog& keyed) {
+    return discover_from_event_log(select_event_log_fields(keyed, concept_options), concept_options);
+  });
+}
+
+}  // namespace
+
 EventLog prepare_inductive_event_log(const EventLog& event_log,
                                      const InductiveMinerOptions& options) {
   validate_options(options);
+  try {
+    if (legacy_inductive_outcome(event_log, options)) return select_event_log_fields(event_log, options);
+  } catch (const std::invalid_argument& error) {
+    throw std::invalid_argument("inductive miner: " + std::string(error.what()));
+  }
   // pm4py's Inductive miner keyed by a typed column of an upload's frame
   // reads each activity as the cell's Python object and raises TypeError on
   // any that is no str (round BS).
@@ -2717,6 +2888,13 @@ EventLog prepare_inductive_event_log(const EventDataView& data,
 ProcessTree discover_process_tree(const EventLog& event_log,
                                   const InductiveMinerOptions& options) {
   validate_options(options);
+  std::optional<LegacyInductiveOutcome> legacy;
+  try {
+    legacy = legacy_inductive_outcome(event_log, options);
+  } catch (const std::invalid_argument& error) {
+    throw std::invalid_argument("inductive miner: " + std::string(error.what()));
+  }
+  if (legacy && legacy->tau) return ProcessTree({}, ProcessTreeNode::tau());
   return discover_from_event_log(prepare_inductive_event_log(event_log, options),
                                  options);
 }

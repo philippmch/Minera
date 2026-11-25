@@ -503,6 +503,25 @@ std::vector<Place> maximal_places(const Footprint& fp) {
 // concept:name, or nullopt for the log's own activities.
 std::optional<EventLog> alpha_frame_keyed_log(const EventLog& log,
                                               const AlphaMinerOptions& options) {
+  // An XES upload's log shape reads read_xes' legacy objects (round HF):
+  // each NaN its own transition, 1 and 1.0 one, a date str() of its
+  // datetime. An event without the key in a trace of one event is left out
+  // (pm4py's start and end activities skip it, observed black-box); in a
+  // directly-follows pair it keeps the older path's KeyError.
+  // A dict value (a list with children) is unhashable in pm4py's counts.
+  if (log.dataframe_columns && !log.dataframe_columns->csv_text)
+    if (auto keyed = legacy_keyed_activities(log, options.activity_attribute)) {
+      bool paired_absent = false;
+      for (std::size_t t = 0; t < keyed->absent.size(); ++t)
+        if (keyed->absent[t].size() > 1)
+          for (const bool absent : keyed->absent[t]) paired_absent = paired_absent || absent;
+      if (!paired_absent) {
+        if (keyed->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+        for (std::size_t t = 0; t < keyed->absent.size(); ++t)
+          if (keyed->absent[t].size() == 1 && keyed->absent[t][0]) keyed->log.traces[t].events.clear();
+        return std::move(keyed->log);
+      }
+    }
   if (auto keyed = frame_keyed_activities(log, options.activity_attribute); keyed && keyed->non_text) {
     // A CSV log's float64 gaps: one transition each (round GR, as GQ's
     // heuristics nodes).

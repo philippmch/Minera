@@ -5,6 +5,7 @@
 #include "minera/csv_event_log_importer.hpp"
 #include "minera/dataframe_columns.hpp"
 #include "minera/timestamp.hpp"
+#include "xes_legacy_cell.hpp"
 
 #include <algorithm>
 #include <map>
@@ -586,6 +587,78 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
   out.non_text = non_text;
   out.distinct = labels.size();
   out.column = column;
+  return out;
+}
+
+std::optional<FrameKeyedActivities> legacy_keyed_activities(const EventLog& log, const std::string& key) {
+  using State = LegacyDeclareCell::State;
+  if (!log.dataframe_columns || log.dataframe_columns->csv_text) return std::nullopt;
+  if (key.empty() || key == "concept:name" || key == "activity") return std::nullopt;
+  FrameKeyedActivities out;
+  out.legacy = true;
+  out.log = log;
+  out.types.resize(log.traces.size());
+  out.missing.resize(log.traces.size());
+  out.absent.resize(log.traces.size());
+  // A value's class (equal as a dict key) -> its label; a printed text ->
+  // the classes printed so (the later ones take trailing \x1f).
+  std::unordered_map<std::string, std::string> label_of;
+  std::unordered_map<std::string, std::size_t> printed;
+  std::size_t fresh = 0;
+  bool typed = false;
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    auto& trace = out.log.traces[t];
+    out.types[t].resize(trace.events.size());
+    out.missing[t].resize(trace.events.size());
+    out.absent[t].resize(trace.events.size());
+    for (std::size_t e = 0; e < trace.events.size(); ++e) {
+      auto& event = trace.events[e];
+      const auto cell = legacy_declare_cell(log.traces[t].events[e], key);
+      if (cell.state == State::kUnmodelled) return std::nullopt;
+      std::string label, type;
+      if (cell.state == State::kAbsent) {
+        out.absent[t][e] = true;
+        out.any_absent = true;
+        typed = true;
+      } else if (cell.state == State::kDict) {
+        type = "dict";
+        out.any_dict = true;
+        typed = true;
+      } else {
+        const bool nan = cell.value.kind == python::Scalar::Kind::kFloat && std::isnan(cell.value.real);
+        if (cell.value.kind != python::Scalar::Kind::kText) {
+          type = cell.type;
+          typed = true;
+        }
+        out.missing[t][e] = nan;
+        out.any_missing = out.any_missing || nan;
+        // float() makes a new object per event: each NaN its own activity.
+        const auto id = nan ? "nan#" + std::to_string(fresh++) : python::identity(cell.value);
+        auto at = label_of.find(id);
+        if (at == label_of.end()) {
+          const auto shown = python::str(cell.value);
+          const auto copies = printed[shown]++;
+          at = label_of.emplace(id, shown + std::string(copies, '\x1f')).first;
+        }
+        label = at->second;
+      }
+      if (!out.absent[t][e]) {
+        if (type.empty()) {
+          out.any_text = true;
+        } else if (!out.non_text) {
+          out.non_text = true;
+          out.first_non_text_type = type;
+        }
+      }
+      event.activity = label;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key.clear();
+      event.activity_attribute.reset();
+      out.types[t][e] = std::move(type);
+    }
+  }
+  if (!typed) return std::nullopt;
+  out.distinct = label_of.size();
   return out;
 }
 

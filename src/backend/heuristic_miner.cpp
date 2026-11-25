@@ -16,6 +16,7 @@
 #include "xes_frame_columns.hpp"
 #include "xes_frame_typed.hpp"
 #include "frame_typed_activities.hpp"
+#include "xes_legacy_cell.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -3725,11 +3726,25 @@ std::optional<HeuristicsNet> legacy_keyed_heuristics(const EventLog& log, const 
   return net;
 }
 
+std::optional<HeuristicsNet> legacy_keyed_plus_plus(const EventLog& log, const HeuristicMinerOptions& options);
+void check_legacy_plus_starts(const EventLog& log, const HeuristicMinerOptions& options);
+bool check_legacy_plus_intervals(const EventLog& log, const HeuristicMinerOptions& options,
+                                 const std::vector<std::vector<bool>>* absent, const std::string& key);
+
 HeuristicsNet discover_heuristics_net(
     const EventLog& log,
     const HeuristicMinerOptions& options) {
-  if (options.variant == HeuristicMinerVariant::kPlusPlus)
+  if (options.variant == HeuristicMinerVariant::kPlusPlus) {
+    // Keyed by an attribute of an XES upload's log shape (round HF).
+    if (log.dataframe_columns && !log.dataframe_columns->csv_text &&
+        !standard_activity_attribute(options.activity_attribute))
+      if (auto net = legacy_keyed_plus_plus(log, options)) return std::move(*net);
+    if (log.dataframe_columns && !log.dataframe_columns->csv_text && !log.traces.empty() &&
+        !log.traces.front().events.empty() &&
+        selected_start_timestamp(log.traces.front().events.front(), options, true))
+      if (!check_legacy_plus_intervals(log, options, nullptr, {})) check_legacy_plus_starts(log, options);
     return discover_plus_plus(log, options);
+  }
   // A custom activity key on an XES upload's log shape reads the legacy
   // event dicts (round GL).
   if (log.dataframe_columns && !log.dataframe_columns->csv_text &&
@@ -4206,6 +4221,57 @@ std::optional<HeuristicsNet> csv_frame_typed_heuristics(const EventDataView& dat
   return net;
 }
 
+// Python compares two labels while it keys a concurrency pair (each
+// overlapping pair of a trace's time-sorted intervals, trace by trace) and
+// while it reads each kept eventually-follows pair's concurrency (sources in
+// the order their activity first appears, each source's targets in the order
+// they follow it first; rounds GB, HA, observed black-box). `less` raises
+// the TypeError of a pair Python does not order. Returns each source's
+// targets in that order.
+std::map<std::string, std::vector<std::string>> plus_label_comparisons(
+    const EventLog& log, const HeuristicMinerOptions& projected, const HeuristicMinerOptions& options,
+    bool pre_interval, InstanceKeyMode instance_mode,
+    const std::function<void(const std::string&, const std::string&)>& less) {
+  std::map<std::string, std::vector<std::string>> targets;
+  std::vector<std::string> order;
+  std::set<std::string> known;
+  std::map<std::string, std::uint64_t> occurrences;
+  std::map<NamePair, std::uint64_t> follows;
+  for (const auto& trace : log.traces) {
+    const auto converted = to_intervals(trace, projected, pre_interval, false, instance_mode);
+    const auto& intervals = converted.sorted;
+    for (const auto& interval : converted.performance_order) {
+      if (known.insert(interval.activity).second) order.push_back(interval.activity);
+      ++occurrences[interval.activity];
+    }
+    for (std::size_t i = 0; i < intervals.size(); ++i)
+      for (std::size_t j = i + 1; j < intervals.size(); ++j) {
+        if (!(std::max(start_instant(intervals[i]), start_instant(intervals[j])) <=
+              std::min(complete_instant(intervals[i]), complete_instant(intervals[j]))))
+          break;
+        less(intervals[j].activity, intervals[i].activity);
+      }
+    for (std::size_t i = 0; i < intervals.size(); ++i)
+      for (std::size_t j = i + 1; j < intervals.size(); ++j)
+        if (complete_instant(intervals[i]) <= start_instant(intervals[j])) {
+          if (follows[{intervals[i].activity, intervals[j].activity}]++ == 0)
+            targets[intervals[i].activity].push_back(intervals[j].activity);
+          break;
+        }
+  }
+  const PlusCountThreshold min_activity{options.min_activity_count, options.plusplus_min_activity_count};
+  const PlusCountThreshold min_frequency{options.min_frequency, options.plusplus_min_frequency};
+  for (const auto& from : order) {
+    const auto found = targets.find(from);
+    if (found == targets.end()) continue;
+    for (const auto& to : found->second)
+      if (min_activity.accepts(occurrences[from]) && min_activity.accepts(occurrences[to]) &&
+          min_frequency.accepts(follows[{from, to}]))
+        less(to, from);
+  }
+  return targets;
+}
+
 // A Heuristics++ net keyed by a typed column (round HA): pm4py's Petri
 // conversion visits the nodes in their order, each followed by its
 // successors, and fails on the first whose value is no str with an
@@ -4241,6 +4307,192 @@ void finish_typed_plus_net(HeuristicsNet& net, const FrameTypedActivities& typed
     const auto at = std::find(net.activities.begin(), net.activities.end(), *typed.missing_name);
     if (at != net.activities.end()) net.null_activity = static_cast<std::size_t>(at - net.activities.begin());
   }
+}
+
+// With a start column (the first event holds one) pm4py reads every event's
+// start before the activities on an XES upload's log shape: an event without
+// one raises KeyError (round HF, observed black-box).
+void check_legacy_plus_starts(const EventLog& log, const HeuristicMinerOptions& options) {
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events)
+      if (!selected_start_timestamp(event, options, true))
+        throw HeuristicPandasError("builtins.KeyError",
+                                   python_str_repr(options.start_timestamp_attribute.value_or("start_timestamp")));
+}
+
+// The interval checks of Heuristics++ on an XES upload's log shape with a
+// start column (round HF, observed black-box): the abstraction reads each
+// event's start and completion as read_xes' legacy objects (dates
+// datetime.datetime with the wall clock marked UTC, ints, floats, str, None,
+// booleans, dicts) and raises as on an XES upload's frame
+// (check_plus_interval_cells): trace by trace it reads the starts (an event
+// without one raises KeyError), sorts the events by them and compares each
+// completion with the later starts, reading each event's activity first
+// (`absent`: an event without the key raises KeyError there); then the
+// performance subtractions and timestamp() calls. Returns
+// false when a cell is not modelled (a completion of another kind).
+bool check_legacy_plus_intervals(const EventLog& log, const HeuristicMinerOptions& options,
+                                 const std::vector<std::vector<bool>>* absent, const std::string& key) {
+  const std::string start_key = options.start_timestamp_attribute.value_or("start_timestamp");
+  if (start_key.empty() || standard_timestamp_attribute(start_key)) return false;
+  const auto cell_of = [](const LegacyDeclareCell& legacy) -> std::optional<detail::PlusCell> {
+    using detail::PlusCellKind;
+    detail::PlusCell cell;
+    if (legacy.state == LegacyDeclareCell::State::kDict) {
+      cell.kind = static_cast<PlusCellKind>(64);
+      return cell;
+    }
+    if (legacy.state != LegacyDeclareCell::State::kValue) return std::nullopt;
+    const auto& value = legacy.value;
+    switch (value.kind) {
+      case python::Scalar::Kind::kDate:
+        cell.kind = PlusCellKind::kDatetime;
+        cell.micros = value.date.seconds * 1'000'000 + static_cast<std::int64_t>(value.date.nanoseconds / 1000);
+        return cell;
+      case python::Scalar::Kind::kText:
+        cell.kind = PlusCellKind::kText;
+        cell.text = value.text;
+        return cell;
+      case python::Scalar::Kind::kNone: cell.kind = PlusCellKind::kNone; return cell;
+      case python::Scalar::Kind::kBool:
+        cell.kind = PlusCellKind::kBool;
+        cell.micros = value.boolean ? 1 : 0;
+        return cell;
+      case python::Scalar::Kind::kFloat:
+        cell.kind = std::isnan(value.real) ? PlusCellKind::kNaN : PlusCellKind::kFloat;
+        cell.number = value.real;
+        return cell;
+      case python::Scalar::Kind::kInt: {
+        cell.kind = PlusCellKind::kInt;
+        const auto text = python::str(value);
+        std::int64_t parsed = 0;
+        const auto [end, error] = std::from_chars(text.data(), text.data() + text.size(), parsed);
+        if (error == std::errc() && end == text.data() + text.size()) cell.micros = parsed;
+        else cell.text = text;
+        return cell;
+      }
+      default: return std::nullopt;
+    }
+  };
+  const std::string complete_key = options.timestamp_attribute.empty() ? std::string("time:timestamp")
+                                                                       : options.timestamp_attribute;
+  std::vector<detail::PlusCell> starts, completes;
+  std::vector<bool> startless;
+  std::vector<std::vector<std::size_t>> traces;
+  for (const auto& trace : log.traces) {
+    auto& rows = traces.emplace_back();
+    for (const auto& event : trace.events) {
+      const auto start_cell = legacy_declare_cell(event, start_key);
+      const bool no_start = start_cell.state == LegacyDeclareCell::State::kAbsent;
+      auto start = no_start ? std::optional<detail::PlusCell>(detail::PlusCell{}) : cell_of(start_cell);
+      auto complete = cell_of(legacy_declare_cell(event, complete_key));
+      if (!start || !complete || complete->kind != detail::PlusCellKind::kDatetime) return false;
+      rows.push_back(starts.size());
+      starts.push_back(std::move(*start));
+      completes.push_back(std::move(*complete));
+      startless.push_back(no_start);
+    }
+  }
+  std::vector<bool> missing;
+  if (absent)
+    for (const auto& trace : *absent) missing.insert(missing.end(), trace.begin(), trace.end());
+  detail::check_plus_interval_cells(
+      traces, starts, completes, options.use_business_hours,
+      [&](std::size_t row) {
+        if (absent && missing[row]) throw HeuristicPandasError("builtins.KeyError", python_str_repr(key));
+      },
+      [&](const std::vector<std::size_t>& rows) {
+        for (const auto row : rows)
+          if (startless[row]) throw HeuristicPandasError("builtins.KeyError", python_str_repr(start_key));
+      });
+  return true;
+}
+
+// Heuristics++ keyed by an event attribute of an XES upload's log shape
+// (round HF, observed black-box): pm4py reads each value from read_xes'
+// legacy objects (legacy_keyed_activities; each NaN float its own
+// activity). Its interval conversion reads the key event by event, so the
+// first event in log order without it raises KeyError, the first holding a
+// dict TypeError unhashable. With a start column (the first event holds
+// one) the conversion keeps the log: a dict anywhere raises first, then the
+// interval checks trace by trace (check_legacy_plus_intervals). The
+// labels then compare as on a typed frame (round HA, frame_activity_less)
+// and the Petri conversion fails on the first node visited whose value is
+// no str with an incoming edge (finish_typed_plus_net). nullopt when every
+// value is text or a value is not modelled.
+std::optional<HeuristicsNet> legacy_keyed_plus_plus(const EventLog& log, const HeuristicMinerOptions& options) {
+  const auto& key = options.activity_attribute;
+  const auto keyed = legacy_keyed_activities(log, key);
+  if (!keyed) return std::nullopt;
+  const bool pre_interval = !log.traces.empty() && !log.traces.front().events.empty() &&
+                            selected_start_timestamp(log.traces.front().events.front(), options, true) != nullptr;
+  if (pre_interval) {
+    if (keyed->any_dict) throw HeuristicPandasError("builtins.TypeError", "unhashable type: 'dict'");
+    if (!check_legacy_plus_intervals(log, options, &keyed->absent, key)) {
+      check_legacy_plus_starts(log, options);
+      if (keyed->any_absent) throw HeuristicPandasError("builtins.KeyError", python_str_repr(key));
+    }
+  } else {
+    for (std::size_t t = 0; t < log.traces.size(); ++t)
+      for (std::size_t e = 0; e < log.traces[t].events.size(); ++e) {
+        if (keyed->absent[t][e]) throw HeuristicPandasError("builtins.KeyError", python_str_repr(key));
+        if (keyed->types[t][e] == "dict") throw HeuristicPandasError("builtins.TypeError", "unhashable type: 'dict'");
+      }
+  }
+  FrameTypedActivities typed;
+  std::size_t fresh = 0;
+  for (std::size_t t = 0; t < log.traces.size(); ++t)
+    for (std::size_t e = 0; e < log.traces[t].events.size(); ++e) {
+      const auto legacy = legacy_declare_cell(log.traces[t].events[e], key);
+      if (legacy.state != LegacyDeclareCell::State::kValue) return std::nullopt;
+      const auto& value = legacy.value;
+      FrameActivityCell cell;
+      cell.type = legacy.type;
+      cell.label = python::str(value);
+      switch (value.kind) {
+        case python::Scalar::Kind::kInt:
+          cell.number = std::strtold(cell.label.c_str(), nullptr);
+          break;
+        case python::Scalar::Kind::kFloat:
+          cell.number = value.real;
+          cell.nan = std::isnan(value.real);
+          break;
+        case python::Scalar::Kind::kBool: cell.number = value.boolean ? 1.0L : 0.0L; break;
+        case python::Scalar::Kind::kDate:
+          cell.micros = value.date.seconds * 1'000'000 + static_cast<std::int64_t>(value.date.nanoseconds / 1000);
+          break;
+        case python::Scalar::Kind::kText:
+        case python::Scalar::Kind::kNone: break;
+        default: return std::nullopt;
+      }
+      cell.identity = cell.nan ? "nan#" + std::to_string(fresh++) : python::identity(value);
+      typed.cells.push_back(std::move(cell));
+    }
+  std::size_t r = 0;
+  for (const auto& trace : keyed->log.traces)
+    for (const auto& event : trace.events) {
+      typed.names.push_back(event.activity);
+      typed.value_of.try_emplace(event.activity, &typed.cells[r++]);
+    }
+  auto projected = options;
+  projected.activity_attribute = "concept:name";
+  const auto targets = plus_label_comparisons(
+      keyed->log, projected, options, pre_interval, InstanceKeyMode::kPythonLog,
+      [&](const std::string& left, const std::string& right) {
+        (void)frame_activity_less(*typed.value_of.at(left), *typed.value_of.at(right));
+      });
+  auto net = discover_plus_plus(keyed->log, projected, std::nullopt,
+                                [&](const std::string& left, const std::string& right) {
+                                  try {
+                                    return frame_activity_less(*typed.value_of.at(left), *typed.value_of.at(right));
+                                  } catch (const HeuristicPandasError&) {
+                                    return false;
+                                  }
+                                });
+  finish_typed_plus_net(net, typed, targets);
+  net.activity_attribute = key;
+  net.activity_ids_are_local = true;
+  return net;
 }
 
 HeuristicsNet discover_heuristics_net_xes_frame(
@@ -4638,42 +4890,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
           throw HeuristicPandasError("builtins.TypeError", "'<' not supported between instances of '" +
                                                                type_of(left) + "' and '" + type_of(right) + "'");
       };
-      std::vector<std::string> order;
-      std::set<std::string> known;
-      std::map<std::string, std::uint64_t> occurrences;
-      std::map<NamePair, std::uint64_t> follows;
-      for (const auto& trace : log.traces) {
-        const auto converted = to_intervals(trace, projected, start_at.has_value(), false, frame_instance_mode);
-        const auto& intervals = converted.sorted;
-        for (const auto& interval : converted.performance_order) {
-          if (known.insert(interval.activity).second) order.push_back(interval.activity);
-          ++occurrences[interval.activity];
-        }
-        for (std::size_t i = 0; i < intervals.size(); ++i)
-          for (std::size_t j = i + 1; j < intervals.size(); ++j) {
-            if (!(std::max(start_instant(intervals[i]), start_instant(intervals[j])) <=
-                  std::min(complete_instant(intervals[i]), complete_instant(intervals[j]))))
-              break;
-            less(intervals[j].activity, intervals[i].activity);
-          }
-        for (std::size_t i = 0; i < intervals.size(); ++i)
-          for (std::size_t j = i + 1; j < intervals.size(); ++j)
-            if (complete_instant(intervals[i]) <= start_instant(intervals[j])) {
-              if (follows[{intervals[i].activity, intervals[j].activity}]++ == 0)
-                targets[intervals[i].activity].push_back(intervals[j].activity);
-              break;
-            }
-      }
-      const PlusCountThreshold min_activity{options.min_activity_count, options.plusplus_min_activity_count};
-      const PlusCountThreshold min_frequency{options.min_frequency, options.plusplus_min_frequency};
-      for (const auto& from : order) {
-        const auto found = targets.find(from);
-        if (found == targets.end()) continue;
-        for (const auto& to : found->second)
-          if (min_activity.accepts(occurrences[from]) && min_activity.accepts(occurrences[to]) &&
-              min_frequency.accepts(follows[{from, to}]))
-            less(to, from);
-      }
+      targets = plus_label_comparisons(log, projected, options, start_at.has_value(), frame_instance_mode, less);
     }
     // The frame's instance cells: pandas' Python objects, Polars' column text.
     std::function<bool(const std::string&, const std::string&)> python_less;

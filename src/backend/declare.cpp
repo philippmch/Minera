@@ -12,6 +12,8 @@
 #include "xes_frame_columns.hpp"
 #include "xes_frame_typed.hpp"
 #include "xes_frame_activity.hpp"
+#include "xes_legacy_cell.hpp"
+#include "python_object_set.hpp"
 #include "minera/timestamp.hpp"
 
 #include <algorithm>
@@ -1577,9 +1579,13 @@ std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, 
                                                        std::string_view activity_name) {
   const auto column = detail::xes_frame_activity_column(table, std::string(activity_name), false);
   if (!column) return std::nullopt;
-  bool gaps = false;
-  for (const auto& cell : column->cells) gaps = gaps || cell.missing;
-  if (!column->typed && !gaps) return std::nullopt;
+  bool gaps = false, empty = false;
+  for (const auto& cell : column->cells) {
+    gaps = gaps || cell.missing;
+    // An empty str is falsy, as a typed column's 0 or False (round HF).
+    empty = empty || (!cell.missing && cell.value.kind == python::Scalar::Kind::kText && cell.value.text.empty());
+  }
+  if (!column->typed && !gaps && !empty) return std::nullopt;
   const auto found = std::find(table.columns.begin(), table.columns.end(), case_id_key);
   if (found == table.columns.end()) return std::nullopt;
   const auto case_at = static_cast<std::size_t>(found - table.columns.begin());
@@ -1662,35 +1668,7 @@ std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, 
 // instant with nanoseconds as the int of its value, else as the timedelta
 // (days, seconds, microseconds) of its UTC instant since 0001-01-01, a
 // CPython tuple hash.
-std::uint64_t timestamp_hash(const ParsedExactTimestamp& date) {
-  const auto int_hash = [](std::int64_t v) -> std::uint64_t {
-    constexpr std::uint64_t modulus = (std::uint64_t(1) << 61) - 1;
-    const std::uint64_t magnitude = v < 0 ? std::uint64_t(0) - static_cast<std::uint64_t>(v) : static_cast<std::uint64_t>(v);
-    std::int64_t h = static_cast<std::int64_t>(magnitude % modulus);
-    if (v < 0) h = -h;
-    if (h == -1) h = -2;
-    return static_cast<std::uint64_t>(h);
-  };
-  // A Timestamp with nanoseconds has the ns unit, whose values fit int64.
-  if (date.nanoseconds % 1000 != 0 && date.seconds > -9223372036 && date.seconds < 9223372036)
-    return int_hash(date.seconds * 1000000000 + static_cast<std::int64_t>(date.nanoseconds));
-  std::int64_t days = date.seconds / 86400, seconds = date.seconds % 86400;
-  if (seconds < 0) {
-    seconds += 86400;
-    --days;
-  }
-  const std::int64_t items[3] = {days + 719163, seconds, static_cast<std::int64_t>(date.nanoseconds / 1000)};
-  constexpr std::uint64_t p1 = 11400714785074694791ULL, p2 = 14029467366897019727ULL, p5 = 2870177450012600261ULL;
-  std::uint64_t acc = p5;
-  for (const auto item : items) {
-    acc += int_hash(item) * p2;
-    acc = (acc << 31) | (acc >> 33);
-    acc *= p1;
-  }
-  acc += 3 ^ (p5 ^ 3527539ULL);
-  if (acc == ~std::uint64_t(0)) acc = 1546275796;
-  return acc;
-}
+std::uint64_t timestamp_hash(const ParsedExactTimestamp& date) { return detail::python_timestamp_hash(date); }
 
 // CPython 3.11's tuple hash (xxHash lanes over the items' hashes).
 std::uint64_t python_tuple_hash(std::initializer_list<std::uint64_t> items) {
@@ -2619,136 +2597,6 @@ TypedDeclareResult typed_declare_result(const TypedDeclareTraces& traces, const 
 
 }  // namespace
 
-namespace {
-
-// event[key] of pm4py's legacy event dict, as the iterparse importer stores
-// an XES attribute (round HE, observed black-box; the classic heuristics'
-// reading of rounds GK and GL): a string or id a str, an int an int of any
-// width, a float float() of its text (each NaN its own object), a boolean
-// True where its text is "true" in any case, a date a datetime.datetime
-// whose wall clock is kept and marked UTC (fix_naivety drops the offset; the
-// microseconds of a finer fraction), a valueless string or a <list> without
-// children None, a <list> with children (or a scalar with children) a dict;
-// a <container> is not stored. kUnmodelled where Minera cannot tell.
-struct LegacyDeclareCell {
-  enum class State { kValue, kAbsent, kDict, kUnmodelled };
-  State state = State::kValue;
-  python::Scalar value;
-  std::string type;
-};
-
-LegacyDeclareCell legacy_declare_attribute(const EventAttribute& attribute) {
-  using State = LegacyDeclareCell::State;
-  LegacyDeclareCell out;
-  const auto none = [&] {
-    out.value = python::none();
-    out.type = "NoneType";
-    return out;
-  };
-  if (attribute.container != AttributeContainerKind::kScalar || attribute.scalar_wrapper ||
-      !attribute.children.empty()) {
-    if (attribute.xes_public_shape == XesPublicShape::kNone) return none();
-    if (attribute.xes_public_shape == XesPublicShape::kAbsent) out.state = State::kAbsent;
-    else if (attribute.xes_public_shape == XesPublicShape::kWrapper || attribute.scalar_wrapper) out.state = State::kDict;
-    else out.state = State::kUnmodelled;
-    return out;
-  }
-  if (attribute.is_null || is_native_na_attribute(attribute)) return none();
-  switch (attribute.kind) {
-    case AttributeKind::kString:
-    case AttributeKind::kId:
-      out.value = python::text(attribute.value);
-      out.type = "str";
-      return out;
-    case AttributeKind::kInt:
-      if (const auto* i = std::get_if<std::int64_t>(&attribute.typed_value)) out.value = python::integer(*i);
-      else if (const auto* u = std::get_if<std::uint64_t>(&attribute.typed_value)) out.value = python::unsigned_integer(*u);
-      else if (const auto parsed = python::integer_literal(attribute.value)) out.value = *parsed;
-      else {
-        out.state = State::kUnmodelled;
-        return out;
-      }
-      out.type = "int";
-      return out;
-    case AttributeKind::kFloat:
-      if (const auto* d = std::get_if<double>(&attribute.typed_value)) out.value = python::real(*d);
-      else if (const auto parsed = detail::parse_python_float_text(attribute.value)) out.value = python::real(*parsed);
-      else {
-        out.state = State::kUnmodelled;
-        return out;
-      }
-      out.type = "float";
-      return out;
-    case AttributeKind::kBoolean: {
-      bool truth = false;
-      if (const auto* b = std::get_if<bool>(&attribute.typed_value)) truth = *b;
-      else {
-        std::string lower = attribute.value;
-        for (auto& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        truth = lower == "true";
-      }
-      out.value = python::boolean(truth);
-      out.type = "bool";
-      return out;
-    }
-    case AttributeKind::kDate: {
-      auto parsed = parse_timestamp_exact(attribute.value);
-      if (!parsed) {
-        out.state = State::kUnmodelled;
-        return out;
-      }
-      if (parsed->timezone_aware) parsed->seconds += static_cast<std::int64_t>(parsed->offset_minutes) * 60;
-      parsed->offset_minutes = 0;
-      parsed->timezone_aware = true;
-      parsed->nanoseconds -= parsed->nanoseconds % 1000;
-      out.value.kind = python::Scalar::Kind::kDate;
-      out.value.date = *parsed;
-      out.value.text = attribute.value;
-      out.type = "datetime.datetime";
-      return out;
-    }
-    default: out.state = State::kUnmodelled; return out;
-  }
-}
-
-LegacyDeclareCell legacy_declare_cell(const Event& event, const std::string& key) {
-  using State = LegacyDeclareCell::State;
-  const auto key_of = [](const std::string& source, std::string_view standard) {
-    return source.empty() ? std::string(standard) : source;
-  };
-  const auto attribute_value = [&] {
-    for (const auto& attribute : event.attributes)
-      if (attribute.key == key) return legacy_declare_attribute(attribute);
-    LegacyDeclareCell out;
-    out.state = State::kAbsent;
-    return out;
-  };
-  // A first-class key the event holds as no scalar stays among its attributes.
-  const auto field = [&](bool present, FirstClassAttributeState state, const std::optional<EventAttribute>& attribute,
-                         const std::string& value, bool date) {
-    if (!present) return attribute_value();
-    if (attribute) return legacy_declare_attribute(*attribute);
-    LegacyDeclareCell out;
-    if (state == FirstClassAttributeState::kNull) {
-      out.value = python::none();
-      out.type = "NoneType";
-      return out;
-    }
-    EventAttribute cell{key, value, date ? AttributeKind::kDate : AttributeKind::kString};
-    return legacy_declare_attribute(cell);
-  };
-  if (key == key_of(event.timestamp_source_key, "time:timestamp"))
-    return field(event.has_timestamp(), event.timestamp_state, event.timestamp_attribute, event.timestamp, true);
-  if (key == key_of(event.activity_source_key, "concept:name"))
-    return field(event.has_activity(), event.activity_state, event.activity_attribute, event.activity, false);
-  if (key == key_of(event.resource_source_key, "org:resource"))
-    return field(event.has_resource(), event.resource_state, event.resource_attribute, event.resource, false);
-  if (key == key_of(event.lifecycle_source_key, "lifecycle:transition"))
-    return field(event.has_lifecycle(), event.lifecycle_state, event.lifecycle_attribute, event.lifecycle, false);
-  return attribute_value();
-}
-
-}  // namespace
 
 std::optional<TypedDeclareResult> discover_declare_typed_log(const EventLog& log,
                                                              const DeclareDiscoveryOptions& options) {
@@ -2764,7 +2612,10 @@ std::optional<TypedDeclareResult> discover_declare_typed_log(const EventLog& log
       if (cell.state == State::kUnmodelled) return std::nullopt;
       absent = absent || cell.state == State::kAbsent;
       dict = dict || cell.state == State::kDict;
-      typed = typed || (cell.state == State::kValue && cell.value.kind != python::Scalar::Kind::kText);
+      // An empty str is falsy too: a binary rule ending in it is stored under
+      // its first activity alone (round HF, as a typed column's 0 or False).
+      typed = typed || (cell.state == State::kValue && (cell.value.kind != python::Scalar::Kind::kText ||
+                                                         cell.value.text.empty()));
       cells[t].push_back(std::move(cell));
     }
   }
@@ -2817,6 +2668,23 @@ DeclareModel discover_declare_frame_slices(const EventDataView& data,
     auto materialized = data.lazy_table()->materialize();
     const auto found = std::find(materialized.columns.begin(), materialized.columns.end(), activity_name);
     const auto column = detail::xes_frame_activity_column(materialized, activity_name, false);
+    // Round HF: an empty str is falsy, so a binary rule ending in it is keyed
+    // by its first activity alone (observed black-box, as on pandas): the
+    // typed model on Polars' projection, and its conformance.
+    if (found != materialized.columns.end() && column && !column->typed &&
+        std::any_of(column->cells.begin(), column->cells.end(), [](const auto& cell) {
+          return !cell.missing && cell.value.kind == python::Scalar::Kind::kText && cell.value.text.empty();
+        })) {
+      auto session = discover_declare(frame_slice_view(data, options.case_id_key, options.activity_key, log, table, true),
+                                      options);
+      const auto projection =
+          polars_projection_table(std::move(materialized), options.case_id_key, options.activity_key, true);
+      if (auto typed = discover_declare_typed_frame(projection, options)) {
+        *shown = std::move(typed->model);
+        if (shown_conformance) *shown_conformance = std::move(typed->conformance);
+      }
+      return session;
+    }
     if (found != materialized.columns.end() && column && column->dtype == detail::XesFrameDtype::kObject) {
       const auto at = static_cast<std::size_t>(found - materialized.columns.begin());
       bool relabeled = false;

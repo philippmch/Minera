@@ -452,7 +452,9 @@ void validate_declare_model(const DeclareModel& model,
           throw std::invalid_argument("Declare unary rule has binary fields");
         }
       } else {
-        if (!rule.binary || !graph.activity_id(rule.second)) {
+        // A binary rule whose second activity is falsy is keyed by its first
+        // alone in pm4py's model (round HF: an XES log shape's empty str).
+        if (rule.binary && !graph.activity_id(rule.second)) {
           throw std::invalid_argument(
               "Declare binary rule has invalid activity fields");
         }

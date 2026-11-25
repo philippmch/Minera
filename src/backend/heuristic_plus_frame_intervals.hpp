@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -230,16 +231,27 @@ inline bool plus_subtract_seconds(const PlusCell& later, const PlusCell& earlier
 // trace in its events' order): raises pm4py's first error. With business
 // hours the performance DFG and the service times measure each span with
 // BusinessHours (round GJ) instead of subtracting and calling timestamp().
+// `read_activity` reads an event's activity (an XES upload's log shape, round
+// HF, observed black-box): each event in start order before the comparisons
+// of its completion, each later event before its start is compared;
+// `read_starts` reads a trace's starts before its sort.
 inline void check_plus_interval_cells(const std::vector<std::vector<std::size_t>>& traces,
                                       const std::vector<PlusCell>& start,
                                       const std::vector<PlusCell>& complete,
-                                      bool business_hours = false) {
+                                      bool business_hours = false,
+                                      const std::function<void(std::size_t)>& read_activity = {},
+                                      const std::function<void(const std::vector<std::size_t>&)>& read_starts = {}) {
   for (const auto& trace : traces) {
+    if (read_starts) read_starts(trace);
     auto sorted = trace;
     python_list_sort(sorted, [&](std::size_t a, std::size_t b) { return plus_compare(start[a], start[b], false); });
-    for (std::size_t i = 0; i < sorted.size(); ++i)
-      for (std::size_t j = i + 1; j < sorted.size(); ++j)
+    for (std::size_t i = 0; i < sorted.size(); ++i) {
+      if (read_activity) read_activity(sorted[i]);
+      for (std::size_t j = i + 1; j < sorted.size(); ++j) {
+        if (read_activity) read_activity(sorted[j]);
         if (plus_compare(complete[sorted[i]], start[sorted[j]], true)) break;
+      }
+    }
   }
   if (business_hours) {
     for (const auto& trace : traces)

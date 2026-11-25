@@ -105,7 +105,28 @@ struct FrameKeyedActivities {
   std::string first_non_text_type;  // in log order
   std::size_t distinct = 0;         // distinct labels
   std::optional<DataFrameColumnType> column;  // the key's dtype
+  // Round HF: an XES upload's log shape (legacy_keyed_activities). Events
+  // without the key (pm4py's KeyError where a family reads one) and dict
+  // cells (a <list> with children, unhashable; their label is empty).
+  bool legacy = false;
+  std::vector<std::vector<bool>> absent;
+  bool any_absent = false;
+  bool any_dict = false;
 };
+
+// The log shape of an XES upload keyed by an event attribute (round HF,
+// observed black-box): pm4py's EventLog families read read_xes' legacy
+// objects (xes_legacy_cell.hpp): an int of any width, a float of its own
+// (each NaN its own object, missing), a bool, a datetime.datetime (its wall
+// clock marked UTC), None for a valueless value, a dict for a list with
+// children. Each value equal to another as a dict key (1, 1.0 and True) is
+// one activity, named str() of the first one met in log order; values
+// printed alike but unequal ('1' beside 1, each NaN) get trailing \x1f
+// (printed_activity_label). nullopt unless the log is an XES upload whose
+// events hold the key as some other value than text or lack it, or when a
+// value is one Minera cannot tell.
+[[nodiscard]] std::optional<FrameKeyedActivities> legacy_keyed_activities(const EventLog& log,
+                                                                          const std::string& key);
 
 // nullopt when the log has no frame, or the key is concept:name (or
 // "activity") or no column of the frame. With every cell text (non_text
