@@ -187,6 +187,15 @@ using TemporalConformanceResult = std::vector<std::vector<TemporalDeviation>>;
     const EventDataView& data, const TemporalProfile& profile, const TemporalProfileOptions& options,
     const std::string& polars_start_name, const std::string& polars_timestamp_name = {});
 
+// pandas' frame conformance where the activity column has the numeric or
+// datetime dtype `merge_dtype` (int64, uint64, float64, datetime64[us,
+// UTC]): a non-empty pair frame's merge with the profile's str labels raises
+// pandas' ValueError (round HM, observed black-box); an empty `merge_dtype`
+// is conform_temporal_profile_dataframe.
+[[nodiscard]] TemporalConformanceResult conform_temporal_profile_dataframe_merge(
+    const EventTable& table, const TemporalProfile& profile, const TemporalProfileOptions& options,
+    const std::string& merge_dtype);
+
 // Detailed conformance preserves one result bucket per input case, including
 // empty buckets. The legacy check function below remains a flattened view.
 [[nodiscard]] TemporalConformanceResult conform_temporal_profile_log(

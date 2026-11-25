@@ -1559,16 +1559,50 @@ TemporalConformanceResult conform_temporal_profile_log(
 
 namespace {
 
+// The rows of pandas' pair frame over temporal_table_to_log's log: the
+// pairs of rows of one case where the first comes first (by "@@index" when
+// `ranks` hold it, else in the sorted order) and has a completion no later
+// than the second's start (NaT on either side pairs nothing).
+std::size_t pandas_pair_rows(const EventLog& log, const PairRanks& ranks) {
+  const auto instant = [](const Event& event, const std::string& attribute) {
+    const auto* value = selected_event_value(event, attribute, "timestamp");
+    return value ? parse_timestamp_exact(*value) : std::nullopt;
+  };
+  const std::string source_attribute, target_attribute = "__minera_temporal_target";
+  std::size_t count = 0;
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    const auto& events = log.traces[t].events;
+    const auto* rank = t < ranks.size() && ranks[t].size() == events.size() ? &ranks[t] : nullptr;
+    for (std::size_t i = 0; i < events.size(); ++i) {
+      const auto completion = instant(events[i], source_attribute);
+      if (!completion) continue;
+      for (std::size_t j = rank ? 0 : i + 1; j < events.size(); ++j) {
+        if (rank && (*rank)[j] <= (*rank)[i]) continue;
+        const auto start = instant(events[j], target_attribute);
+        if (start && std::tie(completion->seconds, completion->nanoseconds) <= std::tie(start->seconds, start->nanoseconds))
+          ++count;
+      }
+    }
+  }
+  return count;
+}
+
 // pm4py's frame conformance merges the row pairs with the profile's frame on
 // the two activity columns; the frame of an empty profile has no columns, so
 // pandas raises KeyError on the activity key and Polars a column-not-found
 // error, after the frame's own columns were checked (round DS, observed
 // black-box; the EventLog conformance lists every case without deviations).
+// `merge_dtype`, when set, is the pandas dtype of the frame's activity
+// column where it is numeric or datetime: pandas' merge of a non-empty pair
+// frame with the profile's frame, whose labels are str, raises its
+// ValueError (round HM, observed black-box; an empty profile's KeyError
+// comes first, an empty pair frame merges).
 TemporalConformanceResult conform_table(const EventTable& table, const TemporalProfile& profile,
                                         const TemporalProfileOptions& options, bool lazy, bool whole_seconds = false,
                                         std::optional<std::size_t> pair_rows = std::nullopt,
                                         const std::string& polars_start_name = {},
-                                        const std::string& polars_timestamp_name = {}) {
+                                        const std::string& polars_timestamp_name = {},
+                                        const std::string& merge_dtype = {}) {
   std::vector<std::size_t> case_first_rows;
   PairRanks ranks, orders;
   auto log = temporal_table_to_log(table, options, &case_first_rows, &ranks, &orders);
@@ -1578,6 +1612,8 @@ TemporalConformanceResult conform_table(const EventTable& table, const TemporalP
                                   "\"; valid columns: []");
     throw std::invalid_argument("KeyError: '" + options.activity_attribute + "'");
   }
+  if (!lazy && !merge_dtype.empty() && pandas_pair_rows(log, ranks) > 0)
+    throw std::invalid_argument(detail::pandas_profile_merge_error(merge_dtype, options.activity_attribute));
   if (lazy && whole_seconds) {
     validate_slots(options);
     check_polars_business_pairs(table, options, polars_start_name, polars_timestamp_name);
@@ -1725,6 +1761,12 @@ TemporalConformanceResult conform_temporal_profile_dataframe(
   return conform_table(table, profile, options, false);
 }
 
+TemporalConformanceResult conform_temporal_profile_dataframe_merge(
+    const EventTable& table, const TemporalProfile& profile, const TemporalProfileOptions& options,
+    const std::string& merge_dtype) {
+  return conform_table(table, profile, options, false, false, std::nullopt, {}, {}, merge_dtype);
+}
+
 TemporalConformanceResult conform_temporal_profile(
     const EventDataView& data, const TemporalProfile& profile,
     const TemporalProfileOptions& options) {
@@ -1865,15 +1907,35 @@ TemporalConformanceResult conform_temporal_profile_xes_frame(
           explicit_start && has(start), options.use_business_hours));
     throw std::invalid_argument(detail::polars_conformance_plan_error(message));
   }
+  // pandas' merge of the pairs with the profile's str labels (round HM).
+  // A bool column's cells, and an object column's cells of other objects
+  // than str, merge but never equal a str label (round HM, observed
+  // black-box: no deviation).
+  std::string merge_dtype;
+  std::vector<bool> unmatched;
+  if (!polars && !profile.entries.empty())
+    if (const auto column = detail::xes_frame_activity_column(present, options.activity_attribute, false)) {
+      merge_dtype = detail::xes_frame_merge_dtype(*column);
+      if (column->dtype == detail::XesFrameDtype::kBool || column->dtype == detail::XesFrameDtype::kObject) {
+        unmatched.assign(present.rows.size(), false);
+        for (std::size_t r = 0; r < column->cells.size() && r < unmatched.size(); ++r)
+          unmatched[r] = !column->cells[r].missing && column->cells[r].type != "str";
+        if (std::none_of(unmatched.begin(), unmatched.end(), [](bool u) { return u; })) unmatched.clear();
+      }
+    }
   if (verdict.kind == detail::XesPandasTpVerdict::Kind::kPairs ||
       verdict.kind == detail::XesPandasTpVerdict::Kind::kSingle ||
       verdict.kind == detail::XesPandasTpVerdict::Kind::kEmpty) {
+    if (!merge_dtype.empty() && (verdict.kind == detail::XesPandasTpVerdict::Kind::kSingle ||
+                                 (verdict.kind == detail::XesPandasTpVerdict::Kind::kPairs && !verdict.pairs.empty())))
+      throw std::invalid_argument(detail::pandas_profile_merge_error(merge_dtype, options.activity_attribute));
     const auto& table = present;
     const auto cases = detail::xes_typed_column(table, options.case_id_attribute, polars);
     const auto column = std::find(table.columns.begin(), table.columns.end(), options.activity_attribute);
     const auto at = static_cast<std::size_t>(column - table.columns.begin());
     const auto activity = [&](std::size_t row) -> const std::string* {
       if (column == table.columns.end()) return nullptr;
+      if (row < unmatched.size() && unmatched[row]) return nullptr;
       const auto& cells = table.rows[row];
       if (at >= cells.size() || !cells[at] || cells[at]->is_null) return nullptr;
       return &cells[at]->value;
@@ -1947,7 +2009,16 @@ TemporalConformanceResult conform_temporal_profile_xes_frame(
         if (std::string_view(error.what()) == detail::kPandasBusinessEmptyFlow) throw;
       }
     }
-    return conform_temporal_profile(view, profile, options);
+    if (!unmatched.empty()) {
+      auto marked = *view.table();
+      const auto found = std::find(marked.columns.begin(), marked.columns.end(), options.activity_attribute);
+      const auto at = static_cast<std::size_t>(found - marked.columns.begin());
+      for (std::size_t r = 0; r < marked.rows.size() && r < unmatched.size(); ++r)
+        if (unmatched[r] && at < marked.rows[r].size() && marked.rows[r][at])
+          marked.rows[r][at]->value.insert(0, "\x1f");
+      return conform_table(marked, profile, options, false, false, std::nullopt, {}, {}, merge_dtype);
+    }
+    return conform_table(*view.table(), profile, options, false, false, std::nullopt, {}, {}, merge_dtype);
   }
   const std::string start_name = explicit_start && start == timestamp ? timestamp : std::string();
   if (auto gaps = detail::xes_frame_date_gaps_missing(*source, keys))

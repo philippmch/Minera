@@ -164,4 +164,31 @@ inline std::string xes_frame_activity_type_error(const XesFrameActivityColumn& c
   return message;
 }
 
+// pandas' merge of a frame's numeric or datetime column with a str column
+// (round HM: the temporal conformance's profile frame).
+inline std::string pandas_profile_merge_error(const std::string& dtype, const std::string& key) {
+  return "ValueError: You are trying to merge on " + dtype + " and str columns for key '" + key +
+         "'. If you wish to proceed you should use pd.concat";
+}
+
+// The pandas dtype of an XES frame's activity column when its merge with a
+// str column raises (int64, uint64, float64, datetime64[us, UTC]: read_xes
+// holds UTC Timestamps of microseconds); empty for bool, str and object
+// columns, which merge (round HM, observed black-box).
+inline std::string xes_frame_merge_dtype(const XesFrameActivityColumn& column) {
+  if (column.polars) return {};
+  switch (column.dtype) {
+    case XesFrameDtype::kInt:
+      for (const auto& cell : column.cells)
+        if (cell.value.kind == python::Scalar::Kind::kInt && !cell.value.negative &&
+            python::compare_digits(cell.value.digits, "9223372036854775807") > 0)
+          return "uint64";
+      return "int64";
+    case XesFrameDtype::kFloat:
+    case XesFrameDtype::kNaNFloat: return "float64";
+    case XesFrameDtype::kDatetime: return "datetime64[us, UTC]";
+    default: return {};
+  }
+}
+
 }  // namespace minera::detail

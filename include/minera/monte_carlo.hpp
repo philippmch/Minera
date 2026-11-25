@@ -157,6 +157,8 @@ struct MonteCarloOptions {
   // fits a cached POWL net on its named replay copy with that copy's order
   // (round GG).
   std::optional<std::vector<std::vector<std::size_t>>> place_outgoing_transition_order;
+  // Fitting-only: StochasticMapFitOptions::falsy_labels (round HM).
+  std::vector<std::string> falsy_labels;
 };
 
 struct MonteCarloDiagnostics {

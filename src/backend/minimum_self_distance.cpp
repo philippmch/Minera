@@ -22,6 +22,11 @@ struct ActivitySequence {
   // their rows the same position, so a repeat there wraps the unsigned
   // 32-bit distance.
   bool null_case = false;
+  // The pandas adapter keeps a row whose activity cell is a gap (NaN, None,
+  // an absent attribute) as an event between others, but never keys it
+  // (round HM, observed black-box: [a, NaN, a] gives a: 1, [NaN, a, NaN]
+  // nothing). Empty: no gaps.
+  std::vector<bool> gaps;
 };
 
 constexpr std::uint64_t kPolarsNullCaseDistance = 4294967295u;
@@ -483,11 +488,53 @@ std::vector<ActivitySequence> stream_sequences(
                         });
 }
 
+bool is_null_cell(const EventAttribute* field);
+
+// The pandas adapter's sequences: a gap in an activity column the frame has
+// is an unkeyed event (ActivitySequence::gaps); a key naming no column, or
+// a gap in the case column, fails as before.
+std::vector<ActivitySequence> pandas_table_sequences(
+    const EventTable& table, const MinimumSelfDistanceOptions& options) {
+  const auto activity_key = effective_activity_key(options);
+  const auto case_id_key = effective_case_id_key(options);
+  const auto activity_column = static_cast<std::size_t>(std::distance(
+      table.columns.begin(), std::find(table.columns.begin(), table.columns.end(), activity_key)));
+  if (activity_column == table.columns.size()) return {};
+  std::vector<ActivitySequence> sequences;
+  std::map<std::string, std::size_t> groups;
+  for (const auto& row : table.rows) {
+    // Only a null cell is a gap; a cell of another first-class role still
+    // fails as it does for the other adapters.
+    const bool gap = activity_column >= row.size() || !row[activity_column] || is_null_cell(&*row[activity_column]);
+    const auto* activity =
+        gap ? nullptr : &required_flat_field(find_activity_table_field(table, row, activity_key), "activity", activity_key);
+    const auto& case_field = required_flat_field(
+        find_table_field(table, row, case_id_key, FirstClassAttributeRole::kCaseId,
+                         {"case_id", "case:id", "case:concept:name"}),
+        "case-id", case_id_key);
+    const auto [found, inserted] = groups.emplace(case_field.value, sequences.size());
+    if (inserted) {
+      ActivitySequence sequence;
+      sequence.case_id = case_field.value;
+      sequences.push_back(std::move(sequence));
+    }
+    auto& sequence = sequences[found->second];
+    if (gap && sequence.gaps.empty()) sequence.gaps.assign(sequence.activities.size(), false);
+    if (!sequence.gaps.empty()) sequence.gaps.push_back(gap);
+    sequence.activities.push_back(gap ? MinimumSelfDistanceActivity{} : MinimumSelfDistanceActivity{activity->value});
+  }
+  return sequences;
+}
+
 std::vector<ActivitySequence> table_sequences(
     const EventTable& table, const MinimumSelfDistanceOptions& options) {
   table.validate();
   const auto activity_key = effective_activity_key(options);
   const auto case_id_key = effective_case_id_key(options);
+  if (options.variant == MinimumSelfDistanceVariant::kPandas) {
+    auto sequences = pandas_table_sequences(table, options);
+    if (!sequences.empty() || table.rows.empty()) return sequences;
+  }
   return flat_sequences(activity_key, case_id_key,
                         [&](const auto& consume) {
                           for (const auto& row : table.rows) {
@@ -567,7 +614,9 @@ DiscoveryData discover_from_sequences(std::vector<ActivitySequence> sequences) {
     const auto& activities = data.sequences[sequence_index].activities;
     std::map<MinimumSelfDistanceActivity,
              std::pair<std::size_t, std::size_t>> previous;
+    const auto& gaps = data.sequences[sequence_index].gaps;
     for (std::size_t index = 0; index < activities.size(); ++index) {
+      if (!gaps.empty() && gaps[index]) continue;
       const auto& activity = activities[index];
       const auto found = previous.find(activity);
       if (found != previous.end()) {
@@ -598,7 +647,9 @@ MinimumSelfDistanceWitnessMap derive_from_sequences(
     const std::map<MinimumSelfDistanceActivity, Distance>& requested) {
   MinimumSelfDistanceWitnessMap witnesses;
   for (const auto& sequence : data.sequences) {
-    for (const auto& activity : sequence.activities) {
+    for (std::size_t index = 0; index < sequence.activities.size(); ++index) {
+      if (!sequence.gaps.empty() && sequence.gaps[index]) continue;
+      const auto& activity = sequence.activities[index];
       const auto found = requested.find(activity);
       if (found != requested.end() && found->second > 0)
         witnesses.try_emplace(activity);
@@ -611,6 +662,7 @@ MinimumSelfDistanceWitnessMap derive_from_sequences(
       continue;
     auto& target = witnesses.at(segment.activity);
     const auto& activities = data.sequences[segment.sequence_index].activities;
+    // A pandas gap between the occurrences is a null witness.
     for (std::size_t index = segment.left + 1; index < segment.right; ++index)
       target.insert(activities[index]);
   }

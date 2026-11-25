@@ -498,6 +498,12 @@ StochasticMapFitResult fit_stochastic_map_with_report(
   const auto activation_sequences =
       replay_token_activation_sequences(log, net, options.replay);
   StochasticMapFitResult result;
+  // Labels pm4py's statistics read as falsy objects (round HM).
+  std::vector<bool> falsy(net.activities().size(), false);
+  for (std::size_t activity = 0; activity < falsy.size(); ++activity)
+    falsy[activity] = net.activities()[activity].empty() ||
+                      std::find(options.falsy_labels.begin(), options.falsy_labels.end(),
+                                net.activities()[activity]) != options.falsy_labels.end();
   std::vector<StochasticMapTransitionStatistics> statistics(net.transitions().size());
   for (std::size_t index = 0; index < statistics.size(); ++index)
     statistics[index].transition = index;
@@ -634,7 +640,9 @@ StochasticMapFitResult fit_stochastic_map_with_report(
       }
       Token produced_token{false, std::nullopt, event_index};
       std::optional<double> performance;
-      if (!transition.activity) {
+      const bool falsy_label = transition.activity && *transition.activity < falsy.size() &&
+                               falsy[*transition.activity];
+      if (!transition.activity || falsy_label) {
         // A hidden firing passes its arrival token on, unless that token
         // came from the first event (or the initial marking): the reference
         // then leaves the hidden firing and its outputs untimed. Its own
@@ -645,6 +653,14 @@ StochasticMapFitResult fit_stochastic_map_with_report(
         if (arrival && arrival->source > 0) {
           produced_token = *arrival;
           if (!first_event_input) performance = 0.0;
+        }
+        // A falsy label is timed as a hidden transition's but still meets
+        // its event (round HM, observed black-box: the next event's
+        // transition measures from the token before it, and the one after
+        // from that event).
+        if (falsy_label && event_index < trace.events.size()) {
+          const auto activity = selected_activity(trace.events[event_index]);
+          if (activity && *activity == net.activities()[*transition.activity]) ++event_index;
         }
       } else if (event_index < trace.events.size()) {
         const auto& event = trace.events[event_index];

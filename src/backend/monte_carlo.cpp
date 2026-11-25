@@ -1275,6 +1275,8 @@ MonteCarloResult run_monte_carlo(const PetriNet& net,
       Event event;
       event.case_id = state.trace.case_id;
       event.activity = net.activities()[*transition.activity];
+      // pm4py's playouts name every visible firing, an empty label too (round HM).
+      if (event.activity.empty()) event.activity_state = FirstClassAttributeState::kPresent;
       event.timestamp = format_timestamp_microseconds(finish);
       event.input_order = state.trace.events.size();
       if (!is_activity_alias(options.activity_key)) {
@@ -1451,6 +1453,7 @@ MonteCarloOptions fit_monte_carlo_options(const EventLog& input_log,
   fit.replay.initial_marking_keys = fitted.initial_marking_keys;
   fit.replay.final_marking_keys = fitted.final_marking_keys;
   fit.replay.cancelled = fitted.cancelled;
+  fit.falsy_labels = fitted.falsy_labels;
   fitted.stochastic_map = fit_stochastic_map_with_report(input_log, net, fit).map;
   return fitted;
 }

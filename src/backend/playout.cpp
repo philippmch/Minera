@@ -170,6 +170,8 @@ EventLog playout(const PetriNet& net, const PlayoutOptions& options) {
       Event event;
       event.case_id = trace.case_id;
       event.activity = net.activities()[*transition.activity];
+      // pm4py's playouts name every visible firing, an empty label too (round HM).
+      if (event.activity.empty()) event.activity_state = FirstClassAttributeState::kPresent;
       event.timestamp = format_timestamp(now);
       event.input_order = trace.events.size();
       trace.events.push_back(std::move(event));
@@ -460,6 +462,8 @@ EventLog stochastic_playout_impl(const PetriNet& net,
         Event event;
         event.case_id = trace.case_id;
         event.activity = net.activities()[*fired.activity];
+        // pm4py's playouts name every visible firing, an empty label too (round HM).
+        if (event.activity.empty()) event.activity_state = FirstClassAttributeState::kPresent;
         event.timestamp = format_timestamp(now);
         event.input_order = trace.events.size();
         trace.events.push_back(std::move(event));
@@ -720,6 +724,8 @@ EventLog extensive_playout_impl(const PetriNet& net,
       Event event;
       event.case_id = trace.case_id;
       event.activity = net.activities()[*transitions[transition].activity];
+      // pm4py's playouts name every visible firing, an empty label too (round HM).
+      if (event.activity.empty()) event.activity_state = FirstClassAttributeState::kPresent;
       event.timestamp = format_timestamp(now);
       event.input_order = trace.events.size();
       trace.events.push_back(std::move(event));

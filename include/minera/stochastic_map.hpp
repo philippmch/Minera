@@ -82,6 +82,12 @@ struct StochasticMapFitOptions {
   bool fit_timing = true;
   int default_priority = 0;
   TokenReplayOptions replay;
+  // The net's activity names whose labels are falsy Python objects in pm4py
+  // (0, 0.0, -0.0, False of a typed key); an activity named "" (the empty
+  // str) is always falsy. pm4py's replay statistics time a transition with
+  // a falsy label as a hidden one, though its firing still consumes its
+  // event (round HM, observed black-box).
+  std::vector<std::string> falsy_labels;
 };
 
 struct StochasticMapTransitionStatistics {

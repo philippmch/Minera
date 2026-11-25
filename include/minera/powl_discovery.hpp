@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <functional>
 #include <string>
+#include <vector>
 
 namespace minera {
 
@@ -70,6 +71,10 @@ struct PowlDiscoveryOptions {
 // the same names under concept:name (a replay keyed the same reads them
 // there). Throws the discovery's KeyError or TypeError.
 [[nodiscard]] bool powl_keyed_by_log_objects(const EventLog& event_log, const PowlDiscoveryOptions& options);
+// The net names of the key's falsy objects (0, 0.0, -0.0, False, '') when
+// the discovery reads them (powl_keyed_by_log_objects): pm4py's stochastic
+// map times a transition so labelled as a hidden one (round HM).
+[[nodiscard]] std::vector<std::string> powl_falsy_labels(const EventLog& event_log, const PowlDiscoveryOptions& options);
 // The same discovery; `cancelled`, when set, is polled at every recursion
 // step and fall-through candidate and throws OperationCancelled
 // (minera/cancellation.hpp) once it returns true. The fall-throughs try every

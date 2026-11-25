@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HL (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HM (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -11137,6 +11137,89 @@ stream; 189 fail on HK's binary; `tc/seedchk.py` under PYTHONHASHSEED 1
 and 3: none differ); the 16 manifests replayed 2,673 responses unchanged;
 no frontend or Python script change.
 Harness and probes: `review-harness/round-hl/`.
+
+Round HM re-reviewed HL. HL's CI run 45681983482 passed every job: Linux,
+macOS and Windows ctest, the frontend, the Python scripts and the parity
+verifier (HK's Windows job had passed as well).
+HM1 /api/stochastic-map?miner=powl and the Monte Carlo fit on a POWL net
+mined under a typed key time a transition labelled by a falsy object (0,
+0.0, -0.0, False, or '') as pm4py's replay statistics do: as a hidden one
+(the immediate distribution, its durations unsampled), while its firing
+still consumes its event (`StochasticMapFitOptions::falsy_labels`, filled
+from `powl_falsy_labels`; observed black-box). Sweep `ct/pdec.py` smap (40
+uploads per bank, keys K1..K6): hfA 177 -> 226 of 234, hfG 85 -> 96 of 96,
+hfN 77 -> 92 of 94, hcS 115 -> 121 of 175. The rest are nets of keys
+holding NaN or NaT (HK's declared residual: pm4py's net differs).
+HM2 /api/analyze-behavior temporal_conformance on the dataframe adapter
+keyed by a typed column raises pandas' merge error (`ValueError: You are
+trying to merge on int64 and str columns for key 'K1'`, the dtype of the
+column as read_xes or format_dataframe(read_csv) types it: int64, uint64
+past 2**63-1, float64, datetime64[us, UTC]) once the pair frame holds a
+pair; a bool or mixed object column merges but never meets the profile's
+str labels. A CSV upload's frame reads the key as format_dataframe(read_csv)
+types it for the temporal profile too (str() of each cell, gaps dropped by
+the groupby), and a case whose key cells are all gaps keeps its empty
+list. Sweep `ct/bh.py` dataframe (hfA 20 + hfN 10 uploads, 180 judgments
+per family; hcS 20 uploads, 120): XES conformance 68 -> 180, CSV
+conformance 109 -> 120, CSV profile 103 -> 120.
+HM3 minimum_self_distance keyed by a typed column. pandas variant: pm4py
+adds the case-id strings to the key column, so the first cell not a str
+raises `TypeError: can only concatenate str (not "int") to str` (a date
+column: `unsupported operand type(s) for +: 'Timestamp' and 'str'`, or
+'DatetimeArray' for a frame of one row), and a gap is an event no entry
+keys ([a, NaN, a] gives a: 1). Polars variant: each value is named str()
+of the Polars value, a gap is the None activity, and -0.0 groups with 0.0
+under the first zero of the first case holding two zeros. Sweep: XES pandas
+27 -> 180 of 180, Polars 89 (+30 printing) -> 180; CSV pandas 32 -> 120,
+Polars 72 (+5 printing) -> 120.
+HM4 the POWL net mined under a typed key: its ETConformance precision
+(/api/mine's token replay `precision_error`, /api/evaluate precision with
+an etconformance variant or the composite) raises pm4py's `TypeError:
+sequence item 0: expected str instance, int found` as the Alpha net's does
+(round HG's `legacy_precision_error`): Minera reported a precision. Sweep
+`ct/pev.py` (40 uploads per bank): one-sided precision errors hfA 194, hfG
+70, hfN 62, hcS 134 -> 0; /api/mine's metrics equal hfA 40 -> 227 of 234,
+hfG 26 -> 96, hfN 32 -> 93 of 94, hcS 41 -> 135 of 175 (the rest are the
+NaN/NaT nets above). Generalization, simplicity and token-based fitness
+were equal wherever the nets are.
+HM5 the Petri playouts (basic, extensive, stochastic and Monte Carlo) name
+every visible firing: an event of a transition labelled '' (a text key's
+empty value) carries `concept:name` "" as pm4py's do (observed
+black-box on all four); Minera wrote the event without its name.
+Left for HN (not declared): the printing of equal objects in temporal
+profile pairs (HL's item: log and stream 11 of 180, dataframe 3).
+Left, declared: the NaN/NaT nets (above), the NaN-addressed operand order of
+the POWL miner's TypeError on a text column with gaps (hcS s68536 K1 flips
+between reference runs; Minera's answer is HL's).
+Not reached: the lazyframe adapter of the temporal families (pm4py's Polars
+path needs pyarrow, which the reference venv must not hold); HE2.
+HM's suite: the full ctest 701 of 702 (-j2, 32 minutes) with the new
+`minera_server_review_hm_tests` (412 checks over 31 uploads: stochastic
+maps, dataframe temporal profiles and conformance, minimum self-distances,
+POWL precision and playouts under typed keys; 237 fail on HL's binary;
+`tc/seedchk.py` under PYTHONHASHSEED 1 and 3: none differ). The one
+failure, `minera_minimum_self_distance_parity_contracts_tests`, caught
+HM3's pandas rule reading a cell of another first-class role as a gap
+(only a null cell is one now; such a cell still fails as on the other
+adapters); after the fix the 19 MSD, temporal and review tests passed and
+the dataframe MSD sweep stayed 180 and 120 of 120. The 16 manifests
+replayed 2,673 responses unchanged; no frontend or Python script change.
+Harness and probes: `review-harness/round-hm/`.
+
+Next round (HN) should start by re-reviewing round HM:
+
+- HM's CI run;
+- the printing of equal objects in temporal profile pairs (HL's item);
+- the stochastic and extensive playouts and the Monte Carlo route on a POWL
+  net mined under a typed key (fits, the falsy rule's durations);
+- whether other routes iterate a copied Python set (HE2, not reached in
+  HF..HM);
+- the declared residuals (HF's..HM's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HM (kept for its older items):
 
 Next round (HM) should start by re-reviewing round HL:
 

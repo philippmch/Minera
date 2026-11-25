@@ -2160,6 +2160,8 @@ namespace {
 struct PowlKeyedLogs {
   EventLog ranked, shown;
   std::unordered_map<std::string, std::string> shown_of;
+  // The shown names of the falsy objects (0, 0.0, -0.0, False, '').
+  std::vector<std::string> falsy;
 };
 
 std::optional<PowlKeyedLogs> powl_log_shape_keyed(const EventLog& event_log, const PowlDiscoveryOptions& options) {
@@ -2278,6 +2280,15 @@ std::optional<PowlKeyedLogs> powl_log_shape_keyed(const EventLog& event_log, con
     const auto text = classes[c]->nat ? std::string("NaT") : python::str(classes[c]->value);
     shown_of[c] = text + std::string(printed[text]++, '\x1f');
     out.shown_of.emplace(rank_of[c], shown_of[c]);
+    if (!classes[c]->nat) {
+      const auto& value = classes[c]->value;
+      using Kind = python::Scalar::Kind;
+      const bool falsy = (value.kind == Kind::kBool && !value.boolean) ||
+                         (value.kind == Kind::kInt && value.digits == "0") ||
+                         (value.kind == Kind::kFloat && value.real == 0.0) ||
+                         (value.kind == Kind::kText && value.text.empty());
+      if (falsy) out.falsy.push_back(shown_of[c]);
+    }
   }
   out.ranked = event_log;
   out.shown = event_log;
@@ -2352,6 +2363,11 @@ PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& op
 
 bool powl_keyed_by_log_objects(const EventLog& event_log, const PowlDiscoveryOptions& options) {
   return powl_log_shape_keyed(event_log, options).has_value();
+}
+
+std::vector<std::string> powl_falsy_labels(const EventLog& event_log, const PowlDiscoveryOptions& options) {
+  auto keyed = powl_log_shape_keyed(event_log, options);
+  return keyed ? std::move(keyed->falsy) : std::vector<std::string>{};
 }
 
 namespace {

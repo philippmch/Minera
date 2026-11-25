@@ -1186,6 +1186,11 @@ struct MinedSession {
   std::string alpha_activity_attribute = "concept:name";
   std::string alpha_case_id_attribute = "case:concept:name";
   std::string powl_activity_key = "concept:name";
+  // The POWL net's labels of falsy key objects (minera::powl_falsy_labels).
+  std::vector<std::string> powl_falsy_labels;
+  // pm4py's ETConformance precision on a POWL net keyed by the log's objects
+  // (legacy_precision_error; empty: none raises).
+  std::string powl_precision_error;
   std::string heuristic_activity_attribute = "concept:name";
   std::string heuristic_case_id_attribute = "case:concept:name";
   std::string powl_timestamp_key = "time:timestamp";
@@ -4323,6 +4328,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           powl_object_replay = true;
         }
       }
+      // Its ETConformance precision joins the log's own objects keyed so
+      // (legacy_precision_error, round HM, observed black-box: TypeError
+      // where /api/mine had a precision).
+      std::optional<minera::FrameKeyedActivities> powl_precision_keyed;
+      if (powl_object_replay)
+        powl_precision_keyed = xes_input ? legacy_keyed_family(log, params.powl.activity_key, true)
+                                         : csv_keyed_family(log, params.powl.activity_key);
       // An explicitly supplied replay key on an XES upload's log shape (round
       // HG): the net replays that key's legacy objects as its miner's objects
       // meet them; the Alpha and Heuristics++ nets' transitions, named by
@@ -4414,6 +4426,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       auto token_replay = none_silent
           ? minera::detail::check_conformance_null_silent(none_silent->log, none_silent->net, replay_options)
           : minera::check_conformance(*conformance_log, use_names ? named->net : petri, replay_options);
+      if (!precision_keyed && powl_precision_keyed) precision_keyed = &*powl_precision_keyed;
       if (precision_keyed) token_replay.precision_error = legacy_precision_error(*precision_keyed);
       // pm4py lists the frame's cases in the case-id order of the replayed
       // log (its own case key; see session_case_order).
@@ -4521,6 +4534,17 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->heuristic_activity_attribute = params.heuristic.activity_attribute;
     session->heuristic_case_id_attribute = params.heuristic.case_id_attribute;
     session->powl_activity_key = params.powl.activity_key;
+    session->powl_falsy_labels = minera::powl_falsy_labels(log, params.powl);
+    session->powl_precision_error = [&] {
+      try {
+        if (!minera::powl_keyed_by_log_objects(log, params.powl)) return std::string();
+        const auto keyed = xes_input ? legacy_keyed_family(log, params.powl.activity_key, true)
+                                     : csv_keyed_family(log, params.powl.activity_key);
+        return keyed ? legacy_precision_error(*keyed) : std::string();
+      } catch (const std::exception&) {
+        return std::string();
+      }
+    }();
     session->powl_timestamp_key = params.powl.timestamp_key;
     session->powl_case_id_key = params.powl.case_id_key;
     const auto body_end = body.find_last_not_of(" \t\r\n");
@@ -7056,6 +7080,197 @@ std::shared_ptr<const minera::CorrelationKeyObjects> behavior_correlation_key_ob
 }
 
 // Source-bound behavioral discovery and temporal profile conformance.
+// pm4py's pandas minimum self-distance joins each case's activities as str
+// (round HM, observed black-box): a column of other objects raises at the
+// first present cell in the frame's row order (NaN, NaT and None skipped):
+// "can only concatenate str (not \"int\") to str" (float, bool,
+// datetime.datetime in an object column), a datetime64 column's Timestamp
+// "unsupported operand type(s) for +: 'Timestamp' and 'str'".
+void check_pandas_msd_activity_cells(const MinedSession& session, const std::string& key) {
+  if (!session.active_source) return;
+  // pm4py adds the case-id strings to the key column: a datetime column of
+  // one row fails as a whole DatetimeArray (round HM, observed black-box).
+  std::size_t rows = 0;
+  const auto raise = [&rows](const std::string& type) {
+    if (type == "Timestamp")
+      throw std::invalid_argument(std::string("TypeError: unsupported operand type(s) for +: '") +
+                                  (rows == 1 ? "DatetimeArray" : "Timestamp") + "' and 'str'");
+    throw std::invalid_argument("TypeError: can only concatenate str (not \"" + type + "\") to str");
+  };
+  if (session.active_source->file().format == "xes") {
+    const auto view = cached_source_view(session, minera::EventDataKind::kEventTable);
+    if (view.kind() != minera::EventDataKind::kEventTable || !view.table()) return;
+    std::optional<minera::EventTable> storage;
+    const auto& table = minera::detail::xes_frame_present_columns(*view.table(), storage, false);
+    const auto column = minera::detail::xes_frame_activity_column(table, key, false);
+    if (!column) return;
+    rows = column->cells.size();
+    for (const auto& cell : column->cells)
+      if (!cell.missing && cell.type != "str") raise(cell.type);
+    return;
+  }
+  if (session.active_source->file().format != "csv" || !session.log_ready) return;
+  const auto& log = require_prepared_log(session);
+  const auto type = minera::csv_frame_label_type(log, key);
+  if (!type || *type == minera::DataFrameColumnType::kString) return;
+  const auto keyed = minera::frame_keyed_activities(log, key);
+  if (!keyed) return;
+  for (const auto& trace : keyed->types) rows += trace.size();
+  for (std::size_t t = 0; t < keyed->types.size(); ++t)
+    for (std::size_t e = 0; e < keyed->types[t].size(); ++e) {
+      const bool missing = t < keyed->missing.size() && e < keyed->missing[t].size() && keyed->missing[t][e];
+      if (missing || keyed->types[t][e].empty()) continue;
+      raise(*type == minera::DataFrameColumnType::kDate ? std::string("Timestamp") : keyed->types[t][e]);
+    }
+}
+
+// pm4py's Polars minimum self-distance keys each activity by the Polars
+// value (round HM, observed black-box): str() of a typed column's value
+// (1000.0, False, a Datetime's 2020-12-31 23:59:59.999999+00:00), a null
+// (a gap, NaN) its own None activity. The frame with each typed key cell
+// as that text and each missing one null; nullopt when the key reads text.
+std::optional<minera::EventTable> polars_msd_typed_table(const MinedSession& session, const std::string& key) {
+  if (!session.active_source) return std::nullopt;
+  const bool xes = session.active_source->file().format == "xes";
+  if (!xes && (session.active_source->file().format != "csv" || !session.log_ready)) return std::nullopt;
+  const auto view = cached_source_view(session, minera::EventDataKind::kLazyEventTable);
+  if (view.kind() != minera::EventDataKind::kLazyEventTable || !view.lazy_table()) return std::nullopt;
+  auto table = view.lazy_table()->materialize();
+  const auto found = std::find(table.columns.begin(), table.columns.end(), key);
+  if (found == table.columns.end()) return std::nullopt;
+  const auto at = static_cast<std::size_t>(found - table.columns.begin());
+  bool changed = false;
+  const auto set = [&](std::size_t row, std::optional<std::string> label) {
+    if (at >= table.rows[row].size() || !table.rows[row][at]) return;
+    auto& cell = *table.rows[row][at];
+    if (!label) {
+      if (!cell.is_null) changed = true;
+      cell.is_null = true;
+      return;
+    }
+    if (cell.is_null || cell.value != *label) changed = true;
+    cell.is_null = false;
+    cell.value = std::move(*label);
+  };
+  // Each row's label (nullopt: a gap; unset: the cell as it is) and whether
+  // it is a float zero.
+  std::vector<std::optional<std::optional<std::string>>> labels(table.rows.size());
+  std::vector<bool> zero_row(table.rows.size(), false);
+  const auto is_zero = [](const std::string& label) { return label == "0.0" || label == "-0.0"; };
+  if (xes) {
+    std::optional<minera::EventTable> storage;
+    const auto& present = minera::detail::xes_frame_present_columns(table, storage, true);
+    const auto column = minera::detail::xes_frame_activity_column(present, key, true);
+    if (!column || !column->typed) return std::nullopt;
+    for (std::size_t r = 0; r < table.rows.size() && r < column->cells.size(); ++r) {
+      const auto& typed = column->cells[r];
+      if (typed.missing) { labels[r] = std::optional<std::string>(); continue; }
+      auto label = minera::detail::xes_frame_activity_label(typed);
+      zero_row[r] = typed.type == "float" && is_zero(label);
+      labels[r] = std::optional<std::string>(std::move(label));
+    }
+  } else {
+    const auto type = minera::csv_frame_label_type(require_prepared_log(session), key);
+    for (std::size_t r = 0; r < table.rows.size(); ++r) {
+      if (at >= table.rows[r].size() || !table.rows[r][at]) continue;
+      const auto& cell = *table.rows[r][at];
+      if (cell.is_null || minera::is_pandas_csv_na_text(cell.value)) labels[r] = std::optional<std::string>();
+      else if (type) {
+        auto label = minera::csv_frame_cell_label(*type, key, cell.value, false);
+        zero_row[r] = label && *type == minera::DataFrameColumnType::kFloat64 && is_zero(*label);
+        labels[r] = std::move(label);
+      }
+    }
+  }
+  // Polars groups -0.0 with 0.0, the key named by the first zero of the
+  // first case (frame order) holding two zeros (round HM, observed
+  // black-box over the banks' -0.0/0.0 frames).
+  std::optional<std::string> zero_label;
+  if (std::find(zero_row.begin(), zero_row.end(), true) != zero_row.end()) {
+    const auto case_at = static_cast<std::size_t>(
+        std::find(table.columns.begin(), table.columns.end(), std::string("case:concept:name")) - table.columns.begin());
+    std::vector<std::string> case_order;
+    std::map<std::string, std::pair<std::size_t, std::string>> zeros;  // case: count, first zero
+    for (std::size_t r = 0; r < table.rows.size(); ++r) {
+      if (!zero_row[r]) continue;
+      const bool has_case = case_at < table.rows[r].size() && table.rows[r][case_at] && !table.rows[r][case_at]->is_null;
+      const auto case_id = has_case ? table.rows[r][case_at]->value : std::string("\x1f");
+      auto [found, inserted] = zeros.try_emplace(case_id, 0, **labels[r]);
+      if (inserted) case_order.push_back(case_id);
+      ++found->second.first;
+      if (!zero_label) zero_label = **labels[r];
+    }
+    for (const auto& case_id : case_order)
+      if (zeros.at(case_id).first >= 2) { zero_label = zeros.at(case_id).second; break; }
+  }
+  for (std::size_t r = 0; r < table.rows.size(); ++r) {
+    if (!labels[r]) continue;
+    set(r, zero_row[r] ? zero_label : *labels[r]);
+  }
+  if (!changed) return std::nullopt;
+  return table;
+}
+
+// pandas' temporal families on a CSV upload's frame read the key column as
+// format_dataframe(read_csv) types it (round HM, observed black-box): the
+// groups are str() of each typed cell (2.0, a date's UTC Timestamp), a gap
+// NaN, which the groupby drops. The frame with the key's cells so named and
+// each gap null; nullopt when nothing changes. `conformance`: a bool cell
+// (a bool column, or an object one with gaps) never equals the profile's str
+// labels in pandas' merge, so its name takes a leading \x1f no profile
+// label holds.
+std::optional<minera::EventTable> csv_frame_keyed_table(const MinedSession& session, const std::string& key,
+                                                        bool conformance = false) {
+  if (!session.active_source || session.active_source->file().format != "csv" || !session.log_ready)
+    return std::nullopt;
+  const auto view = cached_source_view(session, minera::EventDataKind::kEventTable);
+  if (view.kind() != minera::EventDataKind::kEventTable || !view.table()) return std::nullopt;
+  auto table = *view.table();
+  const auto found = std::find(table.columns.begin(), table.columns.end(), key);
+  if (found == table.columns.end()) return std::nullopt;
+  const auto at = static_cast<std::size_t>(found - table.columns.begin());
+  const auto type = minera::csv_frame_label_type(require_prepared_log(session), key);
+  bool changed = false;
+  for (auto& row : table.rows) {
+    if (at >= row.size() || !row[at] || (row[at]->is_null && !conformance)) continue;
+    auto& cell = *row[at];
+    std::optional<std::string> label;
+    if (!cell.is_null && !minera::is_pandas_csv_na_text(cell.value))
+      label = type ? minera::csv_frame_cell_label(*type, key, cell.value, false) : cell.value;
+    if (label && conformance &&
+        (type == minera::DataFrameColumnType::kBool || type == minera::DataFrameColumnType::kObject))
+      label = "\x1f" + *label;
+    // A gap's pairs meet no profile pair in pandas' merge, but its case
+    // stays in the result (round HM, observed black-box: a case of gaps
+    // only gets an empty list).
+    if (!label && conformance) label = std::string("\x1f\x1f");
+    if (!label) {
+      cell.is_null = true;
+      changed = true;
+    } else if (cell.is_null || *label != cell.value) {
+      cell.is_null = false;
+      cell.value = std::move(*label);
+      changed = true;
+    }
+  }
+  if (!changed) return std::nullopt;
+  return table;
+}
+
+// The pandas dtype of a CSV upload's frame column whose merge with the
+// temporal profile's str labels raises (round HM; empty otherwise).
+std::string csv_frame_merge_dtype(const MinedSession& session, const std::string& key) {
+  if (!session.active_source || session.active_source->file().format != "csv" || !session.log_ready) return {};
+  const auto type = minera::csv_frame_label_type(require_prepared_log(session), key);
+  if (!type) return {};
+  switch (*type) {
+    case minera::DataFrameColumnType::kInt64: return "int64";
+    case minera::DataFrameColumnType::kFloat64: return "float64";
+    case minera::DataFrameColumnType::kDate: return "datetime64[us, UTC]";
+    default: return {};
+  }
+}
+
 void handle_behavior_analysis(const httplib::Request& request,
                               httplib::Response& response) {
   try {
@@ -7171,8 +7386,16 @@ void handle_behavior_analysis(const httplib::Request& request,
           }
           if (legacy_temporal) params.temporal_profile.activity_attribute = "concept:name";
         }
+      // A CSV upload's frame keyed by another column (round HM).
+      std::optional<minera::EventTable> csv_keyed_frame;
+      std::string csv_merge_dtype;
+      if (csv_frame && adapter == "dataframe") {
+        csv_keyed_frame = csv_frame_keyed_table(*session, params.temporal_profile.activity_attribute, conform);
+        if (conform) csv_merge_dtype = csv_frame_merge_dtype(*session, params.temporal_profile.activity_attribute);
+      }
       const auto temporal_input = [&]() -> minera::EventDataView {
-        return legacy_temporal ? minera::EventDataView(*legacy_temporal) : input();
+        return legacy_temporal ? minera::EventDataView(*legacy_temporal)
+               : csv_keyed_frame ? minera::EventDataView(*csv_keyed_frame) : input();
       };
       if (conform) {
         if (!request.has_param("temporal_profile_json")) throw std::invalid_argument("temporal_profile_json is required");
@@ -7191,11 +7414,15 @@ void handle_behavior_analysis(const httplib::Request& request,
           // pandas measures the pairs before the profile's merge: an empty
           // pair frame fails as the discovery's does (round GS).
           try {
-            (void)minera::discover_temporal_profile(input(), params.temporal_profile);
+            (void)minera::discover_temporal_profile(temporal_input(), params.temporal_profile);
           } catch (const std::invalid_argument& error) {
             if (std::string_view(error.what()) == minera::detail::kPandasBusinessEmptyFlow) throw;
           }
-          conformance = minera::conform_temporal_profile(input(), *profile, params.temporal_profile);
+          conformance = minera::conform_temporal_profile_dataframe_merge(*temporal_input().table(), *profile,
+                                                                        params.temporal_profile, csv_merge_dtype);
+        } else if (csv_frame && adapter == "dataframe") {
+          conformance = minera::conform_temporal_profile_dataframe_merge(*temporal_input().table(), *profile,
+                                                                        params.temporal_profile, csv_merge_dtype);
         } else {
           conformance = session->active_source && session->active_source->file().format == "xes" &&
                                 (adapter == "dataframe" || adapter == "lazyframe")
@@ -7229,9 +7456,19 @@ void handle_behavior_analysis(const httplib::Request& request,
                                                             params.minimum_self_distance))
                 return std::move(*keyed);
             return minera::MinimumSelfDistanceLogDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kEventLog),params.minimum_self_distance);
-          case minera::MinimumSelfDistanceVariant::kPandas:
-            return minera::MinimumSelfDistancePandasDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kEventTable),params.minimum_self_distance);
+          case minera::MinimumSelfDistanceVariant::kPandas: {
+            // A CSV upload's frame: typed cells and gaps as pandas reads them.
+            // pm4py's string concatenation fails on the first typed cell
+            // before any distance; a gap is an unkeyed event (round HM).
+            check_pandas_msd_activity_cells(*session, params.minimum_self_distance.activity_key);
+            const auto csv_keyed = csv_frame_keyed_table(*session, params.minimum_self_distance.activity_key);
+            return csv_keyed ? minera::MinimumSelfDistancePandasDiscovery::apply(*csv_keyed, params.minimum_self_distance)
+                             : minera::MinimumSelfDistancePandasDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kEventTable),params.minimum_self_distance);
+          }
           case minera::MinimumSelfDistanceVariant::kPolars:
+            if (auto typed = polars_msd_typed_table(*session, params.minimum_self_distance.activity_key))
+              return minera::MinimumSelfDistancePolarsDiscovery::apply(minera::LazyEventTable::from_table(*typed),
+                                                                       params.minimum_self_distance);
             return minera::MinimumSelfDistancePolarsDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kLazyEventTable),params.minimum_self_distance);
         }
         throw std::invalid_argument("minimum self-distance variant is invalid");
@@ -12416,6 +12653,15 @@ void handle_evaluate(const httplib::Request& request,
     std::optional<minera::EventLog> evaluation_csv_log;
     std::function<void()> token_key_checks;
     std::string evaluation_alignment_key;
+    // The POWL net keyed by the log's objects (round HM): pm4py's
+    // ETConformance precision joins them as on the Alpha net (round HG).
+    if (!model_only && adapter == "log" && miner == "powl" && !session->powl_precision_error.empty() &&
+        (!present("evaluation_activity_attribute") ||
+         audited_param_value(request, "evaluation_activity_attribute") == session->powl_activity_key) &&
+        ((params.family == minera::EvaluationFamily::kPrecision &&
+          params.precision_variant != minera::PrecisionVariant::AUTOMATON_AFTER_ALIGN) ||
+         params.family == minera::EvaluationFamily::kComposite))
+      throw std::invalid_argument(session->powl_precision_error);
     if (!model_only && adapter == "log" && (miner == "alpha" || miner == "heuristic"))
       if (const auto* shape = session_log_shape(*session)) {
         const auto& replay_key = params.replay_fitness_options.activity_attribute;
@@ -13420,6 +13666,7 @@ void handle_monte_carlo_json(const httplib::Request& request,
     if (selected_miner == "powl") {
       if (!present("monte_carlo_activity_key"))
         options.activity_key = session->powl_activity_key;
+      options.falsy_labels = session->powl_falsy_labels;  // round HM
       if (!request.has_param("monte_carlo_timestamp_key"))
         options.timestamp_key = session->powl_timestamp_key;
       projected_powl_log = project_powl_activity(
@@ -13710,6 +13957,8 @@ void handle_stochastic_map(const httplib::Request& request,
         // another key fits no transition); the projected log holds the
         // net's names under that key, its concept:name the upload's.
         params.fit.replay.activity_attribute = session->powl_activity_key;
+        // Its labels of falsy objects are timed as hidden (round HM).
+        params.fit.falsy_labels = session->powl_falsy_labels;
       }
       params.fit.replay = minera::tools::stochastic_map_replay_options(
           params.fit.replay, params.initial_marking,
@@ -13885,6 +14134,7 @@ void handle_playout(const httplib::Request& request,
       if (selected_miner == "powl") {
         if (!present("monte_carlo_activity_key"))
           options.activity_key = session->powl_activity_key;
+        options.falsy_labels = session->powl_falsy_labels;  // round HM
         if (!audited_has_param(request, "monte_carlo_timestamp_key"))
           options.timestamp_key = session->powl_timestamp_key;
         projected_powl_log = project_powl_activity(
