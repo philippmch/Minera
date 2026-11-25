@@ -374,94 +374,121 @@ std::optional<minera::FrameKeyedActivities> legacy_keyed_family(const minera::Ev
   return keyed;
 }
 
+namespace {
+bool correlation_blank_text(const minera::python::Scalar& value) {
+  return value.kind == minera::python::Scalar::Kind::kText &&
+         value.text.find_first_not_of(" \t\r\n") == std::string::npos;
+}
+}  // namespace
+
 // The objects pm4py's classic correlation variants read under an activity
-// key other than concept:name (round HI, observed black-box): an XES
-// upload's log shape keyed by an attribute holding other values than text
-// (read_xes' legacy objects, one per event in log order: an event without
-// the key, a dict, each NaN its own float), and a CSV upload's frame keyed
-// by another column (its cells in the projected table's row order: a gap
-// NaN, one object per cell in a float64 column and one shared object in a
-// text or object column, NaT in a date column). Null where the key reads
-// text alone and none of it blank, so the text contract stands.
-std::shared_ptr<const minera::CorrelationKeyObjects> correlation_key_objects(
+// key other than concept:name (round HI, observed black-box), one per event
+// of `log` by trace and event: an XES upload's log shape keyed by an
+// attribute holding other values than text (read_xes' legacy objects: an
+// event without the key, a dict, each NaN its own float, dates
+// datetime.datetime), and a CSV upload's frame keyed by another column (its
+// cells: a gap NaN, one object per cell in a float64 column and one shared
+// object in a text or object column, NaT in a date column). nullopt where
+// the key reads text alone and none of it blank, so the text contract
+// stands.
+std::optional<std::vector<std::vector<minera::CorrelationKeyObject>>> correlation_event_objects(
     const minera::EventLog& log, bool xes, const std::string& key) {
-  if (key.empty() || key == "concept:name" || key == "activity") return nullptr;
-  auto out = std::make_shared<minera::CorrelationKeyObjects>();
-  out->key = key;
-  out->legacy = xes;
+  if (key.empty() || key == "concept:name" || key == "activity") return std::nullopt;
+  std::vector<std::vector<minera::CorrelationKeyObject>> out;
   std::size_t fresh = 0;
   using State = minera::CorrelationKeyObject::State;
-  // A blank text: the text path rejects it, pm4py reads it as any label.
-  const auto blank = [](const minera::python::Scalar& value) {
-    return value.kind == minera::python::Scalar::Kind::kText &&
-           value.text.find_first_not_of(" \t\r\n") == std::string::npos;
-  };
   if (xes) {
     if (!legacy_keyed_family(log, key, true)) {
-      if (!log.dataframe_columns || log.dataframe_columns->csv_text) return nullptr;
+      if (!log.dataframe_columns || log.dataframe_columns->csv_text) return std::nullopt;
       bool any_blank = false;
       for (const auto& trace : log.traces)
         for (const auto& event : trace.events) {
           const auto cell = minera::legacy_declare_cell(event, key);
-          any_blank = any_blank || (cell.state == minera::LegacyDeclareCell::State::kValue && blank(cell.value));
+          any_blank = any_blank || (cell.state == minera::LegacyDeclareCell::State::kValue &&
+                                    correlation_blank_text(cell.value));
         }
-      if (!any_blank) return nullptr;
+      if (!any_blank) return std::nullopt;
     }
-    for (const auto& trace : log.traces)
+    for (const auto& trace : log.traces) {
+      auto& objects = out.emplace_back();
       for (const auto& event : trace.events) {
         const auto cell = minera::legacy_declare_cell(event, key);
         minera::CorrelationKeyObject object;
-        if (cell.state == minera::LegacyDeclareCell::State::kUnmodelled) return nullptr;
+        if (cell.state == minera::LegacyDeclareCell::State::kUnmodelled) return std::nullopt;
         if (cell.state == minera::LegacyDeclareCell::State::kAbsent) object.state = State::kAbsent;
         else if (cell.state == minera::LegacyDeclareCell::State::kDict) object.state = State::kDict;
         else {
           object.value = cell.value;
+          object.py_datetime = object.value.kind == minera::python::Scalar::Kind::kDate;
           if (object.value.kind == minera::python::Scalar::Kind::kFloat && std::isnan(object.value.real))
             object.object = ++fresh;
         }
-        out->objects.push_back(std::move(object));
+        objects.push_back(std::move(object));
       }
+    }
     return out;
   }
   const auto keyed = csv_keyed_family(log, key);
-  if (!keyed) return nullptr;
+  if (!keyed) return std::nullopt;
   // The frame's cells (typed as pandas holds them), its events beside the
   // log's (csv_keyed_family checked the shapes match).
   const auto frame = minera::dataframe_frame_event_log(log);
+  if (frame.traces.size() != log.traces.size()) return std::nullopt;
   if (!keyed->non_text && !keyed->any_missing) {
     bool any_blank = false;
     for (const auto& trace : frame.traces)
       for (const auto& event : trace.events)
         if (const auto value = minera::frame_scalar(frame, trace, event, key, minera::FrameKeyScope::kDataFrame))
-          any_blank = any_blank || blank(*value);
-    if (!any_blank) return nullptr;
+          any_blank = any_blank || correlation_blank_text(*value);
+    if (!any_blank) return std::nullopt;
   }
-  // project_csv_event_table's rows: the log's events by source row.
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    auto& objects = out.emplace_back();
+    if (frame.traces[t].events.size() != log.traces[t].events.size()) return std::nullopt;
+    for (const auto& event : frame.traces[t].events) {
+      minera::CorrelationKeyObject object;
+      if (const auto value = minera::frame_scalar(frame, frame.traces[t], event, key, minera::FrameKeyScope::kDataFrame)) {
+        object.value = *value;
+      } else if (keyed->column == minera::DataFrameColumnType::kDate) {
+        object.nat = true;
+      } else {
+        object.value = minera::python::real(std::numeric_limits<double>::quiet_NaN());
+        if (keyed->column == minera::DataFrameColumnType::kFloat64) object.object = ++fresh;
+      }
+      objects.push_back(std::move(object));
+    }
+  }
+  return out;
+}
+
+// /api/mine's correlation input (round HI): an XES upload's log shape in log
+// order, a CSV upload's projected table (project_csv_event_table: the log's
+// events by source row).
+std::shared_ptr<const minera::CorrelationKeyObjects> correlation_key_objects(
+    const minera::EventLog& log, bool xes, const std::string& key) {
+  auto by_event = correlation_event_objects(log, xes, key);
+  if (!by_event) return nullptr;
+  auto out = std::make_shared<minera::CorrelationKeyObjects>();
+  out->key = key;
+  out->legacy = xes;
+  if (xes) {
+    for (auto& objects : *by_event)
+      for (auto& object : objects) out->objects.push_back(std::move(object));
+    return out;
+  }
   struct Row {
     std::size_t source_row;
     std::size_t encounter;
-    const minera::Trace* trace;
-    const minera::Event* event;
+    minera::CorrelationKeyObject* object;
   };
   std::vector<Row> rows;
   for (std::size_t t = 0; t < log.traces.size(); ++t)
     for (std::size_t e = 0; e < log.traces[t].events.size(); ++e)
-      rows.push_back({log.traces[t].events[e].input_order, rows.size(), &frame.traces[t], &frame.traces[t].events[e]});
+      rows.push_back({log.traces[t].events[e].input_order, rows.size(), &(*by_event)[t][e]});
   std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
     return a.source_row != b.source_row ? a.source_row < b.source_row : a.encounter < b.encounter;
   });
-  for (const auto& row : rows) {
-    minera::CorrelationKeyObject object;
-    if (const auto value = minera::frame_scalar(frame, *row.trace, *row.event, key, minera::FrameKeyScope::kDataFrame)) {
-      object.value = *value;
-    } else if (keyed->column == minera::DataFrameColumnType::kDate) {
-      object.nat = true;
-    } else {
-      object.value = minera::python::real(std::numeric_limits<double>::quiet_NaN());
-      if (keyed->column == minera::DataFrameColumnType::kFloat64) object.object = ++fresh;
-    }
-    out->objects.push_back(std::move(object));
-  }
+  for (const auto& row : rows) out->objects.push_back(std::move(*row.object));
   return out;
 }
 
@@ -902,9 +929,10 @@ struct NoneSilentReplay {
   minera::PetriNet net;
   minera::EventLog log;
 };
-std::optional<NoneSilentReplay> none_silent_replay(const minera::PetriNet& net, const minera::EventLog& model_log,
-                                                   const std::string& model_key,
-                                                   const minera::FrameKeyedActivities& replayed) {
+// The net with the transitions labelled by a None of the model log under
+// `model_key` silent (read_xes' legacy objects); nullopt when none is.
+std::optional<minera::PetriNet> none_silent_net(const minera::PetriNet& net, const minera::EventLog& model_log,
+                                                const std::string& model_key) {
   const auto model = legacy_keyed_family(model_log, model_key, true);
   if (!model) return std::nullopt;
   std::set<std::string> none;
@@ -930,7 +958,15 @@ std::optional<NoneSilentReplay> none_silent_replay(const minera::PetriNet& net, 
       silenced = true;
     }
   if (!silenced) return std::nullopt;
-  NoneSilentReplay out{minera::PetriNet::from_literal_storage(std::move(storage)), replayed.log};
+  return minera::PetriNet::from_literal_storage(std::move(storage));
+}
+
+std::optional<NoneSilentReplay> none_silent_replay(const minera::PetriNet& net, const minera::EventLog& model_log,
+                                                   const std::string& model_key,
+                                                   const minera::FrameKeyedActivities& replayed) {
+  auto silent = none_silent_net(net, model_log, model_key);
+  if (!silent) return std::nullopt;
+  NoneSilentReplay out{std::move(*silent), replayed.log};
   for (std::size_t t = 0; t < out.log.traces.size() && t < replayed.types.size(); ++t)
     for (std::size_t e = 0; e < out.log.traces[t].events.size() && e < replayed.types[t].size(); ++e)
       if (replayed.types[t][e] == "NoneType") {
@@ -6884,6 +6920,126 @@ void handle_dfg_discovery(const httplib::Request& request,
   } catch (const std::exception& error) { response.status = 400; response.set_content(error_json(error.what()), "application/json"); }
 }
 
+// pm4py's correlation miner on /api/analyze-behavior's inputs keyed
+// otherwise than concept:name (round HJ, observed black-box): the route's
+// inputs are the upload's frame (read_xes' DataFrame, format_dataframe's of
+// a CSV) and convert_to_event_log of it, so every adapter reads the frame's
+// cells, not read_xes' legacy objects. An XES upload's column holds them as
+// pandas types it (xes_frame_activity_column: an int column beside a float or
+// a gap float64, dates UTC Timestamps in a datetime64 column and
+// datetime.datetime objects with their own offsets in an object column, a
+// gap NaN, NaT or None; each NaN of a float64 column its own float, one
+// shared NaN in a text or object column), a CSV upload's as /api/mine reads
+// them (correlation_event_objects). convert_to_event_log keeps a gap's object
+// on its event, so no event lacks the key. The log and stream adapters walk
+// that EventLog (classic_split keeps the gaps), the frame adapters the
+// DataFrame (classic_split drops their rows). Null where the key reads text
+// alone and none of it blank (the text contract), or the input's events do
+// not pair with the frame's.
+std::size_t lazy_row_count(const minera::LazyEventTable& lazy) {
+  if (const auto count = lazy.row_count()) return *count;
+  std::size_t count = 0;
+  lazy.scan([&](const minera::LazyEventTable::Row&) { ++count; });
+  return count;
+}
+
+std::shared_ptr<const minera::CorrelationKeyObjects> behavior_correlation_key_objects(
+    const MinedSession& session, std::string_view adapter, const std::string& key, const minera::EventDataView& view) {
+  if (!session.active_source || key.empty() || key == "concept:name" || key == "activity") return nullptr;
+  const auto& source = *session.active_source;
+  const auto& format = source.file().format;
+  if (format != "xes" && format != "csv") return nullptr;
+  const auto& log = source.checked_log();
+  auto out = std::make_shared<minera::CorrelationKeyObjects>();
+  out->key = key;
+  out->legacy = adapter == "log" || adapter == "stream";
+  const auto log_view = view.kind() == minera::EventDataKind::kEventLog;
+  if (log_view && view.log() != &log) return nullptr;
+  const auto input_size = log_view ? log.event_count()
+                          : view.kind() == minera::EventDataKind::kEventStream ? view.stream()->events.size()
+                          : view.kind() == minera::EventDataKind::kEventTable ? view.table()->rows.size()
+                                                                              : lazy_row_count(*view.lazy_table());
+  // A key the frame has no column for: every event of the EventLog lacks it
+  // (KeyError for the key), the frame's column selection fails.
+  const bool has_column = format == "xes"
+      ? std::find(source.checked_table().columns.begin(), source.checked_table().columns.end(), key) !=
+            source.checked_table().columns.end()
+      : log.dataframe_columns && csv_frame_column(*log.dataframe_columns, key).has_value();
+  if (!has_column) {
+    if (out->legacy) out->objects.assign(input_size, minera::CorrelationKeyObject{minera::CorrelationKeyObject::State::kAbsent});
+    else out->missing_column = true;
+    return out;
+  }
+  if (format == "xes") {
+    // The table's rows are the frame's (file order); the log's events name
+    // theirs (representative_row_ordinals).
+    const auto& table = source.checked_table();
+    const auto column = minera::detail::xes_frame_activity_column(table, key, false);
+    if (!column) return nullptr;
+    bool needed = column->typed;
+    for (const auto& cell : column->cells) needed = needed || cell.missing || correlation_blank_text(cell.value);
+    if (!needed) return nullptr;
+    const bool own_nan = column->dtype == minera::detail::XesFrameDtype::kFloat ||
+                         column->dtype == minera::detail::XesFrameDtype::kNaNFloat;
+    std::vector<minera::CorrelationKeyObject> rows;
+    rows.reserve(column->cells.size());
+    std::size_t fresh = 0;
+    for (const auto& cell : column->cells) {
+      minera::CorrelationKeyObject object;
+      if (cell.nat) {
+        object.nat = true;
+      } else {
+        object.value = cell.value;
+        object.py_datetime = cell.type == "datetime.datetime";
+        if (own_nan && cell.value.kind == minera::python::Scalar::Kind::kFloat && std::isnan(cell.value.real))
+          object.object = ++fresh;
+      }
+      rows.push_back(std::move(object));
+    }
+    if (!log_view) {
+      if (input_size != rows.size()) return nullptr;
+      out->objects = std::move(rows);
+      return out;
+    }
+    const auto& representatives = source.representative_row_ordinals();
+    if (representatives.size() != log.traces.size()) return nullptr;
+    for (std::size_t t = 0; t < log.traces.size(); ++t) {
+      if (representatives[t].size() != log.traces[t].events.size()) return nullptr;
+      for (const auto& row : representatives[t]) {
+        if (!row || *row >= rows.size()) return nullptr;
+        out->objects.push_back(rows[*row]);
+      }
+    }
+    return out;
+  }
+  auto by_event = correlation_event_objects(log, false, key);
+  if (!by_event) return nullptr;
+  if (log_view) {
+    for (auto& objects : *by_event)
+      for (auto& object : objects) out->objects.push_back(std::move(object));
+    return out;
+  }
+  // The frame adapters and the stream read the frame's rows (csv_frame_table:
+  // the log's events in the frame's row order).
+  if (!session_frame_table(session) || !log.dataframe_columns) return nullptr;
+  const auto& row_index = log.dataframe_columns->row_index;
+  struct Row {
+    std::int64_t frame_row;
+    minera::CorrelationKeyObject* object;
+  };
+  std::vector<Row> rows;
+  for (std::size_t t = 0; t < log.traces.size(); ++t)
+    for (std::size_t e = 0; e < log.traces[t].events.size(); ++e) {
+      const auto order = log.traces[t].events[e].input_order;
+      if (order >= row_index.size()) return nullptr;
+      rows.push_back({row_index[order], &(*by_event)[t][e]});
+    }
+  std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.frame_row < b.frame_row; });
+  if (rows.size() != input_size) return nullptr;
+  for (const auto& row : rows) out->objects.push_back(std::move(*row.object));
+  return out;
+}
+
 // Source-bound behavioral discovery and temporal profile conformance.
 void handle_behavior_analysis(const httplib::Request& request,
                               httplib::Response& response) {
@@ -7065,7 +7221,10 @@ void handle_behavior_analysis(const httplib::Request& request,
       params.correlation.reference_timestamp_key = correlation_reference_timestamp_key(
           request, params.correlation,
           session->active_source && session->active_source->file().format == "csv");
-      correlations = analyze_correlation_variants(input(), params.correlation_variants, params.correlation);
+      const auto correlation_input = input();
+      params.correlation.key_objects = behavior_correlation_key_objects(
+          *session, adapter, params.correlation.activity_attribute, correlation_input);
+      correlations = analyze_correlation_variants(correlation_input, params.correlation_variants, params.correlation);
       minera::register_correlation_activities(graph, *correlations);
     }
     std::string result = "null", result_error;
@@ -10220,8 +10379,10 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
           const std::string none_label = "None" + std::string(64, '\x1f');
           for (std::size_t t = 0; t < keyed->log.traces.size(); ++t)
             for (std::size_t e = 0; e < keyed->log.traces[t].events.size(); ++e)
-              if ((keyed->legacy && keyed->absent[t][e]) || keyed->types[t][e] == "NoneType")
+              if ((keyed->legacy && keyed->absent[t][e]) || keyed->types[t][e] == "NoneType") {
                 keyed->log.traces[t].events[e].activity = none_label;
+                options.none_activity = none_label;
+              }
           keyed_alignment_log = std::move(keyed->log);
           alignment_log = &*keyed_alignment_log;
           options.activity_attribute = "concept:name";
@@ -10235,16 +10396,24 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
     // costs keep Minera's bundle aligner.
     const bool reference_costs =
         miner == "imported" || options.cost_profile == minera::AlignmentCostProfile::kStandard;
+    // pm4py's transition labelled None (an Alpha or Heuristics++ net mined on
+    // an XES upload's log shape keyed by an attribute with a valueless value)
+    // is silent in the alignments as in the replay (round HJ, observed
+    // black-box: a model move on it costs 1).
+    std::optional<minera::PetriNet> none_silent;
+    if (!mined_key.empty() && session->active_source && session->active_source->file().format == "xes")
+      if (const auto* shape = session_log_shape(*session)) none_silent = none_silent_net(selected, *shape, mined_key);
+    const minera::PetriNet& aligned_net = none_silent ? *none_silent : selected;
     auto alignment =
         reference_costs
-            ? minera::tools::imported_model_alignment(*alignment_log, selected, options)
-            : minera::check_alignment(*alignment_log, selected, options);
+            ? minera::tools::imported_model_alignment(*alignment_log, aligned_net, options)
+            : minera::check_alignment(*alignment_log, aligned_net, options);
     // The reference's log alignments check easy soundness before reading
     // the log, so a session without traces fails on a net whose final
     // marking is unreachable as a non-empty log does (round GH, observed
     // black-box: a heuristics net without transitions; round GI: a supplied
     // model too).
-    minera::tools::fail_empty_log_alignment_on_unsound_net(alignment, selected, options);
+    minera::tools::fail_empty_log_alignment_on_unsound_net(alignment, aligned_net, options);
     auto graph = session->graph;
     register_activity_selector_values(graph, *alignment_log,
                                       options.activity_attribute);

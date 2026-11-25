@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HI (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HJ (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10888,6 +10888,98 @@ key, the 47 server suites and the alignment suites passed again; the 16
 manifests replayed 2,673 responses unchanged (before and after); no
 frontend or Python script change.
 Harness and probes: `review-harness/round-hi/`.
+
+Round HJ re-reviewed HI. HI's CI run 45631958356 passed all six jobs (the
+Linux, macOS and Windows native builds and ctest, the frontend, the Python
+scripts and the parity verifier).
+HJ1 /api/analyze-behavior's correlation family keyed by a typed attribute
+or column (`behavior_correlation_key_objects`, the `key_objects` option)
+reads the objects pm4py reads on the route's inputs: the upload's frame
+(read_xes' DataFrame, format_dataframe of a CSV) and convert_to_event_log
+of it, so every adapter reads the frame's cells, not read_xes' legacy
+objects. An XES upload's column holds them as pandas types it
+(`xes_frame_activity_column`: an int column beside a float or a gap
+float64, dates UTC Timestamps in a datetime64 column and
+datetime.datetime objects with their own offsets in an object column, a
+gap NaN, NaT or None; each NaN of a float64 column its own float, one
+shared NaN in a text or object column), a CSV upload's as /api/mine reads
+them (`correlation_event_objects`, now shared with /api/mine's
+`correlation_key_objects`). The log and stream adapters walk the converted
+EventLog (classic_split keeps the gaps, in log order), the dataframe and
+lazyframe adapters the frame's rows (classic_split drops the rows whose
+object is NaN, NaT or None). A TypeError names a date datetime.datetime
+when it is one (a legacy object, an object column's cell), else Timestamp.
+HJ2 pandas' typing of an XES column of ints past INT64_MAX beside a
+negative int (`xes_frame_cells`): the range check stops at the first None
+(an event without the key) but not at a NaN gap, so the column is object
+only when both ints come before the first None ([2**63, None, -1] is
+float64, [2**63, nan, -1] and [-1, 2**63, None] object). It serves every
+XES frame path keyed by such a column.
+HJ3 a key the frame has no column for: the frame adapters raise pandas'
+column selection error (`KeyError: "['K'] not in index"`) before any row
+is read; the EventLog adapters a KeyError for the key at the first event.
+HJ4 /api/align's moves name a blank event label: a log or synchronous move
+on '' writes `"activity_name": ""` (pm4py prints ''), only a model move on a
+silent transition writes null and `silent` (`write_alignments`); the
+Conformance view shows it as `""` (`alignmentMoveLabel`).
+HJ5 a transition labelled None (an Alpha or Heuristics++ net mined under a
+key some event lacks) is silent in pm4py's alignments: /api/align aligns a
+copy of the net with those transitions silent (`none_silent_net`, as the
+token replay did since HG), and the less-memory Dijkstra prices every
+silent transition 1 in a trace holding None (`less_memory_silent_costs`'
+`none_activity`), since the trace's None meets each silent transition's
+None label (HI's declared 4 judgments of hfN f90228, now equal).
+Checked without change: /api/rework keyed by typed columns (pm4py's
+get_rework_cases_per_activity checks the frame's column first: "the
+activity column should be of type string.", as Minera answers; the legacy
+log's statistic would print the objects).
+Sweeps (`ct/cs2.py`: HI's `ct/cs.py` with the LP tie classification of
+`ct/cor.py`; `ct/al.py`) over hfA, hfG and hfN (XES, keys K1..K6, 100 + 60
++ 60 uploads) and hcS (CSV, 120 uploads), three variants and four adapters
+each: /api/analyze-behavior's correlation hfA 6,130 equal of 7,200
+judgments (786 LP ties where both plans are optimal, 284 where pm4py's
+plan is not), hfG 3,470 equal and 244 raising alike of 4,320 (516 + 78
+LP), hfN 3,226 + 476 of 4,320 (530 + 76 LP), hcS 6,334 + 1,020 of 8,640
+(1,222 LP ties); on the 10 hfA and 10 hcS uploads HI measured, HI's server
+216 and 376 equal of 720 each, HJ's 496 and 616 + 80 raising alike (the
+rest LP ties). Left: 88 TypeErrors whose operands rest on a NaN's address
+(K6, a text column with gaps: one shared np.nan, hashed by its address in
+3.11; declared since HI). /api/align (less-memory, Alpha and Heuristics++
+nets mined under K1..K6): totals hfA 841 equal (unchanged), hfN 185 -> 189
+of 189; moves hfA 768 and hfN 175 equal. Declared: the move orders of
+equal-cost alignments (47 + 14), the messages for a net that is not easy
+sound (45), equal values printed otherwise (30: -0.0 beside 0.0, 1 beside
+1.0; pm4py keeps whichever object it met first), the mines' sort
+TypeError operands beside None (hfN 98 Alpha, 1 Heuristics++; hash(None)
+is an address in 3.11, declared since GZ), and a less-memory TypeError of a trace mixing None and
+text (pm4py sorts the trace's labels; not met in the banks).
+HJ's suite: the full ctest 699 of 699 (-j2, 30 minutes) with the new
+`minera_server_review_hj_tests` (389 checks: 346 correlation judgments over
+the four adapters and 43 alignments, 232 of which fail on HI's server
+binary, 13 seconds; 8 cases whose TypeError operands follow the hash seed
+left out, `tc/seedchk.py`); the 16 manifests replayed 2,673 responses
+unchanged; frontend tsc and vitest passed (240 files, a new
+`alignmentMoveLabel` case for the blank label); no Python script change.
+Harness and probes: `review-harness/round-hj/`.
+
+Next round (HK) should start by re-reviewing round HJ:
+
+- HJ's CI run;
+- the workbench's alignments on typed keys (/api/align-petri-workbench with
+  `alignment_activity_attribute` over the four adapters) and the POWL net's
+  totals with an explicit replay key (still unverified: the reference
+  harness does not mine POWL);
+- the other /api/analyze-behavior families keyed by a typed attribute or
+  column on the stream and lazyframe adapters (HG..HI covered the log and
+  frame shapes);
+- whether other routes iterate a copied Python set (HE2, not reached in
+  HF..HJ);
+- the declared residuals (HF's..HJ's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HJ (kept for its older items):
 
 Next round (HJ) should start by re-reviewing round HI:
 

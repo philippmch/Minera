@@ -58,14 +58,18 @@ bool generator_variant(AlignmentVariant variant) {
 // transition whose input places are all inputs of the silent one (an empty
 // preset included) carries a label of the trace, and 0 otherwise (observed
 // black-box on the reference corpus and on targeted probe nets).
+// A trace holding Python's None (none_activity) meets every silent
+// transition's None label: each costs 1 (round HJ, observed black-box).
 std::vector<double> less_memory_silent_costs(const std::vector<std::string>& trace,
-                                             const PetriNet& net) {
+                                             const PetriNet& net, const std::string& none_activity = {}) {
   const std::unordered_set<std::string> labels(trace.begin(), trace.end());
+  const bool none_in_trace = !none_activity.empty() && labels.contains(none_activity);
   const auto& transitions = net.transitions();
   std::vector<double> costs(transitions.size(), kStandardMoveCost);
   for (std::size_t t = 0; t < transitions.size(); ++t) {
     if (!transitions[t].silent()) continue;
-    costs[t] = 0.0;
+    costs[t] = none_in_trace ? 1.0 : 0.0;
+    if (none_in_trace) continue;
     for (const auto& other : transitions) {
       if (other.silent() || !labels.contains(net.activities()[*other.activity])) continue;
       const bool contained = std::all_of(
@@ -304,7 +308,7 @@ AlignmentOptions search_options(const std::vector<std::string>& trace, const Pet
     case AlignmentVariant::kDijkstraLessMemory:
     case AlignmentVariant::kGeneratorDijkstraLessMemory:
       if (options.variant == AlignmentVariant::kDijkstraLessMemory)
-        search.model_costs_by_transition = less_memory_silent_costs(trace, net);
+        search.model_costs_by_transition = less_memory_silent_costs(trace, net, options.none_activity);
       break;
     case AlignmentVariant::kDiscountedAStar:
       // Unit deviations (silent moves included), discounted by 2^-depth.
@@ -582,7 +586,7 @@ SearchOutcome search(const std::vector<std::string>& trace, const PetriNet& net,
     std::vector<double> model_costs = options.model_costs;
     if (model_costs.empty()) {
       if (options.variant == AlignmentVariant::kDijkstraLessMemory) {
-        model_costs = less_memory_silent_costs(trace, net);
+        model_costs = less_memory_silent_costs(trace, net, options.none_activity);
       } else {
         model_costs.assign(net.transitions().size(), kStandardMoveCost);
         for (std::size_t t = 0; t < model_costs.size(); ++t)
@@ -949,6 +953,7 @@ AlignmentResult reference_log_alignment(const EventLog& log, const PetriNet& net
   reference.trace.max_states = options.max_states;
   reference.trace.max_time_seconds = options.max_time_seconds;
   reference.trace.cancelled = options.cancelled;
+  reference.trace.none_activity = options.none_activity;
   // For state-equation A* and DIJKSTRA_NO_HEURISTICS the dispatcher's trace
   // search is the bundle's own: check_alignment with standard costs on the
   // same net (search_options), whose Aligner reads the markings and the

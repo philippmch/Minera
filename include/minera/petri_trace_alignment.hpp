@@ -76,6 +76,10 @@ struct PetriTraceAlignmentOptions {
   // refuses the net on time and throws OperationCancelled when cancelled.
   double max_time_seconds = 0.0;
   std::function<bool()> cancelled;
+  // A trace label standing for Python's None (an event keyed by a valueless
+  // value; round HJ): DIJKSTRA_LESS_MEMORY prices every silent transition 1
+  // in a trace holding it, as pm4py's None label meets the silent ones'.
+  std::string none_activity;
 };
 
 // Aligns one trace (activity labels) with the reference variant semantics.

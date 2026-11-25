@@ -816,6 +816,12 @@ describe("alignmentQuery", () => {
     expect(alignmentMoveLabel({ type: "model", activity: null, silent: true }, activities)).toBe("τ");
     expect(alignmentMoveLabel({ type: "model", activity: null }, activities)).toBe("τ");
   });
+
+  it("shows a blank event label as a visible move", () => {
+    const activities = [{ name: "A", count: 1, start_count: 1, end_count: 1 }];
+    expect(alignmentMoveLabel({ type: "log", activity: null, activity_name: "" }, activities)).toBe('""');
+    expect(alignmentMoveLabel({ type: "sync", activity: null, activity_name: "", silent: false }, activities)).toBe('""');
+  });
 });
 
 describe("hasActiveFilters", () => {

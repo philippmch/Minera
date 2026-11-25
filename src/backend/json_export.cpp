@@ -1994,7 +1994,10 @@ void write_alignments(std::ostream& out,
   const auto write_move = [&](const AlignmentMove& move) {
     const auto id = graph.activity_id(move.activity);
     out << "{\"type\": \"" << move_type_name(move.type) << "\"";
-    if (move.activity.empty()) {
+    // A log or synchronous move reads the event's label, a blank text
+    // included (pm4py prints ''; round HJ); only a model move on a silent
+    // transition has none.
+    if (move.activity.empty() && move.type == AlignmentMoveType::kModel) {
       out << ", \"activity\": null, \"silent\": true";
     } else {
       out << ", \"activity\": ";

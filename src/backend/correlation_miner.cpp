@@ -1006,9 +1006,16 @@ std::vector<std::vector<std::int64_t>> solve_transportation(
 // sorted order. classic_split counts a legacy NaN's event, but each chunk
 // groups its events by == as classic does, so a NaN activity precedes and
 // follows nothing (zero probability and duration with every other).
-std::string key_type_name(const CorrelationKeyObject& object, bool legacy) {
+// Round HJ: /api/analyze-behavior's adapters hand the same objects over
+// from the upload's frame (read_xes' DataFrame, format_dataframe of a CSV):
+// the log and stream adapters as convert_to_event_log of it (an EventLog
+// walk, `legacy`), the dataframe and lazyframe adapters as its rows. A date
+// is named datetime.datetime in a TypeError when it is one (a legacy
+// object, an object column's cell), else Timestamp; a frame without the
+// key's column raises pandas' "not in index" KeyError before any row.
+std::string key_type_name(const CorrelationKeyObject& object) {
   if (object.nat) return "NaTType";
-  if (object.value.kind == python::Scalar::Kind::kDate) return legacy ? "datetime.datetime" : "Timestamp";
+  if (object.value.kind == python::Scalar::Kind::kDate) return object.py_datetime ? "datetime.datetime" : "Timestamp";
   return python::type_name(object.value);
 }
 
@@ -1022,15 +1029,15 @@ std::string key_identity(const CorrelationKeyObject& object) {
   return python::identity(object.value);
 }
 
-bool key_less(const CorrelationKeyObject& a, const CorrelationKeyObject& b, bool legacy) {
+bool key_less(const CorrelationKeyObject& a, const CorrelationKeyObject& b) {
   using Kind = python::Scalar::Kind;
   const auto date_like = [](const CorrelationKeyObject& o) { return o.nat || o.value.kind == Kind::kDate; };
   if (date_like(a) && date_like(b)) return !a.nat && !b.nat && python::less(a.value, b.value);
   const bool comparable = (!a.nat && !b.nat && python::is_number(a.value) && python::is_number(b.value)) ||
                           (a.value.kind == Kind::kText && b.value.kind == Kind::kText && !a.nat && !b.nat);
   if (!comparable)
-    throw std::invalid_argument("TypeError: '<' not supported between instances of '" + key_type_name(a, legacy) +
-                                "' and '" + key_type_name(b, legacy) + "'");
+    throw std::invalid_argument("TypeError: '<' not supported between instances of '" + key_type_name(a) +
+                                "' and '" + key_type_name(b) + "'");
   return python::less(a.value, b.value);
 }
 
@@ -1060,13 +1067,16 @@ KeyedActivities apply_key_objects(PreparedInput& input, const CorrelationMinerOp
   const auto& objects = keyed.objects;
   const bool legacy = keyed.legacy;
   auto& events = input.raw_flat;
-  for (const auto& event : events)
-    if (event.input_index >= objects.size())
-      throw std::invalid_argument("correlation miner: the activity key's objects do not cover the input");
+  if (!keyed.missing_column)
+    for (const auto& event : events)
+      if (event.input_index >= objects.size())
+        throw std::invalid_argument("correlation miner: the activity key's objects do not cover the input");
   const auto object_of = [&](const PreparedEvent& event) -> const CorrelationKeyObject& {
     return objects[event.input_index];
   };
   const auto key_error = [&] { return std::invalid_argument("KeyError: " + python_key_repr(keyed.key)); };
+  if (keyed.missing_column)
+    throw std::invalid_argument("KeyError: " + python_key_repr("[" + python_key_repr(keyed.key) + "] not in index"));
   const auto unhashable = [] { return std::invalid_argument("TypeError: unhashable type: 'dict'"); };
   using State = CorrelationKeyObject::State;
 
@@ -1109,7 +1119,7 @@ KeyedActivities apply_key_objects(PreparedInput& input, const CorrelationMinerOp
     for (const auto& event : events)
       if (seen.insert(key_identity(object_of(event))).second) members.push_back(event.input_index);
   }
-  python::sort(members, [&](std::size_t a, std::size_t b) { return key_less(objects[a], objects[b], legacy); });
+  python::sort(members, [&](std::size_t a, std::size_t b) { return key_less(objects[a], objects[b]); });
 
   std::unordered_map<std::string, std::string> label_of;  // identity -> label
   std::map<std::string, std::size_t> printed;

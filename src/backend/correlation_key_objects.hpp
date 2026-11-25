@@ -19,6 +19,9 @@ struct CorrelationKeyObject {
   State state = State::kValue;
   python::Scalar value;  // kValue: the object; a NaN is a float NaN
   bool nat = false;      // pandas' NaT (value unused)
+  // A date that is a datetime.datetime (read_xes' legacy objects, a frame's
+  // object column) rather than a pandas Timestamp: TypeErrors name it so.
+  bool py_datetime = false;
   // A NaN or NaT: which object it is (equal ids are one object, so a set
   // keeps one of them; read_xes and a float64 column make one per cell).
   std::size_t object = 0;
@@ -26,7 +29,13 @@ struct CorrelationKeyObject {
 
 struct CorrelationKeyObjects {
   std::string key;  // the activity key, as KeyError names it
-  bool legacy = false;  // read_xes' legacy objects (dates datetime.datetime)
+  // An EventLog's walk (read_xes' legacy objects, or convert_to_event_log of
+  // a frame): classic_split reads every event's key in log order and keeps
+  // its gaps; else a DataFrame's rows, whose gaps classic_split drops.
+  bool legacy = false;
+  // A frame without the key's column: pandas' column selection fails
+  // (KeyError "['key'] not in index") before any row is read.
+  bool missing_column = false;
   // One per input event in the input's order: an EventLog's traces and
   // events in log order, a table's rows.
   std::vector<CorrelationKeyObject> objects;

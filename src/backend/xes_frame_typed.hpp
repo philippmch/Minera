@@ -153,6 +153,12 @@ inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& ta
   kinds.reserve(table.rows.size());
   bool gap = false, none = false, dict = false, date = false, text = false, integer = false, real = false,
        boolean = false, above_int64 = false, negative_int = false;
+  // pandas' inference stops checking the ints' range once it met a None
+  // (not a NaN gap): an int past INT64_MAX and a negative one make the
+  // column object only when both come before the first None (round HJ,
+  // observed black-box: [2**63, None, -1] is float64, [2**63, nan, -1] and
+  // [-1, 2**63, None] object).
+  bool range_conflict = false, range_negative = false, range_above = false;
   for (const auto& row : table.rows) {
     Cell kind = Cell::kGap;
     if (column < row.size() && row[column] && row[column]->xes_public_shape != XesPublicShape::kAbsent) {
@@ -177,11 +183,14 @@ inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& ta
           case AttributeKind::kInt:
             if (const auto* value = std::get_if<std::int64_t>(&cell.typed_value)) {
               negative_int = negative_int || *value < 0;
+              if (!none) range_negative = range_negative || *value < 0;
             } else if (big_ints && std::holds_alternative<std::uint64_t>(cell.typed_value)) {
               above_int64 = true;
+              if (!none) range_above = true;
             } else {
               return std::nullopt;
             }
+            range_conflict = range_conflict || (range_negative && range_above);
             kind = Cell::kInt;
             break;
           case AttributeKind::kFloat:
@@ -215,7 +224,7 @@ inline std::optional<std::vector<PlusCell>> xes_frame_cells(const EventTable& ta
   else if (families > 1 || dict) dtype = Dtype::kObject;
   else if (date) dtype = Dtype::kDatetime;
   else if (text) dtype = Dtype::kString;
-  else if (above_int64 && negative_int) dtype = Dtype::kObject;
+  else if (above_int64 && negative_int && (range_conflict || !none)) dtype = Dtype::kObject;
   else if (integer || real) dtype = real || gap || none ? Dtype::kFloat : Dtype::kInt;
   else dtype = gap || none ? Dtype::kObject : Dtype::kBool;
   if (dtype_out) *dtype_out = dtype;

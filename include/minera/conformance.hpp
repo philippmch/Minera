@@ -688,6 +688,9 @@ struct AlignmentOptions {
   // log listed them so: the variants and their sums follow it. Null: log
   // order.
   const std::vector<std::size_t>* trace_order = nullptr;
+  // The reference dispatcher's trace label for Python's None
+  // (PetriTraceAlignmentOptions::none_activity; empty: none).
+  std::string none_activity;
 };
 
 struct AlignmentDiagnostics {

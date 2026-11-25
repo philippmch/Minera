@@ -2372,13 +2372,16 @@ export function alignmentMoveLabel(
   move: AlignmentMove,
   activities: MineraExport["activities"],
 ): string {
-  if (move.silent || (move.activity === null && !move.activity_name)) return "τ";
+  if (alignmentMoveIsSilent(move)) return "τ";
+  // A blank event label is a visible move of its own (the server names it "").
+  if (move.activity_name === "") return '""';
   if (move.activity_name) return move.activity_name;
   return move.activity === null ? "?" : activities[move.activity]?.name ?? "?";
 }
 
-const alignmentMoveIsSilent = (move: AlignmentMove) =>
-  move.silent === true || (move.activity === null && !move.activity_name);
+function alignmentMoveIsSilent(move: AlignmentMove) {
+  return move.silent === true || (move.activity === null && move.activity_name == null);
+}
 
 function alignmentDiagnosticItems(diagnostics?: AlignmentDiagnostics) {
   if (!diagnostics) return [];
