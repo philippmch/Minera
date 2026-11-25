@@ -4765,9 +4765,10 @@ class Aligner {
           if (!std::isfinite(child.priority)) return;
         }
         // Configured variants retain tau/model routing moves explicitly;
-        // an empty activity denotes a silent transition.
-        const bool keep_move =
-            !move.activity.empty() || move.type == AlignmentMoveType::kModel;
+        // an empty activity denotes a silent transition. A log or
+        // synchronous move on a blank label is a move too (round HK,
+        // observed black-box: pm4py lists ('', '>>')).
+        const bool keep_move = true;
         const auto enqueue = [&]() {
           records.push_back(PathRecord{node.record, child_state, std::move(move),
                                        keep_move, consume});

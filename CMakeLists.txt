@@ -2861,6 +2861,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_hj_tests minera_server)
     add_test(NAME minera_server_review_hj_tests
              COMMAND minera_server_review_hj_tests $<TARGET_FILE:minera_server>)
+    # Round HK: the Petri alignment workbench and the POWL net's replay keyed by typed attributes.
+    add_executable(minera_server_review_hk_tests
+      src/backend/tests/test_server_review_hk.cpp)
+    target_include_directories(minera_server_review_hk_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_hk_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_hk_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_hk_tests minera_server)
+    add_test(NAME minera_server_review_hk_tests
+             COMMAND minera_server_review_hk_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

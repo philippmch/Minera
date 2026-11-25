@@ -2004,7 +2004,8 @@ void write_alignments(std::ostream& out,
       if (id) out << *id;
       else out << "null";
       out << ", \"activity_name\": ";
-      write_json_string(out, move.activity);
+      // Values named apart with trailing \x1f show as printed (round HK).
+      write_activity_label(out, move.activity);
       out << ", \"silent\": false";
     }
     out << '}';
@@ -2070,7 +2071,7 @@ void write_alignments(std::ostream& out,
     }
     out << "], \"activity_names\": [";
     for (std::size_t j = 0; j < variant.activities.size(); ++j) {
-      write_json_string(out, variant.activities[j]);
+      write_activity_label(out, variant.activities[j]);
       out << (j + 1 < variant.activities.size() ? ", " : "");
     }
     out << "], \"count\": " << variant.count << ", \"cost\": " << variant.cost

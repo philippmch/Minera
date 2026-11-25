@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HJ (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HK (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10961,6 +10961,121 @@ left out, `tc/seedchk.py`); the 16 manifests replayed 2,673 responses
 unchanged; frontend tsc and vitest passed (240 files, a new
 `alignmentMoveLabel` case for the blank label); no Python script change.
 Harness and probes: `review-harness/round-hj/`.
+
+Round HK re-reviewed HJ. HJ's CI run 45649670104 passed every job: the
+Linux, macOS and Windows native builds and ctests, the frontend, the Python
+scripts and the parity verifier.
+HK1 /api/align-petri-workbench aligns a supplied net as pm4py's public log
+alignments do, as `/api/align`'s imported model does since HI
+(`imported_model_alignment`): the easy-soundness check first, every
+trace's key, the best-worst cost and each variant in order, with standard
+costs where `cost_profile=standard` and the dispatcher's default variant
+(state equation A*) where the form names none. It aligned with the older
+per-trace check before, whose costs, fitness and totals differed from
+pm4py's on most nets (hfA 1,023 of 1,800 judgments, concept:name too).
+HK2 a log or synchronous move on a blank event label is a move (pm4py
+lists ('', '>>')); the alignment search dropped it.
+HK3 the workbench keyed by an attribute or column of other objects than text
+(`workbench_keyed_input`) reads pm4py's objects on each adapter: an XES
+upload's log and stream read_xes' legacy objects (an event without the key
+`KeyError`, a dict `TypeError: unhashable type: 'dict'`, each NaN its own
+float, dates datetime.datetime; the stream regroups the events by case),
+its dataframe the read_xes frame's cells (`xes_frame_activity_column`; the
+cases by id) and its lazyframe their Polars copy (a gap None, an object
+column str() of each cell; the cases as they first appear); a CSV
+upload's formatted frame's cells, its Polars copy holding an object column
+(True/False beside a gap) as String. The trace-net searches fail at the
+first object that is no str (`TypeError: can only concatenate str (not
+"int") to str`), the less-memory search sorts each trace's distinct objects
+in CPython's set order (`TypeError` for two kinds, None beside anything);
+a missing column is the frames' column error (`KeyError: 'Column not
+found: K'`, Polars' plan error). Otherwise each object aligns as an event
+no transition of the PNML's text labels meets (str() of it marked apart,
+None the dispatcher's None label beside the net's silent transitions);
+the moves and activities show the values as printed, and the result names
+the key the form gave (the frontend checks it against the input context).
+The keyed error is raised only where the net is easy sound, else the
+uncomputed result of GH1-2 stands.
+HK4 /api/mine's POWL keyed by an attribute or column of other objects than
+text on an upload's log shape (`powl_log_shape_keyed`): pm4py reads each
+event's object (an XES upload's legacy objects; a CSV upload's
+convert_to_event_log cells, a float64 column's gaps one NaN each, NaT in a
+date column), raising `KeyError` for an event without the key and
+`TypeError: unhashable type: 'dict'`, sorts the set of the objects
+(CPython's set order; `TypeError` with its operands where two kinds meet),
+and mines them in Python's order, objects equal as dict keys one activity
+(1, 1.0 and True; 0.0 and -0.0). Minera mines a copy named by each
+object's rank, which its text order then follows, and names the net's
+transitions str() of the objects. The frame path of round BS had named
+them str() of the frame's cells (an absent attribute NaN, 1e3 and 1000 one
+label but -0.0 and 0.0 two) and ordered them as text, so the POWL differed
+on most typed keys (hfA 194 of 240 keyed judgments).
+HK5 the POWL net's token replay keyed by the key it was mined by reads the
+net's labels (pm4py's transitions are labelled by the objects themselves,
+which the replay meets): Minera replayed the typed attribute, whose
+objects never meet a text label, so every event was skipped (fit, with
+fewer tokens) or, on a CSV upload, failed with the replay's KeyError. The
+decoration reads the same names. Another replay key (an explicit
+`token_replay_activity_attribute`) reads its own attribute and no longer
+projects the log by it, which had raised the POWL miner's sort TypeError.
+Checked without change: the explicit-key totals of the POWL net mined on
+concept:name (HJ's open item) were equal on hfA, hfG and hcS.
+Sweeps (`ct/wb.py`, `ct/pw.py`) over hfA, hfG and hfN (XES, keys
+concept:name and K1..K6, 25 + 25 + 25 uploads) and hcS (CSV, 25): the
+workbench's alignments with Alpha and Inductive nets (Minera's PNML export
+and pm4py's Inductive on str() of the key), two variants and four
+adapters, judgments equal (moves and costs, or the same error) before ->
+after: hfA 50 -> 1,316 of 1,800 (totals 191 -> 1,214 of 1,214), hfG 101 ->
+652 of 896, hfN 123 -> 750 of 928, hcS 113 -> 1,186 of 1,464 (totals 169
+-> 882 of 882). Left, declared: the move orders of equal-cost alignments
+(hfA 273, hfG 129, hfN 107, hcS 96), equal-cost alternatives that follow
+the hash seed (91, 35, 63, 6; pm4py's own choice moves under
+PYTHONHASHSEED=3), and the message for a net that is not easy sound (120,
+80, 8, 176: pm4py raises, Minera reports the uncomputed result of GH1-2).
+POWL token replay totals (40 uploads per bank, keys K1..K6, the key as
+powl_activity_key, as both keys, or only as the replay key): keyed hfA 40
+-> 227 of 240 equal, hfG 17 + 122 errors -> 96 + 144, hfN 19 -> 93 + 146
+errors, hcS 59 + 47 -> 138 + 44; with only the replay key unchanged but
+for hfN's 5 TypeErrors of its projection (225 of 240 equal or raising
+alike). Left, declared: a key whose objects
+include NaN or NaT (pm4py's miner, comparing them with ==, drops such an
+activity or recurses until RecursionError: hfA 13, hfN 1, hcS 49 keyed
+judgments), the TypeError operands beside a text column's shared NaN (hcS
+9; its hash is an address, declared since HI), and a None-valued event
+replayed by an explicit key (hfN 15: pm4py's label map sends None to one
+of the POWL net's silent transitions, the last its set of transitions
+lists, an address order).
+Not reached: the session routes that replay or align the cached POWL net
+under its typed key after the mine (/api/align, decorations and the
+others project the log as /api/mine does, so their labels agree, but
+pm4py's alignments there were not compared).
+HK's suite: the full ctest 700 of 700 (-j2, 31 minutes) with the new
+`minera_server_review_hk_tests` (560 checks over 24 uploads and 68 PNML
+models, 462 failing on HJ's binary; 5 seed-dependent cases left out,
+`tc/seedchk.py`); the 16 manifests replayed 2,668 responses unchanged and
+5 changed, the workbench's standalone Petri captures (log, stream,
+dataframe, lazyframe, complete typed metadata), refreshed for HK1's
+default variant (the variant and the LP diagnostics only); frontend tsc
+and vitest passed (240 files, 10,734 tests); no frontend source or Python
+script change.
+Harness and probes: `review-harness/round-hk/`.
+
+Next round (HL) should start by re-reviewing round HK:
+
+- HK's CI run;
+- the session routes on a POWL net mined under a typed key (/api/align,
+  decorations, playout, stochastic map) against pm4py;
+- the other /api/analyze-behavior families keyed by a typed attribute or
+  column on the stream and lazyframe adapters (HG..HI covered the log and
+  frame shapes; carried from HJ);
+- whether other routes iterate a copied Python set (HE2, not reached in
+  HF..HK);
+- the declared residuals (HF's..HK's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HK (kept for its older items):
 
 Next round (HK) should start by re-reviewing round HJ:
 

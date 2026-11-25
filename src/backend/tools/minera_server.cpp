@@ -84,6 +84,7 @@
 #include "../frame_cells.hpp"
 #include "../correlation_key_objects.hpp"
 #include "../xes_frame_activity.hpp"
+#include "../python_object_set.hpp"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
@@ -4303,11 +4304,24 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       if (powl_in_order && !xes_input && params.token_replay_activity_attribute_supplied &&
           replay_options.activity_attribute != params.powl.activity_key)
         powl_csv_keyed = minera::detail::csv_log_keyed_replay_in(log, replay_options.activity_attribute, params.powl.activity_key);
+      bool powl_object_replay = false;
       if (is_powl && !powl_csv_keyed) {
+        // Another replay key reads its own attribute of each event, which a
+        // projection by it would sort as the POWL miner does (round HK: no
+        // KeyError or TypeError of the miner's).
+        const bool replay_key_is_model_key = replay_options.activity_attribute == params.powl.activity_key;
         projected_powl_log = project_powl_activity(
-            log, replay_options.activity_attribute, params.powl.timestamp_key,
-            params.powl.case_id_key);
+            log, replay_key_is_model_key ? replay_options.activity_attribute : std::string("concept:name"),
+            params.powl.timestamp_key, params.powl.case_id_key);
         conformance_log = &*projected_powl_log;
+        // pm4py's POWL net keyed by an attribute of other objects than text
+        // labels its transitions with those objects, which the replay keyed
+        // the same meets (round HK, observed black-box): the projected log's
+        // activities name them as the net does.
+        if (replay_key_is_model_key && minera::powl_keyed_by_log_objects(log, params.powl)) {
+          replay_options.activity_attribute = "concept:name";
+          powl_object_replay = true;
+        }
       }
       // An explicitly supplied replay key on an XES upload's log shape (round
       // HG): the net replays that key's legacy objects as its miner's objects
@@ -4337,7 +4351,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       // meet the net's transitions by Python's == (round HG;
       // csv_log_keyed_replay_in). The transitions sort by name first.
       std::optional<minera::EventLog> explicit_csv_log;
-      if (!xes_input && params.token_replay_activity_attribute_supplied &&
+      if (!xes_input && params.token_replay_activity_attribute_supplied && !powl_object_replay &&
           (is_alpha || is_inductive || powl_in_order || id == "heuristic")) {
         const auto& model_key = is_alpha ? params.alpha.activity_attribute
                                 : is_inductive ? params.inductive.activity_key
@@ -4437,7 +4451,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         params.heuristic.timestamp_attribute, cancelled,
         heuristic_replay ? heuristic_replay->place_outgoing : std::nullopt);
     const auto powl_decoration = minera::detail::decorate_model(
-        powl_log, powl_replay ? powl_replay->net : powl_net, params.powl.activity_key,
+        powl_log, powl_replay ? powl_replay->net : powl_net,
+        minera::powl_keyed_by_log_objects(log, params.powl) ? std::string("concept:name") : params.powl.activity_key,
         params.powl.timestamp_key, cancelled,
         powl_replay ? powl_replay->place_outgoing : std::nullopt);
 
@@ -9875,6 +9890,283 @@ void reject_nonfinite_alignment_costs(std::string_view json) {
 
 // Alignment uses independent original inputs; the cached mining session is
 // neither required nor changed. Flat CSV adapters retain the parser's rows.
+// pm4py's log alignments on /api/align-petri-workbench's input keyed by an
+// attribute or column that holds other objects than text (round HK, observed
+// black-box): the reference reads the adapter's own objects. An XES upload's
+// log and stream are read_xes' legacy objects (an event without the key, a
+// dict, each NaN its own float, dates datetime.datetime), its DataFrame
+// read_xes' frame (xes_frame_activity_column) and its LazyFrame that frame's
+// Polars copy (a gap None, an object column str() of each cell, dates
+// datetime.datetime); a CSV upload's log, stream and DataFrame the formatted
+// frame's cells, its LazyFrame their Polars copy. The dispatcher lists the
+// log's traces in order, the DataFrame's cases by id (groupby) and the
+// LazyFrame's in the order they first appear (maintain_order).
+struct WorkbenchKeyedTrace {
+  std::string case_id;
+  std::vector<minera::CorrelationKeyObject> objects;
+};
+
+struct WorkbenchKeyedInput {
+  std::vector<WorkbenchKeyedTrace> traces;
+  // What reading the variants raises before any trace is aligned: KeyError
+  // for an event without the key, unhashable dict, the frames' missing
+  // column.
+  std::string error;
+};
+
+namespace {
+
+bool workbench_key_is_text(const minera::CorrelationKeyObject& object) {
+  return object.state == minera::CorrelationKeyObject::State::kValue && !object.nat &&
+         object.value.kind == minera::python::Scalar::Kind::kText;
+}
+
+std::string workbench_key_type(const minera::CorrelationKeyObject& object) {
+  if (object.nat) return "NaTType";
+  if (object.value.kind == minera::python::Scalar::Kind::kDate)
+    return object.py_datetime ? "datetime.datetime" : "Timestamp";
+  return minera::python::type_name(object.value);
+}
+
+// Polars' copy of a pandas cell: a NaN or NaT is null (None), a date a
+// datetime.datetime.
+minera::CorrelationKeyObject workbench_polars_object(minera::CorrelationKeyObject object) {
+  using Kind = minera::python::Scalar::Kind;
+  if (object.state != minera::CorrelationKeyObject::State::kValue) return object;
+  if (object.nat || (object.value.kind == Kind::kFloat && std::isnan(object.value.real))) {
+    object.nat = false;
+    object.value = minera::python::none();
+    object.object = 0;
+  } else if (object.value.kind == Kind::kDate) {
+    object.py_datetime = true;
+  }
+  return object;
+}
+
+}  // namespace
+
+// nullopt where every object the adapter reads is text (the text path
+// stands) or Minera cannot tell the objects.
+std::optional<WorkbenchKeyedInput> workbench_keyed_input(const minera::ActiveEventSource& source,
+                                                         const minera::EventLog& log, const std::string& adapter,
+                                                         const std::string& key) {
+  if (key.empty() || key == "concept:name" || key == "activity") return std::nullopt;
+  const auto& format = source.file().format;
+  if (format != "xes" && format != "csv") return std::nullopt;
+  const bool frame = adapter == "dataframe" || adapter == "lazyframe";
+  const bool polars = adapter == "lazyframe";
+  WorkbenchKeyedInput out;
+  const auto missing_column = [&](const std::vector<std::string>& columns) {
+    out.error = polars ? minera::detail::polars_df_missing_column_error(key, columns, {"select", "group_by"})
+                       : "KeyError: " + minera::detail::frame_python_str_repr("Column not found: " + key);
+    return out;
+  };
+  const auto from_log = [&](std::vector<std::vector<minera::CorrelationKeyObject>> by_event) {
+    if (by_event.size() != log.traces.size()) return false;
+    for (std::size_t t = 0; t < log.traces.size(); ++t) {
+      if (by_event[t].size() != log.traces[t].events.size()) return false;
+      out.traces.push_back({log.traces[t].case_id, std::move(by_event[t])});
+    }
+    return true;
+  };
+  if (format == "csv") {
+    if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+    if (!csv_frame_column(*log.dataframe_columns, key)) {
+      if (!frame) {
+        out.error = "KeyError: " + minera::detail::frame_python_str_repr(key);
+        return out;
+      }
+      std::vector<std::string> columns;
+      if (polars) {
+        const auto table = formatted_csv_frame_table(source);
+        if (!table) return std::nullopt;
+        columns = table->columns;
+      }
+      return missing_column(columns);
+    }
+    auto by_event = correlation_event_objects(log, false, key);
+    if (!by_event || !from_log(std::move(*by_event))) return std::nullopt;
+    if (polars) {
+      // read_csv keeps a True/False column with a gap as objects, which the
+      // Polars copy holds as String (str() of each object).
+      const auto column = csv_frame_column(*log.dataframe_columns, key);
+      const bool objects = column && (column->type == minera::DataFrameColumnType::kObject ||
+                                      (column->type == minera::DataFrameColumnType::kBool && column->missing_cell));
+      for (auto& trace : out.traces)
+        for (auto& object : trace.objects) {
+          object = workbench_polars_object(std::move(object));
+          if (objects && object.state == minera::CorrelationKeyObject::State::kValue && !object.nat &&
+              object.value.kind != minera::python::Scalar::Kind::kNone &&
+              object.value.kind != minera::python::Scalar::Kind::kText) {
+            object.value = minera::python::text(minera::python::str(object.value));
+            object.py_datetime = false;
+          }
+        }
+    }
+  } else if (!frame) {
+    auto by_event = correlation_event_objects(log, true, key);
+    if (!by_event || !from_log(std::move(*by_event))) return std::nullopt;
+    // The stream regroups the events by their case id.
+    if (adapter == "stream") {
+      std::vector<WorkbenchKeyedTrace> grouped;
+      std::map<std::string, std::size_t> at;
+      for (auto& trace : out.traces) {
+        const auto [found, fresh] = at.emplace(trace.case_id, grouped.size());
+        if (fresh) grouped.push_back({trace.case_id, {}});
+        auto& objects = grouped[found->second].objects;
+        objects.insert(objects.end(), trace.objects.begin(), trace.objects.end());
+      }
+      out.traces = std::move(grouped);
+    }
+  } else {
+    const auto& table = source.checked_table();
+    std::optional<minera::EventTable> storage;
+    const auto& present = minera::detail::xes_frame_present_columns(table, storage, polars);
+    if (std::find(present.columns.begin(), present.columns.end(), key) == present.columns.end())
+      return missing_column(present.columns);
+    const auto column = minera::detail::xes_frame_activity_column(table, key, polars);
+    if (!column || column->cells.size() != table.rows.size()) return std::nullopt;
+    const auto case_at = std::find(table.columns.begin(), table.columns.end(), "case:concept:name");
+    if (case_at == table.columns.end()) return std::nullopt;
+    const auto case_column = static_cast<std::size_t>(case_at - table.columns.begin());
+    const bool own_nan = column->dtype == minera::detail::XesFrameDtype::kFloat ||
+                         column->dtype == minera::detail::XesFrameDtype::kNaNFloat;
+    std::map<std::string, std::size_t> at;
+    std::size_t fresh = 0;
+    for (std::size_t r = 0; r < table.rows.size(); ++r) {
+      const auto& row = table.rows[r];
+      if (case_column >= row.size() || !row[case_column] || row[case_column]->is_null) return std::nullopt;
+      const auto& case_id = row[case_column]->value;
+      const auto [found, added] = at.emplace(case_id, out.traces.size());
+      if (added) out.traces.push_back({case_id, {}});
+      const auto& cell = column->cells[r];
+      minera::CorrelationKeyObject object;
+      if (cell.nat) {
+        object.nat = true;
+      } else {
+        object.value = cell.value;
+        object.py_datetime = cell.type == "datetime.datetime" ||
+                             (polars && cell.value.kind == minera::python::Scalar::Kind::kDate);
+        if (own_nan && cell.value.kind == minera::python::Scalar::Kind::kFloat && std::isnan(cell.value.real))
+          object.object = ++fresh;
+      }
+      out.traces[found->second].objects.push_back(std::move(object));
+    }
+  }
+  // The DataFrame's groupby lists the cases by id.
+  if (adapter == "dataframe")
+    std::stable_sort(out.traces.begin(), out.traces.end(),
+                     [](const WorkbenchKeyedTrace& a, const WorkbenchKeyedTrace& b) { return a.case_id < b.case_id; });
+  bool all_text = true;
+  for (const auto& trace : out.traces)
+    for (const auto& object : trace.objects) all_text = all_text && workbench_key_is_text(object);
+  if (all_text) return std::nullopt;
+  if (!frame)
+    for (const auto& trace : out.traces) {
+      using State = minera::CorrelationKeyObject::State;
+      for (const auto& object : trace.objects)
+        if (object.state == State::kAbsent) {
+          out.error = "KeyError: " + minera::detail::frame_python_str_repr(key);
+          return out;
+        }
+      for (const auto& object : trace.objects)
+        if (object.state == State::kDict) {
+          out.error = "TypeError: unhashable type: 'dict'";
+          return out;
+        }
+    }
+  return out;
+}
+
+// The TypeError aligning the input raises, in the dispatcher's variant
+// order (empty when none does). The trace-net searches name each event's
+// transition 't_' + label + '_' + position, so the first object that is no
+// str fails; the less-memory search sorts each trace's distinct objects
+// (sorted(set(...)), in CPython's set order), which fails for objects of two
+// kinds (text beside a number, None beside anything).
+std::string workbench_keyed_alignment_error(const WorkbenchKeyedInput& input, minera::AlignmentVariant variant) {
+  if (!input.error.empty()) return input.error;
+  if (variant != minera::AlignmentVariant::kDijkstraLessMemory) {
+    for (const auto& trace : input.traces)
+      for (const auto& object : trace.objects)
+        if (!workbench_key_is_text(object))
+          return "TypeError: can only concatenate str (not \"" + workbench_key_type(object) + "\") to str";
+    return {};
+  }
+  using Kind = minera::python::Scalar::Kind;
+  const auto kind_class = [](const minera::CorrelationKeyObject& object) {
+    if (object.nat || object.value.kind == Kind::kDate) return 2;
+    if (object.value.kind == Kind::kText) return 1;
+    if (object.value.kind == Kind::kNone) return 3;
+    return 0;  // numbers (bool, int, float)
+  };
+  for (const auto& trace : input.traces) {
+    std::vector<const minera::CorrelationKeyObject*> items;
+    std::vector<std::uint64_t> hashes;
+    std::vector<std::string> identities;
+    for (const auto& object : trace.objects) {
+      std::uint64_t hash = 0;
+      std::string identity;
+      if (object.nat) {
+        hash = static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::min());
+        identity = "NaT";
+      } else {
+        const auto h = minera::detail::python_object_hash(object.value);
+        if (!h) return {};
+        hash = *h;
+        identity = minera::python::identity(object.value);
+        if (object.object) identity += "#" + std::to_string(object.object);
+      }
+      items.push_back(&object);
+      hashes.push_back(hash);
+      identities.push_back(std::move(identity));
+    }
+    const auto order = minera::detail::python_hash_set_order(hashes, identities);
+    std::vector<const minera::CorrelationKeyObject*> listed;
+    for (const auto index : order) listed.push_back(items[index]);
+    bool mixed = false;
+    for (const auto* object : listed) mixed = mixed || kind_class(*object) != kind_class(*listed.front());
+    if (!mixed) continue;
+    try {
+      minera::python::sort(listed, [&](const minera::CorrelationKeyObject* a, const minera::CorrelationKeyObject* b) {
+        const int ca = kind_class(*a), cb = kind_class(*b);
+        if (ca != cb || ca == 3)
+          throw minera::python::TypeError("'<' not supported between instances of '" + workbench_key_type(*a) +
+                                          "' and '" + workbench_key_type(*b) + "'");
+        if (a->nat || b->nat) return false;
+        return minera::python::less(a->value, b->value);
+      });
+    } catch (const minera::python::TypeError& error) {
+      return std::string("TypeError: ") + error.what();
+    }
+  }
+  return {};
+}
+
+// The log the less-memory search aligns: a str keeps its text, any other
+// object takes str() of it marked with trailing \x1f (no label of the
+// supplied net is such a name; printed_activity_label shows it as
+// printed), None the dispatcher's None label (`none_activity`, which meets
+// the net's silent transitions).
+minera::EventLog workbench_keyed_alignment_log(const WorkbenchKeyedInput& input, const std::string& none_label) {
+  minera::EventLog keyed;
+  for (const auto& trace : input.traces) {
+    minera::Trace out;
+    out.case_id = trace.case_id;
+    for (const auto& object : trace.objects) {
+      minera::Event event;
+      event.case_id = trace.case_id;
+      if (workbench_key_is_text(object)) event.activity = object.value.text;
+      else if (!object.nat && object.value.kind == minera::python::Scalar::Kind::kNone) event.activity = none_label;
+      else event.activity = (object.nat ? std::string("NaT") : minera::python::str(object.value)) + "\x1f";
+      event.activity_state = minera::FirstClassAttributeState::kPresent;
+      out.events.push_back(std::move(event));
+    }
+    keyed.traces.push_back(std::move(out));
+  }
+  return keyed;
+}
+
 void handle_petri_alignment_workbench(const httplib::Request& request,
                                       httplib::Response& response) {
   try {
@@ -9898,6 +10190,9 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     const auto params = minera::parse_mine_params(lookup, present);
     auto options = minera::parse_alignment_params(lookup, present);
     options.cancelled = connection_cancel_hook(request);
+    // The reference's public default variant (state-equation A*), as for
+    // /api/align's supplied model.
+    if (!present("alignment_variant")) options.variant = minera::AlignmentVariant::kStateEquationAStar;
     const auto adapter = minera::parse_alignment_input_adapter(lookup, present);
     const auto& file = request.get_file_value("log");
     const auto& model_file = request.get_file_value("model");
@@ -9947,7 +10242,14 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
       projection.case_id_attribute = params.csv.case_id_column;
     reject_unconsulted_controls(field_audit, request);
     options.activity_attribute = projection.activity_attribute;
+    const std::string reported_key = options.activity_attribute;
+    // A supplied key whose objects are not all text reads the adapter's own
+    // objects (round HK; workbench_keyed_input).
+    std::optional<WorkbenchKeyedInput> keyed_input;
+    if (present("alignment_activity_attribute"))
+      keyed_input = workbench_keyed_input(owned_source, source_log, adapter, options.activity_attribute);
     minera::EventLog evaluated;
+    try {
     if (adapter == "log") {
       if (projection.max_rows_to_materialize && source_log.event_count() > *projection.max_rows_to_materialize)
         throw std::length_error("alignment: event materialization cap exceeded");
@@ -9968,9 +10270,44 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
                                      : minera::event_log_to_lazy_table(source_log);
       evaluated = minera::normalize_token_replay_event_log(minera::EventDataView(lazy), projection);
     }
-    auto attribute_projection = minera::tools::evaluation_input_log(evaluated, options.activity_attribute);
-    const auto& alignment_log = attribute_projection ? *attribute_projection : evaluated;
-    auto result = minera::check_alignment(alignment_log, document.net, options);
+    } catch (const std::exception&) {
+      if (!keyed_input) throw;
+      evaluated = workbench_keyed_alignment_log(*keyed_input, "None");
+    }
+    std::optional<minera::EventLog> attribute_projection;
+    std::optional<minera::EventLog> keyed_log;
+    if (keyed_input) {
+      // pm4py checks the net's easy soundness before reading the variants,
+      // then reads every trace's objects and aligns the variants in order.
+      if (const auto error = workbench_keyed_alignment_error(*keyed_input, options.variant); !error.empty()) {
+        minera::PetriTraceAlignmentOptions check;
+        check.initial_marking = options.initial_marking;
+        check.final_marking = options.final_marking;
+        check.max_states = options.max_states;
+        check.max_time_seconds = options.max_time_seconds;
+        check.cancelled = options.cancelled;
+        bool sound = false;
+        try {
+          sound = minera::reference_easy_sound(document.net, check);
+        } catch (const std::invalid_argument&) {
+        }
+        if (sound) throw std::invalid_argument(error);
+      }
+      const std::string none_label = "None" + std::string(64, '\x1f');
+      keyed_log = workbench_keyed_alignment_log(*keyed_input, none_label);
+      for (const auto& trace : keyed_log->traces)
+        for (const auto& event : trace.events)
+          if (event.activity == none_label) options.none_activity = none_label;
+      options.activity_attribute = "concept:name";
+    } else {
+      attribute_projection = minera::tools::evaluation_input_log(evaluated, options.activity_attribute);
+    }
+    const auto& alignment_log = keyed_log ? *keyed_log : attribute_projection ? *attribute_projection : evaluated;
+    // A supplied net aligns as the reference's public log dispatcher reports
+    // it, as /api/align's imported model does (round HK, observed
+    // black-box): each variant's cost and fitness, the less-memory search's
+    // silent prices and best-worst cost, and the log fitness.
+    auto result = minera::tools::imported_model_alignment(alignment_log, document.net, options);
     // An input without traces fails on a net that is not easy sound, as the
     // reference's log alignments check it first (round GI).
     minera::tools::fail_empty_log_alignment_on_unsound_net(result, document.net, options);
@@ -9998,7 +10335,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
          << ",\"log_bytes\":" << file.content.size() << ",\"model_bytes\":" << model_file.content.size()
          << ",\"source_case_count\":" << source_log.trace_count() << ",\"source_event_count\":" << source_log.event_count()
          << ",\"evaluated_case_count\":" << alignment_log.trace_count() << ",\"evaluated_event_count\":" << alignment_log.event_count()
-         << ",\"activity_attribute\":" << quote(options.activity_attribute)
+         << ",\"activity_attribute\":" << quote(reported_key)
          << ",\"case_id_attribute\":" << quote(projection.case_id_attribute) << "},\"model_context\":{\"places\":[";
     for (std::size_t p = 0; p < document.net.place_count(); ++p) {
       if (p) body << ',';
@@ -10018,7 +10355,11 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
            << ",\"label\":" << (transition.activity ? quote(document.net.activities().at(*transition.activity)) : "null") << '}';
     }
     body << "]},\"activities\":[";
-    for (std::size_t i = 0; i < graph.activities().size(); ++i) { if (i) body << ','; body << quote(graph.activities()[i]); }
+    // Values named apart with trailing \x1f show as printed (round HK).
+    const auto printed = [&](const std::string& label) { return quote(std::string(minera::printed_activity_label(label))); };
+    for (std::size_t i = 0; i < graph.activities().size(); ++i) { if (i) body << ','; body << printed(graph.activities()[i]); }
+    // The keyed log aligns under concept:name; the result names the key.
+    result.activity_attribute = reported_key;
     body << "],\"result\":" << minera::alignment_json(result, graph, std::numeric_limits<double>::max_digits10)
          << ",\"variant_details\":[";
     const auto write_transition = [&](std::size_t transition) {
@@ -10032,7 +10373,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
         const bool silent = move.type == minera::AlignmentMoveType::kModel &&
             move.transition < document.net.transitions().size() && document.net.transitions()[move.transition].silent();
         body << "{\"type\":" << quote(move.type == minera::AlignmentMoveType::kSynchronous ? "sync" : move.type == minera::AlignmentMoveType::kLog ? "log" : "model")
-             << ",\"activity_name\":" << (silent ? "null" : quote(move.activity)) << ",\"transition\":";
+             << ",\"activity_name\":" << (silent ? "null" : printed(move.activity)) << ",\"transition\":";
         write_transition(move.transition); body << '}';
       }
       body << ']';
@@ -10049,7 +10390,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
       for (std::size_t j = 0; j < variant.projected_model_moves.size(); ++j) {
         if (j) body << ',';
         const auto& move = variant.projected_model_moves[j];
-        body << "{\"activity_name\":" << quote(move.activity) << ",\"transition\":";
+        body << "{\"activity_name\":" << printed(move.activity) << ",\"transition\":";
         write_transition(move.transition); body << ",\"marking_before\":"; write_marking(move.marking_before);
         body << ",\"marking_after\":"; write_marking(move.marking_after); body << '}';
       }
@@ -10063,7 +10404,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
       const auto& trace = alignment_log.traces[i];
       body << "{\"trace_index\":" << i << ",\"case_id\":" << quote(trace.case_id)
            << ",\"event_count\":" << trace.events.size() << ",\"activities\":[";
-      for (std::size_t j = 0; j < traces[i].size(); ++j) { if (j) body << ','; body << quote(traces[i][j]); }
+      for (std::size_t j = 0; j < traces[i].size(); ++j) { if (j) body << ','; body << printed(traces[i][j]); }
       body << "],\"variant_index\":";
       const auto match = std::find_if(result.variants.begin(), result.variants.end(), [&](const auto& variant) { return variant.activities == traces[i]; });
       if (match == result.variants.end()) body << "null"; else body << std::distance(result.variants.begin(), match);
@@ -10071,7 +10412,7 @@ void handle_petri_alignment_workbench(const httplib::Request& request,
     }
     body << "],\"input_before\":" << (source_table ? minera::serialize_event_table_input_json(*source_table) : "null")
          << ",\"input_after\":" << (source_table ? minera::serialize_event_table_input_json(*source_table) : "null")
-         << ",\"prepared_log\":" << minera::serialize_active_source_log_json(alignment_log) << '}';
+         << ",\"prepared_log\":" << minera::serialize_active_source_log_json(keyed_log ? evaluated : alignment_log) << '}';
     reject_nonfinite_alignment_costs(body.str());
     response.set_content(active_source_safe_json(body.str()), "application/json");
   } catch (const std::exception& error) {

@@ -63,6 +63,13 @@ struct PowlDiscoveryOptions {
 
 [[nodiscard]] PowlNode discover_powl(
     const EventLog& event_log, const PowlDiscoveryOptions& options = {});
+
+// Whether POWL discovery on `event_log` (an upload's log shape) reads the
+// activity key's objects rather than its text (round HK): the discovered
+// net's labels then name those objects, and normalize_powl_event_log holds
+// the same names under concept:name (a replay keyed the same reads them
+// there). Throws the discovery's KeyError or TypeError.
+[[nodiscard]] bool powl_keyed_by_log_objects(const EventLog& event_log, const PowlDiscoveryOptions& options);
 // The same discovery; `cancelled`, when set, is polled at every recursion
 // step and fall-through candidate and throws OperationCancelled
 // (minera/cancellation.hpp) once it returns true. The fall-throughs try every

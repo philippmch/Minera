@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -21,6 +22,10 @@
 #include "minera/frame_keys.hpp"
 #include "minera/inductive_miner.hpp"
 #include "minera/timestamp.hpp"
+#include "frame_cells.hpp"
+#include "polars_missing_column.hpp"
+#include "python_object_set.hpp"
+#include "xes_legacy_cell.hpp"
 
 namespace minera {
 namespace {
@@ -2138,6 +2143,174 @@ PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& op
 
 namespace {
 
+// pm4py's POWL discovery on an upload's log shape keyed by an attribute or
+// column of other objects than text (round HK, observed black-box): it reads
+// each event's object (an XES upload's read_xes legacy objects, each NaN its
+// own float; a CSV upload's convert_to_event_log cells, a float64 column's
+// gaps one NaN each, NaT in a date column), an event without the key raising
+// KeyError and a dict TypeError, then sorts the set of the objects (CPython's
+// set order, the first comparison of two kinds that do not order raising) and
+// mines them in that order, objects equal as dict keys (True, 1 and 1.0;
+// 0.0 and -0.0) one activity. The log with each activity named by its
+// object's rank (which Minera's text order then follows), the log named
+// str() of each object as the net is shown (distinct objects printed alike
+// take trailing \x1f), and the shown name of each rank; nullopt for a log
+// without frame columns, a key every event holds as text, or objects
+// outside the model.
+struct PowlKeyedLogs {
+  EventLog ranked, shown;
+  std::unordered_map<std::string, std::string> shown_of;
+};
+
+std::optional<PowlKeyedLogs> powl_log_shape_keyed(const EventLog& event_log, const PowlDiscoveryOptions& options) {
+  const auto& key = options.activity_key;
+  if (canonical_activity_key(key) || !event_log.dataframe_columns) return std::nullopt;
+  struct Object {
+    python::Scalar value;
+    bool nat = false;
+    std::size_t fresh = 0;  // a NaN of its own
+    std::string type;
+  };
+  std::vector<std::vector<Object>> objects(event_log.traces.size());
+  std::size_t fresh = 0;
+  bool typed = false;
+  const auto missing_key = [&] {
+    return std::invalid_argument("powl_activity_key: KeyError: " + detail::frame_python_str_repr(key));
+  };
+  if (!event_log.dataframe_columns->csv_text) {
+    for (std::size_t t = 0; t < event_log.traces.size(); ++t)
+      for (const auto& event : event_log.traces[t].events) {
+        const auto cell = legacy_declare_cell(event, key);
+        using State = LegacyDeclareCell::State;
+        if (cell.state == State::kUnmodelled) return std::nullopt;
+        if (cell.state == State::kAbsent) throw missing_key();
+        if (cell.state == State::kDict) throw std::invalid_argument("powl_activity_key: TypeError: unhashable type: 'dict'");
+        Object object{cell.value, false, 0, cell.type};
+        if (cell.value.kind != python::Scalar::Kind::kText) typed = true;
+        if (cell.value.kind == python::Scalar::Kind::kFloat && std::isnan(cell.value.real)) object.fresh = ++fresh;
+        objects[t].push_back(std::move(object));
+      }
+  } else {
+    const auto frame = dataframe_frame_event_log(event_log);
+    if (frame.traces.size() != event_log.traces.size() || !frame_keys(frame, FrameKeyScope::kEventLog).contains(key))
+      return std::nullopt;
+    const auto column = frame_column_type(frame, key);
+    for (std::size_t t = 0; t < frame.traces.size(); ++t) {
+      if (frame.traces[t].events.size() != event_log.traces[t].events.size()) return std::nullopt;
+      for (const auto& event : frame.traces[t].events) {
+        Object object;
+        if (const auto value = frame_scalar(frame, frame.traces[t], event, key, FrameKeyScope::kEventLog)) {
+          object.value = *value;
+          object.type = value->kind == python::Scalar::Kind::kDate ? "Timestamp" : python::type_name(*value);
+          if (value->kind != python::Scalar::Kind::kText) typed = true;
+        } else if (column == DataFrameColumnType::kDate) {
+          object.nat = true;
+          object.type = "NaTType";
+          typed = true;
+        } else {
+          object.value = python::real(std::numeric_limits<double>::quiet_NaN());
+          object.type = "float";
+          if (column == DataFrameColumnType::kFloat64) object.fresh = ++fresh;
+          typed = true;
+        }
+        objects[t].push_back(std::move(object));
+      }
+    }
+  }
+  if (!typed) return std::nullopt;
+  // The distinct objects in log order.
+  std::vector<const Object*> classes;
+  std::vector<std::string> identities;
+  std::vector<std::uint64_t> hashes;
+  std::unordered_map<std::string, std::size_t> class_of;
+  const auto identity = [](const Object& object) {
+    if (object.nat) return std::string("NaT");
+    auto id = python::identity(object.value);
+    if (object.fresh) id += "#" + std::to_string(object.fresh);
+    return id;
+  };
+  for (const auto& trace : objects)
+    for (const auto& object : trace) {
+      const auto id = identity(object);
+      if (class_of.contains(id)) continue;
+      std::uint64_t hash = static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::min());
+      if (!object.nat) {
+        const auto h = detail::python_object_hash(object.value);
+        if (!h) return std::nullopt;
+        hash = *h;
+      }
+      class_of.emplace(id, classes.size());
+      classes.push_back(&object);
+      identities.push_back(id);
+      hashes.push_back(hash);
+    }
+  auto order = detail::python_hash_set_order(hashes, identities);
+  try {
+    python::sort(order, [&](std::size_t x, std::size_t y) {
+      const auto& a = *classes[x];
+      const auto& b = *classes[y];
+      const auto unorderable = [&] {
+        return python::TypeError("'<' not supported between instances of '" + a.type + "' and '" + b.type + "'");
+      };
+      if (a.nat || b.nat) {
+        const auto date = [](const Object& o) { return o.nat || o.value.kind == python::Scalar::Kind::kDate; };
+        if (date(a) && date(b)) return false;
+        throw unorderable();
+      }
+      try {
+        return python::compare(a.value, b.value) < 0;
+      } catch (const python::TypeError&) {
+        throw unorderable();
+      }
+    });
+  } catch (const python::TypeError& error) {
+    throw std::invalid_argument(std::string("powl_activity_key: TypeError: ") + error.what());
+  }
+  PowlKeyedLogs out;
+  std::vector<std::string> rank_of(classes.size()), shown_of(classes.size());
+  for (std::size_t i = 0; i < order.size(); ++i) {
+    char rank[24];
+    std::snprintf(rank, sizeof rank, "%012zu", i);
+    rank_of[order[i]] = rank;
+  }
+  std::unordered_map<std::string, std::size_t> printed;
+  for (std::size_t c = 0; c < classes.size(); ++c) {
+    const auto text = classes[c]->nat ? std::string("NaT") : python::str(classes[c]->value);
+    shown_of[c] = text + std::string(printed[text]++, '\x1f');
+    out.shown_of.emplace(rank_of[c], shown_of[c]);
+  }
+  out.ranked = event_log;
+  out.shown = event_log;
+  for (std::size_t t = 0; t < event_log.traces.size(); ++t)
+    for (std::size_t e = 0; e < event_log.traces[t].events.size(); ++e) {
+      const auto c = class_of.at(identity(objects[t][e]));
+      for (auto* log : {&out.ranked, &out.shown}) {
+        auto& event = log->traces[t].events[e];
+        event.activity = log == &out.ranked ? rank_of[c] : shown_of[c];
+        event.activity_state = FirstClassAttributeState::kPresent;
+        event.activity_source_key.clear();
+        event.activity_attribute.reset();
+      }
+    }
+  return out;
+}
+
+PowlNode relabel_powl(const PowlNode& node, const std::unordered_map<std::string, std::string>& label_of) {
+  std::vector<PowlNode> children;
+  for (const auto& child : node.children()) children.push_back(relabel_powl(child, label_of));
+  switch (node.kind()) {
+    case PowlNodeKind::kTransition: {
+      const auto found = label_of.find(node.label());
+      return PowlNode::transition(found == label_of.end() ? node.label() : found->second, node.frequency());
+    }
+    case PowlNodeKind::kSilent: return PowlNode::silent();
+    case PowlNodeKind::kXor: return PowlNode::xor_node(std::move(children));
+    case PowlNodeKind::kLoop: return PowlNode::loop(std::move(children.at(0)), std::move(children.at(1)));
+    case PowlNodeKind::kStrictPartialOrder: return PowlNode::strict_partial_order(std::move(children), node.order());
+  }
+  return node;
+}
+
 // pm4py's POWL discovery keyed by a typed column of an upload's frame names
 // each activity str() of the cell, and raises TypeError when it sorts text
 // beside another type (round BS): the frame-keyed log under concept:name, or
@@ -2161,6 +2334,8 @@ PowlDiscoveryOptions powl_concept_name_options(PowlDiscoveryOptions options) {
 PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& options,
                        const std::function<bool()>& cancelled) {
   validate_options(options);
+  if (const auto keyed = powl_log_shape_keyed(event_log, options))
+    return relabel_powl(discover_powl(keyed->ranked, powl_concept_name_options(options), cancelled), keyed->shown_of);
   if (const auto keyed = powl_frame_keyed_log(event_log, options))
     return discover_powl(*keyed, powl_concept_name_options(options), cancelled);
   State state{options, 0};
@@ -2175,9 +2350,15 @@ PowlNode discover_powl(const EventLog& event_log, const PowlDiscoveryOptions& op
   return simplify_powl(powl_detail::PowlSelectorRegistry::discover(log, state));
 }
 
+bool powl_keyed_by_log_objects(const EventLog& event_log, const PowlDiscoveryOptions& options) {
+  return powl_log_shape_keyed(event_log, options).has_value();
+}
+
 EventLog normalize_powl_event_log(const EventLog& event_log,
                                   const PowlDiscoveryOptions& options) {
   validate_options(options);
+  if (const auto keyed = powl_log_shape_keyed(event_log, options))
+    return normalize_powl_event_log_impl(keyed->shown, powl_concept_name_options(options));
   if (const auto keyed = powl_frame_keyed_log(event_log, options))
     return normalize_powl_event_log_impl(*keyed, powl_concept_name_options(options));
   return normalize_powl_event_log_impl(event_log, options);

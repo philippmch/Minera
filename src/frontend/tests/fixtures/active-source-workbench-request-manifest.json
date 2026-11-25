@@ -3183,14 +3183,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "30097",
+        "Content-Length": "30098",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "standalone-petri-log.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/standalone-petri-log.response.json",
-        "bytes": 30097,
-        "sha256": "b81d61e28e73155232f0af92874e828e6fd7b0220e8acacb9c892cceb41cd138",
+        "bytes": 30098,
+        "sha256": "a0984d093d9903531f86d71dd4934f83da933f2894975f2a055a98549c98dd69",
         "status": 200
       },
       "exports": {},
@@ -3289,14 +3289,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "30100",
+        "Content-Length": "30101",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "standalone-petri-stream.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/standalone-petri-stream.response.json",
-        "bytes": 30100,
-        "sha256": "8cd216f556a6242692dd1b2af9be884bb7d5a2b97b089e2d09242116b6a31bb9",
+        "bytes": 30101,
+        "sha256": "204975e32a8910ab6ec34bee98a7d359fe5d9241124c8d01ed9836afef9ff86b",
         "status": 200
       },
       "exports": {},
@@ -3395,14 +3395,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "29050",
+        "Content-Length": "29051",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "standalone-petri-dataframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/standalone-petri-dataframe.response.json",
-        "bytes": 29050,
-        "sha256": "9cf6a72223f8e65678abf3c905bbba1cdc5667586930a16e88d58999694d86bc",
+        "bytes": 29051,
+        "sha256": "a3a9fc6f75b88e3d3418d278c8794a88c83e5ac876c50f7644ec737f0ba7c529",
         "status": 200
       },
       "exports": {},
@@ -3501,14 +3501,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "29050",
+        "Content-Length": "29051",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "standalone-petri-lazyframe.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/standalone-petri-lazyframe.response.json",
-        "bytes": 29050,
-        "sha256": "de345b852ad6e0561a97fa046c7e772504f82927a5531b09dddefd28e1ff9afc",
+        "bytes": 29051,
+        "sha256": "14d0be9e17e160d906e6f653d32532b7f1baca97a77302c8d21d921765e4c31f",
         "status": 200
       },
       "exports": {},
@@ -3607,14 +3607,14 @@
       "response_headers": {
         "Access-Control-Allow-Origin": "*",
         "Content-Type": "application/json",
-        "Content-Length": "109752",
+        "Content-Length": "109747",
         "Keep-Alive": "timeout=5, max=100"
       },
       "response": {
         "filename": "standalone-petri-complete-typed-metadata.response.json",
         "path": "src/frontend/tests/fixtures/active-source-workbench/captures/standalone-petri-complete-typed-metadata.response.json",
-        "bytes": 109752,
-        "sha256": "ee60dc20c849fc296450e94382e4f4c2926c3a30e01281f2c6df18c72ac7ee69",
+        "bytes": 109747,
+        "sha256": "3deabdef1f7eb0a51582d9f40888d954bb6ddc24bbec7715e958c8f8207dd00d",
         "status": 200
       },
       "exports": {},

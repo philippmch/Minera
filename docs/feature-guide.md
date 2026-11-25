@@ -2511,7 +2511,11 @@ Edited controls and failed requests retain the last completed result and its inp
 POST /api/align-petri-workbench accepts multipart log/model fields and the displayed
 alignment controls. It requires no cached source and never changes the host mining
 session. Independent numeric output retains native double precision; the existing
-/api/align serializer is unchanged. Full reference parity remains open.
+/api/align serializer is unchanged. It aligns as pm4py's log alignments do (the
+easy-soundness check, then each variant; state equation A* when no variant is
+given; standard costs with `cost_profile=standard`), and an alignment activity
+attribute holding numbers, booleans, dates or gaps reads pm4py's objects on each
+adapter (round HK).
 
 ### Organizational analysis workbench
 
