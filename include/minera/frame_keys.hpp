@@ -95,6 +95,8 @@ void require_sortable_classes(const std::set<FrameValueClass>& classes);
 // activity set to str() of its cell ("7", "2.0", "True", "2020-01-01
 // 00:00:00+00:00", "nan" for a missing cell, "NaT" in a date column) under
 // concept:name; `types` holds each event's Python type name ("" for a str).
+// Cells equal as dict keys are one activity named str() of the first one met
+// in log order (round HN: a float64 column's -0.0 beside 0.0).
 struct FrameKeyedActivities {
   EventLog log;
   std::vector<std::vector<std::string>> types;
@@ -112,6 +114,9 @@ struct FrameKeyedActivities {
   std::vector<std::vector<bool>> absent;
   bool any_absent = false;
   bool any_dict = false;
+  // Round HN: str() of each event's own object ("" for an event without
+  // one), where `log` names a class of equal objects after its first.
+  std::vector<std::vector<std::string>> printed;
 };
 
 // The log shape of an XES upload keyed by an event attribute (round HF,

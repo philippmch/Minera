@@ -555,7 +555,9 @@ std::vector<double> fit_stochastic_transition_weights(
   // The reference fitter reads the activity under the key it is given, and
   // the source log's key is the one its importer or selectors recorded (a
   // CSV "activity" column or a custom selector), not always concept:name.
-  if (auto key = source_log_first_class_key(source_log, true); !key.empty())
+  if (!options.fitting_activity_attribute.empty())
+    fit.replay.activity_attribute = options.fitting_activity_attribute;
+  else if (auto key = source_log_first_class_key(source_log, true); !key.empty())
     fit.replay.activity_attribute = std::move(key);
   if (auto key = source_log_first_class_key(source_log, false); !key.empty())
     fit.replay.timestamp_attribute = std::move(key);

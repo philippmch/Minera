@@ -2647,6 +2647,15 @@ CsvEventData import_csv_event_data_impl(
       }
       return DataFrameColumnType::kString;
     };
+    const auto float_integer_cells = [](DataFrameColumnType type, const std::vector<std::string>& cells,
+                                        const std::vector<std::optional<std::string>>& present) {
+      if (type != DataFrameColumnType::kFloat64) return false;
+      for (std::size_t i = 0; i < cells.size(); ++i) {
+        std::int64_t value = 0;
+        if (present[i] && signed_cell(cells[i], value) != IntegerCell::kFits) return false;
+      }
+      return true;
+    };
     // format_dataframe also converts every other text column whose present
     // cells all read as dates (to_datetime(format="mixed", utc=True)) to
     // dates (observed black-box: a start-time column is a date column of
@@ -2729,6 +2738,7 @@ CsvEventData import_csv_event_data_impl(
       column.type = column_type(typed.kind, ints);
       column.missing_cell = std::any_of(typed.text.begin(), typed.text.end(),
                                         [](const std::optional<std::string>& cell) { return !cell; });
+      column.integer_cells = float_integer_cells(column.type, cells, typed.text);
       if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text)) {
         column.type = DataFrameColumnType::kDate;
         column.nanoseconds = nanosecond_cells(cells, typed.text);
@@ -2794,6 +2804,7 @@ CsvEventData import_csv_event_data_impl(
       column.type = column_type(typed.kind, ints);
       column.missing_cell = std::any_of(typed.text.begin(), typed.text.end(),
                                         [](const std::optional<std::string>& cell) { return !cell; });
+      column.integer_cells = float_integer_cells(column.type, cells, typed.text);
       if (column.type == DataFrameColumnType::kString && date_cells(cells, typed.text)) {
         column.type = DataFrameColumnType::kDate;
         column.nanoseconds = nanosecond_cells(cells, typed.text);
@@ -3155,7 +3166,10 @@ EventAttribute csv_dataframe_cell(const DataFrameColumn& column, const std::stri
       std::optional<double> value;
       std::int64_t integer = 0;
       if (signed_cell(text, integer) == IntegerCell::kFits)
-        value = static_cast<double>(integer);
+        // read_csv reads "-0" in a column parsed as floats as -0.0 (round
+        // HN, observed black-box; an integer column upcast by a gap 0.0).
+        value = integer == 0 && !column.integer_cells && text.find('-') != std::string::npos
+                    ? -0.0 : static_cast<double>(integer);
       else
         value = pandas_float_cell(text);
       if (!value) break;

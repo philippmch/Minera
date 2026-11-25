@@ -439,6 +439,13 @@ constexpr const char* kPolarsPosition = "__minera_polars_position";
 // itself on the case column, where NaN meets NaN; round BL, observed
 // black-box), except on a CSV upload's rows, where format_dataframe drops
 // the rows without a case or an activity.
+// Round HN: a listener for the pairs pandas' groupby factorizes, as (source
+// row, target row) of the frame, set while temporal_profile_xes_frame_labels
+// names the classes of equal objects; with it a row without an activity
+// pairs too (its partner still counts in the column's factorization).
+thread_local const std::function<void(std::size_t, std::size_t)>* g_frame_pair_listener = nullptr;
+const std::string kListenedGap = "\x1fminera:listened gap";
+
 EventLog temporal_table_to_log(const EventTable& table,
                                const TemporalProfileOptions& options,
                                std::vector<std::size_t>* first_rows = nullptr,
@@ -471,6 +478,7 @@ EventLog temporal_table_to_log(const EventTable& table,
     const CaseKey key{case_id == nullptr, case_id ? *case_id : std::string()};
     const auto* activity = table_value(row, columns.activity);
     if (frame_timestamp && activity == nullptr) continue;
+    if (activity == nullptr && g_frame_pair_listener && !frame_timestamp) activity = &kListenedGap;
     std::int64_t rank = 0;
     std::optional<ParsedExactTimestamp> frame_exact;
     double frame_instant = 0.0;
@@ -634,6 +642,8 @@ struct FrameProfileRow {
   // The row's position after Polars' sort, when it orders the pairs apart
   // from the index (polars_partial_order_table).
   std::optional<std::int64_t> order;
+  // The frame row (the event's input_order), for a pair listener.
+  std::size_t row = std::numeric_limits<std::size_t>::max();
 };
 
 // pm4py's DataFrame arithmetic over cases given by sorted id, each case's rows
@@ -671,6 +681,67 @@ EventLog temporal_stream_log(const EventStream& stream, const TemporalProfileOpt
 }
 
 }  // namespace
+
+void name_temporal_pairs_as_met(TemporalProfile& profile, const EventLog& log,
+                                const std::vector<std::vector<std::string>>& printed,
+                                const TemporalProfileOptions& options) {
+  const auto trailing = [](const std::string& label) {
+    const auto end = label.find_last_not_of('\x1f');
+    return label.substr(end == std::string::npos ? 0 : end + 1);
+  };
+  bool apart = false;
+  for (std::size_t t = 0; t < log.traces.size() && t < printed.size() && !apart; ++t)
+    for (std::size_t e = 0; e < log.traces[t].events.size() && e < printed[t].size(); ++e) {
+      const auto& label = log.traces[t].events[e].activity;
+      if (label.substr(0, label.size() - trailing(label).size()) != printed[t][e]) {
+        apart = true;
+        break;
+      }
+    }
+  if (!apart || profile.entries.empty()) return;
+  const auto& source_attribute =
+      configured_attribute(options.source_timestamp_attribute, options.source_completion_timestamp_attribute);
+  const auto& target_attribute =
+      configured_attribute(options.target_timestamp_attribute, options.target_start_timestamp_attribute);
+  std::map<std::pair<std::string, std::string>, std::pair<std::string, std::string>> met;
+  for (std::size_t t = 0; t < log.traces.size() && t < printed.size(); ++t) {
+    const auto& events = log.traces[t].events;
+    if (printed[t].size() != events.size()) continue;
+    for (std::size_t i = 0; i + 1 < events.size(); ++i) {
+      const auto source_time = event_instant(events[i], source_attribute, "", false, true);
+      const auto source = event_activity(events[i], options);
+      if (!source_time || !source) continue;
+      for (std::size_t j = i + 1; j < events.size(); ++j) {
+        const auto target_time = event_instant(events[j], target_attribute, "", false, true);
+        if (!target_time || *target_time < *source_time) continue;
+        const auto target = event_activity(events[j], options);
+        if (!target) continue;
+        met.try_emplace({*source, *target}, printed[t][i], printed[t][j]);
+      }
+    }
+  }
+  // A renamed label never takes another class's (a str "-0.0" beside the
+  // float class first met as 0.0): more \x1f keep it apart, printed alike.
+  std::map<std::string, std::string> taken;
+  for (const auto& trace : log.traces)
+    for (const auto& event : trace.events) taken.try_emplace(event.activity, event.activity);
+  const auto rename = [&](const std::string& label, const std::string& shown) {
+    auto out = shown + trailing(label);
+    while (true) {
+      const auto [at, added] = taken.try_emplace(out, label);
+      if (added || at->second == label) return out;
+      out += '\x1f';
+    }
+  };
+  for (auto& entry : profile.entries)
+    if (const auto found = met.find({entry.source, entry.target}); found != met.end()) {
+      entry.source = rename(entry.source, found->second.first);
+      entry.target = rename(entry.target, found->second.second);
+    }
+  std::sort(profile.entries.begin(), profile.entries.end(), [](const auto& left, const auto& right) {
+    return std::tie(left.source, left.target) < std::tie(right.source, right.target);
+  });
+}
 
 TemporalProfile discover_temporal_profile_log(
     const EventLog& log, const TemporalProfileOptions& options) {
@@ -965,7 +1036,7 @@ TemporalProfile discover_temporal_profile_table(const EventTable& table, const T
                                                         : std::pair<std::int64_t, std::uint32_t>{0, 0})
                                  : std::nullopt,
                            has_source, !split || target.has_value(), ranks.empty() ? std::nullopt : std::optional(ranks[t][e]),
-                           orders.empty() ? std::nullopt : std::optional(orders[t][e])});
+                           orders.empty() ? std::nullopt : std::optional(orders[t][e]), event.input_order});
       }
       ordered.push_back({&log.traces[t].case_id, &rows[t]});
     }
@@ -1123,6 +1194,16 @@ static std::string xes_frame_tp_activity_key(const EventDataView& data, const Te
   return options.activity_attribute;
 }
 
+void listen_temporal_frame_pairs(const std::function<void(std::size_t, std::size_t)>& listener,
+                                 const std::function<void()>& discover) {
+  struct Reset {
+    const std::function<void(std::size_t, std::size_t)>* previous;
+    ~Reset() { g_frame_pair_listener = previous; }
+  } reset{g_frame_pair_listener};
+  g_frame_pair_listener = &listener;
+  discover();
+}
+
 TemporalProfile temporal_profile_xes_frame_labels(const EventDataView& data, const TemporalProfileOptions& options,
                                                   bool explicit_start_key, TemporalProfile profile) {
   const bool polars = data.kind() == EventDataKind::kLazyEventTable;
@@ -1141,9 +1222,50 @@ TemporalProfile temporal_profile_xes_frame_labels(const EventDataView& data, con
     if (column->cells[r].missing || at >= row.size() || !row[at]) continue;
     label_of.try_emplace(row[at]->value, detail::xes_frame_activity_label(column->cells[r]));
   }
+  // Round HN (observed black-box): pandas' groupby factorizes each column of
+  // the pair frame on its own, so a class of equal objects printed apart
+  // (0.0 and -0.0) is named by its first source in the pair frame as a
+  // source and its first target as a target (cases by sorted id, each
+  // case's pairs in order; a pair whose partner has no activity counts).
+  std::map<std::string, std::string> source_label, target_label, class_of_text;
+  if (!polars) {
+    std::vector<std::optional<std::string>> class_of(table.rows.size()), shown(table.rows.size());
+    std::map<std::string, std::set<std::string>> shown_of_class;
+    for (std::size_t r = 0; r < table.rows.size() && r < column->cells.size(); ++r) {
+      const auto& row = table.rows[r];
+      if (column->cells[r].missing || at >= row.size() || !row[at]) continue;
+      class_of[r] = detail::xes_frame_activity_identity(column->cells[r]);
+      shown[r] = detail::xes_frame_activity_label(column->cells[r]);
+      shown_of_class[*class_of[r]].insert(*shown[r]);
+      class_of_text.try_emplace(row[at]->value, *class_of[r]);
+    }
+    if (std::any_of(shown_of_class.begin(), shown_of_class.end(),
+                    [](const auto& item) { return item.second.size() > 1; })) {
+      const std::function<void(std::size_t, std::size_t)> listener = [&](std::size_t i, std::size_t j) {
+        if (i < class_of.size() && class_of[i]) source_label.try_emplace(*class_of[i], *shown[i]);
+        if (j < class_of.size() && class_of[j]) target_label.try_emplace(*class_of[j], *shown[j]);
+      };
+      struct Reset {
+        ~Reset() { g_frame_pair_listener = nullptr; }
+      } reset;
+      g_frame_pair_listener = &listener;
+      try {
+        (void)discover_temporal_profile_xes_frame(data, options, explicit_start_key);
+      } catch (const std::exception&) {
+        source_label.clear();
+        target_label.clear();
+      }
+    }
+  }
+  const auto name = [&](const std::string& text, const std::map<std::string, std::string>& first) {
+    if (const auto at_class = class_of_text.find(text); at_class != class_of_text.end())
+      if (const auto found = first.find(at_class->second); found != first.end()) return found->second;
+    if (const auto found = label_of.find(text); found != label_of.end()) return found->second;
+    return text;
+  };
   for (auto& entry : profile.entries) {
-    if (const auto found = label_of.find(entry.source); found != label_of.end()) entry.source = found->second;
-    if (const auto found = label_of.find(entry.target); found != label_of.end()) entry.target = found->second;
+    entry.source = name(entry.source, source_label);
+    entry.target = name(entry.target, target_label);
   }
   return profile;
 }
@@ -1297,6 +1419,7 @@ static TemporalProfile discover_temporal_profile_xes_frame_pairs(
       };
       std::map<std::pair<std::string, std::string>, Sums> sums;
       for (const auto& [i, j, value] : verdict.pairs) {
+        if (g_frame_pair_listener) (*g_frame_pair_listener)(i, j);
         const auto* source = activity(i);
         const auto* target = activity(j);
         if (!source || !target) continue;
@@ -2255,11 +2378,13 @@ TemporalProfile frame_arithmetic_profile(
                   : whole_seconds ? static_cast<double>(whole)
                   : static_cast<double>(whole) + static_cast<double>(fraction / 1000) * 1e-6 +
                         static_cast<double>(fraction % 1000) * 1e-9;
-        if (whole_seconds && ranked)
+        if (whole_seconds && ranked) {
           deferred.push_back({(*rows)[j].order.value_or(*(*rows)[j].index), source.order.value_or(*source.index),
                               source.activity, (*rows)[j].activity, value});
-        else
+        } else {
+          if (g_frame_pair_listener) (*g_frame_pair_listener)(source.row, (*rows)[j].row);
           accumulate(*source.activity, *(*rows)[j].activity, value);
+        }
       }
   }
   std::stable_sort(deferred.begin(), deferred.end(), [](const Deferred& left, const Deferred& right) {

@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HM (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HN (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -11205,6 +11205,105 @@ adapters); after the fix the 19 MSD, temporal and review tests passed and
 the dataframe MSD sweep stayed 180 and 120 of 120. The 16 manifests
 replayed 2,673 responses unchanged; no frontend or Python script change.
 Harness and probes: `review-harness/round-hm/`.
+
+Round HN re-reviewed HM. HM's CI run 45703330275 passed Linux and macOS
+ctest, the frontend, the Python scripts and the parity verifier (Windows
+still building at HN's handoff).
+HN1 the temporal profile keyed by an attribute or a CSV column whose objects
+are equal as dict keys but printed apart (0.0 and -0.0, 1 and 1.0, 1 and
+True): pm4py's EventLog algorithm keys its dict by each pair's tuple of
+objects, so an entry is named after the first pair of that class met
+(traces in order, the pairs (i, j) for i < j whose target is not earlier
+than the source); Minera named every pair by each activity's first object.
+/api/mine on the XES and CSV log shapes and /api/analyze-behavior's log and
+stream adapters now rename the pairs (`name_temporal_pairs_as_met`, over
+the str() of each event's own object that `legacy_keyed_activities` and
+`frame_keyed_activities` now keep as `printed`; observed black-box). Sweep
+`ct/bh.py` (hfA 40 + hfN 20 uploads, keys K1..K6, 360 judgments per
+adapter): log 346 -> 360, stream 346 -> 360.
+HN2 the same profile on an XES upload's dataframe adapter: pandas' groupby
+factorizes each column of the pair frame on its own, so a class of equal
+objects printed apart is named by its first source as a source and by its
+first target as a target (cases by sorted id, each case's pairs in order; a
+pair whose partner has no activity still counts).
+`temporal_profile_xes_frame_labels` reruns the discovery with a pair
+listener when a class prints two ways. Sweep: dataframe 357 -> 360.
+HN3 /api/playout?miner=powl stochastic with stochastic_fit_from_log on a
+net mined under powl_activity_key fits the weights by replaying the log
+under that key, as /api/stochastic-map does (GG's contract,
+`StochasticPlayoutOptions::fitting_activity_attribute`); Minera fitted under
+the log's first class key. Sweep `ct/spfit.py` (40 uploads, K1..K6): hfA K6
+3 -> 40 of 40, the other keys and hcS unchanged (hcS K1: one map error in
+both).
+HN4 a CSV cell "-0" reads -0.0 in a column pandas parses as floats and 0.0
+in an integer column a gap upcasts to float64
+(`DataFrameColumn::integer_cells`, observed black-box); Minera read 0.0
+everywhere. New bank hnZ (hcS's uploads with K2 drawn from 0.0, -0.0, -0,
+0, 1.5 and 2.5 and 10% gaps, 40 uploads, `gen/genz.py`), with HN1 and HN5:
+CSV log shape families (`ct/csvfam.py`) Alpha 15 -> 40, temporal profile
+13 -> 40, log skeleton 12 -> 30, transition system 17 -> 13 (the zeros now
+printed apart meet the open printing item below); `ct/bh.py` log and stream
+profiles 13 -> 40, log-variant MSD 19 -> 40, Polars MSD 32 -> 40; CSV frame
+shapes (`ct/csvk.py` dataframe) Alpha 35 -> 40, Declare 32 -> 40, temporal
+profile 3 -> 6 of 6 valued, log skeleton 11 -> 15 of 18 valued.
+HN5 the dataframe adapter's temporal profile of a CSV upload keyed by a
+float64 column holding -0.0 beside 0.0: pandas' groupby holds both zeros as
+one group (one mean and deviation), named by the first zero of each column
+of the pair frame; Minera kept two classes. `csv_frame_keyed_table` names
+both zeros "0.0" and the profile takes the first source and target zero
+from a listened rerun (`listen_temporal_frame_pairs`). Sweep hnZ dataframe
+3 -> 6 of 6 valued (34 errors equal); hcS dataframe unchanged (18 of 18
+valued, 102 errors equal).
+Checked, no change: the extensive playout of the POWL net mined under a
+typed key (`ct/pext.py`, hcS 30 uploads x K1..K6, hfA 5 uploads before the
+run was stopped) equals pm4py's in every judgment whose language fits
+Minera's 1,000-trace cap (hcS 78; 14 capped), except the nets of keys
+holding NaN or NaT (HK's declared residual: hcS 8, hfA 1; Minera's XES
+writer also refuses such a net's duplicate NaN labels, which carry the
+internal U+001F mark); the Monte Carlo route under typed keys
+(`p/mc2.py`, hfA 6 uploads x 4 keys: the case arrival ratio and the
+zero-duration verdict equal, the sampled durations random on both sides);
+HE2: an instrumented `set` (`he2/spy.py`) over 40 pm4py families on hfA
+f90003 finds only Declare's rules table (round HE), the ILP miner (its
+tie-aware contract covers the order) and Woflan's S-components (place
+objects, hashed by id) copying a set of five or more elements.
+Left for HO (not declared): the log skeleton's and transition system's
+printing of equal objects (hnZ CSV log shape: log skeleton 10, transition
+system 27 of 40; CSV frame log skeleton 3 of 18): each relation or state
+names a class by the first object it meets in its own pass, which Minera
+does not model; the Inductive miner's RecursionError where Minera raises
+the concat TypeError (hnZ log shape 3, dataframe 4, lazyframe 9 of 40);
+pm4py's Monte Carlo on a simulated empty case (IndexError when the first
+case is empty; a later one overwrites case 0's last timestamp with its
+arrival and counts in the cases' execution times, `p/mc7.py`, `p/mc8.py`);
+on hnZ's lazyframe shape
+(`ct/csvk.py` SHAPE=lazyframe: Alpha 30 -> 36, log skeleton 24 -> 32 of 40)
+the sign Polars prints for the zeros' group (Alpha 4, log skeleton 8,
+temporal profile 3 of 6 valued; the values equal).
+HN's suite: the full ctest 703 of 703 (-j2, 39 minutes) with the new
+`minera_server_review_hn_tests` (235 checks over 38 uploads: temporal
+profiles on the log, stream and dataframe adapters and /api/mine's, minimum
+self-distances on hnZ, and the POWL stochastic playout fit under typed
+keys; 85 fail on HM's binary; `tc/seedchk.py` under PYTHONHASHSEED 1 and 3:
+none differ); the 16 manifests replayed 2,673 responses unchanged; no
+frontend or Python script change.
+Harness and probes: `review-harness/round-hn/`.
+
+Next round (HO) should start by re-reviewing round HN:
+
+- HN's CI run, and HM's Windows job;
+- the log skeleton's and transition system's printing of equal objects
+  (HN's item: hnZ CSV log shape LS 10, TS 27 of 40);
+- the Inductive miner's RecursionError vs Minera's concat TypeError on hnZ;
+- pm4py's Monte Carlo on a simulated empty case (`p/mc7.py`);
+- the sign Polars prints for a float column's zeros' group on hnZ's
+  lazyframe shape (`ct/csvk.py` SHAPE=lazyframe);
+- the declared residuals (HF's..HN's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HN (kept for its older items):
 
 Next round (HN) should start by re-reviewing round HM:
 

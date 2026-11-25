@@ -127,6 +127,10 @@ struct StochasticPlayoutOptions {
   // unset follows the net. The server fits a cached POWL net on its named
   // replay copy with that copy's order (round GG).
   std::optional<std::vector<std::vector<std::size_t>>> fitting_place_outgoing_transition_order;
+  // The activity key source-log fitting replays; empty reads the source
+  // log's own first-class key. The server fits a POWL net under the key it
+  // was mined by, as /api/stochastic-map does (round HN).
+  std::string fitting_activity_attribute;
 };
 
 // Plays out a Petri net into a synthetic event log, as the reference

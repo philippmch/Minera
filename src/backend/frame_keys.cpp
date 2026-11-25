@@ -545,14 +545,18 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
   out.log = log;
   out.types.resize(frame.traces.size());
   out.missing.resize(frame.traces.size());
+  out.printed.resize(frame.traces.size());
   bool non_text = false;
   std::set<std::string> labels;
+  // A class of cells equal as dict keys (python::identity) -> its label.
+  std::unordered_map<std::string, std::string> label_of;
   for (std::size_t t = 0; t < frame.traces.size(); ++t) {
     const auto& trace = frame.traces[t];
     auto& target_trace = out.log.traces[t];
     if (trace.events.size() != target_trace.events.size()) return std::nullopt;
     out.types[t].resize(trace.events.size());
     out.missing[t].resize(trace.events.size());
+    out.printed[t].resize(trace.events.size());
     for (std::size_t e = 0; e < trace.events.size(); ++e) {
       const auto cell = frame_scalar(frame, trace, trace.events[e], key, scope);
       std::string label;
@@ -563,10 +567,13 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
         type = dates ? "NaTType" : "float";
         out.missing[t][e] = true;
         out.any_missing = true;
+        out.printed[t][e] = label;
       } else if (cell->kind == python::Scalar::Kind::kText) {
         label = cell->text;
+        out.printed[t][e] = label;
       } else {
-        label = python::str(*cell);
+        out.printed[t][e] = python::str(*cell);
+        label = label_of.try_emplace(python::identity(*cell), out.printed[t][e]).first->second;
         type = python::type_name(*cell);
       }
       if (type.empty()) {
@@ -605,6 +612,7 @@ std::optional<FrameKeyedActivities> legacy_keyed_activities_impl(const EventLog&
   out.types.resize(log.traces.size());
   out.missing.resize(log.traces.size());
   out.absent.resize(log.traces.size());
+  out.printed.resize(log.traces.size());
   // A value's class (equal as a dict key) -> its label; a printed text ->
   // the classes printed so (the later ones take trailing \x1f).
   std::unordered_map<std::string, std::string> label_of;
@@ -636,10 +644,12 @@ std::optional<FrameKeyedActivities> legacy_keyed_activities_impl(const EventLog&
     out.types[t].resize(trace.events.size());
     out.missing[t].resize(trace.events.size());
     out.absent[t].resize(trace.events.size());
+    out.printed[t].resize(trace.events.size());
     for (std::size_t e = 0; e < trace.events.size(); ++e) {
       auto& event = trace.events[e];
       const auto cell = legacy_declare_cell(log.traces[t].events[e], key);
       if (cell.state == State::kUnmodelled) return std::nullopt;
+      if (cell.state == State::kValue) out.printed[t][e] = python::str(cell.value);
       std::string label, type;
       if (cell.state == State::kAbsent) {
         out.absent[t][e] = true;

@@ -3916,10 +3916,16 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // A CSV log keyed by another column of its frame reads its cells (round
     // GR; csv_keyed_family_log), as do the transition system, the log
     // skeleton and Declare below.
-    auto temporal_keyed = csv_keyed_family_log(log, params.temporal_profile.activity_attribute);
+    std::optional<minera::EventLog> temporal_keyed;
+    std::vector<std::vector<std::string>> temporal_printed;
+    if (auto keyed = csv_keyed_family(log, params.temporal_profile.activity_attribute)) {
+      temporal_printed = std::move(keyed->printed);
+      temporal_keyed = std::move(keyed->log);
+    }
     if (xes_input)
       if (auto legacy = legacy_keyed_family(log, params.temporal_profile.activity_attribute, true)) {
         check_legacy_temporal_keys(*legacy, params.temporal_profile.activity_attribute);
+        temporal_printed = std::move(legacy->printed);
         temporal_keyed = std::move(legacy->log);
       }
     auto temporal_options = params.temporal_profile;
@@ -3932,8 +3938,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                    tp.target_timestamp_attribute.empty() ? tp.target_start_timestamp_attribute
                                                                          : tp.target_timestamp_attribute);
     }
-    const auto temporal_profile =
+    auto temporal_profile =
         minera::discover_temporal_profile_as_uploaded(temporal_keyed ? *temporal_keyed : log, temporal_options, cancelled);
+    // Pairs of equal objects printed apart take the first pair's (round HN).
+    if (temporal_keyed)
+      minera::name_temporal_pairs_as_met(temporal_profile, *temporal_keyed, temporal_printed, temporal_options);
     // An upload's log shape keyed by another attribute (round HH).
     auto keyed_distances = keyed_minimum_self_distances(log, xes_input, params.minimum_self_distance);
     const auto minimum_self_distances = keyed_distances ? std::move(*keyed_distances) :
@@ -7218,9 +7227,12 @@ std::optional<minera::EventTable> polars_msd_typed_table(const MinedSession& ses
 // each gap null; nullopt when nothing changes. `conformance`: a bool cell
 // (a bool column, or an object one with gaps) never equals the profile's str
 // labels in pandas' merge, so its name takes a leading \x1f no profile
-// label holds.
+// label holds. `zero_printed`: pandas' groupby holds a float column's -0.0
+// and 0.0 as one group (round HN, observed black-box); when both occur they
+// are named "0.0" here and zero_printed[row] keeps each zero's own str().
 std::optional<minera::EventTable> csv_frame_keyed_table(const MinedSession& session, const std::string& key,
-                                                        bool conformance = false) {
+                                                        bool conformance = false,
+                                                        std::vector<std::optional<std::string>>* zero_printed = nullptr) {
   if (!session.active_source || session.active_source->file().format != "csv" || !session.log_ready)
     return std::nullopt;
   const auto view = cached_source_view(session, minera::EventDataKind::kEventTable);
@@ -7231,12 +7243,20 @@ std::optional<minera::EventTable> csv_frame_keyed_table(const MinedSession& sess
   const auto at = static_cast<std::size_t>(found - table.columns.begin());
   const auto type = minera::csv_frame_label_type(require_prepared_log(session), key);
   bool changed = false;
-  for (auto& row : table.rows) {
+  if (zero_printed) zero_printed->assign(table.rows.size(), std::nullopt);
+  bool negative_zero = false, positive_zero = false;
+  for (std::size_t r = 0; r < table.rows.size(); ++r) {
+    auto& row = table.rows[r];
     if (at >= row.size() || !row[at] || (row[at]->is_null && !conformance)) continue;
     auto& cell = *row[at];
     std::optional<std::string> label;
     if (!cell.is_null && !minera::is_pandas_csv_na_text(cell.value))
       label = type ? minera::csv_frame_cell_label(*type, key, cell.value, false) : cell.value;
+    if (zero_printed && !conformance && label && type == minera::DataFrameColumnType::kFloat64 &&
+        (*label == "0.0" || *label == "-0.0")) {
+      (*zero_printed)[r] = *label;
+      (*label == "0.0" ? positive_zero : negative_zero) = true;
+    }
     if (label && conformance &&
         (type == minera::DataFrameColumnType::kBool || type == minera::DataFrameColumnType::kObject))
       label = "\x1f" + *label;
@@ -7251,6 +7271,17 @@ std::optional<minera::EventTable> csv_frame_keyed_table(const MinedSession& sess
       cell.is_null = false;
       cell.value = std::move(*label);
       changed = true;
+    }
+  }
+  if (zero_printed) {
+    if (negative_zero && positive_zero) {
+      for (std::size_t r = 0; r < table.rows.size(); ++r)
+        if ((*zero_printed)[r] && table.rows[r][at]->value != "0.0") {
+          table.rows[r][at]->value = "0.0";
+          changed = true;
+        }
+    } else {
+      zero_printed->clear();
     }
   }
   if (!changed) return std::nullopt;
@@ -7372,6 +7403,7 @@ void handle_behavior_analysis(const httplib::Request& request,
       // A CSV upload's log shape reads the frame's cells (round GR's
       // csv_keyed_family_log), its conformance as the XES one.
       std::optional<minera::EventLog> legacy_temporal;
+      std::optional<std::vector<std::vector<std::string>>> legacy_printed;
       if (log_read)
         if (const auto* shape = session_log_shape(*session)) {
           const auto key = params.temporal_profile.activity_attribute;
@@ -7379,9 +7411,13 @@ void handle_behavior_analysis(const httplib::Request& request,
           if (conform) {
             legacy_temporal = xes_shape ? legacy_temporal_conformance_log(*shape, key) : csv_temporal_conformance_log(*shape, key);
           } else if (!xes_shape) {
-            legacy_temporal = csv_keyed_family_log(*shape, key);
+            if (auto keyed = csv_keyed_family(*shape, key)) {
+              legacy_printed = std::move(keyed->printed);
+              legacy_temporal = std::move(keyed->log);
+            }
           } else if (auto legacy = legacy_keyed_family(*shape, key, true)) {
             check_legacy_temporal_keys(*legacy, key);
+            legacy_printed = std::move(legacy->printed);
             legacy_temporal = std::move(legacy->log);
           }
           if (legacy_temporal) params.temporal_profile.activity_attribute = "concept:name";
@@ -7389,8 +7425,10 @@ void handle_behavior_analysis(const httplib::Request& request,
       // A CSV upload's frame keyed by another column (round HM).
       std::optional<minera::EventTable> csv_keyed_frame;
       std::string csv_merge_dtype;
+      std::vector<std::optional<std::string>> csv_zero_printed;
       if (csv_frame && adapter == "dataframe") {
-        csv_keyed_frame = csv_frame_keyed_table(*session, params.temporal_profile.activity_attribute, conform);
+        csv_keyed_frame = csv_frame_keyed_table(*session, params.temporal_profile.activity_attribute, conform,
+                                                &csv_zero_printed);
         if (conform) csv_merge_dtype = csv_frame_merge_dtype(*session, params.temporal_profile.activity_attribute);
       }
       const auto temporal_input = [&]() -> minera::EventDataView {
@@ -7443,8 +7481,35 @@ void handle_behavior_analysis(const httplib::Request& request,
             minera::discover_temporal_profile_xes_frame(input(), params.temporal_profile, explicit_start));
       } else if (verdict == CsvFrameTpVerdict::kEmpty) {
         profile = minera::TemporalProfile{};
-      } else profile = minera::discover_temporal_profile_named_start(temporal_input(), params.temporal_profile, start_name,
-                                                                                timestamp_name);
+      } else {
+        profile = minera::discover_temporal_profile_named_start(temporal_input(), params.temporal_profile, start_name,
+                                                                timestamp_name);
+        // pandas' groupby names the zeros' group by the first zero of each
+        // column of the pair frame: its first source, its first target
+        // (round HN, observed black-box).
+        if (!csv_zero_printed.empty()) {
+          std::optional<std::string> source_zero, target_zero;
+          minera::listen_temporal_frame_pairs(
+              [&](std::size_t i, std::size_t j) {
+                if (!source_zero && i < csv_zero_printed.size() && csv_zero_printed[i]) source_zero = csv_zero_printed[i];
+                if (!target_zero && j < csv_zero_printed.size() && csv_zero_printed[j]) target_zero = csv_zero_printed[j];
+              },
+              [&] {
+                (void)minera::discover_temporal_profile_named_start(temporal_input(), params.temporal_profile, start_name,
+                                                                    timestamp_name);
+              });
+          for (auto& entry : profile->entries) {
+            if (entry.source == "0.0" && source_zero) entry.source = *source_zero;
+            if (entry.target == "0.0" && target_zero) entry.target = *target_zero;
+          }
+          std::sort(profile->entries.begin(), profile->entries.end(), [](const auto& a, const auto& b) {
+            return std::tie(a.source, a.target) < std::tie(b.source, b.target);
+          });
+        }
+        // Pairs of equal objects printed apart take the first pair's (round HN).
+        if (legacy_printed && legacy_temporal)
+          minera::name_temporal_pairs_as_met(*profile, *legacy_temporal, *legacy_printed, params.temporal_profile);
+      }
       for (const auto& entry : profile->entries) { graph.ensure_activity(entry.source); graph.ensure_activity(entry.target); }
     } else if (family == "minimum_self_distance") {
       distances = [&]() -> minera::MinimumSelfDistances {
@@ -14193,6 +14258,9 @@ void handle_playout(const httplib::Request& request,
             require_prepared_log(*session), session->powl_activity_key,
             session->powl_timestamp_key, session->powl_case_id_key);
         fit_log = &*projected_powl_log;
+        // The key the net was mined by, as /api/stochastic-map fits it
+        // (round HN: a text key read the log's own key and fitted apart).
+        options.fitting_activity_attribute = session->powl_activity_key;
       }
       if (options.return_visited_elements) {
         const auto& selected = select_cached_or_process_tree_net(

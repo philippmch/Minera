@@ -39,6 +39,10 @@ struct DataFrameColumn {
   // then drops included (round GW): read_csv keeps a True/False column with
   // a gap as objects even when the gap's row is dropped.
   bool missing_cell = false;
+  // A CSV float64 column whose present cells are all integer literals
+  // (read_csv's integer parse, upcast by a gap): its "-0" reads 0.0, where a
+  // column parsed as floats reads -0.0 (round HN, observed black-box).
+  bool integer_cells = false;
 };
 
 // The event columns of a log's frame. For a CSV log (csv_text) the cells are

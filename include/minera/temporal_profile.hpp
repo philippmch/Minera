@@ -155,6 +155,24 @@ struct TemporalDeviation {
                                                                 const TemporalProfileOptions& options,
                                                                 bool explicit_start_key, TemporalProfile profile);
 
+// Round HN (observed black-box): pm4py's EventLog algorithm keys its dict by
+// each pair's tuple of objects, so objects equal as dict keys but printed
+// apart (0.0 and -0.0, 1 and 1.0, 1 and True) name an entry after the first
+// pair of them met: traces in order, (i, j) for i < j whose target is not
+// earlier than the source. `log` holds one label per class of equal objects
+// (legacy_keyed_activities), `printed[t][e]` str() of each event's own
+// object; an entry keeps its label's trailing \x1f. A no-op when every
+// class prints alike.
+void name_temporal_pairs_as_met(TemporalProfile& profile, const EventLog& log,
+                                const std::vector<std::vector<std::string>>& printed,
+                                const TemporalProfileOptions& options);
+
+// Round HN: runs `discover` while `listener` sees each (source row, target
+// row) pair of a frame's profile in the order pandas' pair frame holds them,
+// the frame's row indices (as temporal_profile_xes_frame_labels reads them).
+void listen_temporal_frame_pairs(const std::function<void(std::size_t, std::size_t)>& listener,
+                                 const std::function<void()>& discover);
+
 // Return only observations whose absolute z-score exceeds options.zeta, or
 // whose zero-variance profile disagrees with the observed duration.
 [[nodiscard]] std::vector<TemporalDeviation> check_temporal_profile_conformance(
