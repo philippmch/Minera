@@ -3650,6 +3650,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         params.declare_conformance_options.activity_key == params.declare_options.activity_key)
       if (const auto frame = formatted_csv_frame_table(*active_source))
         declare_typed = minera::discover_declare_typed_frame(*frame, params.declare_options);
+    // Round HE: an XES upload's log shape (the hybrid legacy log) keyed by
+    // an attribute of other values than text keys the rules frame by the
+    // objects its importer stores (discover_declare_typed_log).
+    if (xes_input && params.declare_conformance_options.activity_key == params.declare_options.activity_key)
+      declare_typed = minera::discover_declare_typed_log(log, params.declare_options);
     if (declare_typed && !declare_typed->conformance.error.empty())
       throw std::invalid_argument(declare_typed->conformance.error);
     auto declare_keyed = declare_typed ? std::nullopt : csv_keyed_family(log, params.declare_options.activity_key);

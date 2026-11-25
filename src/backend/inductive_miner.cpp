@@ -2795,12 +2795,49 @@ static void check_xes_frame_tree_str(const EventDataView& data, const InductiveM
   visit(root);
 }
 
+// A CSV upload's frame keyed by a column without any value (round HE,
+// observed black-box; read_csv's float64 column of NaN, absent-shaped in
+// the typed frame): pandas hands each row its own NaN, so a frame of one
+// row mines that leaf (whose str() fails), one-row cases recurse without end
+// (no NaN is found again) and any longer case concatenates the label; the
+// Polars copy holds nulls, so one-row cases mine a tau and a longer case
+// fails networkx's DFG ("None cannot be a node"). nullopt for other frames.
+static std::optional<ProcessTree> all_gap_activity_tree(const EventDataView& data, const InductiveMinerOptions& options) {
+  const bool polars = data.kind() == EventDataKind::kLazyEventTable;
+  if (!polars && data.kind() != EventDataKind::kEventTable) return std::nullopt;
+  std::optional<EventTable> materialized, storage;
+  const EventTable* source = polars ? &materialized.emplace(data.lazy_table()->materialize()) : data.table();
+  const auto& table = detail::xes_frame_present_columns(*source, storage, polars);
+  const auto column = std::find(table.columns.begin(), table.columns.end(), options.activity_key);
+  const auto cases = std::find(table.columns.begin(), table.columns.end(), options.case_id_key);
+  if (column == table.columns.end() || cases == table.columns.end() || table.rows.empty()) return std::nullopt;
+  const auto at = static_cast<std::size_t>(column - table.columns.begin());
+  const auto case_at = static_cast<std::size_t>(cases - table.columns.begin());
+  std::unordered_map<std::string, std::size_t> length;
+  bool single = true;
+  for (const auto& row : table.rows) {
+    if (at < row.size() && row[at] && row[at]->xes_public_shape != XesPublicShape::kAbsent) return std::nullopt;
+    if (case_at >= row.size() || !row[case_at] || row[case_at]->is_null) return std::nullopt;
+    single = ++length[row[case_at]->value] == 1 && single;
+  }
+  if (polars) {
+    check_xes_frame_projection(data, options);
+    if (!single) throw std::invalid_argument("ValueError: None cannot be a node");
+    return ProcessTree({}, ProcessTreeNode::tau());
+  }
+  check_xes_frame_projection(data, options);
+  if (table.rows.size() == 1) throw std::invalid_argument("TypeError: __str__ returned non-string (type float)");
+  if (single) throw std::invalid_argument("maximum recursion depth exceeded in comparison");
+  throw std::invalid_argument("TypeError: can only concatenate str (not \"float\") to str");
+}
+
 ProcessTree discover_process_tree_xes_frame(const EventDataView& data,
                                             const InductiveMinerOptions& options,
                                             std::vector<std::string>* display) {
   validate_options(options);
   if (display) display->clear();
   if (data.kind() == EventDataKind::kEventLog) return discover_process_tree(data, options);
+  if (auto tree = all_gap_activity_tree(data, options)) return std::move(*tree);
   std::vector<std::string> gap_activities;
   std::map<std::string, std::string> gap_types;
   if (data.kind() == EventDataKind::kEventTable) {

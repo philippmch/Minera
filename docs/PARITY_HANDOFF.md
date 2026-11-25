@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HD (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HE (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10558,6 +10558,65 @@ HD's suite: the full ctest 693 of 693 (-j2, 25 minutes) with the new
 server binary), the 16 manifests replayed 2,673 responses unchanged, no
 Python script or frontend change.
 Harness and probes: `review-harness/round-hd/`.
+
+Round HE re-reviewed HD. HD's CI run 45536343985 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+HE1 Declare keyed by a typed attribute on
+an XES upload's log shape (read_xes' legacy log): the importer stores an
+int as a Python int of any width, a float as float() (each NaN its own
+object), a boolean as `str(v).lower() == "true"`, a date as fromisoformat
+with fix_naivety's `replace(tzinfo=utc)` (the wall clock kept, the offset
+dropped), a valueless value as None and a list with children as a dict,
+and project_on_event_attribute raises `KeyError` on an event without the
+key. `discover_declare_typed_log` (declare.cpp) reads those objects
+(`legacy_declare_cell`) and feeds HA's rules-frame model
+(`typed_declare_result`, split out of the frame path); `handle_mine`'s
+legacy path takes it for XES inputs, so the conformance's error fails the
+mine and the playout reads the typed model as on the frame. gxB `xl`
+(keys X and start_timestamp): 148 judgments where pm4py raised and Minera
+mined, 72 model diffs and 22 conformance differences to none; the 40 left
+are GU1-2's declared whole-mine `'values' is not ordered` (the process
+map). HE2 the activity set pm4py's Declare discovery iterates is a copy
+of the projected set (`set(set(...))`, observed black-box with a set
+subclass): CPython's copy resizes the empty table to the smallest power
+of two above twice the entries once five times them reach 21, so from
+five activities on its slots, and with them the step-1 columns, absence,
+the derived families and the auto threshold sort's operands, can differ
+from the original's (`CPythonSetOrder::copy`). With HD's tuple hashes of
+(template, act, act2) for the base families' set (NaT as -2**63, a
+Timestamp by pandas' hash), the base columns are modelled wherever no NaN
+takes part: hcS K3 (dates with NaT) 4 of 120 conformance messages and 4
+of 120 log-shape mine errors to none; gxB `xd` sort TypeErrors 118 to 13,
+each with a NaN in the column (declared, np.nan's address). HE3 the
+Inductive miner keyed by a column of gaps only (read_csv's float64 NaN):
+pandas and the log shape raise `TypeError: __str__ returned non-string
+(type float)` for one event, `maximum recursion depth exceeded in
+comparison` when every case holds one event, else `TypeError: can only
+concatenate str (not "float") to str`; Polars mines a tau tree when every
+case holds one event, else `ValueError: None cannot be a node`
+(`frame_keyed_inductive_error`, `all_gap_activity_tree`); 51 of 51 on 50
+synthetic CSVs and hcS/hcH uploads over the three shapes.
+HE's suite: the full ctest 694 of 694 (-j2, 32 minutes) with the new
+`minera_server_review_he_tests` (156 checks, 126 of which fail on HD's
+server binary), the 16 manifests replayed 2,673 responses unchanged, no
+Python script or frontend change.
+Harness and probes: `review-harness/round-he/`.
+
+Next round (HF) should start by re-reviewing round HE:
+
+- HE's CI run;
+- the other families keyed by a typed attribute on an XES upload's log
+  shape (Alpha, Inductive, the log skeleton, the temporal profile,
+  Heuristics++, the transition system): HE fed Declare the legacy log's
+  objects (`legacy_declare_cell`); the same reader may serve them;
+- whether other routes iterate a copied Python set (HE2): any pm4py path
+  that builds `set(some_set)` of five or more activities and lists it;
+- the declared residuals (NaN-addressed orders and operands, the GU1-2
+  whole-mine failure, the GT2 and GT4 residuals) if a cheaper model
+  appears;
+- the carried items below.
+
+Previous list for round HE (kept for its older items):
 
 Next round (HE) should start by re-reviewing round HD:
 

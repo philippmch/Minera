@@ -30,6 +30,7 @@
 #include <stdexcept>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace minera {
@@ -1691,29 +1692,72 @@ std::uint64_t timestamp_hash(const ParsedExactTimestamp& date) {
   return acc;
 }
 
-std::vector<std::size_t> typed_set_ranks(const TypedDeclareTraces& input) {
-  const auto& classes = input.classes;
-  std::vector<std::uint64_t> hashes(classes.size());
-  for (std::size_t c = 0; c < classes.size(); ++c) {
-    const auto& rep = classes[c].rep;
-    using K = python::Scalar::Kind;
-    std::uint64_t hash = 0;
-    if (input.nat && *input.nat == c) hash = std::uint64_t(1) << 63;
-    else if (classes[c].na && rep.kind != K::kNone) hash = (std::uint64_t(1) << 60) - 1;
-    else if (rep.kind == K::kNone) hash = 0xad8;
-    else if (rep.kind == K::kBool || rep.kind == K::kInt || rep.kind == K::kFloat) hash = python::numeric_hash(rep);
-    else if (rep.kind == K::kDate) hash = timestamp_hash(rep.date);
-    else hash = detail::python_str_hash_seed0(rep.text).value_or(0);
-    hashes[c] = hash;
+// CPython 3.11's tuple hash (xxHash lanes over the items' hashes).
+std::uint64_t python_tuple_hash(std::initializer_list<std::uint64_t> items) {
+  constexpr std::uint64_t p1 = 11400714785074694791ULL, p2 = 14029467366897019727ULL, p5 = 2870177450012600261ULL;
+  std::uint64_t acc = p5;
+  for (const auto item : items) {
+    acc += item * p2;
+    acc = (acc << 31) | (acc >> 33);
+    acc *= p1;
   }
+  acc += static_cast<std::uint64_t>(items.size()) ^ (p5 ^ 3527539ULL);
+  if (acc == ~std::uint64_t(0)) acc = 1546275796;
+  return acc;
+}
+
+// The iteration order of a CPython 3.11 set (open addressing, nine linear
+// probes, perturbation by 5 bits, resized to the next power of two above 4
+// times its entries, twice past 50,000) filled in `insert` order; equal keys
+// carry one id.
+class CPythonSetOrder {
+ public:
+  void insert(std::size_t id, std::uint64_t hash) {
+    if (!place(table_, id, hash, true)) return;
+    ++used_;
+    if (used_ * 5 < (table_.size() - 1) * 3) return;
+    const std::size_t minused = used_ > 50000 ? used_ * 2 : used_ * 4;
+    std::size_t size = 8;
+    while (size <= minused) size <<= 1;
+    std::vector<Slot> grown(size);
+    for (const auto& old : table_)
+      if (old.used) place(grown, old.id, old.hash, false);
+    table_ = std::move(grown);
+  }
+  [[nodiscard]] std::vector<std::size_t> order() const {
+    std::vector<std::size_t> out;
+    out.reserve(used_);
+    for (const auto& slot : table_)
+      if (slot.used) out.push_back(slot.id);
+    return out;
+  }
+  // set(this): CPython's copy resizes the empty table once, to the smallest
+  // power of two above twice the entries, where 5 times them reach 3 times
+  // its mask (21), then takes the same slots where the sizes agree, else
+  // places each entry afresh in this table's slot order.
+  [[nodiscard]] CPythonSetOrder copy() const {
+    std::size_t size = 8;
+    if (used_ * 5 >= 21)
+      while (size <= used_ * 2) size <<= 1;
+    CPythonSetOrder out;
+    out.used_ = used_;
+    if (size == table_.size()) {
+      out.table_ = table_;
+      return out;
+    }
+    out.table_.assign(size, Slot{});
+    for (const auto& old : table_)
+      if (old.used) place(out.table_, old.id, old.hash, false);
+    return out;
+  }
+
+ private:
   struct Slot {
-    std::size_t cls = 0;
+    std::size_t id = 0;
     std::uint64_t hash = 0;
     bool used = false;
   };
-  std::vector<Slot> table(8);
-  std::size_t fill = 0;
-  const auto place = [](std::vector<Slot>& slots, std::size_t cls, std::uint64_t hash, bool check) {
+  static bool place(std::vector<Slot>& slots, std::size_t id, std::uint64_t hash, bool check) {
     const std::size_t mask = slots.size() - 1;
     std::uint64_t perturb = hash;
     std::size_t i = static_cast<std::size_t>(hash) & mask;
@@ -1721,31 +1765,50 @@ std::vector<std::size_t> typed_set_ranks(const TypedDeclareTraces& input) {
       std::size_t probes = i + 9 <= mask ? 9 : 0;
       for (std::size_t j = i;; ++j) {
         if (!slots[j].used) {
-          slots[j] = {cls, hash, true};
+          slots[j] = {id, hash, true};
           return true;
         }
-        if (check && slots[j].cls == cls) return false;
+        if (check && slots[j].id == id) return false;
         if (probes == 0) break;
         --probes;
       }
       perturb >>= 5;
       i = (i * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
     }
-  };
+  }
+  std::vector<Slot> table_ = std::vector<Slot>(8);
+  std::size_t used_ = 0;
+};
+
+// Each activity's hash: nullopt for a NaN, which hashes by its address.
+// None hashes by its address in the pinned interpreter (600792).
+std::vector<std::optional<std::uint64_t>> typed_class_hashes(const TypedDeclareTraces& input) {
+  const auto& classes = input.classes;
+  std::vector<std::optional<std::uint64_t>> hashes(classes.size());
+  for (std::size_t c = 0; c < classes.size(); ++c) {
+    const auto& rep = classes[c].rep;
+    using K = python::Scalar::Kind;
+    if (input.nat && *input.nat == c) hashes[c] = std::uint64_t(1) << 63;
+    else if (classes[c].na && rep.kind != K::kNone) hashes[c] = std::nullopt;
+    else if (rep.kind == K::kNone) hashes[c] = 600792;
+    else if (rep.kind == K::kBool || rep.kind == K::kInt || rep.kind == K::kFloat) hashes[c] = python::numeric_hash(rep);
+    else if (rep.kind == K::kDate) hashes[c] = timestamp_hash(rep.date);
+    else hashes[c] = detail::python_str_hash_seed0(rep.text);
+  }
+  return hashes;
+}
+
+std::vector<std::size_t> typed_set_ranks(const TypedDeclareTraces& input) {
+  const auto& classes = input.classes;
+  const auto hashes = typed_class_hashes(input);
+  CPythonSetOrder set;
   for (const auto& trace : input.traces)
-    for (const auto cls : trace) {
-      if (!place(table, cls, hashes[cls], true) || ++fill * 5 < (table.size() - 1) * 3) continue;
-      std::size_t size = 8;
-      while (size <= fill * 4) size <<= 1;
-      std::vector<Slot> grown(size);
-      for (const auto& old : table)
-        if (old.used) place(grown, old.cls, old.hash, false);
-      table = std::move(grown);
-    }
+    for (const auto cls : trace) set.insert(cls, hashes[cls].value_or((std::uint64_t(1) << 60) - 1));
   std::vector<std::size_t> rank(classes.size(), classes.size());
   std::size_t next = 0;
-  for (const auto& slot : table)
-    if (slot.used) rank[slot.cls] = next++;
+  // pm4py iterates a copy of the activity set (round HE, observed
+  // black-box: set(set(...)), whose table differs from five activities on).
+  for (const auto cls : set.copy().order()) rank[cls] = next++;
   for (auto& r : rank)
     if (r == classes.size()) r = next++;
   return rank;
@@ -1758,6 +1821,79 @@ struct TypedDeclareKey {
   bool collapsed = false;
 };
 using TypedDeclareRules = std::map<std::string, std::vector<TypedDeclareKey>>;
+
+// A rules-frame column as one number (template, first, second).
+std::uint64_t typed_column_key(bool binary, std::size_t family, std::size_t a, std::size_t b, std::size_t n) {
+  const std::uint64_t f = binary ? family : kBinaryFamilies + family;
+  return (static_cast<std::uint64_t>(f) * n + a) * (n + 1) + (binary ? b : n);
+}
+
+// The base families' columns in the rules frame's order (round HE, observed
+// black-box): pm4py collects the keys of every variant's rules dict (in the
+// variants' first-occurrence order, each dict filled template by template:
+// existence, exactly_one and init over the activity set, then
+// responded_existence, response, altresponse and chainresponse over each act
+// of the trace's Counter and each act2 of the set, precedence,
+// altprecedence and chainprecedence over each activated act2 and each act
+// of the set) into a set of (template, act[, act2]) tuples, whose order
+// becomes the frame's. Each key's position, or nullopt where an activity
+// hashes by its address (NaN), whose order stays the columns' (declared).
+template <class Pairs>
+std::optional<std::unordered_map<std::uint64_t, std::size_t>> typed_base_column_order(
+    const TypedDeclareTraces& input, const std::vector<std::size_t>& rank, const std::array<bool, kUnaryFamilies>& unary,
+    const std::array<bool, kBinaryFamilies>& binary, const Pairs& pairs) {
+  const auto hashes = typed_class_hashes(input);
+  for (const auto& h : hashes)
+    if (!h) return std::nullopt;
+  const std::size_t n = input.classes.size();
+  std::vector<std::size_t> activities(n);
+  for (std::size_t c = 0; c < n; ++c) activities[c] = c;
+  std::sort(activities.begin(), activities.end(), [&](std::size_t x, std::size_t y) { return rank[x] < rank[y]; });
+  std::array<std::uint64_t, kUnaryFamilies> unary_hash{};
+  std::array<std::uint64_t, kBinaryFamilies> binary_hash{};
+  for (std::size_t f = 0; f < kUnaryFamilies; ++f)
+    unary_hash[f] = detail::python_str_hash_seed0(kUnaryFamilyNames[f]).value_or(0);
+  for (std::size_t f = 0; f < kBinaryFamilies; ++f)
+    binary_hash[f] = detail::python_str_hash_seed0(kBinaryFamilyNames[f]).value_or(0);
+  CPythonSetOrder set;
+  std::unordered_set<std::uint64_t> seen;
+  const auto add = [&](bool is_binary, std::size_t family, std::size_t a, std::size_t b) {
+    const auto key = typed_column_key(is_binary, family, a, b, n);
+    if (!seen.insert(key).second) return;
+    const auto hash = is_binary ? python_tuple_hash({binary_hash[family], *hashes[a], *hashes[b]})
+                                : python_tuple_hash({unary_hash[family], *hashes[a]});
+    set.insert(static_cast<std::size_t>(key), hash);
+  };
+  std::set<std::vector<std::size_t>> variants;
+  std::vector<std::size_t> counter;
+  std::vector<char> in(n, 0);
+  for (const auto& trace : input.traces) {
+    if (!variants.insert(trace).second) continue;
+    counter.clear();
+    for (const auto c : trace)
+      if (!in[c]) {
+        in[c] = 1;
+        counter.push_back(c);
+      }
+    for (const auto c : counter) in[c] = 0;
+    for (const auto f : {kExists, kExactlyOne, kInit})
+      if (unary[f])
+        for (const auto a : activities) add(false, f, a, 0);
+    for (const auto f : {kRe, kResp, kPrec, kAltResp, kChainResp, kAltPrec, kChainPrec}) {
+      if (!binary[f]) continue;
+      const bool on_second = f == kPrec || f == kAltPrec || f == kChainPrec;
+      for (const auto x : counter)
+        for (const auto y : activities) {
+          const auto a = on_second ? y : x, b = on_second ? x : y;
+          if (pairs(a, b)) add(true, f, a, b);
+        }
+    }
+  }
+  std::unordered_map<std::uint64_t, std::size_t> out;
+  std::size_t next = 0;
+  for (const auto id : set.order()) out.emplace(static_cast<std::uint64_t>(id), next++);
+  return out;
+}
 
 DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareDiscoveryOptions& options,
                                  TypedDeclareRules* typed_rules = nullptr) {
@@ -1964,6 +2100,37 @@ DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareD
     const int rows = static_cast<int>(nrows);
     return {rows, rows};
   };
+  // The rules frame's column order (round HE): the base families' columns
+  // in the step-1 set order (typed_base_column_order), then absence over the
+  // activity set, then the derived binary families, each over the activity
+  // set (round HD). Where an activity hashes by its address the base
+  // families keep the columns' (template, first, second) order (declared).
+  const auto rank = typed_set_ranks(input);
+  const auto base = typed_base_column_order(input, rank, unary, binary, pairs);
+  const auto derived = [](const Column& c) {
+    return c.binary && (c.family == kSucc || c.family == kAltSucc || c.family == kChainSucc || c.family == kCoex ||
+                        c.family == kNonCoex || c.family == kNonSucc || c.family == kNonChainSucc);
+  };
+  std::vector<std::size_t> frame_order(columns.size());
+  for (std::size_t i = 0; i < frame_order.size(); ++i) frame_order[i] = i;
+  if (base) {
+    const auto group = [&](const Column& c) { return derived(c) ? 2 : (!c.binary && c.family == kAbsent) ? 1 : 0; };
+    const auto position = [&](const Column& c) {
+      const auto found = base->find(typed_column_key(c.binary, c.family, c.a, c.b, n));
+      return found == base->end() ? std::numeric_limits<std::size_t>::max() : found->second;
+    };
+    std::stable_sort(frame_order.begin(), frame_order.end(), [&](std::size_t x, std::size_t y) {
+      const auto& p = columns[x];
+      const auto& q = columns[y];
+      const int gp = group(p), gq = group(q);
+      if (gp != gq) return gp < gq;
+      if (gp == 0) return position(p) < position(q);
+      if (gp == 1) return rank[p.a] < rank[q.a];
+      if (p.family != q.family) return p.family < q.family;
+      if (rank[p.a] != rank[q.a]) return rank[p.a] < rank[q.a];
+      return rank[p.b] < rank[q.b];
+    });
+  }
   const double rows = static_cast<double>(nrows);
   double min_support = options.has_min_support_ratio ? options.min_support_ratio : 0.0;
   double min_confidence = options.has_min_confidence_ratio ? options.min_confidence_ratio : 0.0;
@@ -1973,7 +2140,7 @@ DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareD
       std::size_t column;
     };
     std::vector<Product> products;
-    for (std::size_t i = 0; i < columns.size(); ++i) {
+    for (const auto i : frame_order) {
       const auto [support, confidence] = lookup(i);
       const double ratio = static_cast<double>(support) / rows;
       if (ratio > 0)
@@ -2001,24 +2168,21 @@ DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareD
                          ? static_cast<double>(confidence) / static_cast<double>(support) * options.auto_selection_multiplier
                          : 1.0;
   }
-  // The write order: the derived binary families over the activity set's order.
-  std::vector<std::size_t> writes(columns.size());
-  for (std::size_t i = 0; i < writes.size(); ++i) writes[i] = i;
-  {
-    const auto rank = typed_set_ranks(input);
-    const auto derived = [](const Column& c) {
-      return c.binary && (c.family == kSucc || c.family == kAltSucc || c.family == kChainSucc || c.family == kCoex ||
-                          c.family == kNonCoex || c.family == kNonSucc || c.family == kNonChainSucc);
-    };
+  // The write order: the frame's within each family (where the base order is
+  // unknown, the derived binary families over the activity set's order).
+  std::vector<std::size_t> writes = frame_order;
+  if (!base)
     std::stable_sort(writes.begin(), writes.end(), [&](std::size_t x, std::size_t y) {
       const auto& p = columns[x];
       const auto& q = columns[y];
       if (p.name != q.name) return p.name < q.name;
-      if (!derived(p)) return false;
+      if (!derived(p)) {
+        const bool pa = !p.binary && p.family == kAbsent;
+        return pa && rank[p.a] < rank[q.a];
+      }
       if (rank[p.a] != rank[q.a]) return rank[p.a] < rank[q.a];
       return rank[p.b] < rank[q.b];
     });
-  }
   std::map<std::string, std::unordered_map<std::string, std::size_t>> seen;
   for (const auto i : writes) {
     const auto [support, confidence] = lookup(i);
@@ -2375,6 +2539,8 @@ EventDataView frame_slice_view(const EventDataView& data, std::string_view case_
   return data;
 }
 
+TypedDeclareResult typed_declare_result(const TypedDeclareTraces& traces, const DeclareDiscoveryOptions& options);
+
 }  // namespace
 
 std::optional<TypedDeclareResult> discover_declare_typed_frame(const EventTable& frame,
@@ -2388,12 +2554,19 @@ std::optional<TypedDeclareResult> discover_declare_typed_frame(const EventTable&
   auto traces = typed_declare_traces(present, options.case_id_key, activity_name);
   if (!traces) return std::nullopt;
   check_pandas_declare_frame(frame, options.case_id_key, options.activity_key, false);
+  return typed_declare_result(*traces, options);
+}
+
+namespace {
+
+// The typed model, its conformance and its playout's error.
+TypedDeclareResult typed_declare_result(const TypedDeclareTraces& traces, const DeclareDiscoveryOptions& options) {
   TypedDeclareRules rules;
   TypedDeclareResult out;
-  out.model = typed_declare_model(*traces, options, &rules);
-  out.conformance.case_ids = traces->case_ids;
+  out.model = typed_declare_model(traces, options, &rules);
+  out.conformance.case_ids = traces.case_ids;
   try {
-    out.conformance.results = typed_declare_conformance(*traces, rules);
+    out.conformance.results = typed_declare_conformance(traces, rules);
   } catch (const OperationCancelled&) {
     throw;
   } catch (const std::exception& error) {
@@ -2442,6 +2615,191 @@ std::optional<TypedDeclareResult> discover_declare_typed_frame(const EventTable&
     break;
   }
   return out;
+}
+
+}  // namespace
+
+namespace {
+
+// event[key] of pm4py's legacy event dict, as the iterparse importer stores
+// an XES attribute (round HE, observed black-box; the classic heuristics'
+// reading of rounds GK and GL): a string or id a str, an int an int of any
+// width, a float float() of its text (each NaN its own object), a boolean
+// True where its text is "true" in any case, a date a datetime.datetime
+// whose wall clock is kept and marked UTC (fix_naivety drops the offset; the
+// microseconds of a finer fraction), a valueless string or a <list> without
+// children None, a <list> with children (or a scalar with children) a dict;
+// a <container> is not stored. kUnmodelled where Minera cannot tell.
+struct LegacyDeclareCell {
+  enum class State { kValue, kAbsent, kDict, kUnmodelled };
+  State state = State::kValue;
+  python::Scalar value;
+  std::string type;
+};
+
+LegacyDeclareCell legacy_declare_attribute(const EventAttribute& attribute) {
+  using State = LegacyDeclareCell::State;
+  LegacyDeclareCell out;
+  const auto none = [&] {
+    out.value = python::none();
+    out.type = "NoneType";
+    return out;
+  };
+  if (attribute.container != AttributeContainerKind::kScalar || attribute.scalar_wrapper ||
+      !attribute.children.empty()) {
+    if (attribute.xes_public_shape == XesPublicShape::kNone) return none();
+    if (attribute.xes_public_shape == XesPublicShape::kAbsent) out.state = State::kAbsent;
+    else if (attribute.xes_public_shape == XesPublicShape::kWrapper || attribute.scalar_wrapper) out.state = State::kDict;
+    else out.state = State::kUnmodelled;
+    return out;
+  }
+  if (attribute.is_null || is_native_na_attribute(attribute)) return none();
+  switch (attribute.kind) {
+    case AttributeKind::kString:
+    case AttributeKind::kId:
+      out.value = python::text(attribute.value);
+      out.type = "str";
+      return out;
+    case AttributeKind::kInt:
+      if (const auto* i = std::get_if<std::int64_t>(&attribute.typed_value)) out.value = python::integer(*i);
+      else if (const auto* u = std::get_if<std::uint64_t>(&attribute.typed_value)) out.value = python::unsigned_integer(*u);
+      else if (const auto parsed = python::integer_literal(attribute.value)) out.value = *parsed;
+      else {
+        out.state = State::kUnmodelled;
+        return out;
+      }
+      out.type = "int";
+      return out;
+    case AttributeKind::kFloat:
+      if (const auto* d = std::get_if<double>(&attribute.typed_value)) out.value = python::real(*d);
+      else if (const auto parsed = detail::parse_python_float_text(attribute.value)) out.value = python::real(*parsed);
+      else {
+        out.state = State::kUnmodelled;
+        return out;
+      }
+      out.type = "float";
+      return out;
+    case AttributeKind::kBoolean: {
+      bool truth = false;
+      if (const auto* b = std::get_if<bool>(&attribute.typed_value)) truth = *b;
+      else {
+        std::string lower = attribute.value;
+        for (auto& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        truth = lower == "true";
+      }
+      out.value = python::boolean(truth);
+      out.type = "bool";
+      return out;
+    }
+    case AttributeKind::kDate: {
+      auto parsed = parse_timestamp_exact(attribute.value);
+      if (!parsed) {
+        out.state = State::kUnmodelled;
+        return out;
+      }
+      if (parsed->timezone_aware) parsed->seconds += static_cast<std::int64_t>(parsed->offset_minutes) * 60;
+      parsed->offset_minutes = 0;
+      parsed->timezone_aware = true;
+      parsed->nanoseconds -= parsed->nanoseconds % 1000;
+      out.value.kind = python::Scalar::Kind::kDate;
+      out.value.date = *parsed;
+      out.value.text = attribute.value;
+      out.type = "datetime.datetime";
+      return out;
+    }
+    default: out.state = State::kUnmodelled; return out;
+  }
+}
+
+LegacyDeclareCell legacy_declare_cell(const Event& event, const std::string& key) {
+  using State = LegacyDeclareCell::State;
+  const auto key_of = [](const std::string& source, std::string_view standard) {
+    return source.empty() ? std::string(standard) : source;
+  };
+  const auto attribute_value = [&] {
+    for (const auto& attribute : event.attributes)
+      if (attribute.key == key) return legacy_declare_attribute(attribute);
+    LegacyDeclareCell out;
+    out.state = State::kAbsent;
+    return out;
+  };
+  // A first-class key the event holds as no scalar stays among its attributes.
+  const auto field = [&](bool present, FirstClassAttributeState state, const std::optional<EventAttribute>& attribute,
+                         const std::string& value, bool date) {
+    if (!present) return attribute_value();
+    if (attribute) return legacy_declare_attribute(*attribute);
+    LegacyDeclareCell out;
+    if (state == FirstClassAttributeState::kNull) {
+      out.value = python::none();
+      out.type = "NoneType";
+      return out;
+    }
+    EventAttribute cell{key, value, date ? AttributeKind::kDate : AttributeKind::kString};
+    return legacy_declare_attribute(cell);
+  };
+  if (key == key_of(event.timestamp_source_key, "time:timestamp"))
+    return field(event.has_timestamp(), event.timestamp_state, event.timestamp_attribute, event.timestamp, true);
+  if (key == key_of(event.activity_source_key, "concept:name"))
+    return field(event.has_activity(), event.activity_state, event.activity_attribute, event.activity, false);
+  if (key == key_of(event.resource_source_key, "org:resource"))
+    return field(event.has_resource(), event.resource_state, event.resource_attribute, event.resource, false);
+  if (key == key_of(event.lifecycle_source_key, "lifecycle:transition"))
+    return field(event.has_lifecycle(), event.lifecycle_state, event.lifecycle_attribute, event.lifecycle, false);
+  return attribute_value();
+}
+
+}  // namespace
+
+std::optional<TypedDeclareResult> discover_declare_typed_log(const EventLog& log,
+                                                             const DeclareDiscoveryOptions& options) {
+  using State = LegacyDeclareCell::State;
+  if (options.considered_activities) return std::nullopt;
+  const std::string key = options.activity_key.empty() ? std::string("concept:name") : options.activity_key;
+  std::vector<std::vector<LegacyDeclareCell>> cells(log.traces.size());
+  bool absent = false, dict = false, typed = false;
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    cells[t].reserve(log.traces[t].events.size());
+    for (const auto& event : log.traces[t].events) {
+      auto cell = legacy_declare_cell(event, key);
+      if (cell.state == State::kUnmodelled) return std::nullopt;
+      absent = absent || cell.state == State::kAbsent;
+      dict = dict || cell.state == State::kDict;
+      typed = typed || (cell.state == State::kValue && cell.value.kind != python::Scalar::Kind::kText);
+      cells[t].push_back(std::move(cell));
+    }
+  }
+  // project_on_event_attribute reads every event first, then the activity set hashes them.
+  if (absent) throw std::invalid_argument("KeyError: " + detail::frame_python_str_repr(key));
+  if (dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+  if (!typed) return std::nullopt;
+  TypedDeclareTraces traces;
+  traces.dtype = detail::XesFrameDtype::kObject;
+  std::unordered_map<std::string, std::size_t> class_of;
+  std::size_t fresh = 0;
+  for (std::size_t t = 0; t < log.traces.size(); ++t) {
+    std::vector<std::size_t> trace;
+    trace.reserve(cells[t].size());
+    for (auto& cell : cells[t]) {
+      const bool nan = cell.value.kind == python::Scalar::Kind::kFloat && std::isnan(cell.value.real);
+      const bool none = cell.value.kind == python::Scalar::Kind::kNone;
+      // float() makes a new object per event: each NaN its own activity.
+      const std::string id = nan ? "nan#" + std::to_string(fresh++) : python::identity(cell.value);
+      const auto [at, added] = class_of.emplace(id, traces.classes.size());
+      if (added) {
+        TypedDeclareClass c;
+        c.rep = std::move(cell.value);
+        c.type = std::move(cell.type);
+        c.na = nan || none;
+        c.unequal = nan;
+        c.none = none;
+        traces.classes.push_back(std::move(c));
+      }
+      trace.push_back(at->second);
+    }
+    traces.traces.push_back(std::move(trace));
+    traces.case_ids.push_back(log.traces[t].case_id);
+  }
+  return typed_declare_result(traces, options);
 }
 
 DeclareModel discover_declare_frame_slices(const EventDataView& data,

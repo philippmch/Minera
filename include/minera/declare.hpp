@@ -225,6 +225,16 @@ struct TypedDeclareResult {
 };
 [[nodiscard]] std::optional<TypedDeclareResult> discover_declare_typed_frame(
     const EventTable& frame, const DeclareDiscoveryOptions& options = {});
+// pm4py's Declare on an XES upload's log shape (the hybrid legacy log) keyed
+// by an attribute whose values are not all text (round HE, observed
+// black-box): each event's object as the iterparse importer stores it (an
+// int of any width, a float, a bool, a datetime.datetime of the wall clock
+// marked UTC, None for a valueless string), keyed as on an object column of
+// the frame (discover_declare_typed_frame), the log's traces in order. An
+// event without the key raises KeyError, a dict value TypeError unhashable;
+// nullopt where every value is text (or a value is outside the model).
+[[nodiscard]] std::optional<TypedDeclareResult> discover_declare_typed_log(
+    const EventLog& log, const DeclareDiscoveryOptions& options = {});
 [[nodiscard]] std::vector<DeclareConformance> check_declare_conformance_frame_slices(
     const EventDataView& data, const DeclareModel& model,
     const DeclareConformanceOptions& options = {});

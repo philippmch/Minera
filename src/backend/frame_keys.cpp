@@ -655,6 +655,22 @@ std::string frame_keyed_heuristics_error(const FrameKeyedActivities& keyed) {
 
 std::string frame_keyed_inductive_error(const FrameKeyedActivities& keyed) {
   if (!keyed.non_text) return {};
+  // A column without any value (round HE, observed black-box): each gap a
+  // float NaN of its own, so a log of one event mines that leaf, a log of
+  // one-event traces recurses without end (no NaN is ever found again) and
+  // any longer trace concatenates its label.
+  bool all_gaps = !keyed.missing.empty(), single = true;
+  std::size_t events = 0;
+  for (const auto& trace : keyed.missing) {
+    single = single && trace.size() <= 1;
+    events += trace.size();
+    for (const bool gap : trace) all_gaps = all_gaps && gap;
+  }
+  if (all_gaps && events > 0 && keyed.first_non_text_type == "float") {
+    if (events == 1) return "TypeError: __str__ returned non-string (type float)";
+    if (single) return "maximum recursion depth exceeded in comparison";
+    return "TypeError: can only concatenate str (not \"float\") to str";
+  }
   if (keyed.any_text)
     return column_type_error("TypeError: '<' not supported between instances of '" + keyed.first_non_text_type +
                              "' and 'str'", keyed.column);
