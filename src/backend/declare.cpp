@@ -7,6 +7,7 @@
 #include "numpy_object_sort.hpp"
 #include "polars_sort.hpp"
 #include "python_scalar.hpp"
+#include "python_str_set.hpp"
 #include "polars_missing_column.hpp"
 #include "xes_frame_columns.hpp"
 #include "xes_frame_typed.hpp"
@@ -1639,6 +1640,117 @@ std::optional<TypedDeclareTraces> typed_declare_traces(const EventTable& table, 
   return out;
 }
 
+// pm4py writes the derived binary families (succession, altsuccession,
+// chainsuccession, coexistence, noncoexistence, nonsuccession,
+// nonchainsuccession) act by act and partner by partner over a Python set of
+// the activities, filled trace by trace (round HD, observed black-box with
+// objects of chosen hashes). A collapsed key (act with a falsy or missing
+// partner) is written once per such partner, so it keeps the stats of the
+// partner the set lists last. The set order follows CPython 3.11: False, 0,
+// 0.0 and '' hash to 0, ints and floats by the numeric hash, str by its
+// SipHash under PYTHONHASHSEED=0, NaT to -2**63. NaN (np.nan in an object
+// column, each cell's own object in a float64 one) hashes by its address,
+// which moves with the process: Minera hashes it as 2**60 - 1, the last slot
+// of the table (as python::numeric_hash does), which is where the
+// reference's np.nan lands after False and True in the small tables these
+// columns make in the processes observed; None hashes by its address in the
+// interpreter binary (0xad8 in the pinned one's low bits). The base binary
+// families come from a set of (template, act, act2) tuples, whose hash
+// takes a NaN's whole address, so their collapsed keys keep a partner the
+// address decides (declared). A date hashes as pandas' Timestamp does: an
+// instant with nanoseconds as the int of its value, else as the timedelta
+// (days, seconds, microseconds) of its UTC instant since 0001-01-01, a
+// CPython tuple hash.
+std::uint64_t timestamp_hash(const ParsedExactTimestamp& date) {
+  const auto int_hash = [](std::int64_t v) -> std::uint64_t {
+    constexpr std::uint64_t modulus = (std::uint64_t(1) << 61) - 1;
+    const std::uint64_t magnitude = v < 0 ? std::uint64_t(0) - static_cast<std::uint64_t>(v) : static_cast<std::uint64_t>(v);
+    std::int64_t h = static_cast<std::int64_t>(magnitude % modulus);
+    if (v < 0) h = -h;
+    if (h == -1) h = -2;
+    return static_cast<std::uint64_t>(h);
+  };
+  // A Timestamp with nanoseconds has the ns unit, whose values fit int64.
+  if (date.nanoseconds % 1000 != 0 && date.seconds > -9223372036 && date.seconds < 9223372036)
+    return int_hash(date.seconds * 1000000000 + static_cast<std::int64_t>(date.nanoseconds));
+  std::int64_t days = date.seconds / 86400, seconds = date.seconds % 86400;
+  if (seconds < 0) {
+    seconds += 86400;
+    --days;
+  }
+  const std::int64_t items[3] = {days + 719163, seconds, static_cast<std::int64_t>(date.nanoseconds / 1000)};
+  constexpr std::uint64_t p1 = 11400714785074694791ULL, p2 = 14029467366897019727ULL, p5 = 2870177450012600261ULL;
+  std::uint64_t acc = p5;
+  for (const auto item : items) {
+    acc += int_hash(item) * p2;
+    acc = (acc << 31) | (acc >> 33);
+    acc *= p1;
+  }
+  acc += 3 ^ (p5 ^ 3527539ULL);
+  if (acc == ~std::uint64_t(0)) acc = 1546275796;
+  return acc;
+}
+
+std::vector<std::size_t> typed_set_ranks(const TypedDeclareTraces& input) {
+  const auto& classes = input.classes;
+  std::vector<std::uint64_t> hashes(classes.size());
+  for (std::size_t c = 0; c < classes.size(); ++c) {
+    const auto& rep = classes[c].rep;
+    using K = python::Scalar::Kind;
+    std::uint64_t hash = 0;
+    if (input.nat && *input.nat == c) hash = std::uint64_t(1) << 63;
+    else if (classes[c].na && rep.kind != K::kNone) hash = (std::uint64_t(1) << 60) - 1;
+    else if (rep.kind == K::kNone) hash = 0xad8;
+    else if (rep.kind == K::kBool || rep.kind == K::kInt || rep.kind == K::kFloat) hash = python::numeric_hash(rep);
+    else if (rep.kind == K::kDate) hash = timestamp_hash(rep.date);
+    else hash = detail::python_str_hash_seed0(rep.text).value_or(0);
+    hashes[c] = hash;
+  }
+  struct Slot {
+    std::size_t cls = 0;
+    std::uint64_t hash = 0;
+    bool used = false;
+  };
+  std::vector<Slot> table(8);
+  std::size_t fill = 0;
+  const auto place = [](std::vector<Slot>& slots, std::size_t cls, std::uint64_t hash, bool check) {
+    const std::size_t mask = slots.size() - 1;
+    std::uint64_t perturb = hash;
+    std::size_t i = static_cast<std::size_t>(hash) & mask;
+    for (;;) {
+      std::size_t probes = i + 9 <= mask ? 9 : 0;
+      for (std::size_t j = i;; ++j) {
+        if (!slots[j].used) {
+          slots[j] = {cls, hash, true};
+          return true;
+        }
+        if (check && slots[j].cls == cls) return false;
+        if (probes == 0) break;
+        --probes;
+      }
+      perturb >>= 5;
+      i = (i * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
+    }
+  };
+  for (const auto& trace : input.traces)
+    for (const auto cls : trace) {
+      if (!place(table, cls, hashes[cls], true) || ++fill * 5 < (table.size() - 1) * 3) continue;
+      std::size_t size = 8;
+      while (size <= fill * 4) size <<= 1;
+      std::vector<Slot> grown(size);
+      for (const auto& old : table)
+        if (old.used) place(grown, old.cls, old.hash, false);
+      table = std::move(grown);
+    }
+  std::vector<std::size_t> rank(classes.size(), classes.size());
+  std::size_t next = 0;
+  for (const auto& slot : table)
+    if (slot.used) rank[slot.cls] = next++;
+  for (auto& r : rank)
+    if (r == classes.size()) r = next++;
+  return rank;
+}
+
 // A rule key of the typed model as pm4py's rules dict holds it: (act, act2),
 // or act alone where act2 is missing or falsy (`collapsed`).
 struct TypedDeclareKey {
@@ -1889,8 +2001,26 @@ DeclareModel typed_declare_model(const TypedDeclareTraces& input, const DeclareD
                          ? static_cast<double>(confidence) / static_cast<double>(support) * options.auto_selection_multiplier
                          : 1.0;
   }
+  // The write order: the derived binary families over the activity set's order.
+  std::vector<std::size_t> writes(columns.size());
+  for (std::size_t i = 0; i < writes.size(); ++i) writes[i] = i;
+  {
+    const auto rank = typed_set_ranks(input);
+    const auto derived = [](const Column& c) {
+      return c.binary && (c.family == kSucc || c.family == kAltSucc || c.family == kChainSucc || c.family == kCoex ||
+                          c.family == kNonCoex || c.family == kNonSucc || c.family == kNonChainSucc);
+    };
+    std::stable_sort(writes.begin(), writes.end(), [&](std::size_t x, std::size_t y) {
+      const auto& p = columns[x];
+      const auto& q = columns[y];
+      if (p.name != q.name) return p.name < q.name;
+      if (!derived(p)) return false;
+      if (rank[p.a] != rank[q.a]) return rank[p.a] < rank[q.a];
+      return rank[p.b] < rank[q.b];
+    });
+  }
   std::map<std::string, std::unordered_map<std::string, std::size_t>> seen;
-  for (std::size_t i = 0; i < columns.size(); ++i) {
+  for (const auto i : writes) {
     const auto [support, confidence] = lookup(i);
     if (!(support >= rows * min_support) || support == 0 || !(confidence >= support * min_confidence)) continue;
     const auto& first = labels[i][0];

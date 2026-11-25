@@ -46,13 +46,16 @@
 
 namespace minera::tools {
 
-inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const HeuristicMinerOptions& options) {
+// `log_shape`: the upload's log shape keyed by a typed or gapped column,
+// whose EventLog variant raises the pandas frame's errors (round HD).
+inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const HeuristicMinerOptions& options,
+                                      bool log_shape = false) {
   if (options.variant != HeuristicMinerVariant::kPlusPlus) return;
   // An explicitly empty start key is Minera's own fallback (no pm4py call).
   if (options.start_timestamp_attribute && options.start_timestamp_attribute->empty()) return;
   const auto kind = source.selected_kind();
-  if (kind != EventDataKind::kEventTable && kind != EventDataKind::kLazyEventTable) return;
-  const bool polars = kind == EventDataKind::kLazyEventTable;
+  if (!log_shape && kind != EventDataKind::kEventTable && kind != EventDataKind::kLazyEventTable) return;
+  const bool polars = !log_shape && kind == EventDataKind::kLazyEventTable;
   std::optional<EventTable> table;
   try {
     table = csv_frame_table(source, false);

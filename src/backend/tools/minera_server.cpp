@@ -984,82 +984,87 @@ const minera::DataFrameColumns* csv_frame_columns(const MinedSession& session) {
 // Polars copy of that frame, where a gap is null and an object column
 // (Python ints, or booleans beside a gap, even one in a row format_dataframe
 // drops) holds str() of each object. formatted_csv_frame_table so adjusted.
+std::optional<minera::EventTable> typed_csv_frame_table(const minera::ActiveEventSource& source, bool polars) {
+  std::optional<minera::EventTable> slot;
+  try {
+    slot = formatted_csv_frame_table(source);
+  } catch (const std::exception&) {
+    // the routes report the source's own error
+  }
+  if (!slot) return slot;
+  const auto& log = source.checked_log();
+  const auto* frame = log.dataframe_columns.get();
+  auto& table = *slot;
+  const auto gap = [](const std::optional<minera::EventAttribute>& cell) {
+    if (!cell || cell->is_null) return true;
+    const auto* number = std::get_if<double>(&cell->typed_value);
+    return number != nullptr && std::isnan(*number);
+  };
+  for (std::size_t at = 0; at < table.columns.size(); ++at) {
+    const bool empty = std::all_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
+      return at >= row.size() || gap(row[at]);
+    });
+    const auto column = frame ? csv_frame_column(*frame, table.columns[at]) : std::nullopt;
+    const bool objects = polars && column && column->role != minera::FirstClassAttributeRole::kCaseId &&
+                         (column->type == minera::DataFrameColumnType::kObject ||
+                          (column->type == minera::DataFrameColumnType::kBool && column->missing_cell));
+    for (auto& row : table.rows) {
+      if (at >= row.size()) continue;
+      auto& cell = row[at];
+      if (gap(cell)) {
+        if (!empty) {
+          cell.reset();
+          continue;
+        }
+        // A column without any value: its cells gaps the frame holds.
+        minera::EventAttribute absent{table.columns[at], "", minera::AttributeKind::kString};
+        absent.is_null = true;
+        absent.xes_public_shape = minera::XesPublicShape::kAbsent;
+        cell = std::move(absent);
+        continue;
+      }
+      if (objects) {
+        const auto text = minera::python::str(minera::python::from_attribute(*cell));
+        cell = minera::EventAttribute{cell->key, text, minera::AttributeKind::kString};
+      }
+    }
+  }
+  // The frame's column order (read_csv's header, then the copies and the
+  // index columns), which Polars' plans list: a case column under the
+  // header case:concept:name stays first.
+  if (frame && !frame->order.empty()) {
+    std::vector<std::size_t> permutation;
+    for (const auto& name : frame->order) {
+      const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+      if (found != table.columns.end()) permutation.push_back(static_cast<std::size_t>(found - table.columns.begin()));
+    }
+    for (std::size_t at = 0; at < table.columns.size(); ++at)
+      if (std::find(permutation.begin(), permutation.end(), at) == permutation.end()) permutation.push_back(at);
+    const auto permute = [&](auto& values) {
+      if (values.size() != permutation.size()) return;
+      std::remove_reference_t<decltype(values)> ordered;
+      ordered.reserve(values.size());
+      for (const auto at : permutation) ordered.push_back(std::move(values[at]));
+      values = std::move(ordered);
+    };
+    permute(table.columns);
+    permute(table.dtypes);
+    permute(table.categorical_dtypes);
+    for (auto& row : table.rows) {
+      row.resize(permutation.size());
+      permute(row);
+    }
+    table.metadata.properties.push_back(
+        minera::EventAttribute{minera::detail::kFrameColumnOrderProperty, "true", minera::AttributeKind::kString});
+  }
+  return slot;
+}
+
 const minera::EventTable* session_typed_frame_table(const MinedSession& session, bool polars = false) {
   if (!session.active_source || !session.csv_frame) return nullptr;
   auto& cache = *session.csv_frame;
   std::call_once(polars ? cache.typed_polars_once : cache.typed_once, [&] {
-    auto& slot = polars ? cache.typed_polars : cache.typed;
-    try {
-      slot = formatted_csv_frame_table(*session.active_source);
-    } catch (const std::exception&) {
-      // the routes report the source's own error
-    }
-    if (!slot) return;
-    const auto& log = session.active_source->checked_log();
-    const auto* frame = log.dataframe_columns.get();
-    auto& table = *slot;
-    const auto gap = [](const std::optional<minera::EventAttribute>& cell) {
-      if (!cell || cell->is_null) return true;
-      const auto* number = std::get_if<double>(&cell->typed_value);
-      return number != nullptr && std::isnan(*number);
-    };
-    for (std::size_t at = 0; at < table.columns.size(); ++at) {
-      const bool empty = std::all_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
-        return at >= row.size() || gap(row[at]);
-      });
-      const auto column = frame ? csv_frame_column(*frame, table.columns[at]) : std::nullopt;
-      const bool objects = polars && column && column->role != minera::FirstClassAttributeRole::kCaseId &&
-                           (column->type == minera::DataFrameColumnType::kObject ||
-                            (column->type == minera::DataFrameColumnType::kBool && column->missing_cell));
-      for (auto& row : table.rows) {
-        if (at >= row.size()) continue;
-        auto& cell = row[at];
-        if (gap(cell)) {
-          if (!empty) {
-            cell.reset();
-            continue;
-          }
-          // A column without any value: its cells gaps the frame holds.
-          minera::EventAttribute absent{table.columns[at], "", minera::AttributeKind::kString};
-          absent.is_null = true;
-          absent.xes_public_shape = minera::XesPublicShape::kAbsent;
-          cell = std::move(absent);
-          continue;
-        }
-        if (objects) {
-          const auto text = minera::python::str(minera::python::from_attribute(*cell));
-          cell = minera::EventAttribute{cell->key, text, minera::AttributeKind::kString};
-        }
-      }
-    }
-    // The frame's column order (read_csv's header, then the copies and the
-    // index columns), which Polars' plans list: a case column under the
-    // header case:concept:name stays first.
-    if (frame && !frame->order.empty()) {
-      std::vector<std::size_t> permutation;
-      for (const auto& name : frame->order) {
-        const auto found = std::find(table.columns.begin(), table.columns.end(), name);
-        if (found != table.columns.end()) permutation.push_back(static_cast<std::size_t>(found - table.columns.begin()));
-      }
-      for (std::size_t at = 0; at < table.columns.size(); ++at)
-        if (std::find(permutation.begin(), permutation.end(), at) == permutation.end()) permutation.push_back(at);
-      const auto permute = [&](auto& values) {
-        if (values.size() != permutation.size()) return;
-        std::remove_reference_t<decltype(values)> ordered;
-        ordered.reserve(values.size());
-        for (const auto at : permutation) ordered.push_back(std::move(values[at]));
-        values = std::move(ordered);
-      };
-      permute(table.columns);
-      permute(table.dtypes);
-      permute(table.categorical_dtypes);
-      for (auto& row : table.rows) {
-        row.resize(permutation.size());
-        permute(row);
-      }
-      table.metadata.properties.push_back(
-          minera::EventAttribute{minera::detail::kFrameColumnOrderProperty, "true", minera::AttributeKind::kString});
-    }
+    (polars ? cache.typed_polars : cache.typed) = typed_csv_frame_table(*session.active_source, polars);
   });
   auto& slot = polars ? cache.typed_polars : cache.typed;
   return slot ? &*slot : nullptr;
@@ -3504,7 +3509,30 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
                                       params.alpha.activity_attribute);
     for (const auto& activity : net.activities())
       graph.ensure_activity(activity);
-    const auto heuristics = minera::discover_heuristics_net(log, params.heuristic);
+    // Round HD (observed black-box): Heuristics++ keyed by a typed or gapped
+    // column of a CSV upload's log shape mines the net its frame variant
+    // mines on format_dataframe's frame (240 of 240 hcS uploads alike), so
+    // the net comes from the typed frame as on the frame shapes (round HC).
+    std::optional<minera::HeuristicsNet> heuristics_typed;
+    if (!xes_input && params.heuristic.variant == minera::HeuristicMinerVariant::kPlusPlus)
+      if (const auto keyed = csv_keyed_family(log, params.heuristic.activity_attribute);
+          keyed && (keyed->non_text || keyed->any_missing)) {
+        // It raises the frame's Heuristics++ errors too (round GI).
+        minera::tools::check_plus_plus_csv_frame(*active_source, params.heuristic, true);
+        if (const auto frame = typed_csv_frame_table(*active_source, false)) {
+          const auto frame_key = [&](std::string_view control, const std::string& mapped, const char* copy) {
+            if (!active_source_supplied(request, control)) return std::string(copy);
+            return active_source_field(request, control) == copy ? std::string(copy) : mapped;
+          };
+          auto plus_options = params.heuristic;
+          plus_options.case_id_attribute =
+              frame_key("heuristic_case_id_attribute", plus_options.case_id_attribute, "case:concept:name");
+          plus_options.timestamp_attribute =
+              frame_key("heuristic_timestamp_attribute", plus_options.timestamp_attribute, "time:timestamp");
+          heuristics_typed = minera::discover_heuristics_net_xes_frame(minera::EventDataView(*frame), plus_options);
+        }
+      }
+    const auto heuristics = heuristics_typed ? *heuristics_typed : minera::discover_heuristics_net(log, params.heuristic);
     checkpoint("POWL miner");
     // Its fall-throughs try every activity of a sublog in turn (minutes on
     // logs with hundreds of activities), so a disconnect stops it.

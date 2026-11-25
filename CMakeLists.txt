@@ -2798,6 +2798,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_hc_tests minera_server)
     add_test(NAME minera_server_review_hc_tests
              COMMAND minera_server_review_hc_tests $<TARGET_FILE:minera_server>)
+    # Round HD: Declare collapsed keys on CSV frames, Heuristics++ keyed by typed or gapped CSV columns on the log shape.
+    add_executable(minera_server_review_hd_tests
+      src/backend/tests/test_server_review_hd.cpp)
+    target_include_directories(minera_server_review_hd_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_hd_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_hd_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_hd_tests minera_server)
+    add_test(NAME minera_server_review_hd_tests
+             COMMAND minera_server_review_hd_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

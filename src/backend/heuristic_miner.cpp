@@ -4211,15 +4211,27 @@ std::optional<HeuristicsNet> csv_frame_typed_heuristics(const EventDataView& dat
 // successors, and fails on the first whose value is no str with an
 // incoming edge (check_typed_conversion); pandas' NaN node is the missing
 // label.
-void finish_typed_plus_net(HeuristicsNet& net, const FrameTypedActivities& typed) {
+// A node's successors come in the order their pair first follows it
+// (`targets`, round HD, observed black-box: pm4py's output connections).
+void finish_typed_plus_net(HeuristicsNet& net, const FrameTypedActivities& typed,
+                           const std::map<std::string, std::vector<std::string>>& targets) {
   std::vector<std::string> appearance;
   const auto add = [&](const std::string& name) {
     if (std::find(appearance.begin(), appearance.end(), name) == appearance.end()) appearance.push_back(name);
   };
   for (std::size_t a = 0; a < net.activities.size(); ++a) {
     add(net.activities[a]);
+    std::vector<std::size_t> successors;
     for (const auto& edge : net.edges)
-      if (edge.source == a) add(net.activities[edge.target]);
+      if (edge.source == a) successors.push_back(edge.target);
+    const auto found = targets.find(net.activities[a]);
+    const auto rank = [&](std::size_t target) {
+      if (found == targets.end()) return std::size_t(0);
+      const auto at = std::find(found->second.begin(), found->second.end(), net.activities[target]);
+      return static_cast<std::size_t>(at - found->second.begin());
+    };
+    std::stable_sort(successors.begin(), successors.end(), [&](std::size_t x, std::size_t y) { return rank(x) < rank(y); });
+    for (const auto target : successors) add(net.activities[target]);
   }
   net.petri_conversion_type = typed_conversion_type(net, appearance, [&](const std::string& name) {
     const auto found = typed.value_of.find(name);
@@ -4613,6 +4625,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
     // (round GB, observed black-box).
     // A typed column's objects compare as Python compares them (round HA,
     // observed black-box): frame_activity_less raises the TypeError.
+    std::map<std::string, std::vector<std::string>> targets;
     if (any_missing || typed) {
       const auto type_of = [&](const std::string& label) { return label == null_label ? null_type : std::string("str"); };
       const auto less = [&](const std::string& left, const std::string& right) {
@@ -4629,7 +4642,6 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       std::set<std::string> known;
       std::map<std::string, std::uint64_t> occurrences;
       std::map<NamePair, std::uint64_t> follows;
-      std::map<std::string, std::vector<std::string>> targets;
       for (const auto& trace : log.traces) {
         const auto converted = to_intervals(trace, projected, start_at.has_value(), false, frame_instance_mode);
         const auto& intervals = converted.sorted;
@@ -4675,7 +4687,7 @@ HeuristicsNet discover_heuristics_net_xes_frame(
       };
     auto net = finish(discover_plus_plus(log, projected, frame_instance_mode, python_less));
     if (typed) {
-      finish_typed_plus_net(net, *typed);
+      finish_typed_plus_net(net, *typed, targets);
       return net;
     }
     const auto null_at = std::find(net.activities.begin(), net.activities.end(), null_label);

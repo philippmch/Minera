@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HC (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HD (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10509,6 +10509,76 @@ HC's suite: the full ctest 692 of 692 (-j2; 584 before a container restart, the 
 server binary), the 16 manifests replayed 2,673 responses unchanged, no
 Python script or frontend change.
 Harness and probes: `review-harness/round-hc/`.
+
+Round HD re-reviewed HC. HC's CI run 45522928201 passed Linux, macOS, the
+frontend, the Python scripts and the parity verifier (Windows' ctest was
+still running at HD's handoff). HD1 Declare's collapsed keys: pm4py
+writes the derived binary families (succession, altsuccession,
+chainsuccession, coexistence, noncoexistence, nonsuccession,
+nonchainsuccession) act by act and partner by partner over a Python set
+of the activities, filled trace by trace, so a key collapsed onto its act
+(a False, 0, 0.0 or '' partner, or a gap) keeps the stats of the partner
+the set lists last (observed black-box with objects of chosen hashes).
+`typed_set_ranks` (declare.cpp) replays CPython 3.11's set: False, 0,
+0.0 and '' hash to 0, numbers by the numeric hash, str by SipHash under
+PYTHONHASHSEED=0, NaT to -2**63, a Timestamp as pandas hashes it (the
+int of its value when it has nanoseconds, else the tuple hash of the
+timedelta (days, seconds, microseconds) of its UTC instant), None by its
+address in the pinned interpreter (0xad8), NaN as 2**60 - 1 (the last
+slot, where the reference's np.nan lands after False and True in these
+small tables). The base families keep the column order: they come from a
+set of (template, act, act2) tuples whose hash takes NaN's whole
+address. hcS K5 (True/False with gaps) on the DataFrame shape: model
+diffs 6 to 1, conformance messages 17 to 9, the log shape's mine errors
+15 to 5; every residual is a base family's NaN-addressed order (s68543's
+collapsed True varies run to run in pm4py itself). HD2 the earlier
+rounds' declared operand orders rechecked at a real PYTHONHASHSEED=0: the
+sort TypeErrors' operands and the base families' collapsed keys follow
+np.nan's address, which moves with the imports and allocations of the
+process even at seed 0 (two harnesses disagree on s68504 K1), so they
+stay declared. HD3 Heuristics++ keyed by a typed or gapped column of a
+CSV upload's log shape: pm4py's EventLog variant mines the net the frame
+variant mines on format_dataframe's frame (convert_to_event_log keeps
+the frame's objects, NaN and NaT included), so `handle_mine`'s legacy
+path mines it from the typed frame (`typed_csv_frame_table`, split out of
+`session_typed_frame_table`) and runs the frame's Heuristics++ checks
+(`check_plus_plus_csv_frame(..., log_shape)`); the Petri conversion's
+TypeError visits each node's successors in the order their pair first
+follows it (pm4py's output connections, `finish_typed_plus_net`). Alpha,
+the log skeleton, the temporal profile and the transition system on the
+log shape already matched (`ct/csvfam.py`, hdN = hcS without its
+start_timestamp column, and hcH); Heuristics++ 155 of 1,080 judgments
+matching to 1,080 of 1,080 (hdN + hcH; h68034 K5 was the conversion's
+successor order), and 40 hcS uploads with their start column 240 of
+240. Declared: the Inductive miner keyed so keeps HC's classes; Alpha's
+token replay on the log shape names a transition set's address order in
+its error.
+HD's suite: the full ctest 693 of 693 (-j2, 25 minutes) with the new
+`minera_server_review_hd_tests` (70 checks, 53 of which fail on HC's
+server binary), the 16 manifests replayed 2,673 responses unchanged, no
+Python script or frontend change.
+Harness and probes: `review-harness/round-hd/`.
+
+Next round (HE) should start by re-reviewing round HD:
+
+- HD's CI run (and HC's Windows ctest);
+- Declare keyed by a typed attribute on an XES upload's log shape (the
+  hybrid legacy log): gxB with keys X and start_timestamp, 148 of 400
+  judgments where pm4py raises (sort TypeErrors between mixed types,
+  KeyErrors of a rule column holding a big int beside its float,
+  "Categorical categories must be unique") and Minera mines, 72 model
+  diffs (uint64 and big ints beside floats), pre-existing (`sw.sh`'s `xl`
+  sweep; the DataFrame shape `xd` matches but for the declared operand
+  orders and KeyError templates);
+- the base Declare families' order of a date column with NaT (hcS K3, 4
+  of 120 conformance messages name NaTType where pm4py names Timestamp):
+  their tuple set holds no NaN, so its order may be modelled from the
+  tuple hash of (template, act, act2);
+- the Inductive miner on an activity column with no value (carried);
+- the declared residuals if a cheaper model appears;
+- the carried items below.
+
+Previous list for round HD (kept for its older items):
 
 Next round (HD) should start by re-reviewing round HC:
 
