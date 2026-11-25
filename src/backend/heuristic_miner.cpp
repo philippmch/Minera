@@ -4148,6 +4148,11 @@ std::optional<HeuristicsNet> csv_frame_typed_heuristics(const EventDataView& dat
   auto log = classic_event_log(data, options);
   if (!log.dataframe_columns) log.dataframe_columns = std::make_shared<const DataFrameColumns>(columns);
   const auto framed = dataframe_frame_event_log(log);
+  // Round HC: the Polars copy of an object column (Python ints, or
+  // True/False beside a gap, even one in a row format_dataframe drops)
+  // holds str() of each object.
+  const bool objects = polars && (listed->type == DataFrameColumnType::kObject ||
+                                  (listed->type == DataFrameColumnType::kBool && listed->missing_cell));
   EventTable cells;
   cells.columns = {key};
   for (const auto& trace : framed.traces)
@@ -4159,8 +4164,11 @@ std::optional<HeuristicsNet> csv_frame_typed_heuristics(const EventDataView& dat
         // read_csv's gaps (an empty cell or pandas' NA text): one NaN object
         // in an object column.
         if (!attribute.is_null && !(number && std::isnan(*number)) && !attribute.value.empty() &&
-            !is_pandas_csv_na_text(attribute.value))
+            !is_pandas_csv_na_text(attribute.value)) {
           row[0] = attribute;
+          if (objects)
+            row[0] = EventAttribute{key, python::str(python::from_attribute(attribute)), AttributeKind::kString};
+        }
         break;
       }
     }

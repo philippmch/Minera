@@ -216,6 +216,12 @@ struct DeclareShownConformance {
 struct TypedDeclareResult {
   DeclareModel model;
   DeclareShownConformance conformance;
+  // pm4py's Declare playout of the typed model (round HC, observed
+  // black-box): it reads each key as a tuple (a str key as its 1-tuple),
+  // so the first key that is neither raises: TypeError "'<type>' object is
+  // not subscriptable", or IndexError "tuple index out of range" for a str
+  // key under a binary template. Empty when every key reads.
+  std::string playout_error;
 };
 [[nodiscard]] std::optional<TypedDeclareResult> discover_declare_typed_frame(
     const EventTable& frame, const DeclareDiscoveryOptions& options = {});

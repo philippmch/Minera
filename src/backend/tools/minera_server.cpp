@@ -81,6 +81,7 @@
 #include "../polars_sort.hpp"
 #include "minera/dataframe_validation.hpp"
 #include "../frame_typed_activities.hpp"
+#include "../xes_frame_activity.hpp"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
 #include "query_runtime.hpp"
@@ -651,6 +652,10 @@ struct CsvFrameCache {
   std::optional<minera::EventStream> stream;
   std::optional<minera::EventTable> indexed;  // with "@@index" and "@@case_index"
   std::optional<minera::LazyEventTable> indexed_lazy;
+  // format_dataframe's typed frame with its gaps missing (round HC).
+  std::once_flag typed_once, typed_polars_once, typed_lazy_once;
+  std::optional<minera::EventTable> typed, typed_polars;
+  std::optional<minera::LazyEventTable> typed_lazy;
 };
 
 // pm4py replays the POWL and heuristics nets it builds with its own place
@@ -700,6 +705,8 @@ struct MinedSession {
   bool tree_ready = true;
   bool graph_ready = true;
   bool declare_ready = true;
+  // Round HC: pm4py's playout error of the typed model the family shows.
+  std::string declare_playout_error;
   std::string mining_request_id;
   std::string paired_csv_import_error;
   minera::EventLog log;
@@ -966,6 +973,156 @@ const minera::DataFrameColumns* csv_frame_columns(const MinedSession& session) {
   if (kind != minera::EventDataKind::kEventTable && kind != minera::EventDataKind::kLazyEventTable) return nullptr;
   const auto& log = session.active_source->checked_log();
   return log.dataframe_columns && log.dataframe_columns->csv_text ? log.dataframe_columns.get() : nullptr;
+}
+
+// A CSV upload's frame as the typed table the XES frame paths read (round
+// HC, observed black-box): pm4py's Alpha, Inductive, log skeleton, temporal
+// profile and Heuristics++ read format_dataframe's frame, each cell the
+// object read_csv typed it as (numbers, booleans, UTC dates, text), its gaps
+// (NaN, NaT) as read_xes's frame holds an event without the key (a column
+// without any value keeps its NaN cells: read_csv keeps the column), or the
+// Polars copy of that frame, where a gap is null and an object column
+// (Python ints, or booleans beside a gap, even one in a row format_dataframe
+// drops) holds str() of each object. formatted_csv_frame_table so adjusted.
+const minera::EventTable* session_typed_frame_table(const MinedSession& session, bool polars = false) {
+  if (!session.active_source || !session.csv_frame) return nullptr;
+  auto& cache = *session.csv_frame;
+  std::call_once(polars ? cache.typed_polars_once : cache.typed_once, [&] {
+    auto& slot = polars ? cache.typed_polars : cache.typed;
+    try {
+      slot = formatted_csv_frame_table(*session.active_source);
+    } catch (const std::exception&) {
+      // the routes report the source's own error
+    }
+    if (!slot) return;
+    const auto& log = session.active_source->checked_log();
+    const auto* frame = log.dataframe_columns.get();
+    auto& table = *slot;
+    const auto gap = [](const std::optional<minera::EventAttribute>& cell) {
+      if (!cell || cell->is_null) return true;
+      const auto* number = std::get_if<double>(&cell->typed_value);
+      return number != nullptr && std::isnan(*number);
+    };
+    for (std::size_t at = 0; at < table.columns.size(); ++at) {
+      const bool empty = std::all_of(table.rows.begin(), table.rows.end(), [&](const auto& row) {
+        return at >= row.size() || gap(row[at]);
+      });
+      const auto column = frame ? csv_frame_column(*frame, table.columns[at]) : std::nullopt;
+      const bool objects = polars && column && column->role != minera::FirstClassAttributeRole::kCaseId &&
+                           (column->type == minera::DataFrameColumnType::kObject ||
+                            (column->type == minera::DataFrameColumnType::kBool && column->missing_cell));
+      for (auto& row : table.rows) {
+        if (at >= row.size()) continue;
+        auto& cell = row[at];
+        if (gap(cell)) {
+          if (!empty) {
+            cell.reset();
+            continue;
+          }
+          // A column without any value: its cells gaps the frame holds.
+          minera::EventAttribute absent{table.columns[at], "", minera::AttributeKind::kString};
+          absent.is_null = true;
+          absent.xes_public_shape = minera::XesPublicShape::kAbsent;
+          cell = std::move(absent);
+          continue;
+        }
+        if (objects) {
+          const auto text = minera::python::str(minera::python::from_attribute(*cell));
+          cell = minera::EventAttribute{cell->key, text, minera::AttributeKind::kString};
+        }
+      }
+    }
+    // The frame's column order (read_csv's header, then the copies and the
+    // index columns), which Polars' plans list: a case column under the
+    // header case:concept:name stays first.
+    if (frame && !frame->order.empty()) {
+      std::vector<std::size_t> permutation;
+      for (const auto& name : frame->order) {
+        const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+        if (found != table.columns.end()) permutation.push_back(static_cast<std::size_t>(found - table.columns.begin()));
+      }
+      for (std::size_t at = 0; at < table.columns.size(); ++at)
+        if (std::find(permutation.begin(), permutation.end(), at) == permutation.end()) permutation.push_back(at);
+      const auto permute = [&](auto& values) {
+        if (values.size() != permutation.size()) return;
+        std::remove_reference_t<decltype(values)> ordered;
+        ordered.reserve(values.size());
+        for (const auto at : permutation) ordered.push_back(std::move(values[at]));
+        values = std::move(ordered);
+      };
+      permute(table.columns);
+      permute(table.dtypes);
+      permute(table.categorical_dtypes);
+      for (auto& row : table.rows) {
+        row.resize(permutation.size());
+        permute(row);
+      }
+      table.metadata.properties.push_back(
+          minera::EventAttribute{minera::detail::kFrameColumnOrderProperty, "true", minera::AttributeKind::kString});
+    }
+  });
+  auto& slot = polars ? cache.typed_polars : cache.typed;
+  return slot ? &*slot : nullptr;
+}
+
+const minera::LazyEventTable* session_typed_frame_lazy(const MinedSession& session) {
+  const auto* table = session_typed_frame_table(session, true);
+  if (!table) return nullptr;
+  auto& cache = *session.csv_frame;
+  std::call_once(cache.typed_lazy_once, [&] {cache.typed_lazy = minera::LazyEventTable::from_table(*table);});
+  return cache.typed_lazy ? &*cache.typed_lazy : nullptr;
+}
+
+// That frame, for a family keyed by `key`, when the column holds other
+// values than text or has gaps (the text frame answers otherwise), or when
+// `start_key` names a start column of the frame whose values are no dates
+// or that has a gap (pm4py's Alpha and Heuristics++ sort and compare its
+// objects, NaT last); nullopt for
+// other sessions, a key naming no column of the frame, the case column or
+// a column the frame's copies replace.
+std::optional<minera::EventDataView> csv_typed_frame_view(const MinedSession& session, std::string key,
+                                                          const std::string* start_key = nullptr) {
+  const auto* frame = csv_frame_columns(session);
+  if (!frame) return std::nullopt;
+  const auto& source = *session.active_source;
+  const bool polars = source.selected_kind() == minera::EventDataKind::kLazyEventTable;
+  const auto* table = session_typed_frame_table(session, polars);
+  if (!table) return std::nullopt;
+  const auto view = [&]() -> std::optional<minera::EventDataView> {
+    if (!polars) return minera::EventDataView(*table);
+    const auto* lazy = session_typed_frame_lazy(session);
+    if (!lazy) return std::nullopt;
+    return minera::EventDataView(*lazy);
+  };
+  const auto held = [&](const std::string& name) {
+    return std::find(table->columns.begin(), table->columns.end(), name) != table->columns.end();
+  };
+  if (start_key && !start_key->empty()) {
+    const auto start = csv_frame_column(*frame, *start_key);
+    const auto at = std::find(table->columns.begin(), table->columns.end(), *start_key);
+    // A date column with a gap (NaT) too.
+    const bool dates_only =
+        start && start->type == minera::DataFrameColumnType::kDate && at != table->columns.end() &&
+        std::all_of(table->rows.begin(), table->rows.end(), [&](const auto& row) {
+          const auto index = static_cast<std::size_t>(at - table->columns.begin());
+          return index < row.size() && row[index] && !row[index]->is_null;
+        });
+    if (start && start->role == minera::FirstClassAttributeRole::kNone && !dates_only &&
+        !csv_frame_replaced_column(source, *start_key) && held(*start_key))
+      return view();
+  }
+  if (key.empty()) key = "concept:name";
+  if (key == "case:concept:name" || key == "concept:name" || key == "time:timestamp" ||
+      key == source.selectors().case_id_key || key == source.selectors().activity_key ||
+      csv_frame_replaced_column(source, key))
+    return std::nullopt;
+  const auto column = csv_frame_column(*frame, key);
+  if (!column || column->role == minera::FirstClassAttributeRole::kCaseId) return std::nullopt;
+  const auto typed = minera::detail::xes_frame_activity_column(*table, key, polars);
+  if (!typed) return std::nullopt;
+  const bool gaps = std::any_of(typed->cells.begin(), typed->cells.end(), [](const auto& cell) { return cell.missing; });
+  if (!typed->typed && !gaps) return std::nullopt;
+  return view();
 }
 
 // pm4py's temporal profile on a CSV upload's frame (round GR, observed
@@ -3682,6 +3839,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     session->tree = tree;
     session->powl = powl;
     session->declare = declare;
+    session->declare_playout_error = declare_typed ? declare_typed->playout_error : std::string();
     session->dataset = dataset;
     session->token_replay = minera::tools::default_replay_input_options(
         session_log(*session), params.token_replay, params.token_replay_activity_attribute_supplied);
@@ -12647,6 +12805,7 @@ void handle_playout(const httplib::Request& request,
       const auto options = minera::parse_declare_playout_params(lookup, present);
       const auto log = minera::declare_playout([&]() -> const minera::DeclareModel& {
         if (!session->declare_ready) throw std::invalid_argument("the cached Declare model is unavailable");
+        if (!session->declare_playout_error.empty()) throw std::invalid_argument(session->declare_playout_error);
         return session->declare;
       }(), options);
       response.set_content(minera::to_xes(log, "declare playout"),

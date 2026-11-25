@@ -2269,6 +2269,48 @@ std::optional<TypedDeclareResult> discover_declare_typed_frame(const EventTable&
   } catch (const std::exception& error) {
     out.conformance.error = error.what();
   }
+  // pm4py's dict order: the base binary families first (in an order the
+  // rule columns' hash and address order decide; declared, it only decides
+  // the type a model of mixed key types names), then the fixed rest; each
+  // family's keys in the rules frame's column order, the levels sorted with
+  // NaN and NaT last.
+  static constexpr const char* kPlayoutOrder[] = {
+      kDeclareRespondedExistence, kDeclareResponse, kDeclarePrecedence, kDeclareAltResponse,
+      kDeclareAltPrecedence, kDeclareChainResponse, kDeclareChainPrecedence, kDeclareExistence,
+      kDeclareExactlyOne, kDeclareInit, kDeclareAbsence, kDeclareSuccession, kDeclareAltSuccession,
+      kDeclareChainSuccession, kDeclareCoexistence, kDeclareNonCoexistence, kDeclareNonSuccession,
+      kDeclareNonChainSuccession};
+  const auto missing = [](const TypedLabel& label) { return label.kind != TypedLabel::Kind::kValue; };
+  for (const char* family : kPlayoutOrder) {
+    const auto found = rules.find(family);
+    if (found == rules.end()) continue;
+    const std::string name = family;
+    const bool unary = name == kDeclareExistence || name == kDeclareExactlyOne || name == kDeclareInit ||
+                       name == kDeclareAbsence;
+    const TypedDeclareKey* first = nullptr;
+    for (const auto& key : found->second) {
+      if (!key.collapsed) continue;
+      const bool text = !missing(key.first) && key.first.value.kind == python::Scalar::Kind::kText;
+      if (text && unary) continue;
+      if (!first) { first = &key; continue; }
+      if (missing(key.first)) continue;
+      if (missing(first->first)) { first = &key; continue; }
+      try {
+        if (typed_less(key.first, first->first)) first = &key;
+      } catch (const python::TypeError&) {
+      }
+    }
+    if (!first) continue;
+    if (!missing(first->first) && first->first.value.kind == python::Scalar::Kind::kText) {
+      out.playout_error = "IndexError: tuple index out of range";
+    } else {
+      const auto type = first->first.kind == TypedLabel::Kind::kNaT ? std::string("NaTType")
+                        : first->first.type.empty()                 ? std::string("float")
+                                                                    : first->first.type;
+      out.playout_error = "TypeError: '" + type + "' object is not subscriptable";
+    }
+    break;
+  }
   return out;
 }
 

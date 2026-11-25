@@ -23,6 +23,13 @@ void handle_active_source_mining(const httplib::Request& request,
   // A CSV upload's DataFrame and LazyFrame families read format_dataframe's
   // row order (session_selected_view; rounds BM and BN).
   const auto data = [&] {return session_selected_view(*session);};
+  // Round HC (observed black-box): pm4py's families on format_dataframe's
+  // typed frame read its copies case:concept:name and time:timestamp unless
+  // the request names a key (the copy's own name included).
+  const auto frame_key = [&](std::string_view control, const std::string& mapped, const char* copy) {
+    if (!active_source_supplied(request, control)) return std::string(copy);
+    return active_source_field(request, control) == copy ? std::string(copy) : mapped;
+  };
   std::map<std::string, std::string> records;
   // Each failed family's exception, for the footprints bundle of an XES
   // frame session (round GR).
@@ -83,11 +90,40 @@ void handle_active_source_mining(const httplib::Request& request,
     // Round GZ: a typed activity column's labels as pm4py's net shows them
     // (the session's net keeps each value's text for replay).
     std::vector<std::string> alpha_display;
-    if (!params.alpha.short_loops)
+    // Round HC: a CSV upload's frame keyed by a typed or gapped column shows
+    // pm4py's net on format_dataframe's typed cells (csv_typed_frame_view);
+    // the session's net stays on the texts the log replays (the typed net
+    // where they fail).
+    std::optional<minera::PetriNet> alpha_typed;
+    // The start column the frame's Alpha sorts by (round HC): one of other
+    // values than dates reads the typed frame too.
+    const std::string alpha_start =
+        params.alpha.start_timestamp_attribute.empty() ? "start_timestamp" : params.alpha.start_timestamp_attribute;
+    if (!params.alpha.short_loops && !xes_frame)
+      if (const auto typed = csv_typed_frame_view(*session, params.alpha.activity_attribute, &alpha_start)) {
+        auto typed_options = params.alpha;
+        typed_options.case_id_attribute =
+            frame_key("alpha_case_id_attribute", typed_options.case_id_attribute, "case:concept:name");
+        typed_options.timestamp_attribute =
+            frame_key("alpha_timestamp_attribute", typed_options.timestamp_attribute, "time:timestamp");
+        alpha_typed = minera::discover_petri_net_xes_frame(*typed, typed_options, &alpha_display);
+        try {
+          alpha = minera::discover_petri_net(data(), params.alpha);
+        } catch (const minera::OperationCancelled&) {
+          throw;
+        } catch (const std::exception&) {
+          alpha = *alpha_typed;
+        }
+      }
+    if (!params.alpha.short_loops && !alpha)
       alpha = xes_frame ? minera::discover_petri_net_xes_frame(data(), params.alpha, &alpha_display)
                         : minera::discover_petri_net(data(), params.alpha);
     session->nets.emplace("alpha", *alpha);
     native_returned = true;
+    if (alpha_typed) {
+      if (!alpha_display.empty()) alpha_typed->set_activities(alpha_display);
+      return minera::workflow_input_petri_json(*alpha_typed);
+    }
     if (!alpha_plus && !alpha_display.empty()) {
       auto shown = *alpha;
       shown.set_activities(alpha_display);
@@ -107,7 +143,22 @@ void handle_active_source_mining(const httplib::Request& request,
     // A CSV upload's frame raises Heuristics++'s errors as pm4py's does (round GI).
     if (!xes_frame) minera::tools::check_plus_plus_csv_frame(*session->active_source, params.heuristic);
     const auto* csv_columns = csv_frame_columns(*session);
-    heuristics = minera::observe_exact_heuristic_call(data(),params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(data(), params.heuristic) : csv_columns ? minera::discover_heuristics_net_csv_frame(data(), params.heuristic, *csv_columns) : minera::discover_heuristics_net(data(), params.heuristic);});
+    // Round HC: Heuristics++ keyed by a typed or gapped column of a CSV
+    // upload's frame reads format_dataframe's typed cells as on an XES
+    // upload's frame (csv_typed_frame_view).
+    // A start column of other values than dates likewise.
+    const std::string plus_start = params.heuristic.start_timestamp_attribute.value_or("start_timestamp");
+    const auto plus_typed = !xes_frame && params.heuristic.variant == minera::HeuristicMinerVariant::kPlusPlus
+                                ? csv_typed_frame_view(*session, params.heuristic.activity_attribute, &plus_start)
+                                : std::nullopt;
+    auto plus_options = params.heuristic;
+    if (plus_typed) {
+      plus_options.case_id_attribute =
+          frame_key("heuristic_case_id_attribute", plus_options.case_id_attribute, "case:concept:name");
+      plus_options.timestamp_attribute =
+          frame_key("heuristic_timestamp_attribute", plus_options.timestamp_attribute, "time:timestamp");
+    }
+    heuristics = minera::observe_exact_heuristic_call(data(),params.heuristic,[&]{return xes_frame ? minera::discover_heuristics_net_xes_frame(data(), params.heuristic) : plus_typed ? minera::discover_heuristics_net_xes_frame(*plus_typed, plus_options) : csv_columns ? minera::discover_heuristics_net_csv_frame(data(), params.heuristic, *csv_columns) : minera::discover_heuristics_net(data(), params.heuristic);});
     native_returned = true;
     try{auto bytes=minera::workflow_input_heuristics_json(*heuristics);minera::record_exact_optional_artifact("legacy_heuristics_json",bytes);return bytes;}
     catch(const std::exception& e){minera::record_exact_optional_artifact("legacy_heuristics_json",e.what(),true);throw;}
@@ -122,10 +173,32 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   run("inductive", selected, [&](bool& native_returned) {
     std::vector<std::string> tree_display;
-    session->tree = xes_frame ? minera::discover_process_tree_xes_frame(data(), params.inductive, &tree_display)
-                              : minera::discover_process_tree(data(), params.inductive);
+    // Round HC: a CSV upload's frame keyed by a typed or gapped column shows
+    // pm4py's tree on format_dataframe's typed cells; the session's tree
+    // stays on the texts (the typed tree where they fail).
+    std::optional<minera::ProcessTree> tree_typed;
+    if (!xes_frame)
+      if (const auto typed = csv_typed_frame_view(*session, params.inductive.activity_key)) {
+        auto typed_options = params.inductive;
+        typed_options.case_id_key = frame_key("inductive_case_id_key", typed_options.case_id_key, "case:concept:name");
+        typed_options.timestamp_key = frame_key("inductive_timestamp_key", typed_options.timestamp_key, "time:timestamp");
+        tree_typed = minera::discover_process_tree_xes_frame(*typed, typed_options, &tree_display);
+        try {
+          session->tree = minera::discover_process_tree(data(), params.inductive);
+        } catch (const minera::OperationCancelled&) {
+          throw;
+        } catch (const std::exception&) {
+          session->tree = *tree_typed;
+        }
+      }
+    if (!tree_typed)
+      session->tree = xes_frame ? minera::discover_process_tree_xes_frame(data(), params.inductive, &tree_display)
+                                : minera::discover_process_tree(data(), params.inductive);
     session->tree_ready = true;
     native_returned = true;
+    if (tree_typed)
+      return minera::serialize_inductive_process_tree_json(
+          tree_display.empty() ? *tree_typed : minera::ProcessTree(tree_display, tree_typed->root()));
     // Round GZ: the labels pm4py's Polars frame shows; the session's tree
     // keeps the texts the log replays.
     if (!tree_display.empty())
@@ -177,6 +250,39 @@ void handle_active_source_mining(const httplib::Request& request,
     const bool temporal_explicit_start =
         active_source_supplied(request, "temporal_target_timestamp_attribute") ||
         active_source_supplied(request, "temporal_target_start_timestamp_attribute");
+    // Round HC: a CSV upload's frame keyed by a typed or gapped column
+    // reads format_dataframe's typed cells as on an XES upload's frame; the
+    // session's profile stays on the texts (the typed one where they fail).
+    const auto tp_typed = !xes_frame && verdict == CsvFrameTpVerdict::kRun
+                              ? csv_typed_frame_view(*session, temporal_options.activity_attribute)
+                              : std::nullopt;
+    if (tp_typed) {
+      auto typed_options = temporal_options;
+      typed_options.case_id_attribute =
+          frame_key("temporal_case_id_attribute", typed_options.case_id_attribute, "case:concept:name");
+      const auto timestamp_copy = [&](std::string_view first, std::string_view second, const std::string& mapped) {
+        if (active_source_supplied(request, first))
+          return frame_key(first, mapped, "time:timestamp");
+        return frame_key(second, mapped, "time:timestamp");
+      };
+      typed_options.source_timestamp_attribute =
+          timestamp_copy("temporal_source_timestamp_attribute", "temporal_source_completion_timestamp_attribute",
+                         typed_options.source_timestamp_attribute);
+      typed_options.target_timestamp_attribute =
+          timestamp_copy("temporal_target_timestamp_attribute", "temporal_target_start_timestamp_attribute",
+                         typed_options.target_timestamp_attribute);
+      auto shown = minera::discover_temporal_profile_xes_frame(*tp_typed, typed_options, temporal_explicit_start);
+      try {
+        temporal = minera::discover_temporal_profile_named_start(data(), temporal_options, start_name, timestamp_name);
+      } catch (const minera::OperationCancelled&) {
+        throw;
+      } catch (const std::exception&) {
+        temporal = shown;
+      }
+      native_returned = true;
+      return minera::serialize_active_source_temporal_profile_json(minera::temporal_profile_xes_frame_labels(
+          *tp_typed, typed_options, temporal_explicit_start, std::move(shown)));
+    }
     temporal = xes_frame ? minera::discover_temporal_profile_xes_frame(data(), temporal_options, temporal_explicit_start)
                : verdict == CsvFrameTpVerdict::kEmpty ? minera::TemporalProfile{}
                                                       : minera::discover_temporal_profile_named_start(
@@ -207,11 +313,32 @@ void handle_active_source_mining(const httplib::Request& request,
     return constraint_case_order(*session->active_source, data(),
                                  params.log_skeleton.activity_key, params.log_skeleton.case_id_key);
   };
+  // Round HC: a CSV upload's frame keyed by a typed or gapped column reads
+  // format_dataframe's typed cells as on an XES upload's frame; the
+  // session's model and conformance stay on the texts (the typed model's
+  // texts where they fail).
+  const auto skeleton_typed =
+      xes_frame ? std::nullopt : csv_typed_frame_view(*session, params.log_skeleton.activity_key);
+  auto skeleton_typed_options = params.log_skeleton;
+  if (skeleton_typed)
+    skeleton_typed_options.case_id_key =
+        frame_key("log_skeleton_case_id_key", skeleton_typed_options.case_id_key, "case:concept:name");
   run("log_skeleton", selected, [&](bool& native_returned) {
     if (xes_frame) {
       // A Polars row without an activity is the label None (round FZ).
       skeleton_shown = minera::discover_log_skeleton_xes_frame(data(), params.log_skeleton, true);
       skeleton = minera::log_skeleton_xes_frame_texts(data(), params.log_skeleton, *skeleton_shown);
+    } else if (skeleton_typed) {
+      skeleton_shown = minera::discover_log_skeleton_xes_frame(*skeleton_typed, skeleton_typed_options, true);
+      try {
+        const auto order = skeleton_order();
+        skeleton = order ? minera::discover_log_skeleton(data(), params.log_skeleton, *order)
+                         : minera::discover_log_skeleton(data(), params.log_skeleton);
+      } catch (const minera::OperationCancelled&) {
+        throw;
+      } catch (const std::exception&) {
+        skeleton = minera::log_skeleton_xes_frame_texts(*skeleton_typed, skeleton_typed_options, *skeleton_shown);
+      }
     } else {
       const auto order = skeleton_order();
       skeleton = order ? minera::discover_log_skeleton(data(), params.log_skeleton, *order)
@@ -221,11 +348,12 @@ void handle_active_source_mining(const httplib::Request& request,
     return minera::serialize_active_source_skeleton_json(skeleton_shown ? *skeleton_shown : *skeleton);
   });
   if (skeleton) run("log_skeleton_conformance", selected, [&](bool& native_returned) {
-    if (xes_frame) {
+    if (xes_frame || skeleton_typed) {
       // The cases of pm4py's groupby, in its order (round GA). The analysis
       // presentation keeps its one result per trace of the session log.
       const auto& shown = skeleton_shown ? *skeleton_shown : *skeleton;
-      const auto frame = minera::check_log_skeleton_conformance_xes_frame(data(), shown, params.log_skeleton);
+      const auto frame = minera::check_log_skeleton_conformance_xes_frame(
+          skeleton_typed ? *skeleton_typed : data(), shown, skeleton_typed ? skeleton_typed_options : params.log_skeleton);
       native_returned = true;
       try {skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);}
       catch (const minera::OperationCancelled&) {throw;}
@@ -261,6 +389,7 @@ void handle_active_source_mining(const httplib::Request& request,
     std::optional<minera::DeclareModel> shown;
     if (!declare_slices && csv_typed_declare_input(*session, params.declare_options)) {
       if (auto typed = csv_typed_declare(*session, params.declare_options)) {
+        session->declare_playout_error = typed->playout_error;
         shown = std::move(typed->model);
         declare_shown_conformance = std::move(typed->conformance);
       }

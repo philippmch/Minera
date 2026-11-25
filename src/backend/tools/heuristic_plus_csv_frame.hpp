@@ -156,15 +156,23 @@ inline void check_plus_plus_csv_frame(const ActiveEventSource& source, const Heu
         case DataFrameColumnType::kInt64:
         case DataFrameColumnType::kBool:
         case DataFrameColumnType::kObject: {
+          // read_csv keeps a True/False column with a gap (in any data row)
+          // as objects, as it does Python ints; Polars' copy of such a
+          // column holds str() of each object, a gap null (round HC).
+          const bool objects = column->type == DataFrameColumnType::kObject ||
+                               (column->type == DataFrameColumnType::kBool && column->missing_cell);
           if (!cell) {
-            // An object column of ints with a gap holds NaN; the others
-            // have none. Polars' copy of an object column is not modelled.
-            if (column->type != DataFrameColumnType::kObject || polars) return;
-            start.kind = detail::PlusCellKind::kNaN;
+            // An object column with a gap holds NaN; the others have none.
+            if (!objects) return;
+            start.kind = polars ? detail::PlusCellKind::kNone : detail::PlusCellKind::kNaN;
             break;
           }
-          if (column->type == DataFrameColumnType::kObject && polars) return;
           const auto typed = csv_dataframe_cell(*column, *cell);
+          if (objects && polars) {
+            start.kind = detail::PlusCellKind::kText;
+            start.text = python::str(python::from_attribute(typed));
+            break;
+          }
           if (const auto* value = std::get_if<std::int64_t>(&typed.typed_value)) {
             start.kind = detail::PlusCellKind::kInt;
             start.micros = *value;

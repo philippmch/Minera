@@ -271,7 +271,11 @@ PetriNet discover_classic_table(const EventTable& table,
   std::optional<detail::XesFrameActivityColumn> typed_activity;
   if (xes_frame) {
     typed_activity = detail::xes_frame_activity_column(table, activity, polars);
-    if (typed_activity && (!typed_activity->typed || typed_activity->cells.size() != stream.events.size()))
+    // A pandas column without any value (a CSV upload's, round HC) is a
+    // float64 column of NaN: each case's boundary activities new objects.
+    const bool nan_column = typed_activity && !polars && typed_activity->dtype == detail::XesFrameDtype::kNaNFloat &&
+                            !typed_activity->cells.empty();
+    if (typed_activity && ((!typed_activity->typed && !nan_column) || typed_activity->cells.size() != stream.events.size()))
       typed_activity.reset();
   }
   std::map<std::string, std::string> typed_name;  // identity -> the net's activity

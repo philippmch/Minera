@@ -38,8 +38,19 @@ inline bool xes_frame_cell_present(const std::string& column, const std::optiona
 // its trace's case: attributes (Minera's table places case:concept:name at
 // the first event even when that trace has no name; round FX, observed
 // black-box in the Polars plan's DF line).
+// A table whose columns already stand in its frame's order marks itself
+// with this metadata property (a CSV upload's typed frame, round HC:
+// format_dataframe's frame and its Polars copy keep read_csv's header, then
+// the copies, whatever cells a row lacks).
+inline constexpr const char* kFrameColumnOrderProperty = "minera:frame-column-order";
+inline bool frame_column_order(const EventTable& table) {
+  return std::any_of(table.metadata.properties.begin(), table.metadata.properties.end(),
+                     [](const EventAttribute& property) { return property.key == kFrameColumnOrderProperty; });
+}
+
 inline const EventTable& xes_frame_present_columns(const EventTable& table, std::optional<EventTable>& storage,
                                                    bool read_order = false) {
+  if (read_order && frame_column_order(table)) read_order = false;
   std::vector<bool> keep(table.columns.size(), false);
   std::vector<std::size_t> order;
   const auto is_case = [&](std::size_t column) { return table.columns[column].starts_with("case:"); };

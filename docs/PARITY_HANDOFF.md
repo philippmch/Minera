@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HB (2026-11-05 to 2026-11-24, cloud container)
+## Review-fix loop, rounds T–HC (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10438,6 +10438,98 @@ HB's suite: the full ctest 691 of 691 (38 minutes, -j2) with the new
 server binary), the 16 manifests replayed 2,673 responses unchanged, no
 Python script or frontend change.
 Harness and probes: `review-harness/round-hb/`.
+
+Round HC re-reviewed HB. HB's CI run 45500826116 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+HC1 a CSV upload's frame shapes keyed by a typed or gapped column (numbers,
+booleans, dates or objects as read_csv types them, or a column with gaps)
+for Alpha, the Inductive miner, the log skeleton (and its conformance),
+the temporal profile and Heuristics++: the families read
+format_dataframe's typed cells through the XES frame paths
+(`session_typed_frame_table`, `csv_typed_frame_view`): a gap is a cell the
+row lacks, as read_xes's frame holds an event without the key, a column
+with no value keeps its NaN cells (read_csv keeps the column), and the
+Polars copy holds a gap as null and an object column (Python ints, or
+True/False beside a gap, even one in a row format_dataframe drops) as
+str() of each object. A start column of other values than dates, or one
+with a NaT, sends Alpha and Heuristics++ to the typed frame too (their
+sort compares its objects). The family JSON shows the typed result; the
+session keeps the text model for replay (the typed one where the texts
+fail), as HB did for Declare. Pandas' Alpha keeps one NaN activity per
+case boundary on an all-NaN float64 column. HC2 the typed frame reads
+pm4py's defaults: an unsupplied case or timestamp key is the copy
+case:concept:name or time:timestamp (a CSV whose headers differ sorts and
+names its plans by the copies), and the frame keeps read_csv's column
+order, then the copies and the index columns, which Polars' plans list
+(`kFrameColumnOrderProperty` keeps `xes_frame_present_columns` from
+reordering by first appearance). HC3 the classic heuristics miner on a
+Polars frame keyed by a True/False column whose only gap sits in a row
+format_dataframe drops: read_csv's object column, so its Polars copy is a
+String column (Minera raised `'bool' object is not subscriptable`), and
+the Heuristics++ frame check reads such a column the same way. HC4 the
+Declare playout of a typed model: pm4py's playout reads every key as a
+tuple (a str key as its 1-tuple), so the first unary or collapsed key
+that is no str raises `TypeError: '<type>' object is not subscriptable`
+and a collapsed str key `IndexError: tuple index out of range`; the
+session records that error from the typed model on the CSV log shape and
+pandas frame (`TypedDeclareResult::playout_error`). The family order
+pm4py's model dict holds puts the base binary families first in an order
+the rule columns' hash and address order decide, so a model of mixed key
+types (True/False with NaN, a date column with NaT) may name the other
+type (declared; 2 of 240 hcS DataFrame playouts). Harness note: `run.sh`
+ran the reference with `python -I`, which ignores PYTHONHASHSEED, so the
+sweeps of earlier rounds ran pm4py under random hash seeds; HC's runs use
+`python -s -P` with PYTHONHASHSEED=0. Sweeps (`ct/csvk.py`, `ct/csvo.py`,
+`ct/dplay.py`): gtK (30 uploads) pandas 735 of 1,080 judgments differing
+down to 25 and Polars 732 down to 126, every one an Inductive message
+class declared below; hcS (40 uploads, keys K1-K6 over every value kind
+with gaps) and hcR (the same uploads under the headers cid, act, ts):
+Alpha, the log skeleton, the temporal profile, Heuristics++ and the
+classic heuristics match on both shapes (1,200 judgments per shape and
+bank), and with start keys (start_timestamp, the date column K3) and
+business hours for Alpha, Heuristics++ and the temporal profile (1,920 per
+shape and bank) as well; the Declare playout on hcS DataFrames 228 of 240
+down to 2 (both declared above), and on the log shape every playout of a
+mine that succeeds matches. Declared: the Inductive miner keyed by a
+typed or gapped column on the frame shapes keeps HA's classes (the sort
+TypeError's operands follow the set order of the activities, which Polars'
+random hashing and NaN's address decide; RecursionError where pm4py's
+UVCL DFG never takes a NaN as start or end; the first failing leaf of
+str(tree)); an activity column without any value, where pm4py's Polars
+tree is made of None leaves (tau) and pandas fails at str() of a NaN
+leaf, Minera refuses the null activity (4 of 240 Polars, 2 pandas).
+Found for the next round: Declare on the pandas frame keyed by a
+True/False column with gaps (hcS s68519, s68524, s68537 K5): pm4py's
+collapsed key True holds (True, nan)'s support and confidence where
+Minera keeps (True, False)'s, stable over allocations at PYTHONHASHSEED=0
+(s68539 varies with addresses), so the rules' write order of collapsed
+keys is not the column order HB modelled.
+HC's suite: the full ctest 692 of 692 (-j2; 584 before a container restart, the other 108 after it) with the new
+`minera_server_review_hc_tests` (363 checks, 261 of which fail on HB's
+server binary), the 16 manifests replayed 2,673 responses unchanged, no
+Python script or frontend change.
+Harness and probes: `review-harness/round-hc/`.
+
+Next round (HD) should start by re-reviewing round HC:
+
+- HC's CI run;
+- Declare's collapsed-key write order on a CSV frame keyed by True/False
+  with gaps (above), and whether the earlier rounds' declared operand
+  orders still hold with the reference at PYTHONHASHSEED=0 (their sweeps
+  ran pm4py under random seeds);
+- a CSV upload's log shape keyed by typed or gapped columns for Alpha,
+  Inductive, the log skeleton, the temporal profile and Heuristics++
+  (convert_to_event_log of the typed frame; HC swept the frame shapes);
+- the Inductive miner on an activity column with no value (pm4py's tau
+  tree on Polars, the str() TypeError on pandas);
+- the declared residuals (sort TypeError operands, KeyError templates,
+  address-ordered collapsed keys, the log skeleton's bool equal to an int,
+  Inductive's RecursionError on a NaN activity, the playout's family order,
+  the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a cheaper
+  model appears;
+- the carried items below.
+
+Previous list for round HC (kept for its older items):
 
 Next round (HC) should start by re-reviewing round HB:
 
