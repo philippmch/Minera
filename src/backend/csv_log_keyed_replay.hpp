@@ -140,9 +140,11 @@ inline void check_csv_keyed_heuristic_transitions(const EventLog& log, const Fra
   }
 }
 
+// `sort_variants` false leaves out the variant sort (pm4py's alignments read
+// the variants unsorted, round HH).
 inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, const std::string& key,
                                                         const HeuristicsNet* heuristics = nullptr,
-                                                        const PetriNet* net = nullptr) {
+                                                        const PetriNet* net = nullptr, bool sort_variants = true) {
   if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
   auto keyed = frame_keyed_activities(log, key);
   if (!keyed) return std::nullopt;
@@ -173,7 +175,7 @@ inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, con
     }
     cells.push_back(std::move(tuple));
   }
-  check_keyed_replay_variant_sort(cells);
+  if (sort_variants) check_keyed_replay_variant_sort(cells);
   return std::move(keyed->log);
 }
 
@@ -189,7 +191,8 @@ inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, con
 // variant sort's TypeError. nullopt when the log is no CSV upload's log
 // shape or either key names no column of its frame.
 inline std::optional<FrameKeyedActivities> csv_log_keyed_replay_in(const EventLog& log, const std::string& replay_key,
-                                                                   const std::string& model_key) {
+                                                                   const std::string& model_key,
+                                                                   bool sort_variants = true) {
   if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
   const auto standard = [](const std::string& k) { return k.empty() || k == "concept:name" || k == "activity"; };
   if (standard(replay_key) && standard(model_key)) return std::nullopt;
@@ -290,7 +293,7 @@ inline std::optional<FrameKeyedActivities> csv_log_keyed_replay_in(const EventLo
       sorted.identity = cell.identity;
       sorted_cells[t].push_back(std::move(sorted));
     }
-  check_keyed_replay_variant_sort(sorted_cells);
+  if (sort_variants) check_keyed_replay_variant_sort(sorted_cells);
   return out;
 }
 

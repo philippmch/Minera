@@ -110,6 +110,7 @@
 #include "../xes_frame_columns.hpp"
 #include "../xes_frame_token_replay.hpp"
 #include "../csv_log_keyed_replay.hpp"
+#include "../log_skeleton_typed.hpp"
 #include "../token_replay_null_activity.hpp"
 #include "../heuristics_petri_names.hpp"
 #include "../powl_petri_names.hpp"
@@ -369,6 +370,52 @@ std::optional<minera::FrameKeyedActivities> legacy_keyed_family(const minera::Ev
   auto keyed = minera::legacy_keyed_activities(log, key);
   if (!keyed || (!absent_ok && (keyed->any_absent || keyed->any_dict))) return std::nullopt;
   return keyed;
+}
+
+// pm4py's minimum self-distances of an upload's log shape keyed by another
+// attribute (round HH, observed black-box): the EventLog variant reads
+// read_xes' legacy objects (a CSV upload: the frame's cells), an unhashable
+// dict anywhere first, then a KeyError for an event without the key; values
+// equal as dict keys are one activity, and a NaN, unequal to itself by ==,
+// never repeats (no distance of its own; it counts between others).
+// nullopt where the key reads text alone or names a standard column.
+std::optional<minera::MinimumSelfDistances> keyed_minimum_self_distances(
+    const minera::EventLog& log, bool xes, const minera::MinimumSelfDistanceOptions& options) {
+  if (options.variant != minera::MinimumSelfDistanceVariant::kLog) return std::nullopt;
+  auto keyed = xes ? legacy_keyed_family(log, options.activity_key, true) : csv_keyed_family(log, options.activity_key);
+  if (!keyed) return std::nullopt;
+  if (keyed->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+  if (keyed->any_absent)
+    throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(options.activity_key));
+  auto keyed_options = options;
+  keyed_options.activity_key = "concept:name";
+  auto distances = minera::MinimumSelfDistanceLogDiscovery::apply(keyed->log, keyed_options);
+  std::set<std::string> missing;
+  for (std::size_t t = 0; t < keyed->log.traces.size(); ++t)
+    for (std::size_t e = 0; e < keyed->log.traces[t].events.size() && e < keyed->missing[t].size(); ++e)
+      if (keyed->missing[t][e]) missing.insert(keyed->log.traces[t].events[e].activity);
+  std::erase_if(distances, [&](const minera::MinimumSelfDistance& distance) {
+    return !distance.activity_is_null && missing.contains(distance.activity);
+  });
+  return distances;
+}
+
+// pm4py's footprints of such a log (round HH, observed black-box): the
+// entire log's footprints read every directly-follows pair first (a KeyError
+// for an event without the key in a trace of two or more events), hash them
+// (an unhashable dict there), then hash the activities of every event that
+// holds the key (a dict in a trace of one event) and read the start and end
+// activities (a KeyError for a trace of one event without it).
+void check_legacy_footprints_keys(const minera::FrameKeyedActivities& keyed, const std::string& key) {
+  const auto key_error = [&] {
+    return std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(key));
+  };
+  for (std::size_t t = 0; t < keyed.absent.size(); ++t)
+    if (keyed.absent[t].size() > 1)
+      for (const bool absent : keyed.absent[t])
+        if (absent) throw key_error();
+  if (keyed.any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+  if (keyed.any_absent) throw key_error();
 }
 
 // pm4py's temporal profile on such a log reads the key of both events of
@@ -652,11 +699,23 @@ void check_legacy_alpha_transition_names(const minera::FrameKeyedActivities& key
 // sort as Python sorts their tuples, and each value fires the transition
 // named by an equal object (legacy_keyed_activities_in: '1' never fires 1).
 // nullopt where every object of either key is text.
+// `token_checks` false defers those checks (check_legacy_replay_keyed) to a
+// caller that learns only later whether the token replay runs (round HH).
+void check_legacy_replay_keyed(const minera::FrameKeyedActivities& keyed, const minera::EventLog& log,
+                               const std::string& replay_key);
 std::optional<minera::FrameKeyedActivities> legacy_replay_keyed(const minera::EventLog& log,
                                                                 const std::string& replay_key,
-                                                                const std::string& model_key) {
+                                                                const std::string& model_key,
+                                                                bool token_checks = true) {
   auto keyed = minera::legacy_keyed_activities_in(log, replay_key, model_key);
   if (!keyed) return std::nullopt;
+  if (token_checks) check_legacy_replay_keyed(*keyed, log, replay_key);
+  return keyed;
+}
+
+void check_legacy_replay_keyed(const minera::FrameKeyedActivities& keyed_activities, const minera::EventLog& log,
+                               const std::string& replay_key) {
+  const auto* keyed = &keyed_activities;
   if (keyed->any_absent)
     throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(replay_key));
   if (keyed->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
@@ -676,7 +735,29 @@ std::optional<minera::FrameKeyedActivities> legacy_replay_keyed(const minera::Ev
       cells[t].push_back(std::move(cell));
     }
   minera::detail::check_keyed_replay_variant_sort(cells);
-  return keyed;
+}
+
+// pm4py's alignments of such a keyed log (the alignment-based replay fitness,
+// explicit or picked for an easy-sound net, and the automaton-after-align
+// precision; round HH, observed black-box): after the net's easy-soundness
+// check they read every trace's key in log order (KeyError for an event
+// without it, then the trace's unhashable dict), then build each variant's
+// trace net in first-seen order, whose transition names concatenate a str
+// with each event's object. The first trace in log order holding another
+// object than a str raises at its first such event (a NaN is a float, a
+// valueless value None). Empty when every object is a str.
+std::string keyed_alignment_error(const minera::FrameKeyedActivities& keyed, const std::string& key) {
+  for (std::size_t t = 0; t < keyed.types.size(); ++t) {
+    for (std::size_t e = 0; e < keyed.types[t].size(); ++e)
+      if (keyed.legacy && keyed.absent[t][e])
+        return "KeyError: " + minera::detail::frame_python_str_repr(key);
+    for (const auto& type : keyed.types[t])
+      if (type == "dict") return "TypeError: unhashable type: 'dict'";
+  }
+  for (std::size_t t = 0; t < keyed.types.size(); ++t)
+    for (const auto& type : keyed.types[t])
+      if (!type.empty()) return "TypeError: can only concatenate str (not \"" + type + "\") to str";
+  return {};
 }
 
 // pm4py's ETConformance precision joins each trace's prefixes (every event
@@ -2301,6 +2382,23 @@ minera::FootprintsAnalysis analyze_footprints_models(
       discovery_options.case_id_attribute = "case:concept:name";
     }
   }
+  // An upload's log shape keyed by another attribute (round HH): read_xes'
+  // legacy objects or the CSV frame's cells, as the other families read them.
+  if (!keyed_log && !missing_activity_label && active_source && footprints_custom_keys(options) &&
+      active_source->selected_kind() == minera::EventDataKind::kEventLog &&
+      (active_source->file().format == "xes" || active_source->file().format == "csv") &&
+      !options.activity_attribute.empty() && options.activity_attribute != "concept:name" &&
+      options.activity_attribute != "activity") {
+    const bool xes = active_source->file().format == "xes";
+    const auto& shape = active_source->checked_log();
+    auto keyed = xes ? legacy_keyed_family(shape, options.activity_attribute, true)
+                     : csv_keyed_family(shape, options.activity_attribute);
+    if (keyed) {
+      if (xes) check_legacy_footprints_keys(*keyed, options.activity_attribute);
+      keyed_log = std::move(keyed->log);
+      discovery_options.activity_attribute = "concept:name";
+    }
+  }
   // XES frame sessions (round GP): pm4py converts read_xes's frame to an
   // EventLog, grouping the rows by case id in order of first appearance (the
   // rows without one are one trace), in which a missing activity stays NaN
@@ -3699,7 +3797,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     }
     const auto temporal_profile =
         minera::discover_temporal_profile_as_uploaded(temporal_keyed ? *temporal_keyed : log, temporal_options, cancelled);
-    const auto minimum_self_distances =
+    // An upload's log shape keyed by another attribute (round HH).
+    auto keyed_distances = keyed_minimum_self_distances(log, xes_input, params.minimum_self_distance);
+    const auto minimum_self_distances = keyed_distances ? std::move(*keyed_distances) :
         discover_selected_minimum_self_distances(
             log, params.minimum_self_distance);
     // Selected activity columns can produce labels that are absent from the
@@ -3880,8 +3980,19 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           if (skeleton_keyed->missing[t][e]) missing.insert(skeleton_keyed->log.traces[t].events[e].activity);
       for (const auto& label : missing) log_skeleton.equivalence.push_back({label, label});
     }
-    auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
-        skeleton_log, log_skeleton, skeleton_options);
+    // A trace's deviations sort as Python's list: activities Python cannot
+    // order raise TypeError (round HH).
+    std::map<std::string, std::string> skeleton_types;
+    std::vector<std::string> skeleton_order;
+    if (skeleton_keyed)
+      for (std::size_t t = 0; t < skeleton_keyed->log.traces.size() && t < skeleton_keyed->types.size(); ++t)
+        for (std::size_t e = 0; e < skeleton_keyed->log.traces[t].events.size() && e < skeleton_keyed->types[t].size(); ++e)
+          if (skeleton_types.try_emplace(skeleton_keyed->log.traces[t].events[e].activity, skeleton_keyed->types[t][e]).second)
+            skeleton_order.push_back(skeleton_keyed->log.traces[t].events[e].activity);
+    auto log_skeleton_conformance = skeleton_keyed
+        ? minera::detail::check_log_skeleton_conformance_typed(skeleton_log, log_skeleton, skeleton_options,
+                                                                skeleton_types, skeleton_types, skeleton_order)
+        : minera::check_log_skeleton_conformance(skeleton_log, log_skeleton, skeleton_options);
     if (skeleton_keyed) keep_missing_self_equivalence(log_skeleton_conformance, *skeleton_keyed);
     // A custom key's labels (round GR).
     for (const auto* relation : {&log_skeleton.equivalence, &log_skeleton.always_after, &log_skeleton.always_before,
@@ -6838,6 +6949,11 @@ void handle_behavior_analysis(const httplib::Request& request,
       distances = [&]() -> minera::MinimumSelfDistances {
         switch (params.minimum_self_distance.variant) {
           case minera::MinimumSelfDistanceVariant::kLog:
+            // An upload's log shape keyed by another attribute (round HH).
+            if (const auto* shape = session_log_shape(*session))
+              if (auto keyed = keyed_minimum_self_distances(*shape, session->active_source->file().format == "xes",
+                                                            params.minimum_self_distance))
+                return std::move(*keyed);
             return minera::MinimumSelfDistanceLogDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kEventLog),params.minimum_self_distance);
           case minera::MinimumSelfDistanceVariant::kPandas:
             return minera::MinimumSelfDistancePandasDiscovery::apply(cached_source_view(*session,minera::EventDataKind::kEventTable),params.minimum_self_distance);
@@ -7254,6 +7370,10 @@ void handle_constraint_discovery(const httplib::Request& request,
           if (conformance_keyed && conformance_keyed->any_absent)
             throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(conformance_activity));
           if (conformance_keyed && conformance_keyed->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+        } else {
+          // A CSV upload's other column meets the model's cells by Python's
+          // == (round HH, as the token replay keyed otherwise).
+          conformance_keyed = minera::detail::csv_log_keyed_replay_in(*shape, conformance_activity, key, false);
         }
       }
       if (skeleton_keyed) {
@@ -7279,7 +7399,26 @@ void handle_constraint_discovery(const httplib::Request& request,
       if (conformance_keyed) {
         auto keyed_options = options;
         keyed_options.activity_key = "concept:name";
-        skeleton_conformance = minera::check_log_skeleton_conformance(conformance_keyed->log, *skeleton, keyed_options);
+        // Each trace's deviations sort as Python's list: activities Python
+        // cannot order raise TypeError (round HH).
+        std::map<std::string, std::string> trace_types, model_types;
+        std::vector<std::string> model_order;
+        const auto collect = [](const minera::FrameKeyedActivities& keyed, std::map<std::string, std::string>& types,
+                                std::vector<std::string>* order) {
+          for (std::size_t t = 0; t < keyed.log.traces.size() && t < keyed.types.size(); ++t)
+            for (std::size_t e = 0; e < keyed.log.traces[t].events.size() && e < keyed.types[t].size(); ++e)
+              if (types.try_emplace(keyed.log.traces[t].events[e].activity, keyed.types[t][e]).second && order)
+                order->push_back(keyed.log.traces[t].events[e].activity);
+        };
+        collect(*conformance_keyed, trace_types, nullptr);
+        if (skeleton_keyed) {
+          collect(*skeleton_keyed, model_types, &model_order);
+        } else {
+          // Text keys alike: their order meets no other type.
+          for (const auto& [label, allowed] : skeleton->activ_freq) model_order.push_back(label);
+        }
+        skeleton_conformance = minera::detail::check_log_skeleton_conformance_typed(
+            conformance_keyed->log, *skeleton, keyed_options, trace_types, model_types, model_order);
         keep_missing_self_equivalence(*skeleton_conformance, *conformance_keyed);
       } else if (xes_frame_session(*session)) {
         // pm4py's conformance on the frame lists the cases of its groupby
@@ -9950,6 +10089,22 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
           session->powl_timestamp_key, session->powl_case_id_key);
       alignment_log = &*projected_powl_log;
     }
+    // An alignment key of other values than text on an upload's log shape:
+    // after the easy-soundness check pm4py's state-equation and Dijkstra
+    // alignments read every event's key (KeyError, unhashable dict) and
+    // concatenate the first object that is no str (keyed_alignment_error,
+    // round HH, observed black-box). Its less-memory variant matches the
+    // objects themselves (not modelled here).
+    if (options.variant != minera::AlignmentVariant::kDijkstraLessMemory)
+      if (const auto* shape = session_log_shape(*session)) {
+        const auto& key = options.activity_attribute;
+        const auto keyed = session->active_source->file().format == "xes"
+            ? minera::legacy_keyed_activities(*shape, key) : csv_keyed_family(*shape, key);
+        if (keyed)
+          if (const auto error = keyed_alignment_error(*keyed, key);
+              !error.empty() && minera::final_marking_reachable(selected, options.initial_marking, options.final_marking))
+            throw std::invalid_argument(error);
+      }
     auto alignment =
         miner == "imported"
             ? minera::tools::imported_model_alignment(*alignment_log, selected, options)
@@ -11599,21 +11754,48 @@ void handle_evaluate(const httplib::Request& request,
     // A CSV upload's log shape keyed by the miner's own column replays the
     // frame's cells (csv_log_keyed_replay_log, as /api/mine), by another
     // column that column's cells (csv_log_keyed_replay_in).
+    // The alignment-based replay fitness (explicit, or picked for an easy-sound
+    // net) and the automaton-after-align precision align the keyed log, whose
+    // reads fail otherwise than the token replay's (keyed_alignment_error,
+    // round HH): the token replay's checks wait until the evaluation shows
+    // which replay ran.
+    const bool deferred_key_checks =
+        (params.family == minera::EvaluationFamily::kReplayFitness &&
+         params.replay_fitness_variant != minera::ReplayFitnessVariant::TOKEN_BASED) ||
+        (params.family == minera::EvaluationFamily::kPrecision &&
+         params.precision_variant == minera::PrecisionVariant::AUTOMATON_AFTER_ALIGN);
     std::optional<minera::FrameKeyedActivities> evaluation_legacy;
     std::optional<minera::EventLog> evaluation_csv_log;
+    std::function<void()> token_key_checks;
+    std::string evaluation_alignment_key;
     if (!model_only && adapter == "log" && (miner == "alpha" || miner == "heuristic"))
       if (const auto* shape = session_log_shape(*session)) {
         const auto& replay_key = params.replay_fitness_options.activity_attribute;
+        evaluation_alignment_key = replay_key;
+        const auto model_key = std::string(model_activity);
         if (session->active_source->file().format == "xes") {
-          evaluation_legacy = legacy_replay_keyed(*shape, replay_key, std::string(model_activity));
+          evaluation_legacy = legacy_replay_keyed(*shape, replay_key, model_key, !deferred_key_checks);
+          if (evaluation_legacy)
+            token_key_checks = [shape, replay_key, keyed = &*evaluation_legacy] {
+              check_legacy_replay_keyed(*keyed, *shape, replay_key);
+            };
         } else if (replay_key == model_activity) {
           evaluation_legacy = csv_keyed_family(*shape, replay_key);
-          if (evaluation_legacy) evaluation_csv_log = minera::detail::csv_log_keyed_replay_log(*shape, replay_key);
+          if (evaluation_legacy)
+            evaluation_csv_log =
+                minera::detail::csv_log_keyed_replay_log(*shape, replay_key, nullptr, nullptr, !deferred_key_checks);
           if (!evaluation_csv_log) evaluation_legacy.reset();
+          token_key_checks = [shape, replay_key] {
+            (void)minera::detail::csv_log_keyed_replay_log(*shape, replay_key);
+          };
         } else {
           // Another column's cells meet the net by Python's == (round HG).
-          evaluation_legacy = minera::detail::csv_log_keyed_replay_in(*shape, replay_key, std::string(model_activity));
+          evaluation_legacy = minera::detail::csv_log_keyed_replay_in(*shape, replay_key, model_key, !deferred_key_checks);
+          token_key_checks = [shape, replay_key, model_key] {
+            (void)minera::detail::csv_log_keyed_replay_in(*shape, replay_key, model_key);
+          };
         }
+        if (!deferred_key_checks || !evaluation_legacy) token_key_checks = nullptr;
         if (evaluation_legacy) {
           evaluation_log = evaluation_csv_log ? &*evaluation_csv_log : &evaluation_legacy->log;
           for (auto* key : {&params.replay_fitness_options.activity_attribute, &params.precision_options.activity_attribute,
@@ -11734,6 +11916,28 @@ void handle_evaluate(const httplib::Request& request,
           : minera::evaluate_simplicity(selected,params.simplicity_variant,params.simplicity_options);
     } else if (adapter == "log") {
       evaluate_input(*evaluation_log);
+      if (evaluation_legacy && deferred_key_checks) {
+        // pm4py's alignments raise after the net's easy-soundness check; an
+        // evaluation that fell back to the token replay checks its keys now.
+        const auto unsound = [](const std::string& error) {
+          return error == "final marking is unreachable" || error == "model is not easy sound";
+        };
+        bool aligned = false;
+        if (result.replay_fitness) {
+          const auto& fitness = *result.replay_fitness;
+          if (fitness.variant == minera::ReplayFitnessVariant::TOKEN_BASED) {
+            if (token_key_checks) token_key_checks();
+          } else {
+            aligned = !params.replay_fitness_options.decomposed_alignment_options &&
+                      (fitness.computed || !unsound(fitness.error));
+          }
+        } else if (result.precision) {
+          aligned = result.precision->computed || !unsound(result.precision->error);
+        }
+        if (aligned)
+          if (const auto error = keyed_alignment_error(*evaluation_legacy, evaluation_alignment_key); !error.empty())
+            throw std::invalid_argument(error);
+      }
     } else {
       const auto kind = adapter == "stream" ? minera::EventDataKind::kEventStream :
           adapter == "dataframe" ? minera::EventDataKind::kEventTable : minera::EventDataKind::kLazyEventTable;

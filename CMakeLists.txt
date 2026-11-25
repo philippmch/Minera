@@ -2834,6 +2834,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_hg_tests minera_server)
     add_test(NAME minera_server_review_hg_tests
              COMMAND minera_server_review_hg_tests $<TARGET_FILE:minera_server>)
+    # Round HH: alignments, minimum self-distance, footprints and log skeleton conformance on typed keys of the log shape.
+    add_executable(minera_server_review_hh_tests
+      src/backend/tests/test_server_review_hh.cpp)
+    target_include_directories(minera_server_review_hh_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_hh_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_hh_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_hh_tests minera_server)
+    add_test(NAME minera_server_review_hh_tests
+             COMMAND minera_server_review_hh_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)

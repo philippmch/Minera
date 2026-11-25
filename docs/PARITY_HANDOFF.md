@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HG (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HH (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10727,6 +10727,109 @@ server binary), the 16 manifests replayed 2,673 responses unchanged, the fronten
 typecheck and its 240 test files (one new precision-gauge case), no Python
 script change.
 Harness and probes: `review-harness/round-hg/`.
+
+Round HH re-reviewed HG. HG's CI run 45585099162 passed the Linux native
+build and ctest, the frontend, the Python scripts and the parity verifier
+(macOS and Windows were still in ctest at HH's handoff).
+HH1 /api/evaluate's alignment-based replay fitness (explicit, or picked for
+an easy-sound net) and its AUTOMATON_AFTER_ALIGN precision on the Alpha and
+Heuristics++ nets mined under a typed key align the keyed log, whose reads
+fail otherwise than the token replay's: after the net's easy-soundness
+check pm4py's alignments read every event's key (an event without it a
+KeyError, a dict value unhashable, in log order) and then concatenate the
+first object that is no str (`TypeError: can only concatenate str (not
+"T") to str`, `keyed_alignment_error`). The token replay's checks
+(`check_legacy_replay_keyed`, the variant sorts of `csv_log_keyed_replay_log`
+and `csv_log_keyed_replay_in`, now optional) run only where the evaluation
+fell back to the token replay.
+HH2 the minimum self-distances of the EventLog variant keyed by such a key
+(/api/mine and /api/analyze-behavior) read the legacy objects or the CSV
+cells (`keyed_minimum_self_distances`): an unhashable dict anywhere first,
+then a KeyError for an event without the key; values equal as dict keys are
+one activity, and a NaN, unequal to itself, never repeats.
+HH3 the footprints of /api/discover-graph keyed by such a key (entire log,
+trace by trace, the model's footprints and their conformance) read the same
+objects (`check_legacy_footprints_keys`: an event without the key in a trace
+of two or more events raises KeyError, then a dict unhashable, then any
+other absent key).
+HH4 pm4py's log skeleton conformance sorts each trace's deviation list with
+Python's list.sort: the activity-frequency entries compare their activities
+(the trace's in first-occurrence order, then the model's absent ones in the
+order its discovery met them), so text beside a number or a date, or None
+beside anything, raises the first comparison's TypeError
+(`check_log_skeleton_conformance_typed`, log_skeleton_typed.hpp; numbers,
+bools and NaN compare with each other, Timestamps and NaT with each other).
+The session route's conformance keyed otherwise than its discovery meets
+the model's cells by Python's == on CSV uploads too (`csv_log_keyed_replay_in`;
+a gap is a cell, no longer a missing activity).
+HH5 /api/align with an alignment key of such values (state-equation and
+Dijkstra variants) raises the same errors once the net's final marking is
+reachable; pm4py's less-memory variant matches the objects themselves and
+is not modelled.
+Checked without change: evaluate's replay of an Alpha net's None label
+(silent in pm4py; 30 all-None probes equal on replay fitness,
+generalization, ETConformance precision and the composite).
+Sweeps over hfA, hfG and hfN (XES, keys K1..K6) and hcS (CSV, 120
+uploads), same as pm4py (equal or failing alike) on HG's server vs HH's:
+evaluate's explicit alignment fitness XES Alpha 134 -> 807 and
+Heuristics++ 142 -> 427, CSV Alpha 49 -> 485 and Heuristics++ 6 -> 20; the
+automatic fitness XES 184 -> 857 and 145 -> 430, CSV 106 -> 542 and 9 -> 23;
+AUTOMATON_AFTER_ALIGN XES 92 -> 762 and 93 -> 375, CSV 47 -> 477 and
+5 -> 19; the log skeleton's conformance keyed by concept:name CSV
+417 -> 720 and hfA 333 -> 600, keyed by the next key CSV 53 -> 661 and
+hfA 290 -> 514 (the rest the declared naming class below), keyed like its
+discovery 720 and 600 unchanged; the minimum self-distance and footprints
+sweeps (`ct/fam.py`) found no difference beyond the declared classes on
+the uploads they reached before pm4py's model footprints stalled (its
+reachability walk of some Alpha nets runs for minutes), and the new
+test's cases (15-second limit per reference call) cover both families;
+/api/align with the key supplied (state-equation and Dijkstra variants,
+standard costs) on 10 hfA and 10 hcS uploads: every typed key fails as
+pm4py does, the rest equal in costs and fitness. Declared: the messages for
+a net that is not easy sound (Minera's alignments name the unreachable
+final marking, 50 + 57 + 3 evaluate judgments and the /api/align ones),
+the AUTOMATON_AFTER_ALIGN values that rest on tie choices (45 + 52 XES and
+8 + 1 CSV, cases that failed before HH among them), the mine's
+transitions-sort operands (as HF and HG), and equal values printed
+differently named by the object each container met first (the log
+skeleton's deviations: 86 hfA and 59 CSV judgments, the footprints' 1.0
+beside 1).
+HH's suite: the full ctest 697 of 697 (-j2, 55 minutes under a parallel
+sweep) before the new test's cases, then the new
+`minera_server_review_hh_tests` (387 checks, 248 of which fail on HG's
+server binary, 11 seconds); the 16 manifests
+replayed 2,673 responses unchanged; no frontend or Python script change.
+Harness and probes: `review-harness/round-hh/`.
+
+Next round (HI) should start by re-reviewing round HH:
+
+- HH's CI run;
+- the correlation miner keyed otherwise than concept:name (found in HH,
+  not fixed; `ct/cor.py`): pm4py's trace-based variant reads concept:name
+  whatever the activity key (XES and CSV alike, Minera reads the key); on an
+  XES upload's log shape the classic variants name typed values str() of
+  the legacy objects ('1000.0', 'False', a Timestamp) where Minera shows the
+  XES text, and the classic variant drops a NaN activity's events while
+  classic_split keeps them; on CSV uploads Minera refuses a gap ("activity
+  selector ... is blank") where pm4py reads NaN, and pm4py's classic variant
+  raises TypeError sorting NaN beside text;
+- /api/align's per-variant fitness with standard costs on nets with silent
+  transitions (suspected from the fitting-trace counts of K6 Heuristics++
+  nets: pm4py's fitness seems to drop the silent moves' cost of 1; check
+  on concept:name too);
+- the less-memory alignment variant on typed keys (pm4py matches the
+  objects and sorts the net's and the trace's labels apart), the
+  workbench's alignments on such keys, and the POWL net's totals with an
+  explicit replay key (still unverified: the reference harness does not
+  mine POWL);
+- whether other routes iterate a copied Python set (HE2, not reached in
+  HF, HG or HH);
+- the declared residuals (HF's, HG's and HH's above, the NaN-addressed
+  orders and operands, the GU1-2 whole-mine failure, the GT2 and GT4
+  residuals) if a cheaper model appears;
+- the carried items below.
+
+Previous list for round HH (kept for its older items):
 
 Next round (HH) should start by re-reviewing round HG:
 

@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "polars_missing_column.hpp"
+#include "log_skeleton_typed.hpp"
 #include "python_list_sort.hpp"
 #include "python_scalar.hpp"
 #include "xes_frame_columns.hpp"
@@ -993,6 +994,16 @@ class SkeletonChecker {
   // activity (None) among the activity-frequency deviations beside a named
   // one raises TypeError.
   void python_null_order(bool enabled) { python_null_order_ = enabled; }
+  // Round HH: each activity's Python type name ("" or "str" for a str) as
+  // the trace's events hold it and as the model's keys hold it.
+  void python_types(const std::map<std::string, std::string>* trace_types,
+                    const std::map<std::string, std::string>* model_types,
+                    const std::vector<std::string>* model_order) {
+    trace_types_ = trace_types;
+    model_types_ = model_types;
+    model_order_ = model_order;
+    python_null_order_ = true;
+  }
 
   // The trace's labels as ids, interning labels the model does not name.
   void intern(const std::vector<const std::string*>& trace, std::vector<std::uint32_t>& ids) {
@@ -1148,42 +1159,84 @@ class SkeletonChecker {
   // model's absent ones (model order; pm4py's own model order varies from
   // run to run). Two activity-frequency entries compare their activities,
   // and None beside a text raises TypeError for the first such pair that
-  // CPython's list.sort meets.
+  // CPython's list.sort meets. Round HH: an activity of another Python type
+  // (python_types) compares as Python does: numbers (bool, int, float, NaN)
+  // with numbers, dates with dates, text with text, None with nothing.
   void raise_null_order(const LogSkeletonConformance& result) const {
     struct Entry {
       std::string constraint;
       bool frequency = false;
-      bool null = false;
+      std::string type;  // Python type name
+      int kind = 0;      // what it compares with: 0 text, 1 number, 2 date, -1 nothing
       std::string name;
+    };
+    const auto kind_of = [](const std::string& type) {
+      if (type == "str") return 0;
+      if (type == "int" || type == "float" || type == "bool") return 1;
+      if (type == "Timestamp" || type == "NaTType" || type == "datetime.datetime") return 2;
+      return -1;
+    };
+    const auto type_of = [&](const std::string& name, const std::map<std::string, std::string>* types) {
+      if (name == kLogSkeletonNullActivity) return std::string("NoneType");
+      if (types)
+        if (const auto found = types->find(name); found != types->end() && !found->second.empty()) return found->second;
+      return std::string("str");
     };
     std::vector<Entry> entries;
     for (std::size_t f = 0; f < kPairFamilies; ++f)
       if (std::any_of(result.deviations.begin(), result.deviations.end(),
                       [&](const auto& deviation) { return deviation.constraint == families_[f].name; }))
         entries.push_back({families_[f].name});
-    bool null = false, named = false;
-    const auto frequency = [&](const std::string& name) {
-      const bool missing = name == kLogSkeletonNullActivity;
-      (missing ? null : named) = true;
-      entries.push_back({"activ_freq", true, missing, name});
+    std::set<int> kinds;
+    const auto frequency = [&](const std::string& name, const std::map<std::string, std::string>* types) {
+      auto type = type_of(name, types);
+      const int kind = kind_of(type);
+      kinds.insert(kind);
+      entries.push_back({"activ_freq", true, std::move(type), kind, name});
     };
     for (const auto activity : first_seen_) {
       const auto* allowed = rule_of_[activity];
       if (!allowed || std::find(allowed->begin(), allowed->end(), counts_[activity]) == allowed->end())
-        frequency(*names_[activity]);
+        frequency(*names_[activity], trace_types_);
     }
-    for (const auto& rule : activ_freq_)
-      if (!rule.allowed->empty() && rule.allowed->front() > 0 && counts_[rule.activity] == 0) frequency(*rule.name);
-    if (!null || !named) return;
-    auto less = [](const Entry& a, const Entry& b) {
+    const auto absent = [&](const FrequencyRule& rule) {
+      if (!rule.allowed->empty() && rule.allowed->front() > 0 && counts_[rule.activity] == 0)
+        frequency(*rule.name, model_types_ ? model_types_ : trace_types_);
+    };
+    if (model_order_) {
+      // The model's keys as its discovery met them (an EventLog's
+      // first-occurrence order, round HH).
+      for (const auto& label : *model_order_)
+        for (const auto& rule : activ_freq_)
+          if (*rule.name == label) absent(rule);
+    } else {
+      for (const auto& rule : activ_freq_) absent(rule);
+    }
+    if (kinds.size() < 2) return;
+    // A number's value from its label (str() of the object; trailing \x1f
+    // tell apart values printed alike).
+    const auto number = [](std::string label) {
+      while (!label.empty() && label.back() == '\x1f') label.pop_back();
+      if (label == "True") return python::boolean(true);
+      if (label == "False") return python::boolean(false);
+      if (auto integer = python::integer_literal(label)) return *integer;
+      return python::real(std::strtod(label.c_str(), nullptr));
+    };
+    auto less = [&](const Entry& a, const Entry& b) {
       if (a.constraint != b.constraint) return a.constraint < b.constraint;
-      if (a.null != b.null)
-        throw std::invalid_argument(std::string("TypeError: '<' not supported between instances of '") +
-                                    (a.null ? "NoneType" : "str") + "' and '" + (b.null ? "NoneType" : "str") + "'");
+      if (a.kind != b.kind || a.kind < 0)
+        throw std::invalid_argument("TypeError: '<' not supported between instances of '" + a.type + "' and '" +
+                                    b.type + "'");
+      if (a.kind == 1) return python::compare(number(a.name), number(b.name)) < 0;
+      // NaT orders with no date.
+      if (a.kind == 2 && (a.type == "NaTType" || b.type == "NaTType")) return false;
       return a.name < b.name;
     };
     detail::python_list_sort(entries, less);
   }
+  const std::map<std::string, std::string>* trace_types_ = nullptr;
+  const std::map<std::string, std::string>* model_types_ = nullptr;
+  const std::vector<std::string>* model_order_ = nullptr;
   std::vector<FrequencyRule> activ_freq_;
   std::vector<const std::vector<std::size_t>*> rule_of_;
   std::vector<std::size_t> counts_, first_, last_;
@@ -1212,15 +1265,19 @@ LogSkeletonConformance check_log_skeleton_conformance(
       activities_of(trace, options.activity_key), model, options);
 }
 
-std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
-    const EventLog& log, const LogSkeletonModel& model,
-    const LogSkeletonOptions& options) {
+namespace {
+
+std::vector<LogSkeletonConformance> check_log_skeleton_conformance_impl(
+    const EventLog& log, const LogSkeletonModel& model, const LogSkeletonOptions& options,
+    const std::map<std::string, std::string>* trace_types, const std::map<std::string, std::string>* model_types,
+    const std::vector<std::string>* model_order) {
   validate_activity_key(options.activity_key);
   std::vector<LogSkeletonConformance> result;
   result.reserve(log.traces.size());
   // A trace's result depends only on its activity sequence, so each distinct
   // sequence (variant) is checked once.
   SkeletonChecker checker(model, options);
+  if (trace_types || model_types) checker.python_types(trace_types, model_types, model_order);
   std::unordered_map<std::vector<std::uint32_t>, std::size_t, IdSequenceHash> checked;
   std::vector<const std::string*> labels;
   std::vector<std::uint32_t> ids;
@@ -1236,6 +1293,21 @@ std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
     checked.emplace(ids, result.size() - 1);
   }
   return result;
+}
+
+}  // namespace
+
+std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
+    const EventLog& log, const LogSkeletonModel& model,
+    const LogSkeletonOptions& options) {
+  return check_log_skeleton_conformance_impl(log, model, options, nullptr, nullptr, nullptr);
+}
+
+std::vector<LogSkeletonConformance> detail::check_log_skeleton_conformance_typed(
+    const EventLog& log, const LogSkeletonModel& model, const LogSkeletonOptions& options,
+    const std::map<std::string, std::string>& trace_types, const std::map<std::string, std::string>& model_types,
+    const std::vector<std::string>& model_order) {
+  return check_log_skeleton_conformance_impl(log, model, options, &trace_types, &model_types, &model_order);
 }
 
 std::vector<LogSkeletonConformance> check_log_skeleton_conformance(
