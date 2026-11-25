@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HK (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HL (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -11059,6 +11059,103 @@ default variant (the variant and the LP diagnostics only); frontend tsc
 and vitest passed (240 files, 10,734 tests); no frontend source or Python
 script change.
 Harness and probes: `review-harness/round-hk/`.
+
+Round HL re-reviewed HK. HK's CI run 45668934361 passed the Linux, macOS,
+frontend, Python script and parity verifier jobs; its Windows ctest was
+still running when HL started.
+HL1 the session routes on a POWL net mined under a typed key
+(`powl_activity_key` naming an attribute or column of other objects than
+text) read a projected log whose key attribute holds each event's name as
+the net names it (`powl_keyed_projection` in `normalize_powl_event_log`):
+pm4py's less-memory alignments compare the key's objects with the
+transitions' labels by ==, and the net's labels are those objects, so
+every event meets its transition. The projection had kept the attribute as
+uploaded, so /api/align miner=powl met 1.0 against a transition named 1 as
+a log move, and on a CSV upload an event with a gap in the key failed with
+`conformance: event is missing activity attribute 'K3'` where pm4py aligns.
+Sweep `ct/pa.py` (40 uploads per bank, keys K1..K6, standard costs, the
+default less-memory variant): judgments equal (each trace's cost, fitness
+and moves) before -> after: hfA 124 -> 216 of 234 (10 more equal but for
+the printing of equal objects, a move on -0.0 shown 0.0), hfG 55 -> 94 of
+96 (+2), hfN 51 -> 87 of 94 (+4), hcS 59 -> 128 of 175 (108 one-sided
+errors -> 0); totals hfA 124 -> 226, hfG 55 -> 96, hfN 51 -> 91, hcS 59 ->
+131. The trace-net variants raise pm4py's concat TypeError alike
+(unchanged). The decoration of the POWL net (`ct/pdec.py`, firing counts
+over the fitting traces against pm4py's token replay keyed the same, the
+nets compared by Weisfeiler-Lehman colours) was equal wherever the nets are
+(hfA 226, hfG 96, hfN 91, hcS 128); HK's binary gives the same on the
+ctest's cases (HK5 had projected the names it reads).
+HL2 /api/stochastic-map?miner=powl fits the POWL net replaying the key it
+was mined by, as pm4py's get_map_from_log_and_net does under that
+activity key: it replayed concept:name, whose names never meet a typed
+key's transitions, so every transition got the immediate distribution.
+Sweep `ct/pdec.py` smap (the multiset of distribution, parameters and
+weight): hfA 141 -> 177 of 234, hfG 69 -> 85 of 96, hfN 61 -> 77 of 94,
+hcS 115 of 175 unchanged (its differences are nets with NaT keys).
+HL3 /api/analyze-behavior's temporal_profile and temporal_conformance on
+the stream adapter read the session's log shape as the log adapter does:
+pm4py's stream variant converts the stream back to the log it came from
+(observed black-box: equal results for every typed key). Minera read the
+stream as text cells (an XES upload's typed values as text, a CSV
+upload's gaps as empty labels). Sweep `ct/bh.py` (hfA 20 + hfN 10 uploads,
+K1..K6, 180 judgments per family): stream profile 84 -> 169 of 180 (11
+more equal but for printing, below), stream conformance 83 -> 180; hcS (20
+uploads, 120): profile 44 -> 120, conformance 85 -> 120.
+HL4 the XES dataframe's temporal profile names typed activities str() of
+the frame's objects (`temporal_profile_xes_frame_labels`, as /api/mine's
+family result since GZ): the route named them by the merged XES text (1e3
+for 1000.0). HL5 pandas' groupby drops a pair whose activity is a float
+column's NaN as it drops a gap; Minera kept a NaN group. Sweep: dataframe
+profile 74 (+38 printing) -> 177 of 180 (+3 printing).
+Left for HM (not declared): the printing of equal objects in temporal
+profile pairs (pm4py's log variant keys each pair by the first pair's
+tuple of objects, (-0.0, 0.0) or (1.0, 1); pandas' groupby by each
+column's first value in the pair frame; Minera names both by the column's
+first text: log and stream 11 of 180, dataframe 3); the stochastic map's
+falsy labels (a transition labelled by 0, 0.0, -0.0, False or '' gets the
+immediate distribution in pm4py, its durations unsampled: hfA 53, hfG 11,
+hfN 15, hcS 16 judgments); the XES dataframe's temporal conformance keyed
+by typed attributes (pandas' merge raises `ValueError: You are trying to
+merge on int64 and str columns for key 'K1'`, 105 of 180 one-sided
+errors); minimum_self_distance keyed by typed attributes on the pandas
+(concat TypeError) and Polars (str() labels, None) variants; the CSV frame
+adapters of the temporal families (hcS dataframe 17 differences).
+Left, declared: the POWL nets of keys holding NaN or NaT (HK's residual:
+the alignments, decorations and maps on them follow the differing net:
+hfA 8, hfN 3, hcS 45 alignment judgments), the printing of equal objects
+in alignment moves (above), and equal-cost move orders of the A* variant
+(hfA 26, hfG 5, hfN 4, hcS 3).
+Not reached: /api/playout and the POWL evaluate/precision routes on a net
+mined under a typed key (`ct/pev.py` written, not run), the lazyframe
+adapter of the temporal families (pm4py's Polars path for the profile
+needs pyarrow, which the reference venv must not hold).
+HL's suite: the full ctest 701 of 701 (-j2, 26 minutes) with the new
+`minera_server_review_hl_tests` (356 checks over 40 uploads: POWL
+alignments, decorations and stochastic maps under typed keys, temporal
+profiles on the stream and dataframe adapters and conformance on the
+stream; 189 fail on HK's binary; `tc/seedchk.py` under PYTHONHASHSEED 1
+and 3: none differ); the 16 manifests replayed 2,673 responses unchanged;
+no frontend or Python script change.
+Harness and probes: `review-harness/round-hl/`.
+
+Next round (HM) should start by re-reviewing round HL:
+
+- HL's CI run, and HK's Windows job;
+- the HL items left for HM above (temporal profile pair labels of equal
+  objects, the stochastic map's falsy labels, the typed-key dataframe
+  temporal conformance merge error, minimum_self_distance's pandas and
+  Polars variants on typed keys, the CSV frame adapters of the temporal
+  families);
+- /api/playout and POWL evaluate/precision on a net mined under a typed
+  key (`ct/pev.py`);
+- whether other routes iterate a copied Python set (HE2, not reached in
+  HF..HL);
+- the declared residuals (HF's..HL's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HL (kept for its older items):
 
 Next round (HL) should start by re-reviewing round HK:
 

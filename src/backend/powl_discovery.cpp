@@ -2354,11 +2354,41 @@ bool powl_keyed_by_log_objects(const EventLog& event_log, const PowlDiscoveryOpt
   return powl_log_shape_keyed(event_log, options).has_value();
 }
 
+namespace {
+
+// The projected log of a POWL net keyed by typed objects names each event as
+// the net's transitions are named; the session routes that read the POWL key
+// of it (alignments, evaluation, stochastic map, Monte Carlo, ...) meet those
+// names as pm4py's routes meet the objects themselves (round HL, observed
+// black-box: the less-memory alignments read the key's objects, equal to the
+// transitions' labels by ==). The key's attribute becomes plain text holding
+// the event's name.
+EventLog powl_keyed_projection(EventLog projected, const std::string& key) {
+  for (auto& trace : projected.traces)
+    for (auto& event : trace.events) {
+      EventAttribute shown;
+      shown.key = key;
+      shown.value = event.activity;
+      bool replaced = false;
+      for (auto& attribute : event.attributes)
+        if (attribute.key == key) {
+          attribute = shown;
+          replaced = true;
+          break;
+        }
+      if (!replaced) event.attributes.push_back(std::move(shown));
+    }
+  return projected;
+}
+
+}  // namespace
+
 EventLog normalize_powl_event_log(const EventLog& event_log,
                                   const PowlDiscoveryOptions& options) {
   validate_options(options);
   if (const auto keyed = powl_log_shape_keyed(event_log, options))
-    return normalize_powl_event_log_impl(keyed->shown, powl_concept_name_options(options));
+    return powl_keyed_projection(normalize_powl_event_log_impl(keyed->shown, powl_concept_name_options(options)),
+                                 options.activity_key);
   if (const auto keyed = powl_frame_keyed_log(event_log, options))
     return normalize_powl_event_log_impl(*keyed, powl_concept_name_options(options));
   return normalize_powl_event_log_impl(event_log, options);

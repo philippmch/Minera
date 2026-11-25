@@ -1210,7 +1210,16 @@ TemporalProfile discover_temporal_profile_xes_frame(
     std::map<std::string, std::string> first_text;
     for (std::size_t r = 0; r < table.rows.size() && r < column->cells.size(); ++r) {
       const auto& row = table.rows[r];
-      if (column->cells[r].missing || at >= row.size() || !row[at]) continue;
+      if (at >= row.size() || !row[at]) continue;
+      // Round HL (observed black-box): pandas' groupby drops a pair whose
+      // activity is NaN (a float column's NaN cell) as it drops a gap.
+      if (column->cells[r].missing) {
+        if (!polars && !row[at]->is_null) {
+          if (!merged) merged = table;
+          merged->rows[r][at]->is_null = true;
+        }
+        continue;
+      }
       const auto& cell = column->cells[r];
       const auto key = polars && column->dtype == detail::XesFrameDtype::kObject
                            ? "s" + detail::xes_frame_activity_label(cell)

@@ -7117,8 +7117,12 @@ void handle_behavior_analysis(const httplib::Request& request,
     if (temporal) {
       // A CSV upload's log shape: pm4py's EventLog algorithms read every
       // pair's timestamps first (round GT, discovery and conformance alike).
-      if (adapter == "log" && session->active_source && session->active_source->file().format == "csv") {
-        const auto view = input();
+      // pm4py's stream variant reads the log it converts the stream to (round
+      // HL, observed black-box), so the stream adapter of a log-shape session
+      // reads the session's log shape as the log adapter does.
+      const bool log_read = adapter == "log" || (adapter == "stream" && session_log_shape(*session));
+      if (log_read && session->active_source && session->active_source->file().format == "csv") {
+        const auto view = adapter == "stream" ? minera::EventDataView(*session_log_shape(*session)) : input();
         const auto& tp = params.temporal_profile;
         if (view.kind() == minera::EventDataKind::kEventLog)
           check_csv_log_temporal_reads(*view.log(),
@@ -7153,7 +7157,7 @@ void handle_behavior_analysis(const httplib::Request& request,
       // A CSV upload's log shape reads the frame's cells (round GR's
       // csv_keyed_family_log), its conformance as the XES one.
       std::optional<minera::EventLog> legacy_temporal;
-      if (adapter == "log")
+      if (log_read)
         if (const auto* shape = session_log_shape(*session)) {
           const auto key = params.temporal_profile.activity_attribute;
           const bool xes_shape = session->active_source->file().format == "xes";
@@ -7203,9 +7207,13 @@ void handle_behavior_analysis(const httplib::Request& request,
         }
       } else if (session->active_source && session->active_source->file().format == "xes" &&
                  (adapter == "dataframe" || adapter == "lazyframe")) {
-        // An XES upload's frame as /api/mine reads it (round GB).
-        profile = minera::discover_temporal_profile_xes_frame(input(), params.temporal_profile,
-                                                              request.has_param("temporal_target_timestamp_attribute"));
+        // An XES upload's frame as /api/mine reads it (round GB), its typed
+        // activities named str() of the frame's objects as pm4py's keys and
+        // /api/mine's family result name them (round HL, observed black-box).
+        const bool explicit_start = request.has_param("temporal_target_timestamp_attribute");
+        profile = minera::temporal_profile_xes_frame_labels(
+            input(), params.temporal_profile, explicit_start,
+            minera::discover_temporal_profile_xes_frame(input(), params.temporal_profile, explicit_start));
       } else if (verdict == CsvFrameTpVerdict::kEmpty) {
         profile = minera::TemporalProfile{};
       } else profile = minera::discover_temporal_profile_named_start(temporal_input(), params.temporal_profile, start_name,
@@ -13697,6 +13705,11 @@ void handle_stochastic_map(const httplib::Request& request,
             require_prepared_log(*session), session->powl_activity_key,
             session->powl_timestamp_key, session->powl_case_id_key);
         fit_log = &*projected_powl_log;
+        // pm4py fits the POWL net's map replaying the key it was mined by
+        // (round HL, observed black-box: get_map_from_log_and_net under
+        // another key fits no transition); the projected log holds the
+        // net's names under that key, its concept:name the upload's.
+        params.fit.replay.activity_attribute = session->powl_activity_key;
       }
       params.fit.replay = minera::tools::stochastic_map_replay_options(
           params.fit.replay, params.initial_marking,
