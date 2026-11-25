@@ -81,6 +81,8 @@
 #include "../polars_sort.hpp"
 #include "minera/dataframe_validation.hpp"
 #include "../frame_typed_activities.hpp"
+#include "../frame_cells.hpp"
+#include "../correlation_key_objects.hpp"
 #include "../xes_frame_activity.hpp"
 #include "embedding_runtime.hpp"
 #include "llm_runtime.hpp"
@@ -370,6 +372,97 @@ std::optional<minera::FrameKeyedActivities> legacy_keyed_family(const minera::Ev
   auto keyed = minera::legacy_keyed_activities(log, key);
   if (!keyed || (!absent_ok && (keyed->any_absent || keyed->any_dict))) return std::nullopt;
   return keyed;
+}
+
+// The objects pm4py's classic correlation variants read under an activity
+// key other than concept:name (round HI, observed black-box): an XES
+// upload's log shape keyed by an attribute holding other values than text
+// (read_xes' legacy objects, one per event in log order: an event without
+// the key, a dict, each NaN its own float), and a CSV upload's frame keyed
+// by another column (its cells in the projected table's row order: a gap
+// NaN, one object per cell in a float64 column and one shared object in a
+// text or object column, NaT in a date column). Null where the key reads
+// text alone and none of it blank, so the text contract stands.
+std::shared_ptr<const minera::CorrelationKeyObjects> correlation_key_objects(
+    const minera::EventLog& log, bool xes, const std::string& key) {
+  if (key.empty() || key == "concept:name" || key == "activity") return nullptr;
+  auto out = std::make_shared<minera::CorrelationKeyObjects>();
+  out->key = key;
+  out->legacy = xes;
+  std::size_t fresh = 0;
+  using State = minera::CorrelationKeyObject::State;
+  // A blank text: the text path rejects it, pm4py reads it as any label.
+  const auto blank = [](const minera::python::Scalar& value) {
+    return value.kind == minera::python::Scalar::Kind::kText &&
+           value.text.find_first_not_of(" \t\r\n") == std::string::npos;
+  };
+  if (xes) {
+    if (!legacy_keyed_family(log, key, true)) {
+      if (!log.dataframe_columns || log.dataframe_columns->csv_text) return nullptr;
+      bool any_blank = false;
+      for (const auto& trace : log.traces)
+        for (const auto& event : trace.events) {
+          const auto cell = minera::legacy_declare_cell(event, key);
+          any_blank = any_blank || (cell.state == minera::LegacyDeclareCell::State::kValue && blank(cell.value));
+        }
+      if (!any_blank) return nullptr;
+    }
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) {
+        const auto cell = minera::legacy_declare_cell(event, key);
+        minera::CorrelationKeyObject object;
+        if (cell.state == minera::LegacyDeclareCell::State::kUnmodelled) return nullptr;
+        if (cell.state == minera::LegacyDeclareCell::State::kAbsent) object.state = State::kAbsent;
+        else if (cell.state == minera::LegacyDeclareCell::State::kDict) object.state = State::kDict;
+        else {
+          object.value = cell.value;
+          if (object.value.kind == minera::python::Scalar::Kind::kFloat && std::isnan(object.value.real))
+            object.object = ++fresh;
+        }
+        out->objects.push_back(std::move(object));
+      }
+    return out;
+  }
+  const auto keyed = csv_keyed_family(log, key);
+  if (!keyed) return nullptr;
+  // The frame's cells (typed as pandas holds them), its events beside the
+  // log's (csv_keyed_family checked the shapes match).
+  const auto frame = minera::dataframe_frame_event_log(log);
+  if (!keyed->non_text && !keyed->any_missing) {
+    bool any_blank = false;
+    for (const auto& trace : frame.traces)
+      for (const auto& event : trace.events)
+        if (const auto value = minera::frame_scalar(frame, trace, event, key, minera::FrameKeyScope::kDataFrame))
+          any_blank = any_blank || blank(*value);
+    if (!any_blank) return nullptr;
+  }
+  // project_csv_event_table's rows: the log's events by source row.
+  struct Row {
+    std::size_t source_row;
+    std::size_t encounter;
+    const minera::Trace* trace;
+    const minera::Event* event;
+  };
+  std::vector<Row> rows;
+  for (std::size_t t = 0; t < log.traces.size(); ++t)
+    for (std::size_t e = 0; e < log.traces[t].events.size(); ++e)
+      rows.push_back({log.traces[t].events[e].input_order, rows.size(), &frame.traces[t], &frame.traces[t].events[e]});
+  std::stable_sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) {
+    return a.source_row != b.source_row ? a.source_row < b.source_row : a.encounter < b.encounter;
+  });
+  for (const auto& row : rows) {
+    minera::CorrelationKeyObject object;
+    if (const auto value = minera::frame_scalar(frame, *row.trace, *row.event, key, minera::FrameKeyScope::kDataFrame)) {
+      object.value = *value;
+    } else if (keyed->column == minera::DataFrameColumnType::kDate) {
+      object.nat = true;
+    } else {
+      object.value = minera::python::real(std::numeric_limits<double>::quiet_NaN());
+      if (keyed->column == minera::DataFrameColumnType::kFloat64) object.object = ++fresh;
+    }
+    out->objects.push_back(std::move(object));
+  }
+  return out;
 }
 
 // pm4py's minimum self-distances of an upload's log shape keyed by another
@@ -3759,6 +3852,8 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     if (!params.correlation_variants.empty()) {
       params.correlation.reference_timestamp_key =
           correlation_reference_timestamp_key(request, params.correlation, !xes_input);
+      params.correlation.key_objects =
+          correlation_key_objects(log, xes_input, params.correlation.activity_attribute);
       if (xes_input) {
         correlation_variants_analysis = analyze_correlation_variants(
             minera::EventDataView(log), params.correlation_variants,
@@ -10105,8 +10200,43 @@ void handle_align(const httplib::Request& request, httplib::Response& response) 
               !error.empty() && minera::final_marking_reachable(selected, options.initial_marking, options.final_marking))
             throw std::invalid_argument(error);
       }
+    // pm4py's less-memory search matches each event's object with the net's
+    // labels by == (a NaN only with the transition it labels itself; round
+    // HI, observed black-box): the keyed log's labels, which the net mined
+    // under the key carries too. An event without the key or holding None
+    // reads None, which no visible transition carries. Only for a net mined
+    // under the same key (another key's labels meet these objects otherwise).
+    std::optional<minera::EventLog> keyed_alignment_log;
+    const std::string& mined_key = miner == "alpha" ? session->alpha_activity_attribute
+                                   : miner == "heuristic" ? session->heuristic_activity_attribute
+                                                          : std::string();
+    if (options.variant == minera::AlignmentVariant::kDijkstraLessMemory && !mined_key.empty() &&
+        mined_key == options.activity_attribute)
+      if (const auto* shape = session_log_shape(*session)) {
+        const bool xes = session->active_source->file().format == "xes";
+        auto keyed = xes ? minera::legacy_keyed_activities(*shape, options.activity_attribute)
+                         : csv_keyed_family(*shape, options.activity_attribute);
+        if (keyed && !keyed->any_dict) {
+          const std::string none_label = "None" + std::string(64, '\x1f');
+          for (std::size_t t = 0; t < keyed->log.traces.size(); ++t)
+            for (std::size_t e = 0; e < keyed->log.traces[t].events.size(); ++e)
+              if ((keyed->legacy && keyed->absent[t][e]) || keyed->types[t][e] == "NoneType")
+                keyed->log.traces[t].events[e].activity = none_label;
+          keyed_alignment_log = std::move(keyed->log);
+          alignment_log = &*keyed_alignment_log;
+          options.activity_attribute = "concept:name";
+        }
+      }
+    // A discovered model aligned with standard costs reads the reference's
+    // log alignments too (round HI, observed black-box): each variant's
+    // fitness is 1 - floor(cost / 10000) / floor(bwc / 10000), so a silent
+    // move's cost of 1 leaves a trace fitting, and the less-memory search
+    // prices silent moves and the best-worst cost its own way. Legacy unit
+    // costs keep Minera's bundle aligner.
+    const bool reference_costs =
+        miner == "imported" || options.cost_profile == minera::AlignmentCostProfile::kStandard;
     auto alignment =
-        miner == "imported"
+        reference_costs
             ? minera::tools::imported_model_alignment(*alignment_log, selected, options)
             : minera::check_alignment(*alignment_log, selected, options);
     // The reference's log alignments check easy soundness before reading

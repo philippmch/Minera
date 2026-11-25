@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HH (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HI (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10800,6 +10800,118 @@ sweep) before the new test's cases, then the new
 server binary, 11 seconds); the 16 manifests
 replayed 2,673 responses unchanged; no frontend or Python script change.
 Harness and probes: `review-harness/round-hh/`.
+
+Round HI re-reviewed HH. HH's CI run 45612060209 passed all six jobs (the
+Linux, macOS and Windows native builds and ctest, the frontend, the Python
+scripts and the parity verifier).
+HI1 /api/mine's correlation miner keyed otherwise than concept:name reads
+the objects pm4py's variants read (`correlation_key_objects`, the
+`key_objects` option, correlation_key_objects.hpp): on an XES upload's log
+shape read_xes' legacy objects (one per event in log order: an event without
+the key, a dict, each NaN its own float), on a CSV upload the formatted
+frame's cells (a gap NaN, one object per cell in a float64 column and one
+shared object in a text or object column, NaT in a date column; read from
+`dataframe_frame_event_log`, as `frame_keyed_activities` does). The classic
+variant reads every event's key first (KeyError), then sorts the set of the
+objects in time order (unhashable dict; CPython's set order by
+`python_hash_set_order`, NaT hashing as the int64 minimum) with Python's
+list.sort (TypeError for text beside a number or a date, None beside
+anything); a NaN or NaT activity holds no event, its events drop out.
+classic_split on the legacy log walks the events in log order (KeyError or
+unhashable dict at the first one) and sorts the objects' first appearances;
+every NaN is its own activity with its own event, but each chunk groups
+events by ==, so a NaN activity precedes and follows nothing (zero
+probability and duration). On a frame it first drops the rows whose object
+is NaN, NaT or None (none left: `ValueError: n must be a positive
+integer`). The trace-based variant reads concept:name whatever the key.
+Labels are str() of the objects (later ones printed alike take trailing
+\x1f), and the activities enter the transportation problem in the sorted
+order. A key holding text alone stays on the text path unless some value is
+blank (the text path refused it; pm4py reads it as any label).
+HI2 the correlation transportation solver could spin forever (and grow until
+the server ran out of memory): its single double cost put pm4py's 1e11
+missing-pair cost beside costs near 1e5, and rounding left residual cycles
+of tiny negative reduced cost on which Dijkstra never settled, with an
+absolute tolerance of 1e-12. Costs are now kept as whole missing units plus
+the rest (`FlowCost`), the tolerance scales with the largest cost, and a
+search that does not settle fails instead of spinning. Pre-existing: HH's
+server hangs on a concept:name CSV upload of hcS (s68519, classic) as on a
+3x3 problem keyed by K1 (s68577, classic_split).
+HI3 /api/align with standard costs on a discovered net reads pm4py's log
+alignments (`reference_log_alignment`, as a supplied net did): each trace's
+fitness is 1 - floor(cost / 10000) / floor(best-worst cost / 10000), so a
+silent move's cost of 1 leaves a trace fitting, and the less-memory Dijkstra
+prices silent moves and the best-worst cost its own way; legacy unit costs
+keep Minera's bundle aligner.
+HI4 /api/align's less-memory variant on a typed key of an upload's log shape
+(an Alpha or Heuristics++ net mined under the same key) matches each
+event's object with the net's labels by == (a NaN only the transition it
+labels itself): it aligns the keyed log's labels
+(`legacy_keyed_activities`, `csv_keyed_family`), which the net mined under
+the key carries too; an event without the key or holding None reads None,
+which no visible transition carries.
+Checked without change: /api/align with standard costs on concept:name and
+on keys holding text alone with the state-equation and Dijkstra variants
+(totals equal before and after, move orders aside).
+Sweeps (`ct/cor.py`, `ct/al.py`) over hfA, hfG and hfN (XES, keys K1..K6)
+and hcS (CSV, 120 uploads), same as pm4py on HH's server vs HI's: the
+correlation miner's frequency and performance DFGs keyed by K1..K6 hfA
+494 -> 1,528 of 1,800 judgments, hfG 128 -> 537 of 1,080 (456 raising
+alike in both), hfN 110 -> 514 of 1,080 (470 raising alike now), CSV
+1,761 equal and 185 raising alike of 2,160 (HH's server hung on the 20th
+upload, s68519, a concept:name case of HI2, and ran out of memory; its
+first 19 uploads gave 66 equal); concept:name unchanged on XES (566 equal),
+CSV 310 equal now. The rest are pm4py's cvxopt LP plans (classified by the
+LP's own cost matrix, `lp_tie`: both plans optimal 201 + 75 + 90 + 213 on
+the keys and 36 + 12 + 18 + 48 on concept:name; pm4py's plan not optimal,
+declared since BQ, 71 + 12 + 6 + 0 and 17 + 3 + 8 + 2), and one CSV classic
+TypeError whose operands rest on a NaN's address (declared). /api/align
+with standard costs on concept:name (hfA and hcS; Alpha and Heuristics++,
+three variants): the less-memory variant's totals (fitness, fitting traces,
+total cost) Alpha 29 -> 192 and Heuristics++ 10 -> 110, the state-equation
+and Dijkstra variants Heuristics++ 59 -> 110 each (Alpha 192 unchanged);
+the less-memory variant on keys K1..K6 (before and after HI4) hfA
+472 -> 841, hfG 119 -> 204, hfN 111 -> 185 (CSV 505 equal now, none
+differing). Declared: the move
+orders of equal-cost alignments, the messages for a net that is not easy
+sound (Minera names the unreachable final marking), the move label of a
+blank activity (pm4py prints '', Minera a silent-looking null; totals
+equal), the CSV Alpha mine's transitions-sort operands (as HF), and a
+model move on a None-labelled transition, silent in pm4py (cost 1) and
+visible in Minera's net (4 judgments of hfN f90228, an event without the
+key).
+HI's suite: the full ctest 698 of 698 (-j2, 27 minutes) with the new
+`minera_server_review_hi_tests` (454 checks, 302 of which fail on HH's
+server binary, 8 seconds; one hash-seed dependent correlation case left
+out, `tc/seedchk.py`); after HI4 was narrowed to nets mined under the same
+key, the 47 server suites and the alignment suites passed again; the 16
+manifests replayed 2,673 responses unchanged (before and after); no
+frontend or Python script change.
+Harness and probes: `review-harness/round-hi/`.
+
+Next round (HJ) should start by re-reviewing round HI:
+
+- HI's CI run;
+- /api/analyze-behavior's correlation keyed by a typed attribute or column
+  (four adapters; `ct/cs.py`): pm4py reads the upload's frame (read_xes'
+  DataFrame, format_dataframe of a CSV) and convert_to_event_log of it, so
+  an XES upload's objects are the frame's cells, not the legacy objects;
+  148 of 360 judgments per adapter equal on 10 hfA and 10 hcS uploads
+  (LP ties not yet separated there);
+- a None-labelled transition of a net mined under a typed key in the
+  alignments (silent in pm4py, HI's declared 4), and the move label of a
+  blank activity;
+- the workbench's alignments on typed keys and the POWL net's totals with an
+  explicit replay key (still unverified: the reference harness does not
+  mine POWL);
+- whether other routes iterate a copied Python set (HE2, not reached in
+  HF..HI);
+- the declared residuals (HF's..HI's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HI (kept for its older items):
 
 Next round (HI) should start by re-reviewing round HH:
 

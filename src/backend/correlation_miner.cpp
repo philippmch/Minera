@@ -12,13 +12,17 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "minera/directly_follows_graph.hpp"
 #include "minera/timestamp.hpp"
+#include "correlation_key_objects.hpp"
 #include "exact_mean.hpp"
 #include "frame_times.hpp"
+#include "python_object_set.hpp"
+#include "python_scalar.hpp"
 #include "scipy_lsap.hpp"
 
 namespace minera {
@@ -401,12 +405,19 @@ std::optional<std::string> start_selector(
   return require_selector(options.start_timestamp_attribute, "start timestamp");
 }
 
+// The classic variants read the activity key's objects (round HI).
+bool typed_activities(const CorrelationMinerOptions& options) {
+  return options.key_objects && options.variant != CorrelationVariant::kTraceBased;
+}
+
 PreparedEvent prepare_event(const Event& event,
                             std::string_view activity_key,
                             std::string_view completion_key,
                             const std::optional<std::string>& start_key,
                             std::size_t input_index) {
-  const auto activity = selected_event_value(
+  // An empty key: the activity key's objects name the events afterwards
+  // (CorrelationMinerOptions::key_objects).
+  const auto activity = activity_key.empty() ? std::string() : selected_event_value(
       event, activity_key, SelectorRole::kActivity, "activity");
   const auto complete = selected_event_timestamp(
       event, completion_key, "completion timestamp");
@@ -422,7 +433,7 @@ PreparedEvent prepare_flat_record(
     std::string_view completion_key,
     const std::optional<std::string>& start_key,
     std::size_t input_index) {
-  const auto activity = require_value(
+  const auto activity = activity_key.empty() ? std::string() : require_value(
       select_flat_field(record.fields, activity_key, SelectorRole::kActivity),
       "activity", activity_key);
   const auto complete = selected_timestamp(
@@ -456,8 +467,9 @@ PreparedEvent prepare_flat_row(
 
 PreparedInput prepare_event_log(const EventLog& log,
                                 const CorrelationMinerOptions& options) {
-  const auto activity_key = require_selector(options.activity_attribute,
-                                             "activity");
+  const auto activity_key = typed_activities(options)
+                                ? std::string()
+                                : require_selector(options.activity_attribute, "activity");
   const auto completion_key = completion_selector(options);
   const auto start_key = start_selector(options);
   PreparedInput prepared;
@@ -485,8 +497,9 @@ PreparedInput prepare_event_log(const EventLog& log,
 
 PreparedInput prepare_event_stream(const EventStream& stream,
                                    const CorrelationMinerOptions& options) {
-  const auto activity_key = require_selector(options.activity_attribute,
-                                             "activity");
+  const auto activity_key = typed_activities(options)
+                                ? std::string()
+                                : require_selector(options.activity_attribute, "activity");
   const auto completion_key = completion_selector(options);
   const auto start_key = start_selector(options);
   PreparedInput prepared;
@@ -554,7 +567,8 @@ void validate_empty_table_schema(
           std::string(selector) + "' is missing from the empty table schema");
     }
   };
-  require_column(activity_key, SelectorRole::kActivity, "activity");
+  if (!activity_key.empty())
+    require_column(activity_key, SelectorRole::kActivity, "activity");
   require_column(completion_key, SelectorRole::kTimestamp,
                  "completion timestamp");
   if (start_key)
@@ -569,8 +583,9 @@ void validate_empty_table_schema(
 PreparedInput prepare_event_table(const EventTable& table,
                                   const CorrelationMinerOptions& options) {
   table.validate();
-  const auto activity_key = require_selector(options.activity_attribute,
-                                             "activity");
+  const auto activity_key = typed_activities(options)
+                                ? std::string()
+                                : require_selector(options.activity_attribute, "activity");
   const auto completion_key = completion_selector(options);
   const auto start_key = start_selector(options);
   if (table.rows.empty())
@@ -797,17 +812,36 @@ PairStatistics trace_pair_statistics(
       std::min(mean_or_zero(fifo), mean_or_zero(reverse_lifo))};
 }
 
+// A transportation cost as pm4py's LP prices it: whole units of the missing
+// pair's cost (1e11) and the rest. Kept apart so the rest keeps its own
+// precision: summed into one double beside 1e11, rounding left residual
+// cycles of tiny negative reduced cost on which Dijkstra never settled
+// (round HI, a 3x3 problem with costs near 1e5).
+struct FlowCost {
+  std::int64_t missing = 0;
+  double rest = 0.0;
+};
+
+FlowCost operator+(const FlowCost& a, const FlowCost& b) { return {a.missing + b.missing, a.rest + b.rest}; }
+FlowCost operator-(const FlowCost& a, const FlowCost& b) { return {a.missing - b.missing, a.rest - b.rest}; }
+
+// a < b by more than the tolerance (missing units compare exactly).
+bool cost_below(const FlowCost& a, const FlowCost& b, double tolerance) {
+  if (a.missing != b.missing) return a.missing < b.missing;
+  return a.rest < b.rest - tolerance;
+}
+
 struct FlowEdge {
   int target = 0;
   int reverse = 0;
   std::int64_t capacity = 0;
-  double cost = 0.0;
+  FlowCost cost;
   std::int64_t flow = 0;
 };
 
 void add_flow_edge(std::vector<std::vector<FlowEdge>>& graph,
                    int source, int target, std::int64_t capacity,
-                   double cost) {
+                   FlowCost cost) {
   const auto forward_reverse =
       static_cast<int>(graph[target].size());
   const auto reverse_reverse =
@@ -815,7 +849,7 @@ void add_flow_edge(std::vector<std::vector<FlowEdge>>& graph,
   graph[source].push_back(
       {target, forward_reverse, capacity, cost, 0});
   graph[target].push_back(
-      {source, reverse_reverse, 0, -cost, 0});
+      {source, reverse_reverse, 0, FlowCost{} - cost, 0});
 }
 
 std::vector<std::vector<std::int64_t>> solve_transportation(
@@ -827,61 +861,74 @@ std::vector<std::vector<std::int64_t>> solve_transportation(
   const int sink_node = source_node + 1;
   std::vector<std::vector<FlowEdge>> graph(
       static_cast<std::size_t>(sink_node + 1));
+  // The tolerance scales with the costs (each at least 1).
+  double scale = 1.0;
+  for (const auto& row : costs)
+    for (const double cost : row)
+      if (cost != kMissingCost && std::isfinite(cost)) scale = std::max(scale, std::abs(cost));
+  const double tolerance = kComparisonTolerance * scale * 1000.0;
   for (int source = 0; source < activity_count; ++source) {
-    add_flow_edge(graph, source_node, source, supply[source], 0.0);
+    add_flow_edge(graph, source_node, source, supply[source], FlowCost{});
     add_flow_edge(graph, activity_count + source, sink_node,
-                  demand[source], 0.0);
+                  demand[source], FlowCost{});
     for (int target = 0; target < activity_count; ++target) {
+      const double cost = costs[static_cast<std::size_t>(source)][static_cast<std::size_t>(target)];
       add_flow_edge(
           graph, source, activity_count + target,
           std::numeric_limits<std::int64_t>::max() / 4,
-          costs[static_cast<std::size_t>(source)]
-               [static_cast<std::size_t>(target)]);
+          cost == kMissingCost ? FlowCost{1, 0.0} : FlowCost{0, cost});
     }
   }
 
   std::int64_t remaining = 0;
   for (const auto count : supply) remaining += count;
-  std::vector<double> potential(graph.size(), 0.0);
+  std::vector<FlowCost> potential(graph.size());
+  // A bound on relaxations per search: far above what a settling search
+  // needs, so a search that never settles fails instead of spinning.
+  std::size_t edge_total = 0;
+  for (const auto& edges : graph) edge_total += edges.size();
+  const std::size_t relaxation_limit = 1000 * (edge_total + 1) * graph.size() + 1000000;
   while (remaining > 0) {
-    const double infinity = std::numeric_limits<double>::infinity();
-    std::vector<double> distance(graph.size(), infinity);
+    std::vector<FlowCost> distance(graph.size());
+    std::vector<bool> reached(graph.size(), false);
     std::vector<int> previous_node(graph.size(), -1);
     std::vector<int> previous_edge(graph.size(), -1);
-    using QueueEntry = std::pair<double, int>;
-    std::priority_queue<QueueEntry, std::vector<QueueEntry>,
-                        std::greater<QueueEntry>>
-        queue;
-    distance[source_node] = 0.0;
-    queue.push({0.0, source_node});
+    using QueueEntry = std::pair<FlowCost, int>;
+    const auto later = [](const QueueEntry& a, const QueueEntry& b) {
+      if (a.first.missing != b.first.missing) return a.first.missing > b.first.missing;
+      if (a.first.rest != b.first.rest) return a.first.rest > b.first.rest;
+      return a.second > b.second;
+    };
+    std::priority_queue<QueueEntry, std::vector<QueueEntry>, decltype(later)> queue(later);
+    distance[source_node] = FlowCost{};
+    reached[source_node] = true;
+    queue.push({FlowCost{}, source_node});
+    std::size_t relaxations = 0;
     while (!queue.empty()) {
       const auto [current_distance, node] = queue.top();
       queue.pop();
-      if (current_distance >
-          distance[static_cast<std::size_t>(node)] +
-              kComparisonTolerance) {
-        continue;
-      }
+      if (cost_below(distance[static_cast<std::size_t>(node)], current_distance, tolerance)) continue;
       for (std::size_t edge_index = 0;
            edge_index < graph[static_cast<std::size_t>(node)].size();
            ++edge_index) {
         const auto& edge =
             graph[static_cast<std::size_t>(node)][edge_index];
         if (edge.capacity <= 0) continue;
-        double reduced =
+        FlowCost reduced =
             edge.cost + potential[static_cast<std::size_t>(node)] -
             potential[static_cast<std::size_t>(edge.target)];
-        if (reduced < 0.0 && reduced > -kComparisonTolerance) {
-          reduced = 0.0;
+        if (reduced.missing == 0 && reduced.rest < 0.0 && reduced.rest > -tolerance) {
+          reduced.rest = 0.0;
         }
-        const double candidate = current_distance + reduced;
-        if (candidate <
-            distance[static_cast<std::size_t>(edge.target)] -
-                kComparisonTolerance) {
-          distance[static_cast<std::size_t>(edge.target)] = candidate;
-          previous_node[static_cast<std::size_t>(edge.target)] = node;
-          previous_edge[static_cast<std::size_t>(edge.target)] =
-              static_cast<int>(edge_index);
+        const FlowCost candidate = current_distance + reduced;
+        const auto target = static_cast<std::size_t>(edge.target);
+        if (!reached[target] || cost_below(candidate, distance[target], tolerance)) {
+          if (++relaxations > relaxation_limit)
+            throw std::runtime_error("correlation transportation problem did not settle");
+          distance[target] = candidate;
+          reached[target] = true;
+          previous_node[target] = node;
+          previous_edge[target] = static_cast<int>(edge_index);
           queue.push({candidate, edge.target});
         }
       }
@@ -891,7 +938,7 @@ std::vector<std::vector<std::int64_t>> solve_transportation(
           "correlation transportation problem is infeasible");
     }
     for (std::size_t node = 0; node < graph.size(); ++node) {
-      if (std::isfinite(distance[node])) potential[node] += distance[node];
+      if (reached[node]) potential[node] = potential[node] + distance[node];
     }
     std::int64_t augment = remaining;
     for (int node = sink_node; node != source_node;
@@ -937,10 +984,157 @@ std::vector<std::vector<std::int64_t>> solve_transportation(
   return flow;
 }
 
+
+// pm4py's classic variants keyed by objects other than text (round HI,
+// observed black-box on legacy EventLogs and DataFrames):
+// - classic reads every event's key first (an event without it a KeyError),
+//   then builds a set of the objects in the time-sorted stream's order (a
+//   dict unhashable) and sorts it with Python's list.sort (a TypeError for
+//   text beside a number or a date, or None beside anything). Each activity
+//   is the set's object (the first of its equals in time order) and holds
+//   the events whose object is == to it, so a NaN or NaT activity has none:
+//   those events drop out while the NaN still takes its place in the sort.
+// - classic_split on a legacy log walks the events in log order (KeyError
+//   or unhashable dict at the first such event), keeps each object's first
+//   appearance and sorts those; every NaN is an object of its own with its
+//   own event (read_xes makes one float per value). On a frame it first
+//   drops the rows whose object is NaN, NaT or None (no row left: ValueError
+//   "n must be a positive integer"), then keeps first appearances in the
+//   frame's time order.
+// Labels are str() of each activity's object (later ones printed alike take
+// trailing \x1f); the activities enter the transportation problem in the
+// sorted order. classic_split counts a legacy NaN's event, but each chunk
+// groups its events by == as classic does, so a NaN activity precedes and
+// follows nothing (zero probability and duration with every other).
+std::string key_type_name(const CorrelationKeyObject& object, bool legacy) {
+  if (object.nat) return "NaTType";
+  if (object.value.kind == python::Scalar::Kind::kDate) return legacy ? "datetime.datetime" : "Timestamp";
+  return python::type_name(object.value);
+}
+
+bool key_missing(const CorrelationKeyObject& object) {
+  return object.nat || (object.value.kind == python::Scalar::Kind::kFloat && std::isnan(object.value.real));
+}
+
+std::string key_identity(const CorrelationKeyObject& object) {
+  if (object.nat) return "T#" + std::to_string(object.object);
+  if (key_missing(object)) return "F#" + std::to_string(object.object);
+  return python::identity(object.value);
+}
+
+bool key_less(const CorrelationKeyObject& a, const CorrelationKeyObject& b, bool legacy) {
+  using Kind = python::Scalar::Kind;
+  const auto date_like = [](const CorrelationKeyObject& o) { return o.nat || o.value.kind == Kind::kDate; };
+  if (date_like(a) && date_like(b)) return !a.nat && !b.nat && python::less(a.value, b.value);
+  const bool comparable = (!a.nat && !b.nat && python::is_number(a.value) && python::is_number(b.value)) ||
+                          (a.value.kind == Kind::kText && b.value.kind == Kind::kText && !a.nat && !b.nat);
+  if (!comparable)
+    throw std::invalid_argument("TypeError: '<' not supported between instances of '" + key_type_name(a, legacy) +
+                                "' and '" + key_type_name(b, legacy) + "'");
+  return python::less(a.value, b.value);
+}
+
+std::string python_key_repr(const std::string& key) {
+  // repr() of a str: single quotes unless the text holds one and no double.
+  const bool single = key.find('\'') != std::string::npos && key.find('"') == std::string::npos;
+  const char quote = single ? '"' : '\'';
+  std::string out(1, quote);
+  for (const char c : key) {
+    if (c == '\\') out += "\\\\";
+    else if (c == quote) out += std::string("\\") + quote;
+    else if (c == '\n') out += "\\n";
+    else if (c == '\r') out += "\\r";
+    else if (c == '\t') out += "\\t";
+    else out += c;
+  }
+  return out + quote;
+}
+
+struct KeyedActivities {
+  std::vector<std::string> order;    // the sorted activities
+  std::set<std::string> ungrouped;   // NaN activities a chunk never groups
+};
+
+KeyedActivities apply_key_objects(PreparedInput& input, const CorrelationMinerOptions& options) {
+  const auto& keyed = *options.key_objects;
+  const auto& objects = keyed.objects;
+  const bool legacy = keyed.legacy;
+  auto& events = input.raw_flat;
+  for (const auto& event : events)
+    if (event.input_index >= objects.size())
+      throw std::invalid_argument("correlation miner: the activity key's objects do not cover the input");
+  const auto object_of = [&](const PreparedEvent& event) -> const CorrelationKeyObject& {
+    return objects[event.input_index];
+  };
+  const auto key_error = [&] { return std::invalid_argument("KeyError: " + python_key_repr(keyed.key)); };
+  const auto unhashable = [] { return std::invalid_argument("TypeError: unhashable type: 'dict'"); };
+  using State = CorrelationKeyObject::State;
+
+  std::vector<std::size_t> members;  // input indices of the activities' objects
+  if (options.variant == CorrelationVariant::kClassic) {
+    for (const auto& event : events)
+      if (object_of(event).state == State::kAbsent) throw key_error();
+    for (const auto& event : events)
+      if (object_of(event).state == State::kDict) throw unhashable();
+    PreparedEvents sorted = events;
+    std::stable_sort(sorted.begin(), sorted.end(), event_less);
+    std::vector<std::uint64_t> hashes;
+    std::vector<std::string> identities;
+    hashes.reserve(sorted.size());
+    identities.reserve(sorted.size());
+    for (const auto& event : sorted) {
+      const auto& object = object_of(event);
+      std::uint64_t hash = 0;
+      if (object.nat) hash = std::uint64_t(1) << 63;  // hash(pd.NaT): the int64 minimum
+      else if (const auto h = detail::python_object_hash(object.value)) hash = *h;
+      hashes.push_back(hash);
+      identities.push_back(key_identity(object));
+    }
+    for (const auto at : detail::python_hash_set_order(hashes, identities)) members.push_back(sorted[at].input_index);
+  } else {
+    if (legacy) {
+      for (const auto& event : events) {
+        const auto state = object_of(event).state;
+        if (state == State::kAbsent) throw key_error();
+        if (state == State::kDict) throw unhashable();
+      }
+    } else {
+      std::erase_if(events, [&](const PreparedEvent& event) {
+        const auto& object = object_of(event);
+        return key_missing(object) || object.value.kind == python::Scalar::Kind::kNone;
+      });
+      if (events.empty()) throw std::invalid_argument("ValueError: n must be a positive integer");
+    }
+    std::set<std::string> seen;
+    for (const auto& event : events)
+      if (seen.insert(key_identity(object_of(event))).second) members.push_back(event.input_index);
+  }
+  python::sort(members, [&](std::size_t a, std::size_t b) { return key_less(objects[a], objects[b], legacy); });
+
+  std::unordered_map<std::string, std::string> label_of;  // identity -> label
+  std::map<std::string, std::size_t> printed;
+  KeyedActivities out;
+  for (const auto member : members) {
+    const auto& object = objects[member];
+    const auto shown = object.nat ? std::string("NaT") : python::str(object.value);
+    auto label = shown + std::string(printed[shown]++, '\x1f');
+    // A NaN or NaT activity of the classic variant holds no event.
+    if (options.variant == CorrelationVariant::kClassic && key_missing(object)) continue;
+    label_of.emplace(key_identity(object), label);
+    if (key_missing(object)) out.ungrouped.insert(label);
+    out.order.push_back(std::move(label));
+  }
+  std::erase_if(events, [&](const PreparedEvent& event) { return !label_of.contains(key_identity(object_of(event))); });
+  for (auto& event : events) event.activity = label_of.at(key_identity(object_of(event)));
+  return out;
+}
+
 }  // namespace
 
 CorrelationMinerResult discover_prepared(
-    const PreparedInput& input, const CorrelationMinerOptions& options) {
+    const PreparedInput& input, const CorrelationMinerOptions& options,
+    const std::vector<std::string>* activity_order = nullptr,
+    const std::set<std::string>* ungrouped = nullptr) {
   if (options.variant == CorrelationVariant::kClassicSplit &&
       options.sample_size == 0) {
     throw std::invalid_argument(
@@ -968,6 +1162,17 @@ CorrelationMinerResult discover_prepared(
   for (const auto& [activity, events] : global_groups) {
     (void)events;
     activities.push_back(activity);
+  }
+  if (activity_order) {
+    std::map<std::string, std::size_t> rank;
+    for (std::size_t index = 0; index < activity_order->size(); ++index)
+      rank.emplace((*activity_order)[index], index);
+    const auto rank_of = [&](const std::string& activity) {
+      const auto found = rank.find(activity);
+      return found == rank.end() ? activity_order->size() : found->second;
+    };
+    std::stable_sort(activities.begin(), activities.end(),
+                     [&](const auto& left, const auto& right) { return rank_of(left) < rank_of(right); });
   }
 
   const std::size_t activity_count = activities.size();
@@ -1003,6 +1208,8 @@ CorrelationMinerResult discover_prepared(
     for (std::size_t source = 0; source < activity_count; ++source) {
       for (std::size_t target = 0; target < activity_count; ++target) {
         if (source == target) continue;
+        if (ungrouped && (ungrouped->contains(activities[source]) || ungrouped->contains(activities[target])))
+          continue;
         double probability_total = 0.0;
         double maximum_duration = 0.0;
         for (std::size_t chunk = 0; chunk < chunk_count; ++chunk) {
@@ -1094,9 +1301,21 @@ namespace {
 // concept:name (an activity compared with a time); with fewer it never pairs
 // (round FS, observed black-box on frames and EventLogs alike). Modeled when
 // the caller names pm4py's completion key (reference_timestamp_key).
+CorrelationMinerResult discover_keyed(PreparedInput prepared, const CorrelationMinerOptions& options) {
+  if (!typed_activities(options)) return discover_prepared(prepared, options);
+  const auto keyed = apply_key_objects(prepared, options);
+  return discover_prepared(prepared, options, &keyed.order, &keyed.ungrouped);
+}
+
 template <typename Input, typename Prepare>
 CorrelationMinerResult discover_with_reference_keys(
-    const Input& input, const CorrelationMinerOptions& options, Prepare prepare) {
+    const Input& input, const CorrelationMinerOptions& given, Prepare prepare) {
+  // The trace-based variant reads concept:name whatever activity key it is
+  // given (round HI, observed black-box on EventLogs and frames alike).
+  auto options = given;
+  if (options.variant == CorrelationVariant::kTraceBased && !options.reference_timestamp_key.empty() &&
+      !is_alias(SelectorRole::kActivity, options.activity_attribute))
+    options.activity_attribute = "concept:name";
   if (options.variant == CorrelationVariant::kTraceBased &&
       !options.reference_timestamp_key.empty()) {
     const auto& timestamp_key = options.reference_timestamp_key;
@@ -1129,9 +1348,9 @@ CorrelationMinerResult discover_with_reference_keys(
       options.start_timestamp_attribute.empty()) {
     auto started = options;
     started.start_timestamp_attribute = "time:timestamp";
-    return discover_prepared(prepare(input, started), started);
+    return discover_keyed(prepare(input, started), started);
   }
-  return discover_prepared(prepare(input, options), options);
+  return discover_keyed(prepare(input, options), options);
 }
 
 }  // namespace

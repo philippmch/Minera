@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,6 +13,7 @@
 namespace minera {
 
 class DirectlyFollowsGraph;
+struct CorrelationKeyObjects;  // correlation_key_objects.hpp (internal)
 
 enum class CorrelationVariant {
   kClassic,
@@ -40,6 +42,13 @@ struct CorrelationMinerOptions {
   std::string reference_timestamp_key;
   bool exact_time_matching = false;
   std::size_t sample_size = 100000;
+  // Round HI: the activity key's Python objects, one per input event, where
+  // pm4py's classic variants read a key holding other values than text
+  // (an XES upload's legacy objects, a CSV frame's typed or gapped cells).
+  // The classic variants then group, order and name the activities as
+  // pm4py's sorted set of those objects does; null keeps the text contract.
+  // The trace-based variant never reads it (it reads concept:name).
+  std::shared_ptr<const CorrelationKeyObjects> key_objects;
 };
 
 using CorrelationPerformanceDfg = std::map<DfgActivityPair, double>;

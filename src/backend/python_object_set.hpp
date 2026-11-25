@@ -73,8 +73,25 @@ inline std::optional<std::uint64_t> python_object_hash(const python::Scalar& val
 // The indices of `values` in the order iterating a set built by adding them
 // in order gives, `identities` telling equal objects (the first kept);
 // nullopt when a hash is outside the model.
+inline std::vector<std::size_t> python_hash_set_order(const std::vector<std::uint64_t>& hashes,
+                                                      const std::vector<std::string>& identities);
+
 inline std::optional<std::vector<std::size_t>> python_object_set_order(const std::vector<python::Scalar>& values,
                                                                        const std::vector<std::string>& identities) {
+  std::vector<std::uint64_t> hashes;
+  hashes.reserve(values.size());
+  for (const auto& value : values) {
+    const auto hash = python_object_hash(value);
+    if (!hash) return std::nullopt;
+    hashes.push_back(*hash);
+  }
+  return python_hash_set_order(hashes, identities);
+}
+
+// The same order from the objects' hashes (round HI: pandas' NaT, whose hash
+// is the int64 minimum, beside Timestamps).
+inline std::vector<std::size_t> python_hash_set_order(const std::vector<std::uint64_t>& hashes,
+                                                      const std::vector<std::string>& identities) {
   struct Slot {
     std::size_t index = 0;
     std::uint64_t hash = 0;
@@ -97,9 +114,8 @@ inline std::optional<std::vector<std::size_t>> python_object_set_order(const std
       i = (i * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
     }
   };
-  for (std::size_t index = 0; index < values.size(); ++index) {
-    const auto hash = python_object_hash(values[index]);
-    if (!hash) return std::nullopt;
+  for (std::size_t index = 0; index < hashes.size(); ++index) {
+    const std::optional<std::uint64_t> hash = hashes[index];
     bool added = false;
     probe(table, *hash, [&](Slot& slot, std::size_t) {
       if (!slot.used) {

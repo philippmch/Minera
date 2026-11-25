@@ -2843,6 +2843,15 @@ if(MINERA_BUILD_TESTS)
     add_dependencies(minera_server_review_hh_tests minera_server)
     add_test(NAME minera_server_review_hh_tests
              COMMAND minera_server_review_hh_tests $<TARGET_FILE:minera_server>)
+    # Round HI: the correlation miner keyed by typed attributes and columns, /api/align with standard costs.
+    add_executable(minera_server_review_hi_tests
+      src/backend/tests/test_server_review_hi.cpp)
+    target_include_directories(minera_server_review_hi_tests PRIVATE third_party)
+    target_link_libraries(minera_server_review_hi_tests PRIVATE Threads::Threads)
+    target_compile_features(minera_server_review_hi_tests PRIVATE cxx_std_20)
+    add_dependencies(minera_server_review_hi_tests minera_server)
+    add_test(NAME minera_server_review_hi_tests
+             COMMAND minera_server_review_hi_tests $<TARGET_FILE:minera_server>)
     # Round CW: rework, boundary activities and cycle time on upload frames.
     add_executable(minera_server_upload_frame_routes_tests
       src/backend/tests/test_server_upload_frame_routes.cpp)
