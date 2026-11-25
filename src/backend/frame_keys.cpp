@@ -590,10 +590,15 @@ std::optional<FrameKeyedActivities> frame_keyed_activities(const EventLog& log, 
   return out;
 }
 
-std::optional<FrameKeyedActivities> legacy_keyed_activities(const EventLog& log, const std::string& key) {
+namespace {
+
+// legacy_keyed_activities, with `model_key`'s objects named first when given
+// (legacy_keyed_activities_in).
+std::optional<FrameKeyedActivities> legacy_keyed_activities_impl(const EventLog& log, const std::string& key,
+                                                                 const std::string* model_key) {
   using State = LegacyDeclareCell::State;
   if (!log.dataframe_columns || log.dataframe_columns->csv_text) return std::nullopt;
-  if (key.empty() || key == "concept:name" || key == "activity") return std::nullopt;
+  if (key.empty() || (!model_key && (key == "concept:name" || key == "activity"))) return std::nullopt;
   FrameKeyedActivities out;
   out.legacy = true;
   out.log = log;
@@ -606,6 +611,26 @@ std::optional<FrameKeyedActivities> legacy_keyed_activities(const EventLog& log,
   std::unordered_map<std::string, std::size_t> printed;
   std::size_t fresh = 0;
   bool typed = false;
+  // The model's activities first, in log order: a value of `key` equal to one
+  // of them (as a dict key) takes its label; a NaN never does (each its own
+  // float).
+  if (model_key)
+    for (const auto& trace : log.traces)
+      for (const auto& event : trace.events) {
+        const auto cell = legacy_declare_cell(event, *model_key == "activity" ? std::string("concept:name") : *model_key);
+        if (cell.state == State::kUnmodelled) return std::nullopt;
+        if (cell.state != State::kValue) {
+          typed = true;
+          continue;
+        }
+        if (cell.value.kind != python::Scalar::Kind::kText) typed = true;
+        const bool nan = cell.value.kind == python::Scalar::Kind::kFloat && std::isnan(cell.value.real);
+        const auto id = nan ? "nan#" + std::to_string(fresh++) : python::identity(cell.value);
+        if (!label_of.contains(id)) {
+          const auto shown = python::str(cell.value);
+          label_of.emplace(id, shown + std::string(printed[shown]++, '\x1f'));
+        }
+      }
   for (std::size_t t = 0; t < log.traces.size(); ++t) {
     auto& trace = out.log.traces[t];
     out.types[t].resize(trace.events.size());
@@ -660,6 +685,19 @@ std::optional<FrameKeyedActivities> legacy_keyed_activities(const EventLog& log,
   if (!typed) return std::nullopt;
   out.distinct = label_of.size();
   return out;
+}
+
+}  // namespace
+
+std::optional<FrameKeyedActivities> legacy_keyed_activities(const EventLog& log, const std::string& key) {
+  return legacy_keyed_activities_impl(log, key, nullptr);
+}
+
+std::optional<FrameKeyedActivities> legacy_keyed_activities_in(const EventLog& log, const std::string& key,
+                                                               const std::string& model_key) {
+  const auto standard = [](const std::string& k) { return k.empty() || k == "concept:name" || k == "activity"; };
+  if (key == model_key || (standard(key) && standard(model_key))) return legacy_keyed_activities(log, key);
+  return legacy_keyed_activities_impl(log, standard(key) ? std::string("concept:name") : key, &model_key);
 }
 
 void distinct_float_gap_labels(FrameKeyedActivities& keyed) {

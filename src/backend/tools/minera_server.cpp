@@ -387,9 +387,64 @@ void check_legacy_temporal_keys(const minera::FrameKeyedActivities& keyed, const
   }
 }
 
+// The transition system's log keyed by another attribute (rounds GR and HF):
+// a gap's label marked so it equals no other (pm4py compares labels with ==).
+// Shared by /api/mine and /api/discover-graph (round HG).
+std::optional<minera::EventLog> transition_keyed_log(const minera::EventLog& log, const std::string& key, bool xes) {
+  auto keyed = xes ? legacy_keyed_family(log, key) : csv_keyed_family(log, key);
+  if (!keyed) return std::nullopt;
+  for (std::size_t t = 0; t < keyed->log.traces.size(); ++t)
+    for (std::size_t e = 0; e < keyed->log.traces[t].events.size(); ++e)
+      if (keyed->missing[t][e]) {
+        auto& activity = keyed->log.traces[t].events[e].activity;
+        activity = (keyed->types[t][e] == "NaTType" ? "\x1d" : "\x1e") + activity;
+      }
+  return std::move(keyed->log);
+}
+
+// pm4py's temporal profile conformance on an XES upload's log shape keyed by
+// an event attribute (round HG, observed black-box): every pair (i, j) of a
+// trace reads both events' keys (check_legacy_temporal_keys) and looks the
+// pair up in the profile, whose names JSON carries as text: a str value
+// matches the entry of its text, any other value (an int, a float, a bool, a
+// date, None) none. nullopt where the log's objects are all text.
+std::optional<minera::EventLog> legacy_temporal_conformance_log(const minera::EventLog& log, const std::string& key) {
+  auto keyed = legacy_keyed_family(log, key, true);
+  if (!keyed) return std::nullopt;
+  check_legacy_temporal_keys(*keyed, key);
+  for (std::size_t t = 0; t < keyed->log.traces.size(); ++t)
+    for (std::size_t e = 0; e < keyed->log.traces[t].events.size(); ++e) {
+      auto& activity = keyed->log.traces[t].events[e].activity;
+      if (keyed->types[t][e].empty()) {
+        // A str keeps its text (a later value printed alike took \x1f).
+        const auto cell = minera::legacy_declare_cell(log.traces[t].events[e], key);
+        activity = cell.value.text;
+      } else {
+        activity = "\x1fminera:typed:" + activity;
+      }
+    }
+  return std::move(keyed->log);
+}
+
 std::optional<minera::EventLog> csv_keyed_family_log(const minera::EventLog& log, const std::string& key) {
   auto keyed = csv_keyed_family(log, key);
   if (!keyed) return std::nullopt;
+  return std::move(keyed->log);
+}
+
+// The same conformance on a CSV upload's log shape keyed by another column
+// (round HG, observed black-box): convert_to_event_log's cells meet the
+// profile's text names, so a text cell matches its entry and a number, a
+// bool, a Timestamp or a gap none.
+std::optional<minera::EventLog> csv_temporal_conformance_log(const minera::EventLog& log, const std::string& key) {
+  auto keyed = csv_keyed_family(log, key);
+  if (!keyed) return std::nullopt;
+  for (std::size_t t = 0; t < keyed->log.traces.size(); ++t)
+    for (std::size_t e = 0; e < keyed->log.traces[t].events.size(); ++e)
+      if (!keyed->types[t][e].empty() || keyed->missing[t][e]) {
+        auto& activity = keyed->log.traces[t].events[e].activity;
+        activity = "\x1fminera:typed:" + activity;
+      }
   return std::move(keyed->log);
 }
 
@@ -589,6 +644,127 @@ void check_legacy_alpha_transition_names(const minera::FrameKeyedActivities& key
                                       earlier_type + "'");
       seen.push_back({k, python_type});
     }
+}
+
+// pm4py's token replay of a net mined under `model_key` on an XES upload's
+// log shape, keyed by `replay_key` (round HG, observed black-box): its
+// variants read every event's key (KeyError, then an unhashable dict) and
+// sort as Python sorts their tuples, and each value fires the transition
+// named by an equal object (legacy_keyed_activities_in: '1' never fires 1).
+// nullopt where every object of either key is text.
+std::optional<minera::FrameKeyedActivities> legacy_replay_keyed(const minera::EventLog& log,
+                                                                const std::string& replay_key,
+                                                                const std::string& model_key) {
+  auto keyed = minera::legacy_keyed_activities_in(log, replay_key, model_key);
+  if (!keyed) return std::nullopt;
+  if (keyed->any_absent)
+    throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(replay_key));
+  if (keyed->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+  std::vector<std::vector<minera::detail::KeyedReplayCell>> cells(log.traces.size());
+  for (std::size_t t = 0; t < log.traces.size(); ++t)
+    for (std::size_t e = 0; e < log.traces[t].events.size(); ++e) {
+      const auto legacy = minera::legacy_declare_cell(log.traces[t].events[e], replay_key == "activity" ? std::string("concept:name") : replay_key);
+      minera::detail::KeyedReplayCell cell;
+      cell.type = legacy.type;
+      if (keyed->missing[t][e]) {
+        cell.gap = minera::detail::KeyedReplayCell::Gap::kNaN;
+        cell.identity = "nan#" + std::to_string(t) + ":" + std::to_string(e);
+      } else {
+        cell.value = legacy.value;
+        cell.identity = minera::python::identity(legacy.value);
+      }
+      cells[t].push_back(std::move(cell));
+    }
+  minera::detail::check_keyed_replay_variant_sort(cells);
+  return keyed;
+}
+
+// pm4py's ETConformance precision joins each trace's prefixes (every event
+// but the last) with ",": the first trace in log order holding an object
+// other than a str before its last event raises TypeError at the first such
+// position (round HG, observed black-box). Empty when none does.
+std::string legacy_precision_error(const minera::FrameKeyedActivities& keyed) {
+  for (std::size_t t = 0; t < keyed.types.size(); ++t)
+    for (std::size_t e = 0; e + 1 < keyed.types[t].size(); ++e)
+      if (!keyed.types[t][e].empty() && !(keyed.legacy && keyed.absent[t][e]))
+        return "TypeError: sequence item " + std::to_string(e) + ": expected str instance, " + keyed.types[t][e] +
+               " found";
+  return {};
+}
+
+// pm4py's log skeleton conformance pairs a trace's activities a != b: a NaN
+// or NaT is unequal to itself, so a trace holding one meets its own
+// equivalence (round HG, observed black-box). Drops the deviations the
+// label-equal check reports for those pairs.
+void keep_missing_self_equivalence(std::vector<minera::LogSkeletonConformance>& results,
+                                   const minera::FrameKeyedActivities& keyed) {
+  std::set<std::string> missing;
+  for (std::size_t t = 0; t < keyed.log.traces.size(); ++t)
+    for (std::size_t e = 0; e < keyed.log.traces[t].events.size() && e < keyed.missing[t].size(); ++e)
+      if (keyed.missing[t][e]) missing.insert(keyed.log.traces[t].events[e].activity);
+  if (missing.empty()) return;
+  for (auto& result : results) {
+    const auto before = result.deviations.size();
+    std::erase_if(result.deviations, [&](const minera::LogSkeletonDeviation& deviation) {
+      return deviation.constraint == "equivalence" && deviation.relation.source == deviation.relation.target &&
+             missing.contains(deviation.relation.source);
+    });
+    const auto dropped = before - result.deviations.size();
+    if (!dropped) continue;
+    result.no_dev_total -= dropped;
+    result.dev_fitness = result.no_constr_total == 0
+        ? 1.0 : 1.0 - static_cast<double>(result.no_dev_total) / static_cast<double>(result.no_constr_total);
+    result.is_fit = result.deviations.empty();
+  }
+}
+
+// pm4py's transition labelled None (an Alpha net mined on an XES upload's
+// log shape keyed by an attribute with a valueless value) is silent: the
+// replay fires it to enable others, and an event whose key is None fires it
+// as its own (round HG, observed black-box). The net with those transitions
+// silent, and the replayed log with those events null, for
+// check_conformance_null_silent; nullopt when the model names no None.
+struct NoneSilentReplay {
+  minera::PetriNet net;
+  minera::EventLog log;
+};
+std::optional<NoneSilentReplay> none_silent_replay(const minera::PetriNet& net, const minera::EventLog& model_log,
+                                                   const std::string& model_key,
+                                                   const minera::FrameKeyedActivities& replayed) {
+  const auto model = legacy_keyed_family(model_log, model_key, true);
+  if (!model) return std::nullopt;
+  std::set<std::string> none;
+  for (std::size_t t = 0; t < model->types.size(); ++t)
+    for (std::size_t e = 0; e < model->types[t].size(); ++e)
+      if (model->types[t][e] == "NoneType") none.insert(model->log.traces[t].events[e].activity);
+  if (none.empty()) return std::nullopt;
+  minera::PetriNetLiteralStorage storage;
+  storage.place_count = net.place_count();
+  storage.source_storage = net.source();
+  storage.sink_storage = net.sink();
+  storage.has_source = net.has_source();
+  storage.has_sink = net.has_sink();
+  storage.transitions = net.transitions();
+  storage.activities = net.activities();
+  storage.discovery_markings = net.discovery_markings();
+  storage.transition_names = net.transition_names();
+  storage.place_names = net.place_names();
+  bool silenced = false;
+  for (auto& transition : storage.transitions)
+    if (transition.activity && none.contains(storage.activities[*transition.activity])) {
+      transition.activity.reset();
+      silenced = true;
+    }
+  if (!silenced) return std::nullopt;
+  NoneSilentReplay out{minera::PetriNet::from_literal_storage(std::move(storage)), replayed.log};
+  for (std::size_t t = 0; t < out.log.traces.size() && t < replayed.types.size(); ++t)
+    for (std::size_t e = 0; e < out.log.traces[t].events.size() && e < replayed.types[t].size(); ++e)
+      if (replayed.types[t][e] == "NoneType") {
+        auto& event = out.log.traces[t].events[e];
+        event.activity.clear();
+        event.activity_state = minera::FirstClassAttributeState::kNull;
+      }
+  return out;
 }
 
 void register_activity_selector_values(
@@ -1527,6 +1703,17 @@ bool xes_frame_session(const MinedSession& session) {
   if (!session.active_source || session.active_source->file().format != "xes") return false;
   const auto kind = session.active_source->selected_kind();
   return kind == minera::EventDataKind::kEventTable || kind == minera::EventDataKind::kLazyEventTable;
+}
+
+// The session's log when it holds an XES or CSV upload mined as its log
+// shape (read_xes' legacy log, convert_to_event_log's), else nullptr.
+const minera::EventLog* session_log_shape(const MinedSession& session) {
+  if (!session.active_source || !session.log_ready) return nullptr;
+  const auto& format = session.active_source->file().format;
+  if ((format != "xes" && format != "csv") || session.active_source->selected_kind() != minera::EventDataKind::kEventLog)
+    return nullptr;
+  const auto view = session.active_source->selected_view();
+  return view.kind() == minera::EventDataKind::kEventLog ? view.log() : nullptr;
 }
 
 const minera::EventLog& cached_model_log(const MinedSession& session,
@@ -3535,18 +3722,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto& transition_key = params.transition_system.activity_attribute.empty()
                                      ? params.transition_system.activity_key
                                      : params.transition_system.activity_attribute;
-    auto transition_keyed = xes_input ? legacy_keyed_family(log, transition_key) : csv_keyed_family(log, transition_key);
-    if (transition_keyed)
-      for (std::size_t t = 0; t < transition_keyed->log.traces.size(); ++t)
-        for (std::size_t e = 0; e < transition_keyed->log.traces[t].events.size(); ++e)
-          if (transition_keyed->missing[t][e]) {
-            auto& activity = transition_keyed->log.traces[t].events[e].activity;
-            activity = (transition_keyed->types[t][e] == "NaTType" ? "\x1d" : "\x1e") + activity;
-          }
+    const auto transition_keyed = transition_keyed_log(log, transition_key, xes_input);
     auto transition_options = params.transition_system;
     if (transition_keyed) transition_options.activity_attribute = transition_options.activity_key = "concept:name";
     const auto transition_system =
-        minera::discover_transition_system(transition_keyed ? transition_keyed->log : log, transition_options);
+        minera::discover_transition_system(transition_keyed ? *transition_keyed : log, transition_options);
     for (const auto& transition : transition_system.transitions()) {
       if (const auto shown = minera::transition_activity_shown(transition.label)) graph.ensure_activity(*shown);
     }
@@ -3700,8 +3880,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           if (skeleton_keyed->missing[t][e]) missing.insert(skeleton_keyed->log.traces[t].events[e].activity);
       for (const auto& label : missing) log_skeleton.equivalence.push_back({label, label});
     }
-    const auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
+    auto log_skeleton_conformance = minera::check_log_skeleton_conformance(
         skeleton_log, log_skeleton, skeleton_options);
+    if (skeleton_keyed) keep_missing_self_equivalence(log_skeleton_conformance, *skeleton_keyed);
     // A custom key's labels (round GR).
     for (const auto* relation : {&log_skeleton.equivalence, &log_skeleton.always_after, &log_skeleton.always_before,
                                  &log_skeleton.never_together, &log_skeleton.directly_follows})
@@ -3790,9 +3971,11 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     // (round GR, as round GO's heuristics replay).
     const auto& alpha_key = params.alpha.activity_attribute;
     std::optional<minera::EventLog> alpha_keyed_log;
+    std::optional<minera::FrameKeyedActivities> alpha_csv_keyed;
     if (!params.token_replay_activity_attribute_supplied && csv_keyed_family_log(log, alpha_key)) {
       check_csv_keyed_alpha_transition_names(log, alpha_key, net);
       alpha_keyed_log = minera::detail::csv_log_keyed_replay_log(log, alpha_key);
+      if (alpha_keyed_log) alpha_csv_keyed = csv_keyed_family(log, alpha_key);
     }
     // An XES upload's log shape replays the legacy objects (round HF). An
     // event without the key in a trace of one event (Alpha leaves it out; in
@@ -3803,6 +3986,9 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         if (trace.size() > 1 && std::find(trace.begin(), trace.end(), true) != trace.end()) return false;
       return true;
     };
+    // Their precision reads the objects too (legacy_precision_error), as on a
+    // CSV upload's log shape (convert_to_event_log's cells, round HG).
+    std::optional<minera::FrameKeyedActivities> alpha_legacy = alpha_csv_keyed, heuristic_legacy;
     if (xes_input && !params.token_replay_activity_attribute_supplied)
       if (const auto legacy = legacy_keyed_family(log, alpha_key, true);
           legacy && !legacy->any_dict && single_absent(*legacy)) {
@@ -3810,17 +3996,26 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         if (legacy->any_absent)
           throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(alpha_key));
         alpha_keyed_log = minera::detail::legacy_log_keyed_replay_log(log, alpha_key);
+        alpha_legacy = legacy;
       }
+    // With another replay key the Alpha miner's own KeyError stands: it reads
+    // every event of a trace of two or more (round HG, observed black-box).
+    if (xes_input && params.token_replay_activity_attribute_supplied)
+      if (const auto legacy = legacy_keyed_family(log, alpha_key, true);
+          legacy && !legacy->any_dict && !single_absent(*legacy))
+        throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(alpha_key));
     const auto& heuristic_key = params.heuristic.activity_attribute;
     auto heuristic_keyed_log = !heuristic_key.empty() && heuristic_key != "concept:name" && heuristic_key != "activity"
         ? minera::detail::csv_log_keyed_replay_log(log, heuristic_key, &heuristics, &heuristic_net)
         : std::nullopt;
+    if (heuristic_keyed_log) heuristic_legacy = csv_keyed_family(log, heuristic_key);
     // An XES upload's log shape replays the legacy objects (round HF): the
     // converted net's transitions are named by them, as the Alpha net's.
     if (xes_input && !heuristic_keyed_log && !params.token_replay_activity_attribute_supplied)
       if (const auto legacy = legacy_keyed_family(log, heuristic_key)) {
         check_legacy_alpha_transition_names(*legacy, heuristic_net);
         heuristic_keyed_log = minera::detail::legacy_log_keyed_replay_log(log, heuristic_key);
+        heuristic_legacy = legacy;
       }
     // Token replay is cheap and robust, so run it for every model now; defer the
     // costlier alignment to POST /api/align, which reuses the cached nets below.
@@ -3857,11 +4052,81 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         conformance_log = &*heuristic_keyed_log;
         replay_options.activity_attribute = "concept:name";
       }
-      if (is_powl) {
+      // The POWL net's log keeps each trace's event order under the default
+      // timestamp and case keys (project_powl_activity); a CSV upload's
+      // column it replays reads the frame's cells (round HG).
+      const bool powl_in_order = is_powl && (params.powl.timestamp_key.empty() || params.powl.timestamp_key == "time:timestamp") &&
+                                 (params.powl.case_id_key.empty() || params.powl.case_id_key == "case:concept:name");
+      std::optional<minera::FrameKeyedActivities> powl_csv_keyed;
+      if (powl_in_order && !xes_input && params.token_replay_activity_attribute_supplied &&
+          replay_options.activity_attribute != params.powl.activity_key)
+        powl_csv_keyed = minera::detail::csv_log_keyed_replay_in(log, replay_options.activity_attribute, params.powl.activity_key);
+      if (is_powl && !powl_csv_keyed) {
         projected_powl_log = project_powl_activity(
             log, replay_options.activity_attribute, params.powl.timestamp_key,
             params.powl.case_id_key);
         conformance_log = &*projected_powl_log;
+      }
+      // An explicitly supplied replay key on an XES upload's log shape (round
+      // HG): the net replays that key's legacy objects as its miner's objects
+      // meet them; the Alpha and Heuristics++ nets' transitions, named by
+      // their objects, sort first (check_legacy_alpha_transition_names).
+      std::optional<minera::FrameKeyedActivities> explicit_legacy;
+      const minera::FrameKeyedActivities* precision_keyed =
+          is_alpha && alpha_keyed_log && alpha_legacy ? &*alpha_legacy
+          : id == "heuristic" && heuristic_keyed_log && heuristic_legacy && conformance_log == &*heuristic_keyed_log
+              ? &*heuristic_legacy : nullptr;
+      if (xes_input && params.token_replay_activity_attribute_supplied && !is_powl) {
+        const std::string model_key = is_inductive ? params.inductive.activity_key
+                                      : is_alpha   ? params.alpha.activity_attribute
+                                                   : params.heuristic.activity_attribute;
+        if (!is_inductive)
+          if (const auto named_by = legacy_keyed_family(log, model_key, true); named_by && !named_by->any_dict)
+            check_legacy_alpha_transition_names(*named_by, is_alpha ? net : heuristic_net);
+        explicit_legacy = legacy_replay_keyed(log, replay_options.activity_attribute, model_key);
+        if (explicit_legacy) {
+          conformance_log = &explicit_legacy->log;
+          replay_options.activity_attribute = "concept:name";
+          precision_keyed = &*explicit_legacy;
+        }
+      }
+      // On a CSV upload's log shape the same key as the miner's replays the
+      // frame's cells as /api/mine's default does; another column's cells
+      // meet the net's transitions by Python's == (round HG;
+      // csv_log_keyed_replay_in). The transitions sort by name first.
+      std::optional<minera::EventLog> explicit_csv_log;
+      if (!xes_input && params.token_replay_activity_attribute_supplied &&
+          (is_alpha || is_inductive || powl_in_order || id == "heuristic")) {
+        const auto& model_key = is_alpha ? params.alpha.activity_attribute
+                                : is_inductive ? params.inductive.activity_key
+                                : is_powl ? params.powl.activity_key : params.heuristic.activity_attribute;
+        if ((is_inductive || is_powl) && replay_options.activity_attribute == model_key) {
+          // The Inductive and POWL nets keyed as they replay keep their own path.
+        } else if (replay_options.activity_attribute == model_key) {
+          if (auto keyed = csv_keyed_family(log, model_key)) {
+            if (is_alpha) check_csv_keyed_alpha_transition_names(log, model_key, net);
+            explicit_csv_log = is_alpha ? minera::detail::csv_log_keyed_replay_log(log, model_key)
+                                        : minera::detail::csv_log_keyed_replay_log(log, model_key, &heuristics, &heuristic_net);
+            if (explicit_csv_log) {
+              conformance_log = &*explicit_csv_log;
+              replay_options.activity_attribute = "concept:name";
+              explicit_legacy = std::move(keyed);
+              precision_keyed = &*explicit_legacy;
+            }
+          }
+        } else if (log.dataframe_columns && log.dataframe_columns->csv_text) {
+          if (const auto keyed = csv_keyed_family(log, model_key); keyed && (is_alpha || id == "heuristic")) {
+            if (is_alpha) check_csv_keyed_alpha_transition_names(log, model_key, net);
+            else minera::detail::check_csv_keyed_heuristic_transitions(log, *keyed, model_key, heuristics, heuristic_net);
+          }
+          explicit_legacy = powl_csv_keyed ? std::move(powl_csv_keyed)
+                                           : minera::detail::csv_log_keyed_replay_in(log, replay_options.activity_attribute, model_key);
+          if (explicit_legacy) {
+            conformance_log = &explicit_legacy->log;
+            replay_options.activity_attribute = "concept:name";
+            precision_keyed = &*explicit_legacy;
+          }
+        }
       }
       replay_options = minera::tools::default_replay_input_options(
           *conformance_log, std::move(replay_options),
@@ -3882,8 +4147,18 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
           replay_options.transition_names.empty() && !replay_options.nullable_transition_names &&
           !replay_options.place_outgoing_transition_order;
       if (use_names) replay_options.place_outgoing_transition_order = named->place_outgoing;
-      auto token_replay = minera::check_conformance(*conformance_log, use_names ? named->net : petri,
-                                                    replay_options);
+      // The Alpha net's None label is silent on an XES upload's log shape.
+      std::optional<NoneSilentReplay> none_silent;
+      if (is_alpha && xes_input && !use_names) {
+        if (explicit_legacy && conformance_log == &explicit_legacy->log)
+          none_silent = none_silent_replay(petri, log, params.alpha.activity_attribute, *explicit_legacy);
+        else if (alpha_legacy && alpha_keyed_log && conformance_log == &*alpha_keyed_log)
+          none_silent = none_silent_replay(petri, log, params.alpha.activity_attribute, *alpha_legacy);
+      }
+      auto token_replay = none_silent
+          ? minera::detail::check_conformance_null_silent(none_silent->log, none_silent->net, replay_options)
+          : minera::check_conformance(*conformance_log, use_names ? named->net : petri, replay_options);
+      if (precision_keyed) token_replay.precision_error = legacy_precision_error(*precision_keyed);
       // pm4py lists the frame's cases in the case-id order of the replayed
       // log (its own case key; see session_case_order).
       minera::order_trace_diagnostics(token_replay,
@@ -6495,6 +6770,29 @@ void handle_behavior_analysis(const httplib::Request& request,
       }
       const bool csv_frame = session->active_source && session->active_source->file().format == "csv" &&
                              (adapter == "dataframe" || adapter == "lazyframe");
+      // An XES upload's log shape keyed by an event attribute reads read_xes'
+      // legacy objects, as /api/mine's profile does; the conformance meets
+      // the profile's text names with them (round HG).
+      // A CSV upload's log shape reads the frame's cells (round GR's
+      // csv_keyed_family_log), its conformance as the XES one.
+      std::optional<minera::EventLog> legacy_temporal;
+      if (adapter == "log")
+        if (const auto* shape = session_log_shape(*session)) {
+          const auto key = params.temporal_profile.activity_attribute;
+          const bool xes_shape = session->active_source->file().format == "xes";
+          if (conform) {
+            legacy_temporal = xes_shape ? legacy_temporal_conformance_log(*shape, key) : csv_temporal_conformance_log(*shape, key);
+          } else if (!xes_shape) {
+            legacy_temporal = csv_keyed_family_log(*shape, key);
+          } else if (auto legacy = legacy_keyed_family(*shape, key, true)) {
+            check_legacy_temporal_keys(*legacy, key);
+            legacy_temporal = std::move(legacy->log);
+          }
+          if (legacy_temporal) params.temporal_profile.activity_attribute = "concept:name";
+        }
+      const auto temporal_input = [&]() -> minera::EventDataView {
+        return legacy_temporal ? minera::EventDataView(*legacy_temporal) : input();
+      };
       if (conform) {
         if (!request.has_param("temporal_profile_json")) throw std::invalid_argument("temporal_profile_json is required");
         profile = minera::parse_temporal_profile_json(request.get_param_value("temporal_profile_json"));
@@ -6523,7 +6821,7 @@ void handle_behavior_analysis(const httplib::Request& request,
               ? minera::conform_temporal_profile_xes_frame(input(), *profile, params.temporal_profile,
                                                            request.has_param("temporal_target_timestamp_attribute") ||
                                                            request.has_param("temporal_target_start_timestamp_attribute"))
-              : minera::conform_temporal_profile_named_start(input(), *profile, params.temporal_profile, start_name,
+              : minera::conform_temporal_profile_named_start(temporal_input(), *profile, params.temporal_profile, start_name,
                                                                    timestamp_name);
         }
       } else if (session->active_source && session->active_source->file().format == "xes" &&
@@ -6533,7 +6831,7 @@ void handle_behavior_analysis(const httplib::Request& request,
                                                               request.has_param("temporal_target_timestamp_attribute"));
       } else if (verdict == CsvFrameTpVerdict::kEmpty) {
         profile = minera::TemporalProfile{};
-      } else profile = minera::discover_temporal_profile_named_start(input(), params.temporal_profile, start_name,
+      } else profile = minera::discover_temporal_profile_named_start(temporal_input(), params.temporal_profile, start_name,
                                                                                 timestamp_name);
       for (const auto& entry : profile->entries) { graph.ensure_activity(entry.source); graph.ensure_activity(entry.target); }
     } else if (family == "minimum_self_distance") {
@@ -6788,9 +7086,24 @@ void handle_graph_discovery(const httplib::Request& request,
       model_footprint = minera::footprint_json(footprints->model_footprint, graph);
       model_origin = params.footprints.model == "dfg" ? "selected_source_dfg" : "cached_analysis_model";
     } else {
-      transitions = xes_frame_session(*session)
-          ? minera::discover_transition_system_xes_frame(session_selected_view(*session), params.transition_system)
-          : minera::discover_transition_system(session_selected_view(*session), params.transition_system);
+      // An upload's log shape keyed by another attribute reads read_xes'
+      // legacy objects or the CSV frame's cells, as /api/mine (round HG).
+      std::optional<minera::EventLog> keyed;
+      if (const auto* shape = session_log_shape(*session)) {
+        const auto& ts = params.transition_system;
+        keyed = transition_keyed_log(*shape, ts.activity_attribute.empty() ? ts.activity_key : ts.activity_attribute,
+                                     session->active_source->file().format == "xes");
+      }
+      if (keyed) {
+        auto options = params.transition_system;
+        options.activity_attribute = options.activity_key = "concept:name";
+        auto mined = minera::discover_transition_system(*keyed, options);
+        transitions.emplace(params.transition_system, mined.states(), mined.transitions());
+      } else {
+        transitions = xes_frame_session(*session)
+            ? minera::discover_transition_system_xes_frame(session_selected_view(*session), params.transition_system)
+            : minera::discover_transition_system(session_selected_view(*session), params.transition_system);
+      }
       for (const auto& state : transitions->states())
         for (const auto& activity : state.payload)
           if (const auto shown = minera::transition_activity_shown(activity)) graph.ensure_activity(*shown);
@@ -6917,14 +7230,58 @@ void handle_constraint_discovery(const httplib::Request& request,
         } catch (const std::exception& error) { playout_error = error.what(); }
       }
     } else {
-      skeleton = xes_frame_session(*session)
-          ? minera::discover_log_skeleton_xes_frame(session_selected_view(*session), params.log_skeleton, true)
-          : constraint_order
-          ? minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton, *constraint_order)
-          : minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton);
+      // An upload's log shape keyed by another attribute reads read_xes'
+      // legacy objects (every key first: KeyError, then unhashable dict) or
+      // the CSV frame's cells, as /api/mine does (round HG). The conformance
+      // keyed otherwise meets the model's objects by == (legacy_keyed_activities_in).
+      const auto* shape = session_log_shape(*session);
+      const bool xes_shape = shape && session->active_source->file().format == "xes";
+      std::optional<minera::FrameKeyedActivities> skeleton_keyed, conformance_keyed;
+      if (shape) {
+        const auto& key = params.log_skeleton.activity_key;
+        if (xes_shape)
+          if (auto legacy = legacy_keyed_family(*shape, key, true)) {
+            if (legacy->any_absent)
+              throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(key));
+            if (legacy->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+            skeleton_keyed = std::move(legacy);
+          }
+        if (!xes_shape) skeleton_keyed = csv_keyed_family(*shape, key);
+        if (conformance_activity == key) {
+          conformance_keyed = skeleton_keyed;
+        } else if (xes_shape) {
+          conformance_keyed = minera::legacy_keyed_activities_in(*shape, conformance_activity, key);
+          if (conformance_keyed && conformance_keyed->any_absent)
+            throw std::invalid_argument("KeyError: " + minera::detail::frame_python_str_repr(conformance_activity));
+          if (conformance_keyed && conformance_keyed->any_dict) throw std::invalid_argument("TypeError: unhashable type: 'dict'");
+        }
+      }
+      if (skeleton_keyed) {
+        auto keyed_options = params.log_skeleton;
+        keyed_options.activity_key = "concept:name";
+        skeleton = constraint_order ? minera::discover_log_skeleton(skeleton_keyed->log, keyed_options, *constraint_order)
+                                    : minera::discover_log_skeleton(skeleton_keyed->log, keyed_options);
+        // Each NaN or NaT is its own equivalence (round GR, as /api/mine).
+        std::set<std::string> missing;
+        for (std::size_t t = 0; t < skeleton_keyed->log.traces.size(); ++t)
+          for (std::size_t e = 0; e < skeleton_keyed->log.traces[t].events.size(); ++e)
+            if (skeleton_keyed->missing[t][e]) missing.insert(skeleton_keyed->log.traces[t].events[e].activity);
+        for (const auto& label : missing) skeleton->equivalence.push_back({label, label});
+      } else {
+        skeleton = xes_frame_session(*session)
+            ? minera::discover_log_skeleton_xes_frame(session_selected_view(*session), params.log_skeleton, true)
+            : constraint_order
+            ? minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton, *constraint_order)
+            : minera::discover_log_skeleton(session_selected_view(*session), params.log_skeleton);
+      }
       auto options = params.log_skeleton; options.activity_key = conformance_activity;
       std::string trace_conformance_error;
-      if (xes_frame_session(*session)) {
+      if (conformance_keyed) {
+        auto keyed_options = options;
+        keyed_options.activity_key = "concept:name";
+        skeleton_conformance = minera::check_log_skeleton_conformance(conformance_keyed->log, *skeleton, keyed_options);
+        keep_missing_self_equivalence(*skeleton_conformance, *conformance_keyed);
+      } else if (xes_frame_session(*session)) {
         // pm4py's conformance on the frame lists the cases of its groupby
         // (rows without a case dropped, same-named traces merged) in its
         // order, as /api/mine's (round GB). The analysis presentation and
@@ -11235,6 +11592,43 @@ void handle_evaluate(const httplib::Request& request,
       params.replay_fitness_options.trace_order =
           session_case_order(session->active_source.get(), *evaluation_log);
     }
+    // An XES upload's log shape whose Alpha or Heuristics++ net is named by a
+    // key's legacy objects (round HF): pm4py's evaluation replays the log
+    // keyed as that net meets it (legacy_replay_keyed), and its ETConformance
+    // precision joins the objects (round HG, observed black-box).
+    // A CSV upload's log shape keyed by the miner's own column replays the
+    // frame's cells (csv_log_keyed_replay_log, as /api/mine), by another
+    // column that column's cells (csv_log_keyed_replay_in).
+    std::optional<minera::FrameKeyedActivities> evaluation_legacy;
+    std::optional<minera::EventLog> evaluation_csv_log;
+    if (!model_only && adapter == "log" && (miner == "alpha" || miner == "heuristic"))
+      if (const auto* shape = session_log_shape(*session)) {
+        const auto& replay_key = params.replay_fitness_options.activity_attribute;
+        if (session->active_source->file().format == "xes") {
+          evaluation_legacy = legacy_replay_keyed(*shape, replay_key, std::string(model_activity));
+        } else if (replay_key == model_activity) {
+          evaluation_legacy = csv_keyed_family(*shape, replay_key);
+          if (evaluation_legacy) evaluation_csv_log = minera::detail::csv_log_keyed_replay_log(*shape, replay_key);
+          if (!evaluation_csv_log) evaluation_legacy.reset();
+        } else {
+          // Another column's cells meet the net by Python's == (round HG).
+          evaluation_legacy = minera::detail::csv_log_keyed_replay_in(*shape, replay_key, std::string(model_activity));
+        }
+        if (evaluation_legacy) {
+          evaluation_log = evaluation_csv_log ? &*evaluation_csv_log : &evaluation_legacy->log;
+          for (auto* key : {&params.replay_fitness_options.activity_attribute, &params.precision_options.activity_attribute,
+                            &params.generalization_options.activity_attribute, &params.composite_options.activity_attribute})
+            *key = "concept:name";
+          if (params.family == minera::EvaluationFamily::kReplayFitness)
+            params.replay_fitness_options.trace_order = session_case_order(session->active_source.get(), *evaluation_log);
+          // Both ETConformance variants (and the composite's precision).
+          if ((params.family == minera::EvaluationFamily::kPrecision &&
+               params.precision_variant != minera::PrecisionVariant::AUTOMATON_AFTER_ALIGN) ||
+              params.family == minera::EvaluationFamily::kComposite)
+            if (const auto error = legacy_precision_error(*evaluation_legacy); !error.empty())
+              throw std::invalid_argument(error);
+        }
+      }
     if (!model_only && adapter != "log") {
       overlay_cached_source_selectors(request, *session, params, true);
       if (!present("evaluation_activity_attribute") && session->active_source) {
@@ -13976,8 +14370,17 @@ void handle_temporal_conformance(const httplib::Request& request,
         request.get_param_value("temporal_profile"), "temporal_profile");
     minera::TemporalConformanceResult result;
     if (variant == "log") {
-      result = minera::conform_temporal_profile_log(require_prepared_log(*session), profile,
-                                                    options);
+      // An XES upload's log shape keyed by an event attribute (round HG, as
+      // /api/analyze-behavior's conformance).
+      std::optional<minera::EventLog> legacy_temporal;
+      if (const auto* shape = session_log_shape(*session)) {
+        legacy_temporal = session->active_source->file().format == "xes"
+            ? legacy_temporal_conformance_log(*shape, options.activity_attribute)
+            : csv_temporal_conformance_log(*shape, options.activity_attribute);
+        if (legacy_temporal) options.activity_attribute = "concept:name";
+      }
+      result = minera::conform_temporal_profile_log(legacy_temporal ? *legacy_temporal : require_prepared_log(*session),
+                                                    profile, options);
     } else if (variant == "dataframe") {
       result = minera::conform_temporal_profile_dataframe(
           *cached_source_view(*session,minera::EventDataKind::kEventTable).table(), profile, options);

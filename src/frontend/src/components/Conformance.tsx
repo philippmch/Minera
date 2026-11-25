@@ -100,7 +100,8 @@ const INCOMPLETE_PRECISION_HINTS: Record<PrecisionSource, string> = {
     "Not computed: either the model's silent transitions allow more states than the precision search explores, or backwards token replay reached a log prefix it cannot replay, where the reference evaluator raises instead of returning a value.",
 };
 /** The precision gauge: unavailable when the backend could not compute it. */
-export function precisionGauge(precision: number | null, incomplete: boolean | undefined, hint: string, source: PrecisionSource = "alignments"): Gauge {
+export function precisionGauge(precision: number | null, incomplete: boolean | undefined, hint: string, source: PrecisionSource = "alignments", error?: string): Gauge {
+  if (error) return { label: "Precision", value: null, hint: `Not computed: the reference evaluator raises ${error}.` };
   return precision === null || incomplete
     ? { label: "Precision", value: null, hint: INCOMPLETE_PRECISION_HINTS[source] }
     : { label: "Precision", value: precision, hint };
@@ -1567,7 +1568,8 @@ function TokenReplay({
       hint: "Token-replay: how much of the log the model reproduces.",
     },
     precisionGauge(conformance.precision, conformance.precision_incomplete,
-      "Escaping edges: how tightly the model matches the log (lower = the model allows more unseen behavior).", "token_replay"),
+      "Escaping edges: how tightly the model matches the log (lower = the model allows more unseen behavior).", "token_replay",
+      conformance.precision_error),
     ...(conformance.generalization !== undefined
       ? [
           {

@@ -24,6 +24,7 @@
 #include <cstddef>
 #include <map>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -113,6 +114,32 @@ inline void check_keyed_replay_variant_sort(const std::vector<std::vector<KeyedR
 // log is no CSV upload's log shape or `key` names no column of its frame).
 // Raises the transition sort's TypeError (with the mined heuristics net and
 // its Petri net), then the variant sort's.
+// The replay's sort of the heuristics net's transitions by name, the net
+// mined under the frame column `key` (whatever key the replay reads): a gap's
+// node in a text or object column is a transition named NaN.
+inline void check_csv_keyed_heuristic_transitions(const EventLog& log, const FrameKeyedActivities& keyed,
+                                                  const std::string& key, const HeuristicsNet& heuristics,
+                                                  const PetriNet& net) {
+  const auto frame = dataframe_frame_event_log(log);
+  const auto column = frame_column_type(frame, key);
+  const bool text_column = column && (*column == DataFrameColumnType::kString || *column == DataFrameColumnType::kObject);
+  if (keyed.any_missing && text_column) {
+    const auto at = std::find(heuristics.activities.begin(), heuristics.activities.end(), std::string("nan"));
+    // The other transitions' names: silent ones are text, a node's its cell
+    // (bools and numbers order beside NaN).
+    bool text_name = std::any_of(net.transitions().begin(), net.transitions().end(),
+                                 [](const auto& transition) { return transition.silent(); });
+    for (std::size_t t = 0; t < keyed.log.traces.size() && !text_name; ++t)
+      for (std::size_t e = 0; e < keyed.types[t].size(); ++e)
+        if (keyed.types[t][e].empty() && !keyed.missing[t][e]) text_name = true;
+    if (at != heuristics.activities.end() && text_name) {
+      auto named = heuristics;
+      named.null_activity = static_cast<std::size_t>(at - heuristics.activities.begin());
+      check_heuristics_null_transition_names(named, net);
+    }
+  }
+}
+
 inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, const std::string& key,
                                                         const HeuristicsNet* heuristics = nullptr,
                                                         const PetriNet* net = nullptr) {
@@ -123,22 +150,7 @@ inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, con
   const auto frame = dataframe_frame_event_log(log);
   if (frame.traces.size() != log.traces.size()) return std::nullopt;
   const auto column = frame_column_type(frame, key);
-  const bool text_column = column && (*column == DataFrameColumnType::kString || *column == DataFrameColumnType::kObject);
-  if (heuristics && net && keyed->any_missing && text_column) {
-    const auto at = std::find(heuristics->activities.begin(), heuristics->activities.end(), std::string("nan"));
-    // The other transitions' names: silent ones are text, a node's its cell
-    // (bools and numbers order beside NaN).
-    bool text_name = std::any_of(net->transitions().begin(), net->transitions().end(),
-                                 [](const auto& transition) { return transition.silent(); });
-    for (std::size_t t = 0; t < keyed->log.traces.size() && !text_name; ++t)
-      for (std::size_t e = 0; e < keyed->types[t].size(); ++e)
-        if (keyed->types[t][e].empty() && !keyed->missing[t][e]) text_name = true;
-    if (at != heuristics->activities.end() && text_name) {
-      auto named = *heuristics;
-      named.null_activity = static_cast<std::size_t>(at - heuristics->activities.begin());
-      check_heuristics_null_transition_names(named, *net);
-    }
-  }
+  if (heuristics && net) check_csv_keyed_heuristic_transitions(log, *keyed, key, *heuristics, *net);
   std::vector<std::vector<KeyedReplayCell>> cells;
   for (std::size_t t = 0; t < frame.traces.size(); ++t) {
     const auto& trace = frame.traces[t];
@@ -163,6 +175,123 @@ inline std::optional<EventLog> csv_log_keyed_replay_log(const EventLog& log, con
   }
   check_keyed_replay_variant_sort(cells);
   return std::move(keyed->log);
+}
+
+// A CSV upload's log shape replayed under `replay_key` against a net mined
+// under another column `model_key` (round HG, observed black-box):
+// convert_to_event_log's cells match the transition named by an equal object
+// (1 == 1.0 == True, '1' unequal to 1; a float64 column's gaps each its own
+// NaN, a text column's one shared NaN, NaT one object). The model's labels
+// are frame_keyed_activities' (a text column's cells under concept:name);
+// the replayed cells take an equal model cell's label, else one no model
+// label equals. Returns the keyed activities (types and gaps of the
+// replayed cells) with the log to replay under concept:name; raises the
+// variant sort's TypeError. nullopt when the log is no CSV upload's log
+// shape or either key names no column of its frame.
+inline std::optional<FrameKeyedActivities> csv_log_keyed_replay_in(const EventLog& log, const std::string& replay_key,
+                                                                   const std::string& model_key) {
+  if (!log.dataframe_columns || !log.dataframe_columns->csv_text) return std::nullopt;
+  const auto standard = [](const std::string& k) { return k.empty() || k == "concept:name" || k == "activity"; };
+  if (standard(replay_key) && standard(model_key)) return std::nullopt;
+  const auto frame = dataframe_frame_event_log(log);
+  if (frame.traces.size() != log.traces.size()) return std::nullopt;
+  // One cell's identity (equal objects alike) and printed text.
+  struct Cell {
+    std::string identity, shown, type;
+    bool gap = false;
+    python::Scalar value;
+  };
+  const auto cells_of = [&](const std::string& key) -> std::optional<std::vector<std::vector<Cell>>> {
+    std::vector<std::vector<Cell>> out(frame.traces.size());
+    const auto column = standard(key) ? std::optional<DataFrameColumnType>(DataFrameColumnType::kString)
+                                      : frame_column_type(frame, key);
+    if (!column) return std::nullopt;
+    for (std::size_t t = 0; t < frame.traces.size(); ++t) {
+      if (frame.traces[t].events.size() != log.traces[t].events.size()) return std::nullopt;
+      for (std::size_t e = 0; e < frame.traces[t].events.size(); ++e) {
+        Cell cell;
+        if (standard(key)) {
+          cell.value = python::text(log.traces[t].events[e].activity);
+        } else if (const auto value = frame_scalar(frame, frame.traces[t], frame.traces[t].events[e], key,
+                                                   FrameKeyScope::kEventLog);
+                   value && !python::is_missing(*value)) {
+          cell.value = *value;
+        } else {
+          cell.gap = true;
+          const bool dates = *column == DataFrameColumnType::kDate;
+          cell.type = dates ? "NaTType" : "float";
+          cell.shown = dates ? "NaT" : "nan";
+          cell.identity = dates ? "NaT"
+              : *column == DataFrameColumnType::kFloat64 ? key + "#nan#" + std::to_string(t) + ":" + std::to_string(e)
+              : "nan";
+          out[t].push_back(std::move(cell));
+          continue;
+        }
+        cell.identity = python::identity(cell.value);
+        cell.shown = cell.value.kind == python::Scalar::Kind::kText ? cell.value.text : python::str(cell.value);
+        if (cell.value.kind != python::Scalar::Kind::kText) cell.type = python::type_name(cell.value);
+        out[t].push_back(std::move(cell));
+      }
+    }
+    return out;
+  };
+  const auto model = cells_of(model_key);
+  const auto replay = cells_of(replay_key);
+  if (!model || !replay) return std::nullopt;
+  // The model's labels as its miner names them.
+  std::optional<FrameKeyedActivities> model_keyed;
+  if (!standard(model_key)) {
+    model_keyed = frame_keyed_activities(log, model_key);
+    if (!model_keyed) return std::nullopt;
+    distinct_float_gap_labels(*model_keyed);
+  }
+  std::map<std::string, std::string> label_of;
+  std::set<std::string> labels;
+  for (std::size_t t = 0; t < model->size(); ++t)
+    for (std::size_t e = 0; e < (*model)[t].size(); ++e) {
+      const auto& label = model_keyed ? model_keyed->log.traces[t].events[e].activity : (*model)[t][e].shown;
+      label_of.emplace((*model)[t][e].identity, label);
+      labels.insert(label);
+    }
+  FrameKeyedActivities out;
+  out.log = log;
+  out.types.resize(log.traces.size());
+  out.missing.resize(log.traces.size());
+  std::map<std::string, std::string> fresh;
+  std::vector<std::vector<KeyedReplayCell>> sorted_cells(log.traces.size());
+  for (std::size_t t = 0; t < replay->size(); ++t)
+    for (std::size_t e = 0; e < (*replay)[t].size(); ++e) {
+      const auto& cell = (*replay)[t][e];
+      std::string label;
+      if (const auto found = label_of.find(cell.identity); found != label_of.end()) {
+        label = found->second;
+      } else if (const auto made = fresh.find(cell.identity); made != fresh.end()) {
+        label = made->second;
+      } else {
+        label = cell.shown;
+        while (labels.contains(label)) label += '\x1f';
+        labels.insert(label);
+        fresh.emplace(cell.identity, label);
+      }
+      auto& event = out.log.traces[t].events[e];
+      event.activity = label;
+      event.activity_state = FirstClassAttributeState::kPresent;
+      event.activity_source_key.clear();
+      event.activity_attribute.reset();
+      out.types[t].push_back(cell.type);
+      out.missing[t].push_back(cell.gap);
+      out.any_missing = out.any_missing || cell.gap;
+      KeyedReplayCell sorted;
+      if (cell.gap) {
+        sorted.gap = cell.type == "NaTType" ? KeyedReplayCell::Gap::kNaT : KeyedReplayCell::Gap::kNaN;
+      } else {
+        sorted.value = cell.value;
+      }
+      sorted.identity = cell.identity;
+      sorted_cells[t].push_back(std::move(sorted));
+    }
+  check_keyed_replay_variant_sort(sorted_cells);
+  return out;
 }
 
 // The same on an XES upload's log shape keyed by an event attribute (round

@@ -1891,10 +1891,14 @@ void write_conformance(std::ostream& out,
   out << "{\"fitness\": ";
   write_round_trip_double(out, conformance.fitness);
   out << ", \"precision\": ";
-  if (fitness_only || !conformance.precision_computed) out << "null";
+  if (fitness_only || !conformance.precision_computed || !conformance.precision_error.empty()) out << "null";
   else write_round_trip_double(out, conformance.precision);
   if (!fitness_only && !conformance.precision_computed)
     out << ", \"precision_incomplete\": true";
+  if (!fitness_only && !conformance.precision_error.empty()) {
+    out << ", \"precision_error\": ";
+    write_json_string(out, conformance.precision_error);
+  }
   out << ", \"generalization\": ";
   if (fitness_only) out << "null";
   else write_round_trip_double(out, conformance.generalization);

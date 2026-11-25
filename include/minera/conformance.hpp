@@ -193,6 +193,10 @@ struct ConformanceResult {
   // determined within the silent-search budget; precision is then NaN and
   // serialized as null rather than as a misleadingly low number.
   bool precision_computed = true;
+  // The reference's precision error where it raises (round HG: an upload's
+  // log shape keyed by objects or cells that are no str); precision is then
+  // serialized as null.
+  std::string precision_error;
   double generalization = 1.0;  // token-replay generalization in [0, 1]
   double simplicity = 1.0;      // inverse arc-degree simplicity in (0, 1]
 

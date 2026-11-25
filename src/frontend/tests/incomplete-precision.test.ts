@@ -28,6 +28,16 @@ describe("precision the backend could not compute", () => {
     expect(token).toContain("backwards token replay");
   });
 
+  it("names the reference's own error where its precision raises", () => {
+    const error = "TypeError: sequence item 0: expected str instance, int found";
+    const gauge = precisionGauge(null, undefined, "hint", "token_replay", error);
+    expect(gauge.value).toBeNull();
+    expect(gauge.hint).toContain(error);
+    const html = renderToStaticMarkup(createElement(GaugeTile, { metric: gauge }));
+    expect(html).toContain("conf-gauge unavailable");
+    expect(html).not.toContain("0.0%");
+  });
+
   it("keeps genuine numbers, including a real zero", () => {
     expect(render(0)).toContain("conf-gauge poor");
     expect(render(0)).toContain("0.0%");

@@ -128,6 +128,19 @@ struct FrameKeyedActivities {
 [[nodiscard]] std::optional<FrameKeyedActivities> legacy_keyed_activities(const EventLog& log,
                                                                           const std::string& key);
 
+// Round HG (observed black-box): `key`'s legacy objects as a model mined
+// under `model_key` meets them (a replay, a conformance check or a precision
+// keyed otherwise than the miner): the model's activities are named first,
+// as legacy_keyed_activities(log, model_key) names them (a str by its text
+// where model_key is concept:name), and a value of `key` equal to one of
+// them as a dict key takes its label, so labels match where pm4py's ==
+// does; '1' never matches 1, nor one NaN another. The same as
+// legacy_keyed_activities when the keys are equal; nullopt when neither key
+// holds a value other than text, or as legacy_keyed_activities.
+[[nodiscard]] std::optional<FrameKeyedActivities> legacy_keyed_activities_in(const EventLog& log,
+                                                                             const std::string& key,
+                                                                             const std::string& model_key);
+
 // nullopt when the log has no frame, or the key is concept:name (or
 // "activity") or no column of the frame. With every cell text (non_text
 // false) the labels are the cells' text, which the log's own lookup reads

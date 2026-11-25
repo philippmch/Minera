@@ -3215,6 +3215,12 @@ export interface Conformance {
   precision: number | null;
   /** True when the silent-transition search for precision ran out of budget. */
   precision_incomplete?: boolean;
+  /**
+   * The reference evaluator's error where its precision raises (an upload's
+   * log keyed by typed values whose prefixes it cannot join as text);
+   * precision is then null.
+   */
+  precision_error?: string;
   /** Token-replay generalization in [0, 1]: how evenly the log exercises the model. Absent in older exports. */
   generalization?: number;
   /** Inverse arc-degree simplicity in (0, 1]: how lean the net itself is. Absent in older exports. */

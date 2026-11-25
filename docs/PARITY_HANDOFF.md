@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HF (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HG (2026-11-05 to 2026-11-25, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -10661,6 +10661,92 @@ HF's suite: the full ctest 695 of 695 (-j2, 39 minutes) with the new
 server binary), the 16 manifests replayed 2,673 responses unchanged, no
 Python script or frontend change.
 Harness and probes: `review-harness/round-hf/`.
+
+Round HG re-reviewed HF. HF's CI run 45568534096 passed every job (Linux,
+macOS, Windows, the frontend, the Python scripts and the parity verifier).
+HG1 the session routes keyed by a typed attribute or column on an upload's
+log shape read what /api/mine's families read (round HF's legacy objects
+on an XES upload, the frame's cells on a CSV upload): the log skeleton of
+/api/discover-constraints (every key read first: KeyError, then
+unhashable dict; its conformance keyed by another key meets the model's
+objects by Python's ==, `legacy_keyed_activities_in`), the temporal
+profile and its conformance of /api/analyze-behavior (`legacy_temporal_conformance_log`,
+`csv_temporal_conformance_log`: a profile from JSON names str, which no
+typed value equals) and the transition system of /api/discover-graph
+(`transition_keyed_log`). pm4py's log skeleton conformance pairs a trace's
+activities a != b, so a NaN or NaT meets its own equivalence
+(`keep_missing_self_equivalence`, on /api/mine too).
+HG2 /api/evaluate on the Alpha and Heuristics++ nets mined under such a key
+replays the log as the net meets it (`legacy_replay_keyed`,
+`csv_log_keyed_replay_log`, `csv_log_keyed_replay_in`); pm4py's
+ETConformance precision (both token variants, and the composite's) joins
+each trace's prefix (every event but the last) with ",", so the first
+trace in log order whose prefix holds an object other than a str raises
+`TypeError: sequence item k: expected str instance, T found`
+(`legacy_precision_error`). /api/mine's token-replay precision reports it
+as `precision_error` beside a null precision, and the conformance view
+names it in the precision gauge's hint.
+HG3 an explicitly supplied token-replay key replays its own objects (XES)
+or cells (CSV) against each net: the Alpha and Heuristics++ nets'
+transitions sort by their objects first, whatever the replay key
+(`check_legacy_alpha_transition_names`, `check_csv_keyed_alpha_transition_names`,
+`check_csv_keyed_heuristic_transitions`), the variants read every event's
+key (KeyError, unhashable dict) and sort, and each value fires the
+transition named by an equal object (1 == 1.0 == True; '1' never fires 1,
+nor one NaN another): `legacy_keyed_activities_in` on XES,
+`csv_log_keyed_replay_in` on CSV for the Alpha, heuristics, Inductive and
+POWL nets. The Alpha miner's own KeyError stands when a trace of two or
+more events lacks its key. A transition pm4py labels None (an Alpha net
+keyed by an attribute with a valueless value) is silent, and an event whose
+key is None fires it as its own (`none_silent_replay` over
+`check_conformance_null_silent`).
+Sweeps (`ct/routes.py`) over hfA, hfG and hfN (XES, keys K1..K6) and hcS
+(CSV, 120 uploads), same as pm4py on HF's server vs HG's: XES the log
+skeleton 448 -> 1,078 and its conformance 773 -> 1,092, the temporal
+profile 494 -> 1,285 and its conformance 490 -> 1,320, the transition
+system 682 -> 1,282, evaluate on Alpha (replay fitness 145 -> 857,
+precision 176 -> 857, generalization 243 -> 857) and Heuristics++
+(145 -> 430, 176 -> 430, 199 -> 430), /api/mine's token-replay precision
+(Alpha 201 -> 857, Heuristics++ 201 -> 430), the Alpha net replayed with
+the key supplied 145 -> 857 and with concept:name 150 -> 869; CSV the log
+skeleton 131 -> 720 and its conformance 160 -> 720, the temporal profile
+167 -> 720 and its conformance 141 -> 720, the transition system
+131 -> 720, evaluate on Alpha (131 -> 542, 76 -> 542, 138 -> 542), the
+token-replay precision 92 -> 542, the Alpha net replayed with the key
+supplied 131 -> 542 (the mine failed on 560 judgments before, 55 now, each
+a declared operand order) and with concept:name 0 -> 542. Declared: the transitions' sort operands (the set in address
+order, as HF: 98 + 97 + 108 XES and 8 + 6 + 55 CSV whole-mine messages),
+and equal values printed differently (1, 1.0 and True; 0.0 and -0.0) named
+by the object each container entry met first in the log skeleton, the
+temporal profile and the transition system (83 judgments, where Minera
+names the activity once), where pm4py's transition system also keeps two
+such states apart (4).
+HG's suite: the full ctest 696 of 696 (-j2, 26 minutes) with the new
+`minera_server_review_hg_tests` (711 checks, 391 of which fail on HF's
+server binary), the 16 manifests replayed 2,673 responses unchanged, the frontend
+typecheck and its 240 test files (one new precision-gauge case), no Python
+script change.
+Harness and probes: `review-harness/round-hg/`.
+
+Next round (HH) should start by re-reviewing round HG:
+
+- HG's CI run;
+- the same typed keys on the routes HG did not reach: alignments
+  (/api/align and the workbench) and the AUTOMATON_AFTER_ALIGN precision on
+  nets mined under them, the POWL net's totals with an explicit replay key
+  (Minera replays the frame's cells; the reference harness does not mine
+  POWL), the evaluate routes' replay of an Alpha net's None label (silent
+  in pm4py; /api/mine models it, evaluate does not), a CSV log skeleton
+  conformance keyed otherwise than its discovery, and the footprints,
+  minimum self-distance and correlation families keyed by such values;
+- whether other routes iterate a copied Python set (HE2, not reached in HF
+  or HG);
+- the declared residuals (HF's and HG's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HG (kept for its older items):
 
 Next round (HG) should start by re-reviewing round HF:
 
