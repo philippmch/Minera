@@ -12,6 +12,7 @@
 // the deviation list before the sort.
 
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -23,5 +24,15 @@ namespace minera::detail {
     const EventLog& log, const LogSkeletonModel& model, const LogSkeletonOptions& options,
     const std::map<std::string, std::string>& trace_types, const std::map<std::string, std::string>& model_types,
     const std::vector<std::string>& model_order);
+
+// The case groups of pm4py's log skeleton on a frame keyed by a typed
+// column (round HO), in its groupby order: each row's label (str() of the
+// first object equal to its own) and str() of its own object, for
+// name_log_skeleton_pairs. nullopt unless the column is typed.
+struct LogSkeletonFrameObjects {
+  std::vector<std::vector<std::string>> labels, printed;
+};
+[[nodiscard]] std::optional<LogSkeletonFrameObjects> log_skeleton_xes_frame_objects(const EventDataView& data,
+                                                                                   const LogSkeletonOptions& options);
 
 }  // namespace minera::detail

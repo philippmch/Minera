@@ -245,6 +245,9 @@ void transition_system_multiset_value_lookup_contract() {
       "Counter({'d': 1, 'a': 1}) -c-> Counter({'d': 1, 'c': 1})",
       "Counter({'d': 1, 'a': 1}) -d-> Counter({'d': 1, 'a': 1})",
       "Counter({'d': 1}) -a-> Counter({'d': 1, 'a': 1})"})));
+  // Forward, two equal states are created in one step; the a-step's source is
+  // the last equal state CPython's set iterates (PYTHONHASHSEED=0, round HO;
+  // under seed 3 it is the other one).
   options.direction = TransitionDirection::kForward;
   const auto forward = discover_transition_system(nullable_log({"d", "a", "d", "c"}), options);
   assert(forward.root_state_count() == 5);
@@ -252,8 +255,8 @@ void transition_system_multiset_value_lookup_contract() {
       "Counter()", "Counter({'a': 1, 'd': 1})", "Counter({'c': 1})",
       "Counter({'d': 1, 'a': 1})", "Counter({'d': 1, 'c': 1})"})));
   assert((transition_names(forward) == sorted_names({
+      "Counter({'a': 1, 'd': 1}) -a-> Counter({'d': 1, 'c': 1})",
       "Counter({'c': 1}) -c-> Counter()",
-      "Counter({'d': 1, 'a': 1}) -a-> Counter({'d': 1, 'c': 1})",
       "Counter({'d': 1, 'a': 1}) -d-> Counter({'a': 1, 'd': 1})",
       "Counter({'d': 1, 'c': 1}) -d-> Counter({'c': 1})"})));
 }

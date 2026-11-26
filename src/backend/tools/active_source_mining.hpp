@@ -296,9 +296,16 @@ void handle_active_source_mining(const httplib::Request& request,
   });
   std::optional<minera::TransitionSystem> transition;
   run("transition_system", selected, [&](bool& native_returned) {
-    transition = xes_frame
-        ? minera::discover_transition_system_xes_frame(data(), params.transition_system)
-        : minera::discover_transition_system(data(), params.transition_system);
+    // Round HO: a CSV upload's frame keyed by a typed or gapped column reads
+    // format_dataframe's typed cells as on an XES upload's frame.
+    const auto& transition_key = params.transition_system.activity_attribute.empty()
+                                     ? params.transition_system.activity_key
+                                     : params.transition_system.activity_attribute;
+    const auto transition_typed = xes_frame ? std::nullopt : csv_typed_frame_view(*session, transition_key);
+    transition = xes_frame ? minera::discover_transition_system_xes_frame(data(), params.transition_system)
+                 : transition_typed
+                     ? minera::discover_transition_system_xes_frame(*transition_typed, params.transition_system)
+                     : minera::discover_transition_system(data(), params.transition_system);
     native_returned = true;
     return minera::serialize_active_source_transition_json(*transition);
   });
@@ -307,6 +314,7 @@ void handle_active_source_mining(const httplib::Request& request,
   // session's model names each activity by its text, as the log does).
   std::optional<minera::LogSkeletonModel> skeleton_shown;
   std::optional<std::vector<minera::LogSkeletonConformance>> skeleton_conformance;
+  std::optional<minera::detail::LogSkeletonFrameObjects> skeleton_objects;
   // pm4py's DataFrame log skeleton and Declare meet an XES frame's cases in
   // case-id order and list their conformance in it (constraint_case_order).
   const auto skeleton_order = [&] {
@@ -345,6 +353,18 @@ void handle_active_source_mining(const httplib::Request& request,
                        : minera::discover_log_skeleton(data(), params.log_skeleton);
     }
     native_returned = true;
+    // Pairs of equal objects printed apart take the first pair met (round
+    // HO); the conformance below checks the unrenamed model.
+    if (skeleton_shown) {
+      skeleton_objects = minera::detail::log_skeleton_xes_frame_objects(
+          skeleton_typed ? *skeleton_typed : data(), skeleton_typed ? skeleton_typed_options : params.log_skeleton);
+      if (skeleton_objects) {
+        auto named = *skeleton_shown;
+        std::vector<minera::LogSkeletonConformance> none;
+        minera::detail::name_log_skeleton_pairs(named, none, skeleton_objects->labels, skeleton_objects->printed, {}, {});
+        return minera::serialize_active_source_skeleton_json(named);
+      }
+    }
     return minera::serialize_active_source_skeleton_json(skeleton_shown ? *skeleton_shown : *skeleton);
   });
   if (skeleton) run("log_skeleton_conformance", selected, [&](bool& native_returned) {
@@ -358,6 +378,13 @@ void handle_active_source_mining(const httplib::Request& request,
       try {skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);}
       catch (const minera::OperationCancelled&) {throw;}
       catch (const std::exception&) {}
+      if (skeleton_objects && skeleton_shown) {
+        auto named = *skeleton_shown;
+        auto named_frame = frame;
+        minera::detail::name_log_skeleton_pairs(named, named_frame, skeleton_objects->labels, skeleton_objects->printed,
+                                                {}, {});
+        return minera::serialize_active_source_skeleton_json(named, &named_frame);
+      }
       return minera::serialize_active_source_skeleton_json(shown, &frame);
     }
     skeleton_conformance = minera::check_log_skeleton_conformance(data(), *skeleton, params.log_skeleton);
@@ -641,9 +668,14 @@ void handle_active_source_mining(const httplib::Request& request,
         if (footprints_custom_keys(params.footprints)) register_footprints_activities(graph, *footprints);
       }
       if (temporal) for (const auto& entry : temporal->entries) {graph.ensure_activity(entry.source); graph.ensure_activity(entry.target);}
-      if (transition)
+      if (transition) {
         for (const auto& item : transition->transitions())
           if (const auto shown = minera::transition_activity_shown(item.label)) graph.ensure_activity(*shown);
+        // A window names a state by its own objects (round HO).
+        for (const auto& state : transition->states())
+          for (const auto& activity : state.payload)
+            if (const auto shown = minera::transition_activity_shown(activity)) graph.ensure_activity(*shown);
+      }
       if (distances) for (const auto& item : *distances) {if (!item.activity_is_null) graph.ensure_activity(item.activity); for (const auto& witness : item.witnesses) graph.ensure_activity(witness);}
       if (correlations) minera::register_correlation_activities(graph, *correlations);
       if (session->declare_ready) for (const auto& [name, rules] : session->declare.rules) { (void)name; for (const auto& rule : rules) {graph.ensure_activity(rule.first); if (rule.binary) graph.ensure_activity(rule.second);} }

@@ -14,6 +14,8 @@
 #include <vector>
 
 #include "polars_missing_column.hpp"
+#include "python_object_set.hpp"
+#include "python_str_set.hpp"
 #include "python_scalar.hpp"
 #include "frame_typed_activities.hpp"
 #include "xes_frame_columns.hpp"
@@ -30,6 +32,109 @@ struct TraceSequence {
   // A typed column's own str() of each cell when `activities` holds the
   // name of its value's first label (empty otherwise).
   TransitionPayload shown;
+  // Round HO: repr() and hash() of each event's object (empty, or nullopt
+  // for an object outside the model).
+  std::vector<std::optional<std::string>> reprs;
+  std::vector<std::optional<std::uint64_t>> hashes;
+};
+
+// repr() and hash() of a Python str under PYTHONHASHSEED=0; nullopt for text
+// holding a code point Python's repr may escape beyond ASCII's controls.
+std::optional<std::string> python_text_repr(std::string_view text) {
+  for (std::size_t i = 0; i < text.size(); ++i) {
+    const auto byte = static_cast<unsigned char>(text[i]);
+    if (byte < 0x80) continue;
+    // U+0080..U+00A0 and U+00AD (C2 80..A0, C2 AD), and the general
+    // punctuation/format blocks (E2 80 80..E2 81 AF), U+3000, U+FEFF and
+    // anything past the BMP.
+    if (byte == 0xc2 && i + 1 < text.size()) {
+      const auto next = static_cast<unsigned char>(text[i + 1]);
+      if (next <= 0xa0 || next == 0xad) return std::nullopt;
+    }
+    if (byte == 0xe2 && i + 1 < text.size() && (static_cast<unsigned char>(text[i + 1]) == 0x80 ||
+                                                static_cast<unsigned char>(text[i + 1]) == 0x81))
+      return std::nullopt;
+    if (byte == 0xe3 && i + 2 < text.size() && static_cast<unsigned char>(text[i + 1]) == 0x80 &&
+        static_cast<unsigned char>(text[i + 2]) == 0x80)
+      return std::nullopt;
+    if (byte == 0xef && i + 2 < text.size() && static_cast<unsigned char>(text[i + 1]) == 0xbb &&
+        static_cast<unsigned char>(text[i + 2]) == 0xbf)
+      return std::nullopt;
+    if (byte >= 0xf0) return std::nullopt;
+  }
+  return detail::frame_python_str_repr(text);
+}
+
+// The objects of plain text activities (an upload's str labels): nothing for
+// a sequence holding a missing or a typed label. With `missing_nan` a missing
+// label is a text column's shared NaN (a pandas frame's object column): repr
+// nan, its hash an address.
+void plain_text_objects(TraceSequence& sequence, bool missing_nan = false) {
+  sequence.reprs.clear();
+  sequence.hashes.clear();
+  for (const auto& activity : sequence.activities) {
+    if (!activity && missing_nan) {
+      sequence.reprs.push_back(std::string("nan"));
+      sequence.hashes.push_back(std::nullopt);
+      continue;
+    }
+    if (!activity || (!activity->empty() && (activity->front() == '\x1e' || activity->front() == '\x1d' ||
+                                             activity->front() == '\x1c' || activity->back() == '\x1f'))) {
+      sequence.reprs.assign(sequence.activities.size(), std::nullopt);
+      sequence.hashes.assign(sequence.activities.size(), std::nullopt);
+      return;
+    }
+    sequence.reprs.push_back(python_text_repr(*activity));
+    sequence.hashes.push_back(detail::python_str_hash_seed0(*activity));
+  }
+}
+
+// CPython 3.11's set table as elements are added (each new to the set): the
+// slot that holds each, whose order is the set's iteration order (open
+// addressing with 9 linear probes, perturbation, growth past 3/5 full).
+class PythonSetSlots {
+ public:
+  void add(std::size_t id, std::uint64_t hash) {
+    if (slot_of_.size() <= id) slot_of_.resize(id + 1, kNone);
+    place(table_, id, hash);
+    if (++fill_ * 5 < (table_.size() - 1) * 3) return;
+    std::size_t size = 8;
+    while (size <= fill_ * 4) size <<= 1;
+    std::vector<Slot> grown(size);
+    for (const auto& old : table_)
+      if (old.used) place(grown, old.id, old.hash);
+    table_ = std::move(grown);
+  }
+  [[nodiscard]] std::size_t position(std::size_t id) const {
+    return id < slot_of_.size() ? slot_of_[id] : kNone;
+  }
+
+ private:
+  struct Slot {
+    std::size_t id = 0;
+    std::uint64_t hash = 0;
+    bool used = false;
+  };
+  static constexpr std::size_t kNone = std::numeric_limits<std::size_t>::max();
+  void place(std::vector<Slot>& slots, std::size_t id, std::uint64_t hash) {
+    const std::size_t mask = slots.size() - 1;
+    std::uint64_t perturb = hash;
+    std::size_t i = static_cast<std::size_t>(hash) & mask;
+    while (true) {
+      const std::size_t probes = i + 9 <= mask ? 9 : 0;
+      for (std::size_t j = i; j <= i + probes; ++j)
+        if (!slots[j].used) {
+          slots[j] = {id, hash, true};
+          slot_of_[id] = j;
+          return;
+        }
+      perturb >>= 5;
+      i = (i * 5 + 1 + static_cast<std::size_t>(perturb)) & mask;
+    }
+  }
+  std::vector<Slot> table_ = std::vector<Slot>(8);
+  std::vector<std::size_t> slot_of_;
+  std::size_t fill_ = 0;
 };
 
 Payload make_payload(const TransitionPayload& activities,
@@ -55,10 +160,11 @@ struct StateKey {
   }
 };
 
-// Transitions are identified by the values of their endpoint states and their
-// label, so a window whose activities arrive in another order reuses the edge.
+// pm4py looks a step's transition up among its source state's outgoing
+// transitions by label and target value (round HO, observed black-box): two
+// states of one value (written apart) keep transitions of their own.
 struct EdgeKey {
-  Payload source;
+  std::size_t source = 0;
   Payload target;
   TransitionActivity label;
 
@@ -475,9 +581,14 @@ TransitionSystem build_transition_system(
   // Root membership follows the state's own representation (two equal
   // multisets written in a different order are both kept when they are
   // created in the same step), while a lookup matches any root state by
-  // value and returns the first one registered with that value.
+  // value. pm4py's set of states hashes a state by str() of its name and a
+  // lookup keeps the last equal state the set iterates (round HO, observed
+  // black-box); without the objects' repr (printed_model below) the first
+  // one registered.
   std::map<StateKey, std::size_t> roots;
   std::map<Payload, std::size_t> roots_by_value;
+  std::map<Payload, std::vector<std::size_t>> roots_with_value;
+  PythonSetSlots root_slots;
   std::map<EdgeKey, std::size_t> edges;
   std::vector<TransitionSystemState> result_states;
   std::vector<StateKey> state_keys;
@@ -489,9 +600,93 @@ TransitionSystem build_transition_system(
   };
   std::vector<Origin> state_origins;
   std::vector<Origin> edge_origins;
+  // str() of each window's state name, from its objects' repr (round HO):
+  // a list for a sequence, a Counter (most_common order) for a multiset, a
+  // set (its elements' hash order) for a set. Empty unless every window has
+  // one.
+  std::vector<std::vector<std::string>> printed;
+  const auto printed_window = [&](const TraceSequence& sequence, std::size_t index) -> std::optional<std::string> {
+    const auto [begin, end] = window_bounds(index, sequence.activities.size(), options);
+    if (sequence.reprs.size() != sequence.activities.size() || sequence.hashes.size() != sequence.activities.size())
+      return std::nullopt;
+    const auto& labels = sequence.activities;
+    std::string out;
+    if (options.view == TransitionView::kSequence) {
+      out = "[";
+      for (auto position = begin; position < end; ++position) {
+        if (!sequence.reprs[position]) return std::nullopt;
+        out += (position == begin ? "" : ", ") + *sequence.reprs[position];
+      }
+      return out + "]";
+    }
+    // Each class's first object in the window, in window order.
+    std::vector<std::size_t> firsts;
+    std::vector<std::size_t> counts;
+    for (auto position = begin; position < end; ++position) {
+      std::size_t k = 0;
+      while (k < firsts.size() && labels[firsts[k]] != labels[position]) ++k;
+      if (k == firsts.size()) {
+        firsts.push_back(position);
+        counts.push_back(0);
+      }
+      ++counts[k];
+    }
+    if (firsts.empty()) return options.view == TransitionView::kMultiset ? "Counter()" : "set()";
+    std::vector<std::size_t> order(firsts.size());
+    std::iota(order.begin(), order.end(), 0);
+    if (options.view == TransitionView::kMultiset) {
+      std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) { return counts[a] > counts[b]; });
+      out = "Counter({";
+      for (std::size_t k = 0; k < order.size(); ++k) {
+        const auto& repr = sequence.reprs[firsts[order[k]]];
+        if (!repr) return std::nullopt;
+        out += (k ? ", " : "") + *repr + ": " + std::to_string(counts[order[k]]);
+      }
+      return out + "})";
+    }
+    std::vector<std::uint64_t> hashes;
+    std::vector<std::string> identities;
+    for (const auto first : firsts) {
+      if (!sequence.reprs[first]) return std::nullopt;
+      // A NaN hashes by its address: a stand-in fixed per label keeps
+      // every set of one content in one order (declared).
+      const auto hash = sequence.hashes[first]
+          ? sequence.hashes[first]
+          : detail::python_str_hash_seed0("\x1enan:" + labels[first].value_or(std::string()));
+      if (!hash) return std::nullopt;
+      hashes.push_back(*hash);
+      identities.push_back(std::to_string(identities.size()));
+    }
+    out = "{";
+    const auto set_order = detail::python_hash_set_order(hashes, identities);
+    for (std::size_t k = 0; k < set_order.size(); ++k) out += (k ? ", " : "") + *sequence.reprs[firsts[set_order[k]]];
+    return out + "}";
+  };
+  bool printed_model = !sequences.empty();
+  for (const auto& sequence : sequences) {
+    if (!printed_model) break;
+    auto& row = printed.emplace_back();
+    for (std::size_t index = 0; index <= sequence.activities.size(); ++index) {
+      auto text = printed_window(sequence, index);
+      if (!text || !detail::python_str_hash_seed0(*text)) {
+        printed_model = false;
+        break;
+      }
+      row.push_back(std::move(*text));
+    }
+  }
+  if (!printed_model) printed.clear();
   const auto lookup_state = [&](const StateKey& key, TransitionSystemState state, Origin origin) {
-    if (const auto found = roots_by_value.find(key.payload); found != roots_by_value.end())
+    if (printed_model) {
+      if (const auto found = roots_with_value.find(key.payload); found != roots_with_value.end()) {
+        auto best = found->second.front();
+        for (const auto candidate : found->second)
+          if (root_slots.position(candidate) > root_slots.position(best)) best = candidate;
+        return best;
+      }
+    } else if (const auto found = roots_by_value.find(key.payload); found != roots_by_value.end()) {
       return found->second;
+    }
     const auto identity = result_states.size();
     state.in_root = false;
     state.id = identity;
@@ -528,7 +723,10 @@ TransitionSystem build_transition_system(
     for (std::size_t index = 0; index < activities.size(); ++index) {
       auto [source_key, source_state] = window_state(activities, index, options);
       auto [target_key, target_state] = window_state(activities, index + 1, options);
-      if (shown) {
+      if (printed_model) {
+        source_key.representation_order = {printed[sequence_index][index]};
+        target_key.representation_order = {printed[sequence_index][index + 1]};
+      } else if (shown) {
         source_key.representation_order = shown_order(sequence, index, source_key.representation_order);
         target_key.representation_order = shown_order(sequence, index + 1, target_key.representation_order);
       }
@@ -540,12 +738,16 @@ TransitionSystem build_transition_system(
         if (!roots.emplace(state_keys[identity], identity).second) return;
         result_states[identity].in_root = true;
         roots_by_value.emplace(state_keys[identity].payload, identity);
+        if (printed_model) {
+          roots_with_value[state_keys[identity].payload].push_back(identity);
+          root_slots.add(identity, *detail::python_str_hash_seed0(state_keys[identity].representation_order.front().value()));
+        }
       };
       register_root(source);
       register_root(target);
       if (index == 0) ++result_states[source].start_count;
       if (index + 1 == activities.size()) ++result_states[target].end_count;
-      EdgeKey key{source_key.payload, target_key.payload, activities[index]};
+      EdgeKey key{source, target_key.payload, activities[index]};
       // A missing activity of a pandas frame is NaN, which equals no label
       // (not even itself), so each step it labels is a transition of its own.
       std::size_t edge_index = result_transitions.size();
@@ -594,13 +796,30 @@ TransitionSystem build_transition_system(
       state.name_order = state.payload;
       continue;
     }
-    const auto own = [&](const TransitionActivity& value) {
+    // A class printed alike as another keeps its label's trailing \x1f, so
+    // the payload stays sorted and a set's unique (round HO).
+    const auto own = [&](const TransitionActivity& value) -> TransitionActivity {
       for (auto position = begin; position < end; ++position)
-        if (sequence.activities[position] == value) return sequence.shown[position];
+        if (sequence.activities[position] == value) {
+          const auto& shown = sequence.shown[position];
+          if (!shown || !value || shown == value) return shown;
+          const auto last = value->find_last_not_of('\x1f');
+          return *shown + value->substr(last == std::string::npos ? 0 : last + 1);
+        }
       return value;
     };
     for (auto& value : state.payload) value = own(value);
     for (auto& value : state.name_order) value = own(value);
+    std::sort(state.payload.begin(), state.payload.end());
+    if (options.view == TransitionView::kSet)
+      for (std::size_t k = 1; k < state.payload.size(); ++k)
+        if (state.payload[k] && state.payload[k] == state.payload[k - 1]) {
+          // Two classes shown alike: the later one marked apart.
+          *state.payload[k] += '\x1f';
+          std::sort(state.payload.begin(), state.payload.end());
+          k = 0;
+        }
+    if (options.view == TransitionView::kSet) state.name_order = state.payload;
   }
   for (std::size_t index = 0; index < result_transitions.size(); ++index) {
     const auto& origin = edge_origins[index];
@@ -641,8 +860,9 @@ TransitionSystem build_transition_system(
 }
 
 TransitionSystem build_event_log_system(
-    const EventLog& log, const TransitionSystemOptions& options) {
-  const auto sequences = event_log_sequences(log, options);
+    const EventLog& log, const TransitionSystemOptions& options,
+    const TransitionSystemEventObjects* objects = nullptr) {
+  auto sequences = event_log_sequences(log, options);
   // A CSV log keyed by a column with gaps labels a NaN "\x1e" and a NaT
   // "\x1d" (round GR, the server's csv_keyed_family_log): they equal no
   // label, as on an XES frame (round GQ).
@@ -651,6 +871,25 @@ TransitionSystem build_event_log_system(
     for (const auto& activity : sequence.activities)
       if (activity && !activity->empty() && (activity->front() == '\x1e' || activity->front() == '\x1d'))
         typed_labels = true;
+  // The events' own objects (round HO): one sequence per trace.
+  const bool per_trace = sequences.size() == log.traces.size() &&
+                         std::all_of(sequences.begin(), sequences.end(), [&](const TraceSequence& sequence) {
+                           return sequence.activities.size() == log.traces[sequence.occurrence_trace_index].events.size();
+                         });
+  if (objects && per_trace && objects->size() == log.traces.size()) {
+    for (auto& sequence : sequences) {
+      const auto& row = (*objects)[sequence.occurrence_trace_index];
+      if (row.size() != sequence.activities.size()) continue;
+      sequence.shown.clear();
+      for (const auto& object : row) {
+        sequence.shown.push_back(object.shown);
+        sequence.reprs.push_back(object.repr);
+        sequence.hashes.push_back(object.hash);
+      }
+    }
+  } else if (!objects && !typed_labels) {
+    for (auto& sequence : sequences) plain_text_objects(sequence);
+  }
   return build_transition_system(
       sequences, options, [](const TraceSequence& sequence,
                              std::size_t event_index) {
@@ -663,8 +902,10 @@ TransitionSystem build_event_log_system(
 }
 
 TransitionSystem build_flat_system(
-    const std::vector<TraceSequence>& sequences,
+    std::vector<TraceSequence> sequences,
     const TransitionSystemOptions& options) {
+  // Plain text activities: their repr (round HO).
+  for (auto& sequence : sequences) plain_text_objects(sequence);
   return build_transition_system(
       sequences, options, [](const TraceSequence& sequence,
                              std::size_t event_index) {
@@ -674,6 +915,38 @@ TransitionSystem build_flat_system(
         return TransitionOccurrence{sequence.occurrence_trace_index,
                                     source_index};
       });
+}
+
+// repr() and hash() of a pandas frame cell (round HO): nullopt for a NaN's
+// hash (its address), a datetime.datetime or another kind outside the model.
+std::pair<std::optional<std::string>, std::optional<std::uint64_t>> frame_cell_object(const FrameActivityCell& value) {
+  if (value.type == "str") return {python_text_repr(value.label), detail::python_str_hash_seed0(value.label)};
+  if (value.type == "float") {
+    if (value.nan || value.missing) return {std::string("nan"), std::nullopt};
+    return {value.label, python::numeric_hash(python::real(static_cast<double>(value.number)))};
+  }
+  if (value.type == "int") {
+    const auto literal = python::integer_literal(value.label);
+    if (!literal) return {std::nullopt, std::nullopt};
+    return {value.label, python::numeric_hash(*literal)};
+  }
+  if (value.type == "bool") return {value.label, std::uint64_t(value.label == "True" ? 1 : 0)};
+  if (value.type == "NoneType") return {std::string("None"), detail::kPythonNoneHash};
+  if (value.type == "NaTType") return {std::string("NaT"), std::uint64_t(1) << 63};
+  if (value.type == "Timestamp") {
+    // str() with the offset written +0000 for UTC; naive as it prints.
+    std::optional<std::string> repr;
+    const bool aware = value.label.size() > 6 && value.label.compare(value.label.size() - 6, 6, "+00:00") == 0;
+    if (aware) repr = "Timestamp('" + value.label.substr(0, value.label.size() - 3) + "00', tz='UTC')";
+    else if (value.label.find('+') == std::string::npos && value.label.rfind('-') <= 7) repr = "Timestamp('" + value.label + "')";
+    ParsedExactTimestamp date;
+    date.seconds = value.micros >= 0 ? value.micros / 1000000 : -((-value.micros + 999999) / 1000000);
+    date.nanoseconds = static_cast<std::uint32_t>((value.micros - date.seconds * 1000000) * 1000);
+    date.timezone_aware = aware;
+    if (!repr) return {std::nullopt, std::nullopt};
+    return {repr, detail::python_timestamp_hash(date)};
+  }
+  return {std::nullopt, std::nullopt};
 }
 
 // pm4py's view-based transition system on the frame of an XES upload
@@ -780,12 +1053,19 @@ std::vector<TraceSequence> xes_frame_sequences(const EventTable& source, bool po
                                          value.type != "NoneType"
                                      ? TransitionActivity(value.label)
                                      : sequence.activities.back());
+        // The cell's repr and hash (round HO).
+        if (!polars) {
+          const auto [repr, hash] = frame_cell_object(value);
+          sequence.reprs.push_back(repr);
+          sequence.hashes.push_back(hash);
+        }
       } else {
         const auto* activity = cell(table.rows[row], *activity_at);
         sequence.activities.push_back(activity ? TransitionActivity(activity->value) : std::nullopt);
       }
       sequence.event_indices.push_back(row);
     }
+    if (!typed) plain_text_objects(sequence, /*missing_nan=*/!polars);
     sequences.push_back(std::move(sequence));
   }
   return sequences;
@@ -832,6 +1112,13 @@ TransitionSystem discover_transition_system(
     const EventLog& event_log, const TransitionSystemOptions& options) {
   return build_event_log_system(event_log, options);
 }
+
+TransitionSystem discover_transition_system(const EventLog& event_log, const TransitionSystemOptions& options,
+                                            const TransitionSystemEventObjects& objects) {
+  return build_event_log_system(event_log, options, &objects);
+}
+
+std::optional<std::string> transition_text_repr(std::string_view text) { return python_text_repr(text); }
 
 TransitionSystem discover_transition_system(
     const EventStream& event_stream, const TransitionSystemOptions& options) {

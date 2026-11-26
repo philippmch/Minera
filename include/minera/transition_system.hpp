@@ -300,6 +300,29 @@ class TransitionSystemSelectorRegistry {
 [[nodiscard]] TransitionSystemVariant parse_transition_system_variant(
     std::string_view name);
 
+// Round HO (observed black-box): the Python object of each event of an
+// upload's log shape (per trace, per event) as pm4py's view-based discovery
+// meets it. str() names the windows and the steps an object opens; repr()
+// spells the state names whose str() hashes place a state in pm4py's set of
+// states (each step looks a window up by value over that set and keeps the
+// last equal state it iterates); hash() orders a set view's elements.
+// nullopt where Minera does not model the object (a NaN's hash follows its
+// address), which keeps the first equal state registered (declared).
+struct TransitionSystemEventObject {
+  std::string shown;
+  std::optional<std::string> repr;
+  std::optional<std::uint64_t> hash;
+};
+using TransitionSystemEventObjects = std::vector<std::vector<TransitionSystemEventObject>>;
+
+[[nodiscard]] TransitionSystem discover_transition_system(
+    const EventLog& event_log, const TransitionSystemOptions& options,
+    const TransitionSystemEventObjects& objects);
+
+// repr() of a Python str as such a state name spells it; nullopt for text
+// holding a code point whose escaping Minera does not model.
+[[nodiscard]] std::optional<std::string> transition_text_repr(std::string_view text);
+
 // Resolve the selected value while distinguishing a present null from absence.
 [[nodiscard]] TransitionActivity transition_system_event_activity(
     const Event& event, std::string_view activity_key);

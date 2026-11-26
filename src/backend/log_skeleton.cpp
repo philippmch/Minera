@@ -883,6 +883,38 @@ LogSkeletonModel discover_log_skeleton_xes_frame(const EventDataView& data,
   return discover_from_variants(variants.finish(), options, &frame.outside, frame.table->rows.size());
 }
 
+namespace detail {
+
+std::optional<LogSkeletonFrameObjects> log_skeleton_xes_frame_objects(const EventDataView& data,
+                                                                     const LogSkeletonOptions& options) {
+  if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable) return std::nullopt;
+  SkeletonFrame frame;
+  try {
+    read_skeleton_frame(data, options, frame);
+  } catch (const std::exception&) {
+    return std::nullopt;
+  }
+  if (!frame.typed) return std::nullopt;
+  LogSkeletonFrameObjects objects;
+  for (const auto& rows : frame.groups) {
+    auto& labels = objects.labels.emplace_back();
+    auto& printed = objects.printed.emplace_back();
+    for (const auto row : rows) {
+      const auto& cell = frame.typed->cells[row];
+      if (cell.missing) {
+        labels.push_back(kLogSkeletonNullActivity);
+        printed.push_back(kLogSkeletonNullActivity);
+        continue;
+      }
+      labels.push_back(frame.labels[row]);
+      printed.push_back(xes_frame_activity_label(cell));
+    }
+  }
+  return objects;
+}
+
+}  // namespace detail
+
 LogSkeletonModel log_skeleton_xes_frame_texts(const EventDataView& data, const LogSkeletonOptions& options,
                                               LogSkeletonModel model) {
   if (data.kind() != EventDataKind::kEventTable && data.kind() != EventDataKind::kLazyEventTable) return model;

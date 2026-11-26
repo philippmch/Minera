@@ -4211,7 +4211,7 @@ builds a range whose step test wraps but whose length does not; numpy names
 uint64 scalars `uint64` or `ulonglong` depending on what the process converted
 earlier, so capture those results in a fresh process.
 
-## Review-fix loop, rounds T–HN (2026-11-05 to 2026-11-25, cloud container)
+## Review-fix loop, rounds T–HO (2026-11-05 to 2026-11-26, cloud container)
 
 Each round runs two read-only reviewers in parallel (one re-reviews the
 previous round's fixes, one sweeps an area against the pinned reference with
@@ -11288,6 +11288,106 @@ keys; 85 fail on HM's binary; `tc/seedchk.py` under PYTHONHASHSEED 1 and 3:
 none differ); the 16 manifests replayed 2,673 responses unchanged; no
 frontend or Python script change.
 Harness and probes: `review-harness/round-hn/`.
+
+Round HO re-reviewed HN. HN's CI run 45722650626 passed Linux and macOS
+ctest, the frontend, the Python scripts and the parity verifier, and
+Windows' ctest after HO started (all six jobs green); HM's run 45703330275 passed on all six jobs,
+Windows included.
+HO1 /api/mine's transition system keyed by an attribute or a CSV column
+whose objects are equal but printed apart (0.0 and -0.0, 1 and 1.0, 1 and
+True), on the XES and CSV log shapes: pm4py's set of states hashes a state
+by str() of its name and compares names by value, so two windows of equal
+objects printed apart are two states when both are created in the same
+step, and each step's source and target are the last equal state the set
+iterates (CPython's set order of the names' str hashes, PYTHONHASHSEED=0);
+a transition is deduplicated against the source's outgoing ones by value.
+Minera kept one state per value, named by its first window. The state
+names now print each window's own objects (`TransitionSystemEventObjects`:
+a list's repr, a Counter's most_common order, a set's element hash order;
+str hashes by SipHash13, numbers by numeric_hash, read_xes' dates and
+pandas Timestamps by their hash; observed black-box), and the lookup keeps
+the last equal state in the emulated set (`PythonSetSlots`). Sweep
+`ct/tsv.py` (views x directions x windows sampled, keys K1..K6): hcS
+26 -> 3 of 2,520 judgments differing, hfA 94 -> 1 of 2,100, hfN 43 -> 0 of
+1,260, hnZ 84 -> 1 of 840.
+HO2 the same on the dataframe shape (CSV uploads keyed by a typed or gapped
+column now read `csv_typed_frame_view` as the XES frame does, each pandas
+cell its own object; a text column's gap is its shared NaN): hcS 1,772 ->
+4 of 2,520, hfA 23 -> 0 of 2,100, hnZ 569 -> 1 of 840. A set view holding
+a NaN orders it by a fixed stand-in hash per label (its real hash is its
+address), so the view keeps the printed model instead of falling back. A state whose
+window names an object no step names registers that object's label (it
+failed the mine's presentation).
+HO3 the log skeleton on the log shapes keyed by such objects: each relation
+names its pairs by the first pair its own pass meets (traces in order:
+directly_follows each event with the next, always_after each event with
+every later one, always_before each event with every earlier one from the
+trace's start, equivalence the first objects of both classes in the first
+trace holding equal counts; never_together and activ_freq by the class's
+first object), and the conformance's deviations of those four relations
+name the model's pairs (`detail::name_log_skeleton_pairs`, observed
+black-box with tagged floats, `p/ls2.py`..`p/ls5.py`). Sweep `ct/csvfam.py`
+/ `hf/ct/xesfam.py` (models): hnZ 10 -> 0 of 240, hfA 11 -> 0 of 600, hfN
+2 -> 0 of 360, hcS 0 of 720 both.
+HO4 a trace's never_together deviations are the intersection of the model's
+pairs whose source the trace holds with the trace's pairs a != b of its
+variant's first objects: CPython iterates the smaller operand, so the
+deviations name the trace's objects unless the model's set is the smaller
+(`p/ls7.py`, `p/ls8.py`: 1,302 of 1,302 deviations). And pm4py's
+never_together pairs a != b too: a NaN or NaT class of one object (a text
+or object column's shared NaN, pandas' NaT) keeps its self pair when its
+occurrences less the traces holding it reach the noise threshold, and
+every trace holding it deviates. Sweep `ct/lsdev.py` (model and per-trace
+deviations at noise 0, 0.2 and 0.4): hnZ 50 -> 0 of 1,440, hcS 30 -> 0 of
+4,314, hfA 54 -> 0 of 3,594, hfN 11 -> 0 of 2,160 (6 more per bank were a
+harness error on pm4py's activ_freq tuples).
+HO5 /api/discover-constraints' log skeleton names its pairs as HO3/HO4
+(HG's declared `_repr` judgments): hnZ 10 -> 0 of 480, hfA 8 -> 0 of 360,
+hfN 2 -> 0 of 720.
+HO6 the log skeleton family on the dataframe and lazyframe shapes keyed by a
+typed column: the same first-pair naming over the frame's case groups in
+the groupby's order (pandas sorted cases, Polars first-row order), each
+cell's own str() (`detail::log_skeleton_xes_frame_objects`; the
+conformance checks the unrenamed model and renames its deviations). This
+is HN's open "sign Polars prints for the zeros' group" for the log
+skeleton. Sweep `ct/lsfdev.py` (model and deviations): hnZ dataframe 11 ->
+0 of 945, lazyframe 33 -> 0 of 1,440; hcS 0 of 921 and 1,440 both.
+Left, declared: a transition system's set view holding NaN (its hash is the
+object's address, so two NaN windows may be two states: hcS 3 + 4, hfA 1 +
+0, hnZ 1 + 1 above, all set views with a NaN); the Inductive
+miner's RecursionError where Minera raises the concat TypeError on a float
+key holding NaN (hnZ log shape 3, dataframe 4, lazyframe 9 of 40: pm4py
+compares NaN objects with == in its cuts, which a model would have to
+replay); pm4py's Monte Carlo on a simulated empty case (IndexError when the
+first case is empty, otherwise case 0's last event takes a later empty
+case's arrival; Minera refuses a simulation with an empty case: under
+numpy_legacy_seed the outcome is reproducible, so it can be modelled with a
+seeded probe); the other lazyframe families' zero sign (Alpha 4, temporal
+profile 3 of 6 valued on hnZ, HN's count).
+Suite: full build 0 errors (892 steps after the transition system header
+change); full ctest 703/704 (-j2, 39 min): the transition system contract's
+forward multiset capture had been taken under another hash seed (under
+seed 0 the a-step's source is the other equal state), now seed 0's, then it
+passed; the HO test 253 checks (130 fail on HN's binary; `tc/seedchk.py`
+under PYTHONHASHSEED 1 and 3: only transition system cases differ, 8 and 9,
+since Minera emulates seed 0's str hashes); the 16 manifests replayed 2,673
+responses unchanged; no frontend or Python script change.
+Harness and probes: `review-harness/round-ho/`.
+
+Next round (HP) should start by re-reviewing round HO:
+
+- HO's CI run;
+- the transition system and log skeleton on the other routes that discover
+  them under a typed key (/api/discover-graph's transition system on frame
+  sessions, the workbench's log skeleton);
+- the Monte Carlo empty case (above) with a numpy-seeded probe;
+- the Alpha and temporal profile zero sign on the lazyframe shape;
+- the declared residuals (HF's..HO's above, the NaN-addressed orders and
+  operands, the GU1-2 whole-mine failure, the GT2 and GT4 residuals) if a
+  cheaper model appears;
+- the carried items below.
+
+Previous list for round HO (kept for its older items):
 
 Next round (HO) should start by re-reviewing round HN:
 

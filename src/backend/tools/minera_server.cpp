@@ -114,6 +114,7 @@
 #include "../xes_frame_token_replay.hpp"
 #include "../csv_log_keyed_replay.hpp"
 #include "../log_skeleton_typed.hpp"
+#include "../log_skeleton_naming.hpp"
 #include "../token_replay_null_activity.hpp"
 #include "../heuristics_petri_names.hpp"
 #include "../powl_petri_names.hpp"
@@ -363,6 +364,25 @@ std::optional<minera::FrameKeyedActivities> csv_keyed_family(const minera::Event
   minera::distinct_float_gap_labels(*keyed);
   return keyed;
 }
+// pm4py's log skeleton on a log shape keyed by objects equal as dict keys
+// but printed apart names each relation's pairs by the first pair its own
+// pass meets (round HO, detail::name_log_skeleton_pairs). `printed` is str()
+// of each event's own object, `missing` its NaN or NaT cells.
+void name_log_skeleton_pairs_as_met(minera::LogSkeletonModel& model,
+                                    std::vector<minera::LogSkeletonConformance>& conformance,
+                                    const minera::EventLog& keyed, const std::vector<std::vector<std::string>>& printed,
+                                    const std::optional<std::vector<std::size_t>>& order,
+                                    const std::vector<std::vector<bool>>& missing) {
+  std::vector<std::vector<std::string>> labels;
+  labels.reserve(keyed.traces.size());
+  for (const auto& trace : keyed.traces) {
+    auto& row = labels.emplace_back();
+    for (const auto& event : trace.events) row.push_back(event.activity);
+  }
+  minera::detail::name_log_skeleton_pairs(model, conformance, labels, printed, missing,
+                                          order ? *order : std::vector<std::size_t>{});
+}
+
 // An XES upload's log shape keyed by an event attribute (round HF): pm4py's
 // EventLog families read read_xes' legacy objects (legacy_keyed_activities).
 // nullopt for a CSV log, a key every event holds as text, or an event
@@ -568,6 +588,99 @@ std::optional<minera::EventLog> transition_keyed_log(const minera::EventLog& log
         activity = (keyed->types[t][e] == "NaTType" ? "\x1d" : "\x1e") + activity;
       }
   return std::move(keyed->log);
+}
+
+// The Python objects of a log shape's events as pm4py's transition system
+// meets them under `key` (round HO, observed black-box): str() names a
+// window, repr() spells a state name (a list's, a Counter's or a set's),
+// hash() orders a set view. A NaN or NaT keeps the keyed log's label as
+// shown (its activity reads null or NaT); a NaN's hash follows its address
+// (nullopt). nullopt where correlation_event_objects models no object.
+std::optional<minera::TransitionSystemEventObjects> transition_event_objects(const minera::EventLog& log,
+                                                                             const minera::EventLog& keyed, bool xes,
+                                                                             const std::string& key) {
+  const auto objects = correlation_event_objects(log, xes, key);
+  if (!objects || objects->size() != keyed.traces.size()) return std::nullopt;
+  using Kind = minera::python::Scalar::Kind;
+  const auto wall = [](const minera::ParsedExactTimestamp& date) {
+    // The date's wall clock fields (timestamp_str's split).
+    const std::int64_t local = date.seconds + (date.timezone_aware ? std::int64_t(date.offset_minutes) * 60 : 0);
+    std::int64_t days = local / 86400, rest = local % 86400;
+    if (rest < 0) {
+      rest += 86400;
+      --days;
+    }
+    days += 719468;
+    const std::int64_t era = (days >= 0 ? days : days - 146096) / 146097;
+    const std::int64_t doe = days - era * 146097;
+    const std::int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    const std::int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    const std::int64_t mp = (5 * doy + 2) / 153;
+    const std::int64_t day = doy - (153 * mp + 2) / 5 + 1;
+    const std::int64_t month = mp < 10 ? mp + 3 : mp - 9;
+    const std::int64_t year = yoe + era * 400 + (month <= 2 ? 1 : 0);
+    return std::array<std::int64_t, 6>{year, month, day, rest / 3600, rest / 60 % 60, rest % 60};
+  };
+  const auto date_repr = [&](const minera::python::Scalar& value, bool py_datetime) -> std::optional<std::string> {
+    const auto& date = value.date;
+    if (date.timezone_aware && date.offset_minutes != 0) return std::nullopt;
+    if (py_datetime) {
+      // datetime.datetime: seconds and microseconds only when set.
+      if (date.nanoseconds % 1000 != 0) return std::nullopt;
+      const auto f = wall(date);
+      std::string out = "datetime.datetime(" + std::to_string(f[0]) + ", " + std::to_string(f[1]) + ", " +
+                        std::to_string(f[2]) + ", " + std::to_string(f[3]) + ", " + std::to_string(f[4]);
+      const auto micros = date.nanoseconds / 1000;
+      if (f[5] != 0 || micros != 0) out += ", " + std::to_string(f[5]);
+      if (micros != 0) out += ", " + std::to_string(micros);
+      return out + (date.timezone_aware ? ", tzinfo=datetime.timezone.utc)" : ")");
+    }
+    // pandas' Timestamp: its str() with the offset written +0000.
+    auto shown = minera::python::str(value);
+    if (date.timezone_aware) {
+      if (shown.size() < 6 || shown.compare(shown.size() - 6, 6, "+00:00") != 0) return std::nullopt;
+      shown.erase(shown.size() - 3, 1);
+      return "Timestamp('" + shown + "', tz='UTC')";
+    }
+    return "Timestamp('" + shown + "')";
+  };
+  minera::TransitionSystemEventObjects out(keyed.traces.size());
+  for (std::size_t t = 0; t < keyed.traces.size(); ++t) {
+    const auto& events = keyed.traces[t].events;
+    if ((*objects)[t].size() != events.size()) return std::nullopt;
+    for (std::size_t e = 0; e < events.size(); ++e) {
+      const auto& object = (*objects)[t][e];
+      minera::TransitionSystemEventObject shown;
+      shown.shown = events[e].activity;
+      if (object.state != minera::CorrelationKeyObject::State::kValue) {
+        out[t].push_back(std::move(shown));
+        continue;
+      }
+      const auto& value = object.value;
+      if (object.nat) {
+        shown.repr = "NaT";
+        shown.hash = std::uint64_t(1) << 63;  // hash(NaT): the int64 minimum
+      } else if (value.kind == Kind::kFloat && std::isnan(value.real)) {
+        shown.repr = "nan";
+      } else if (value.kind == Kind::kText) {
+        shown.shown = value.text;
+        shown.repr = minera::transition_text_repr(value.text);
+        shown.hash = minera::detail::python_str_hash_seed0(value.text);
+      } else if (value.kind == Kind::kDate) {
+        shown.shown = minera::python::str(value);
+        shown.repr = date_repr(value, object.py_datetime);
+        shown.hash = minera::detail::python_timestamp_hash(value.date);
+      } else if (value.kind == Kind::kNA) {
+        shown.shown = minera::python::str(value);
+      } else {
+        shown.shown = minera::python::str(value);
+        shown.repr = shown.shown;
+        shown.hash = minera::detail::python_object_hash(value);
+      }
+      out[t].push_back(std::move(shown));
+    }
+  }
+  return out;
 }
 
 // pm4py's temporal profile conformance on an XES upload's log shape keyed by
@@ -898,22 +1011,81 @@ std::string legacy_precision_error(const minera::FrameKeyedActivities& keyed) {
 // or NaT is unequal to itself, so a trace holding one meets its own
 // equivalence (round HG, observed black-box). Drops the deviations the
 // label-equal check reports for those pairs.
+// pm4py's never_together pairs activities a != b too (round HO, observed
+// black-box): a NaN or NaT class of one object starts its own pair at its
+// occurrences, each trace holding it takes one off, and the pair stays when
+// the rest reaches the noise threshold (a class seen more often than the
+// traces holding it).
+void add_missing_self_never_together(minera::LogSkeletonModel& model, const minera::FrameKeyedActivities& keyed,
+                                     double noise_threshold) {
+  std::map<std::string, std::pair<std::size_t, std::size_t>> counts;  // occurrences, traces
+  for (std::size_t t = 0; t < keyed.log.traces.size(); ++t) {
+    std::set<std::string> seen;
+    for (std::size_t e = 0; e < keyed.log.traces[t].events.size() && e < keyed.missing[t].size(); ++e) {
+      if (!keyed.missing[t][e]) continue;
+      const auto& label = keyed.log.traces[t].events[e].activity;
+      auto& [occurrences, traces] = counts[label];
+      ++occurrences;
+      if (seen.insert(label).second) ++traces;
+    }
+  }
+  bool added = false;
+  for (const auto& [label, count] : counts) {
+    const auto rest = count.first - count.second;
+    if (rest == 0 || static_cast<double>(rest) < static_cast<double>(count.first) * (1.0 - noise_threshold)) continue;
+    model.never_together.push_back({label, label});
+    added = true;
+  }
+  if (added) std::sort(model.never_together.begin(), model.never_together.end());
+}
+
+bool log_skeleton_considers(const minera::LogSkeletonOptions& options, const std::string& name) {
+  return (!options.considered_constraints_present && options.considered_constraints.empty()) ||
+         std::find(options.considered_constraints.begin(), options.considered_constraints.end(), name) !=
+             options.considered_constraints.end();
+}
+
+// The never_together self pair of such a class likewise meets every trace
+// holding it (round HO): `model` adds that deviation.
 void keep_missing_self_equivalence(std::vector<minera::LogSkeletonConformance>& results,
-                                   const minera::FrameKeyedActivities& keyed) {
+                                   const minera::FrameKeyedActivities& keyed,
+                                   const minera::LogSkeletonModel* model = nullptr) {
   std::set<std::string> missing;
   for (std::size_t t = 0; t < keyed.log.traces.size(); ++t)
     for (std::size_t e = 0; e < keyed.log.traces[t].events.size() && e < keyed.missing[t].size(); ++e)
       if (keyed.missing[t][e]) missing.insert(keyed.log.traces[t].events[e].activity);
   if (missing.empty()) return;
-  for (auto& result : results) {
+  std::set<std::string> apart;
+  if (model)
+    for (const auto& pair : model->never_together)
+      if (pair.source == pair.target && missing.contains(pair.source)) apart.insert(pair.source);
+  for (std::size_t i = 0; i < results.size(); ++i) {
+    auto& result = results[i];
     const auto before = result.deviations.size();
     std::erase_if(result.deviations, [&](const minera::LogSkeletonDeviation& deviation) {
       return deviation.constraint == "equivalence" && deviation.relation.source == deviation.relation.target &&
              missing.contains(deviation.relation.source);
     });
-    const auto dropped = before - result.deviations.size();
+    auto dropped = static_cast<long long>(before - result.deviations.size());
+    if (i < keyed.log.traces.size())
+      for (const auto& label : apart) {
+        const auto& events = keyed.log.traces[i].events;
+        if (std::none_of(events.begin(), events.end(), [&](const auto& event) { return event.activity == label; }))
+          continue;
+        minera::LogSkeletonDeviation deviation;
+        deviation.constraint = "never_together";
+        deviation.relation = {label, label};
+        auto at = result.deviations.begin();
+        while (at != result.deviations.end() &&
+               (at->constraint < deviation.constraint ||
+                (at->constraint == deviation.constraint &&
+                 std::tie(at->relation.source, at->relation.target) < std::tie(label, label))))
+          ++at;
+        result.deviations.insert(at, std::move(deviation));
+        --dropped;
+      }
     if (!dropped) continue;
-    result.no_dev_total -= dropped;
+    result.no_dev_total = static_cast<std::size_t>(static_cast<long long>(result.no_dev_total) - dropped);
     result.dev_fitness = result.no_constr_total == 0
         ? 1.0 : 1.0 - static_cast<double>(result.no_dev_total) / static_cast<double>(result.no_constr_total);
     result.is_fit = result.deviations.empty();
@@ -3971,11 +4143,20 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
     const auto transition_keyed = transition_keyed_log(log, transition_key, xes_input);
     auto transition_options = params.transition_system;
     if (transition_keyed) transition_options.activity_attribute = transition_options.activity_key = "concept:name";
+    // Each event's own object names its windows and steps (round HO).
+    const auto transition_objects =
+        transition_keyed ? transition_event_objects(log, *transition_keyed, xes_input, transition_key) : std::nullopt;
     const auto transition_system =
-        minera::discover_transition_system(transition_keyed ? *transition_keyed : log, transition_options);
+        transition_objects
+            ? minera::discover_transition_system(*transition_keyed, transition_options, *transition_objects)
+            : minera::discover_transition_system(transition_keyed ? *transition_keyed : log, transition_options);
     for (const auto& transition : transition_system.transitions()) {
       if (const auto shown = minera::transition_activity_shown(transition.label)) graph.ensure_activity(*shown);
     }
+    // A window names a state by its own objects, some of which name no step.
+    for (const auto& state : transition_system.states())
+      for (const auto& activity : state.payload)
+        if (const auto shown = minera::transition_activity_shown(activity)) graph.ensure_activity(*shown);
     checkpoint("Inductive miner");
     // A preparation that changed nothing is dropped and the checked log
     // shared, so the session keeps one copy instead of three.
@@ -4125,6 +4306,7 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         for (std::size_t e = 0; e < skeleton_keyed->log.traces[t].events.size(); ++e)
           if (skeleton_keyed->missing[t][e]) missing.insert(skeleton_keyed->log.traces[t].events[e].activity);
       for (const auto& label : missing) log_skeleton.equivalence.push_back({label, label});
+      add_missing_self_never_together(log_skeleton, *skeleton_keyed, skeleton_options.noise_threshold);
     }
     // A trace's deviations sort as Python's list: activities Python cannot
     // order raise TypeError (round HH).
@@ -4139,7 +4321,13 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
         ? minera::detail::check_log_skeleton_conformance_typed(skeleton_log, log_skeleton, skeleton_options,
                                                                 skeleton_types, skeleton_types, skeleton_order)
         : minera::check_log_skeleton_conformance(skeleton_log, log_skeleton, skeleton_options);
-    if (skeleton_keyed) keep_missing_self_equivalence(log_skeleton_conformance, *skeleton_keyed);
+    if (skeleton_keyed)
+      keep_missing_self_equivalence(log_skeleton_conformance, *skeleton_keyed,
+                                    log_skeleton_considers(skeleton_options, "never_together") ? &log_skeleton : nullptr);
+    // Pairs of equal objects printed apart take the first pair met (round HO).
+    if (skeleton_keyed)
+      name_log_skeleton_pairs_as_met(log_skeleton, log_skeleton_conformance, skeleton_keyed->log,
+                                     skeleton_keyed->printed, constraint_order, skeleton_keyed->missing);
     // A custom key's labels (round GR).
     for (const auto* relation : {&log_skeleton.equivalence, &log_skeleton.always_after, &log_skeleton.always_before,
                                  &log_skeleton.never_together, &log_skeleton.directly_follows})
@@ -4151,6 +4339,14 @@ void handle_mine(const httplib::Request& request, httplib::Response& response) {
       (void)counts;
       graph.ensure_activity(activity);
     }
+    // A never_together deviation may name the trace's objects (round HO).
+    if (skeleton_keyed)
+      for (const auto& result : log_skeleton_conformance)
+        for (const auto& deviation : result.deviations)
+          if (deviation.constraint == "never_together") {
+            graph.ensure_activity(deviation.relation.source);
+            graph.ensure_activity(deviation.relation.target);
+          }
     checkpoint("Declare constraints");
     // Declare keyed by a text column with gaps sorts its rule columns, a str
     // beside the gap's NaN: TypeError, its operands in an order that follows
@@ -7784,15 +7980,19 @@ void handle_graph_discovery(const httplib::Request& request,
       // An upload's log shape keyed by another attribute reads read_xes'
       // legacy objects or the CSV frame's cells, as /api/mine (round HG).
       std::optional<minera::EventLog> keyed;
+      std::optional<minera::TransitionSystemEventObjects> keyed_objects;
       if (const auto* shape = session_log_shape(*session)) {
         const auto& ts = params.transition_system;
-        keyed = transition_keyed_log(*shape, ts.activity_attribute.empty() ? ts.activity_key : ts.activity_attribute,
-                                     session->active_source->file().format == "xes");
+        const auto& key = ts.activity_attribute.empty() ? ts.activity_key : ts.activity_attribute;
+        const bool xes = session->active_source->file().format == "xes";
+        keyed = transition_keyed_log(*shape, key, xes);
+        if (keyed) keyed_objects = transition_event_objects(*shape, *keyed, xes, key);
       }
       if (keyed) {
         auto options = params.transition_system;
         options.activity_attribute = options.activity_key = "concept:name";
-        auto mined = minera::discover_transition_system(*keyed, options);
+        auto mined = keyed_objects ? minera::discover_transition_system(*keyed, options, *keyed_objects)
+                                   : minera::discover_transition_system(*keyed, options);
         transitions.emplace(params.transition_system, mined.states(), mined.transitions());
       } else {
         transitions = xes_frame_session(*session)
@@ -7966,6 +8166,7 @@ void handle_constraint_discovery(const httplib::Request& request,
           for (std::size_t e = 0; e < skeleton_keyed->log.traces[t].events.size(); ++e)
             if (skeleton_keyed->missing[t][e]) missing.insert(skeleton_keyed->log.traces[t].events[e].activity);
         for (const auto& label : missing) skeleton->equivalence.push_back({label, label});
+        add_missing_self_never_together(*skeleton, *skeleton_keyed, params.log_skeleton.noise_threshold);
       } else {
         skeleton = xes_frame_session(*session)
             ? minera::discover_log_skeleton_xes_frame(session_selected_view(*session), params.log_skeleton, true)
@@ -7998,7 +8199,21 @@ void handle_constraint_discovery(const httplib::Request& request,
         }
         skeleton_conformance = minera::detail::check_log_skeleton_conformance_typed(
             conformance_keyed->log, *skeleton, keyed_options, trace_types, model_types, model_order);
-        keep_missing_self_equivalence(*skeleton_conformance, *conformance_keyed);
+        keep_missing_self_equivalence(*skeleton_conformance, *conformance_keyed,
+                                      conformance_activity == params.log_skeleton.activity_key &&
+                                              log_skeleton_considers(keyed_options, "never_together")
+                                          ? &*skeleton
+                                          : nullptr);
+        // Pairs of equal objects printed apart take the first pair met, as
+        // /api/mine's (round HO); a conformance under another key keeps its names.
+        if (skeleton_keyed) {
+          std::vector<minera::LogSkeletonConformance> other_key;
+          name_log_skeleton_pairs_as_met(*skeleton,
+                                         conformance_activity == params.log_skeleton.activity_key ? *skeleton_conformance
+                                                                                                  : other_key,
+                                         skeleton_keyed->log, skeleton_keyed->printed, constraint_order,
+                                         skeleton_keyed->missing);
+        }
       } else if (xes_frame_session(*session)) {
         // pm4py's conformance on the frame lists the cases of its groupby
         // (rows without a case dropped, same-named traces merged) in its
